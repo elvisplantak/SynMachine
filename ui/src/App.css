@@ -15,7 +15,8 @@ body {
 
 .appShell {
   min-height: 100vh;
-  padding: 18px;
+  width: 100%;
+  padding: 12px;
   background:
     radial-gradient(circle at 20% 0%, rgba(54, 110, 255, 0.12), transparent 30%),
     radial-gradient(circle at 100% 20%, rgba(176, 108, 255, 0.1), transparent 28%),
@@ -59,12 +60,157 @@ body {
   background: rgba(7, 15, 28, 0.95);
 }
 
+.workspaceGrid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(220px, 260px);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.sidePanel,
+.bottomBar {
+  border: 1px solid rgba(89, 134, 197, 0.42);
+  background: rgba(8, 13, 24, 0.9);
+  border-radius: 18px;
+  box-shadow:
+    0 12px 35px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.sidePanel {
+  min-height: 620px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.panelBlock {
+  display: grid;
+  gap: 8px;
+}
+
+.panelEyebrow {
+  color: #8ea3bf;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.panelValue,
+.actionText {
+  color: #e3f2ff;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.panelValue {
+  font-size: 19px;
+}
+
+.actionText {
+  border: 1px solid rgba(50, 202, 255, 0.38);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(50, 202, 255, 0.08);
+  font-size: 17px;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metricTile,
+.alertBox {
+  border: 1px solid rgba(89, 134, 197, 0.34);
+  background: rgba(7, 15, 28, 0.72);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.metricTile span,
+.alertBox span,
+.statusList span {
+  color: #91a7c4;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.metricTile strong,
+.alertBox strong,
+.statusList strong {
+  color: #e3f2ff;
+  font-size: 15px;
+}
+
+.metricTile {
+  display: grid;
+  gap: 6px;
+}
+
+.controlRow {
+  margin-top: 4px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.controlButton {
+  border: 1px solid rgba(89, 134, 197, 0.44);
+  border-radius: 12px;
+  min-height: 44px;
+  padding: 10px 9px;
+  color: #dff1ff;
+  background: rgba(12, 23, 42, 0.95);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.runButton {
+  border-color: rgba(50, 202, 255, 0.64);
+  background: rgba(50, 202, 255, 0.14);
+}
+
+.abortButton {
+  border-color: rgba(255, 109, 109, 0.58);
+  color: #ffd9d9;
+}
+
+.statusList {
+  display: grid;
+  gap: 8px;
+}
+
+.statusList div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid rgba(89, 134, 197, 0.18);
+  padding-bottom: 8px;
+}
+
+.statusList div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.alertBox {
+  margin-top: 6px;
+  display: grid;
+  gap: 6px;
+}
+
 .schemePanel {
-  margin-top: 18px;
   border: 1px solid rgba(89, 134, 197, 0.42);
   background: rgba(8, 13, 24, 0.92);
   border-radius: 18px;
-  padding: 16px;
+  padding: 10px;
   box-shadow:
     0 12px 35px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.03);
@@ -72,13 +218,71 @@ body {
 
 .schemeCanvas {
   width: 100%;
-  height: calc(100vh - 132px);
-  min-height: 680px;
+  height: calc(100vh - 205px);
+  min-height: 620px;
   border-radius: 16px;
   border: 1px solid rgba(90, 120, 170, 0.45);
   background:
     radial-gradient(circle at 45% 40%, rgba(255, 255, 255, 0.035), transparent 35%),
     linear-gradient(180deg, rgba(7, 15, 30, 0.88), rgba(6, 9, 19, 0.96));
+}
+
+.bottomBar {
+  margin-top: 10px;
+  padding: 9px;
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.commandInput {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid rgba(89, 134, 197, 0.48);
+  border-radius: 10px;
+  padding: 0 11px;
+  color: #e3f2ff;
+  background: rgba(7, 15, 28, 0.92);
+  font: inherit;
+  font-size: 14px;
+}
+
+.commandInput::placeholder {
+  color: #7f92ad;
+}
+
+.telemetryLog {
+  display: grid;
+  gap: 3px;
+  color: #9fb2cd;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: left;
+}
+
+@media (max-width: 1080px) {
+  .workspaceGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .sidePanel {
+    min-height: auto;
+  }
+
+  .controlRow {
+    margin-top: 0;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .schemeCanvas {
+    height: 620px;
+  }
+
+  .bottomBar {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Pipes */

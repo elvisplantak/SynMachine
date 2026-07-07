@@ -258,8 +258,44 @@ export default function App() {
         <div className="statusPill">SCHEME PREVIEW</div>
       </header>
 
-      <section className="schemePanel">
-        <svg className="schemeCanvas" viewBox="-900 -420 1800 840">
+      <section className="workspaceGrid">
+        <aside className="sidePanel leftPanel" aria-label="Protocol status">
+          <div className="panelBlock">
+            <div className="panelEyebrow">Protocol</div>
+            <div className="panelValue">Colored water demo</div>
+          </div>
+
+          <div className="metricGrid">
+            <div className="metricTile">
+              <span>Step</span>
+              <strong>1 / 5</strong>
+            </div>
+            <div className="metricTile">
+              <span>Volume</span>
+              <strong>2.0 ml</strong>
+            </div>
+          </div>
+
+          <div className="panelBlock">
+            <div className="panelEyebrow">Current action</div>
+            <div className="actionText">Transfer B1 to Reactor</div>
+          </div>
+
+          <div className="controlRow" aria-label="Run controls">
+            <button className="controlButton runButton" type="button">
+              Run
+            </button>
+            <button className="controlButton" type="button">
+              Pause
+            </button>
+            <button className="controlButton abortButton" type="button">
+              Abort
+            </button>
+          </div>
+        </aside>
+
+        <section className="schemePanel" aria-label="Physical scheme">
+          <svg className="schemeCanvas" viewBox="-900 -420 1800 840">
           {/* P1 input pipes */}
           <Pipe d="M -716 -210 L -665 -210" active />
           <Pipe d="M -716 -335 L -600 -335 L -600 -275" />
@@ -319,7 +355,50 @@ export default function App() {
           <text x={410} y={-380} className="sectionLabel">
             P2 output / SF / column
           </text>
-        </svg>
+          </svg>
+        </section>
+
+        <aside className="sidePanel rightPanel" aria-label="Hardware status">
+          <div className="panelBlock">
+            <div className="panelEyebrow">Hardware status</div>
+            <div className="statusList">
+              <div>
+                <span>P1</span>
+                <strong>Ready</strong>
+              </div>
+              <div>
+                <span>P2</span>
+                <strong>Idle</strong>
+              </div>
+              <div>
+                <span>Reactor</span>
+                <strong>Receiving</strong>
+              </div>
+              <div>
+                <span>Separator</span>
+                <strong>Standby</strong>
+              </div>
+              <div>
+                <span>Column</span>
+                <strong>Not loaded</strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="alertBox">
+            <span>Alerts</span>
+            <strong>No active alerts</strong>
+          </div>
+        </aside>
+      </section>
+
+      <section className="bottomBar" aria-label="Command and telemetry">
+        <input className="commandInput" type="text" placeholder="Type command..." />
+        <div className="telemetryLog">
+          <div>12:04 Route preview ready: B1 to Reactor.</div>
+          <div>12:05 V4 and V6 aligned for aspirate phase.</div>
+          <div>12:05 P1 ready for 2.0 ml transfer.</div>
+        </div>
       </section>
     </main>
   );
