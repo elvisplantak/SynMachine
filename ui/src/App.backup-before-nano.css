@@ -1,0 +1,398 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #050812;
+  color: #dbe7f5;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button {
+  font: inherit;
+}
+
+.appShell {
+  min-height: 100vh;
+  padding: 18px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(54, 110, 255, 0.10), transparent 28%),
+    radial-gradient(circle at 100% 20%, rgba(176, 108, 255, 0.10), transparent 28%),
+    linear-gradient(180deg, #0a1020 0%, #060a13 100%);
+}
+
+.topBar {
+  height: 76px;
+  border: 1px solid rgba(89, 134, 197, 0.45);
+  background: rgba(10, 16, 32, 0.78);
+  border-radius: 18px;
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow:
+    0 12px 35px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.brand {
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  font-size: 17px;
+  color: #d9ecff;
+}
+
+.subBrand {
+  color: #8ea3bf;
+  font-size: 13px;
+  margin-top: 3px;
+}
+
+.statusCluster {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(180deg, rgba(15, 25, 45, 0.95), rgba(8, 14, 28, 0.95));
+  border: 1px solid rgba(81, 136, 211, 0.55);
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  color: #dff6ff;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+}
+
+.statusDot {
+  width: 10px;
+  height: 10px;
+  background: #2ef0a7;
+  border-radius: 999px;
+  box-shadow: 0 0 14px #2ef0a7;
+}
+
+.fullWidthPanel,
+.protocolPanel,
+.logPanel {
+  border: 1px solid rgba(89, 134, 197, 0.4);
+  background: rgba(8, 13, 24, 0.88);
+  border-radius: 18px;
+  box-shadow:
+    0 12px 35px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+.diagramPanel {
+  margin-top: 18px;
+  padding: 16px;
+}
+
+.controlsPanel {
+  margin-top: 18px;
+  padding: 16px;
+}
+
+.panelTitle {
+  color: #94a9c5;
+  font-size: 12px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  font-weight: 700;
+}
+
+.pathText {
+  color: #e3f2ff;
+}
+
+.labDiagram {
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid rgba(87, 117, 162, 0.45);
+  background:
+    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(7, 15, 30, 0.8), rgba(6, 9, 19, 0.8));
+  background-size: 34px 34px, 34px 34px, auto;
+}
+
+.largeDiagram {
+  height: 620px;
+}
+
+.pipeBase {
+  stroke: #314258;
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+
+.pipeFlow {
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 14 12;
+  animation: flow 0.75s linear infinite;
+  filter: drop-shadow(0 0 8px currentColor) drop-shadow(0 0 14px currentColor);
+}
+
+@keyframes flow {
+  from {
+    stroke-dashoffset: 26;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.node {
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.22));
+}
+
+.valveNode {
+  fill: #edf7ff;
+  stroke: #9ed2ff;
+}
+
+.bottleB1 {
+  fill: #3d9cff;
+  stroke: #9fd0ff;
+}
+
+.bottleS1 {
+  fill: #48d7ff;
+  stroke: #b4f0ff;
+}
+
+.bottleB2 {
+  fill: #f3b14f;
+  stroke: #ffd898;
+}
+
+.bottleS2 {
+  fill: #5ed79f;
+  stroke: #bdf4d7;
+}
+
+.pumpNode {
+  fill: #dfe9ff;
+  stroke: #87b8ff;
+}
+
+.reactorNode {
+  fill: #d8ccff;
+  stroke: #c5a6ff;
+}
+
+.sfNode {
+  fill: #f4d7ff;
+  stroke: #f0b0ff;
+}
+
+.columnNode {
+  fill: #ffd4a6;
+  stroke: #ffb45a;
+}
+
+.wasteNode {
+  fill: #ff8c8c;
+  stroke: #ffc2c2;
+}
+
+.nodeText {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.darkText {
+  fill: #07111d;
+}
+
+.smallText {
+  font-size: 11px;
+}
+
+.smallLabel {
+  fill: #a7bdd8;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.controlsTop {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+
+.knob {
+  background: linear-gradient(180deg, rgba(10, 18, 35, 0.95), rgba(6, 11, 22, 0.95));
+  border: 1px solid rgba(83, 126, 194, 0.42);
+  border-radius: 16px;
+  padding: 12px;
+  text-align: center;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+  min-height: 132px;
+}
+
+.knobCircle {
+  width: 74px;
+  height: 74px;
+  margin: 0 auto 8px;
+  border-radius: 999px;
+  border: 2px solid rgba(92, 155, 255, 0.7);
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 30% 30%, #284668, #0a1220 68%);
+  box-shadow:
+    inset 0 0 18px rgba(255, 255, 255, 0.04),
+    0 0 18px rgba(47, 128, 255, 0.12);
+  font-weight: 800;
+  color: #e9f5ff;
+}
+
+.knob span {
+  color: #9db2ca;
+  font-size: 12px;
+}
+
+.pumpWidget {
+  background: linear-gradient(180deg, rgba(9, 16, 31, 0.95), rgba(6, 10, 20, 0.95));
+  border: 1px solid rgba(83, 126, 194, 0.42);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.widgetHeader {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 8px;
+  color: #d6ebff;
+}
+
+.syringeBar {
+  height: 24px;
+  background: #04070d;
+  border: 1px solid #35506e;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.syringeFill {
+  height: 100%;
+  transition: width 0.35s ease;
+  box-shadow: 0 0 14px currentColor;
+}
+
+.buttonRow {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.phaseButton {
+  height: 46px;
+  border-radius: 12px;
+  border: 1px solid rgba(86, 128, 194, 0.48);
+  background: linear-gradient(180deg, rgba(17, 28, 48, 0.96), rgba(8, 14, 28, 0.96));
+  color: #ddecff;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: all 0.18s ease;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.03),
+    0 6px 16px rgba(0,0,0,0.18);
+}
+
+.phaseButton:hover {
+  transform: translateY(-1px);
+  border-color: rgba(118, 172, 255, 0.8);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 0 0 1px rgba(106, 163, 255, 0.18),
+    0 8px 18px rgba(0,0,0,0.22);
+}
+
+.phaseButton.active {
+  background: linear-gradient(180deg, rgba(30, 72, 135, 0.95), rgba(16, 37, 76, 0.95));
+  border-color: rgba(127, 193, 255, 0.95);
+  color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 0 18px rgba(70, 160, 255, 0.25);
+}
+
+.bottomConsole {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.protocolPanel,
+.logPanel {
+  padding: 16px;
+  min-height: 190px;
+}
+
+.protocolPanel ol {
+  margin: 0;
+  padding-left: 20px;
+  color: #95a8c1;
+}
+
+.protocolPanel li {
+  margin-bottom: 10px;
+}
+
+.protocolPanel li.running {
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(70, 160, 255, 0.45);
+}
+
+.logPanel {
+  font-family: "Ubuntu Mono", "Cascadia Code", monospace;
+}
+
+.logLine {
+  color: #98b5d6;
+  margin-bottom: 8px;
+}
+
+.commandLine {
+  margin-top: 14px;
+  color: #2ef0a7;
+}
+
+@media (max-width: 1200px) {
+  .controlsTop {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .buttonRow {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+
+  .largeDiagram {
+    height: 520px;
+  }
+}
+
+@media (max-width: 800px) {
+  .controlsTop,
+  .buttonRow,
+  .bottomConsole {
+    grid-template-columns: 1fr;
+  }
+
+  .largeDiagram {
+    height: 460px;
+  }
+}

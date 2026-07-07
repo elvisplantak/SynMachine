@@ -1,0 +1,409 @@
+* {
+  box-sizing: border-box;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+body {
+  margin: 0;
+  background: #050812;
+  color: #dbe7f5;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.appShell {
+  min-height: 100vh;
+  padding: 18px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(54, 110, 255, 0.12), transparent 30%),
+    radial-gradient(circle at 100% 20%, rgba(176, 108, 255, 0.1), transparent 28%),
+    linear-gradient(180deg, #0a1020 0%, #050812 100%);
+}
+
+.topBar {
+  height: 78px;
+  border: 1px solid rgba(89, 134, 197, 0.45);
+  background: rgba(10, 16, 32, 0.82);
+  border-radius: 18px;
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow:
+    0 12px 35px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.brand {
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  font-size: 17px;
+  color: #e3f2ff;
+  white-space: nowrap;
+}
+
+.subBrand {
+  color: #8ea3bf;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.statusPill {
+  border: 1px solid rgba(70, 160, 255, 0.55);
+  color: #dff1ff;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-weight: 800;
+  background: rgba(7, 15, 28, 0.95);
+}
+
+.schemePanel {
+  margin-top: 18px;
+  border: 1px solid rgba(89, 134, 197, 0.42);
+  background: rgba(8, 13, 24, 0.92);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow:
+    0 12px 35px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.schemeCanvas {
+  width: 100%;
+  height: calc(100vh - 132px);
+  min-height: 680px;
+  border-radius: 16px;
+  border: 1px solid rgba(90, 120, 170, 0.45);
+  background:
+    radial-gradient(circle at 45% 40%, rgba(255, 255, 255, 0.035), transparent 35%),
+    linear-gradient(180deg, rgba(7, 15, 30, 0.88), rgba(6, 9, 19, 0.96));
+}
+
+/* Pipes */
+
+.pipe {
+  fill: none;
+  stroke: #d8cbbd;
+  stroke-width: 12;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.92;
+}
+
+.activePipe {
+  stroke: #32caff;
+  stroke-dasharray: 20 12;
+  animation: flow 0.8s linear infinite;
+  filter: drop-shadow(0 0 10px #32caff);
+}
+
+@keyframes flow {
+  from {
+    stroke-dashoffset: 32;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Valve v2 compact */
+
+.valveStub {
+  stroke: #4f6078;
+  stroke-width: 14;
+  stroke-linecap: round;
+}
+
+.valveStubActive {
+  stroke: #32caff;
+  stroke-width: 8;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 8px #32caff);
+}
+
+.collar {
+  fill: #c9d4e3;
+  stroke: #889bb4;
+  stroke-width: 3;
+}
+
+.activeCollar {
+  fill: #b7ebff;
+  stroke: #32caff;
+  filter: drop-shadow(0 0 8px #32caff);
+}
+
+.valveShadow {
+  fill: rgba(0, 0, 0, 0.35);
+}
+
+.valveBody {
+  fill: #e7edf5;
+  stroke: #a7b7ca;
+  stroke-width: 4;
+}
+
+.rotorPlate {
+  fill: #cfd9e6;
+  stroke: #96a9bf;
+  stroke-width: 4;
+}
+
+.rotorInner {
+  fill: #eaf1f8;
+  stroke: #bbcadd;
+  stroke-width: 3;
+}
+
+.internalPath {
+  fill: none;
+  stroke: #32caff;
+  stroke-width: 11;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 9px #32caff);
+}
+
+.closedMark {
+  stroke: #7b8797;
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+.hubDot {
+  stroke-width: 3;
+}
+
+.activeDot {
+  fill: #32caff;
+  stroke: #d7f4ff;
+  filter: drop-shadow(0 0 8px #32caff);
+}
+
+.closedDot {
+  fill: #7b8797;
+  stroke: #e3e9f0;
+}
+
+.bolt {
+  fill: #6f7b8d;
+  stroke: #f1f5fa;
+  stroke-width: 1.5;
+}
+
+.valveLabel {
+  fill: #000 !important;
+  font-size: 40px;
+  font-weight: 950;
+}
+
+.portHint {
+  fill: #eef6ff;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  paint-order: stroke;
+  stroke: #07111d;
+  stroke-width: 3px;
+}
+
+/* Bottles */
+
+.bottleBody,
+.bottleNeck,
+.bottleOutlet {
+  fill: #e7edf5;
+  stroke: #a7b7ca;
+  stroke-width: 3;
+}
+
+.bottleHighlight {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.65);
+  stroke-width: 4;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.liquidBlue {
+  fill: rgba(70, 160, 255, 0.75);
+}
+
+.liquidCyan {
+  fill: rgba(46, 240, 210, 0.7);
+}
+
+.liquidPurple {
+  fill: rgba(176, 108, 255, 0.72);
+}
+
+.liquidGreen {
+  fill: rgba(46, 240, 167, 0.7);
+}
+
+.nodeLabel {
+  fill: #000 !important;
+  font-size: 25px;
+  font-weight: 950;
+}
+
+.externalLabel {
+  fill: #dcecff;
+  font-size: 24px;
+  font-weight: 850;
+}
+
+/* Pumps */
+
+.pumpBody {
+  fill: #dce7f6;
+  stroke: #91a9c8;
+  stroke-width: 4;
+}
+
+.pumpChamber {
+  fill: #f7fbff;
+  stroke: #9db5d2;
+  stroke-width: 3;
+}
+
+.plunger {
+  stroke: #6d7f98;
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+.pumpDot {
+  fill: #32caff;
+  stroke: #d7f4ff;
+  stroke-width: 3;
+}
+
+.pumpLabel {
+  fill: #000 !important;
+  font-size: 28px;
+  font-weight: 950;
+}
+
+/* Reactor */
+
+.reactorBody {
+  fill: #d8ccff;
+  stroke: #bba4ff;
+  stroke-width: 4;
+}
+
+.reactorLiquid {
+  fill: rgba(176, 108, 255, 0.55);
+}
+
+/* Separatory funnel */
+
+.sfBody {
+  fill: #e7edf5;
+}
+
+.sfNeck,
+.sfRim,
+.sfStem {
+  fill: #e7edf5;
+  stroke: #a7b7ca;
+  stroke-width: 4;
+}
+
+.sfOutline {
+  fill: none;
+  stroke: #a7b7ca;
+  stroke-width: 4;
+}
+
+.sfOpening {
+  fill: #53657c;
+  stroke: #d9e5f2;
+  stroke-width: 2;
+}
+
+.sfLiquidTop {
+  fill: rgba(70, 160, 255, 0.45);
+}
+
+.sfLiquidBottom {
+  fill: rgba(176, 108, 255, 0.55);
+}
+
+.sfGlassHighlight {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.7);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.sfStopcock {
+  fill: #c9d4e3;
+  stroke: #889bb4;
+  stroke-width: 3;
+}
+
+.sfStopcockHub {
+  fill: #7689a2;
+  stroke: #edf4fb;
+  stroke-width: 2;
+}
+
+/* Column */
+
+.columnBody {
+  fill: #edf3f8;
+  stroke: #a7b7ca;
+  stroke-width: 4;
+}
+
+.columnPacking {
+  fill: rgba(230, 196, 96, 0.68);
+  stroke: rgba(80, 60, 20, 0.3);
+  stroke-width: 2;
+}
+
+.smallDarkLabel {
+  fill: #000 !important;
+  font-size: 20px;
+  font-weight: 950;
+}
+
+.valveLabel,
+.nodeLabel,
+.pumpLabel,
+.smallDarkLabel {
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+  forced-color-adjust: none;
+  filter: brightness(0);
+}
+
+/* Waste and fractions */
+
+.wasteBody {
+  fill: #bfc9d7;
+  stroke: #8fa0b8;
+  stroke-width: 4;
+}
+
+.rack {
+  fill: #78879c;
+}
+
+.tube {
+  fill: #dfe8f4;
+  stroke: #9aacbf;
+  stroke-width: 3;
+}
+
+.sectionLabel {
+  fill: #e7f3ff;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
