@@ -11,6 +11,11 @@
 This is a React + Vite + TypeScript UI mockup for LabForge.
 The goal is to iterate quickly on UI/UX without introducing regressions.
 
+## Source of truth
+
+- For now, the source of truth for the UI mockup is `src/App.tsx`, `src/App.css`, `src/index.css`, and the project context files.
+- Generated build output is not source of truth.
+
 ## Working style
 
 - Treat each user request as a narrowly scoped patch.
@@ -32,7 +37,16 @@ The goal is to iterate quickly on UI/UX without introducing regressions.
 - Always check `git status --short` before editing.
 - If the working tree is not clean, stop and report the existing changes before making new ones.
 - Do not commit changes unless the user explicitly asks.
+- After a successful change and verification, ask the user: `Promjena je spremna. Želiš li commit? (da/ne)`
+- Commit only if the user explicitly confirms.
+- If the user says the change is not good, ask whether to fix it or restore the previous version.
 - After changes, always show `git diff` and `git status --short`.
+
+## Generated and dependency files
+
+- Do not commit `node_modules/`.
+- Do not commit `dist/`.
+- Do not edit generated build output in `dist/`; change source files instead.
 
 ## UI-specific rules
 
