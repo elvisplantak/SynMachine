@@ -11,11 +11,13 @@ function Valve({
   x,
   y,
   state = "closed",
+  rotation = 0,
 }: {
   id: string;
   x: number;
   y: number;
   state?: ValveState;
+  rotation?: number;
 }) {
   const activeK1 = state === "k1k3" || state === "k1k2";
   const activeK2 = state === "k1k2";
@@ -23,7 +25,8 @@ function Valve({
 
   return (
     <g transform={`translate(${x} ${y}) scale(0.62)`}>
-      {/* port stubs: k1 right, k2 left, k3 top */}
+      <g transform={`rotate(${rotation})`}>
+      {/* default port stubs: k1 right, k2 left, k3 top */}
       <line x1={58} y1={0} x2={105} y2={0} className="valveStub" />
       <line x1={-58} y1={0} x2={-105} y2={0} className="valveStub" />
       <line x1={0} y1={-58} x2={0} y2={-105} className="valveStub" />
@@ -103,19 +106,44 @@ function Valve({
       <circle cx={-48} cy={50} r={4} className="bolt" />
       <circle cx={48} cy={50} r={4} className="bolt" />
 
-      <text x={0} y={9} textAnchor="middle" className="valveLabel">
+      <text
+        x={0}
+        y={9}
+        textAnchor="middle"
+        className="valveLabel"
+        transform={`rotate(${-rotation} 0 9)`}
+      >
         {id}
       </text>
 
-      <text x={137} y={8} textAnchor="middle" className="portHint">
+      <text
+        x={137}
+        y={8}
+        textAnchor="middle"
+        className="portHint"
+        transform={`rotate(${-rotation} 137 8)`}
+      >
         k1
       </text>
-      <text x={-137} y={8} textAnchor="middle" className="portHint">
+      <text
+        x={-137}
+        y={8}
+        textAnchor="middle"
+        className="portHint"
+        transform={`rotate(${-rotation} -137 8)`}
+      >
         k2
       </text>
-      <text x={0} y={-137} textAnchor="middle" className="portHint">
+      <text
+        x={0}
+        y={-137}
+        textAnchor="middle"
+        className="portHint"
+        transform={`rotate(${-rotation} 0 -137)`}
+      >
         k3
       </text>
+      </g>
     </g>
   );
 }
@@ -219,12 +247,26 @@ function Column({ x, y }: { x: number; y: number }) {
   );
 }
 
+function ColumnBottomValve({ x, y }: { x: number; y: number }) {
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      <line x1={0} y1={-31} x2={0} y2={-16} className="valveStub" />
+      <line x1={18} y1={0} x2={42} y2={0} className="valveStub" />
+      <rect x={-18} y={-18} width={36} height={36} rx={8} className="collar" />
+      <circle cx={0} cy={0} r={11} className="rotorInner" />
+      <text x={0} y={7} textAnchor="middle" className="smallDarkLabel">
+        BV
+      </text>
+    </g>
+  );
+}
+
 function Waste({ x, y }: { x: number; y: number }) {
   return (
     <g transform={`translate(${x} ${y})`}>
       <path d="M -42 -30 L 42 -30 L 30 46 L -30 46 Z" className="wasteBody" />
-      <text x={0} y={10} textAnchor="middle" className="nodeLabel">
-        W
+      <text x={0} y={10} textAnchor="middle" className="wasteLabel">
+        WASTE
       </text>
     </g>
   );
@@ -297,57 +339,55 @@ export default function App() {
         <section className="schemePanel" aria-label="Physical scheme">
           <svg className="schemeCanvas" viewBox="-900 -420 1800 840">
           {/* P1 input pipes */}
-          <Pipe d="M -716 -210 L -665 -210" active />
-          <Pipe d="M -716 -335 L -600 -335 L -600 -275" />
-          <Pipe d="M -535 -210 L -455 -210 L -390 -95" active />
-
-          <Pipe d="M -716 150 L -665 150" />
-          <Pipe d="M -716 15 L -600 15 L -600 85" />
-          <Pipe d="M -535 150 L -500 150 L -500 -30 L -455 -30" />
-
+          <Pipe d="M -716 -230 L -690 -230 L -690 -165 L -665 -165" active />
+          <Pipe d="M -716 -100 L -640 -100 L -640 -230 L -600 -230" />
+          <Pipe d="M -535 -165 L -455 -165 L -455 -95 L -390 -95" active />
+          <Pipe d="M -716 70 L -500 70 L -500 -30 L -455 -30" />
           <Pipe d="M -325 -30 L -300 -30 L -300 -120 L -170 -120 L -170 -95" active />
           <Pipe d="M -105 -30 L 2 -30" active />
 
           {/* P1 output / reactor / waste pipes */}
           <Pipe d="M -235 -30 L -280 -30 L -280 235 L -105 235 L -105 165" />
           <Pipe d="M -170 100 L 185 100 L 185 165 L 206 165" />
-          <Pipe d="M -235 165 L -320 165 L -320 270 L -170 270" />
+          <Pipe d="M -235 165 L -320 165 L -320 300 L 608 300" />
 
           {/* P2 branch pipes */}
-          <Pipe d="M 335 165 L 370 165 L 370 100 L 470 100" />
+          <Pipe d="M 335 165 L 405 165" />
           <Pipe d="M 535 165 L 632 165" />
-          <Pipe d="M 405 165 L 380 165 L 380 65 L 560 65 L 560 0 L 535 0" />
-          <Pipe d="M 405 0 L 340 0 L 340 -340 L 650 -340 L 650 -309" />
-          <Pipe d="M 470 -65 L 470 -90 L 750 -90 L 750 0 L 715 0" />
-          <Pipe d="M 585 0 L 550 0 L 550 -120 L 650 -120 L 650 -105" />
-          <Pipe d="M 650 -65 L 720 -65 L 720 65 L 800 65 L 800 83" />
-          <Pipe d="M 800 247 L 800 270 L 840 270" />
+          <Pipe d="M 470 100 L 470 65" />
+          <Pipe d="M 470 -65 L 470 -340 L 650 -340 L 650 -309" />
+          <Pipe d="M 535 0 L 650 0" />
+          <Pipe d="M 650 -130 L 650 -105" />
+          <Pipe d="M 715 -65 L 735 -65 L 735 0" />
+          <Pipe d="M 865 0 L 890 0 L 890 300 L 692 300" />
+          <Pipe d="M 800 65 L 800 83" />
+          <Pipe d="M 800 247 L 800 239" />
+          <Pipe d="M 842 270 L 880 270 L 880 304" />
 
           {/* P1 branch nodes */}
-          <Bottle id="B1" x={-760} y={-210} liquidClass="liquidBlue" />
-          <Bottle id="S1" x={-760} y={-335} liquidClass="liquidCyan" />
-          <Valve id="V4" x={-600} y={-210} state="k1k2" />
-
-          <Bottle id="B2" x={-760} y={150} liquidClass="liquidPurple" />
-          <Bottle id="S2" x={-760} y={15} liquidClass="liquidGreen" />
-          <Valve id="V5" x={-600} y={150} state="closed" />
+          <Bottle id="B1" x={-760} y={-230} liquidClass="liquidBlue" />
+          <Bottle id="B2" x={-760} y={-100} liquidClass="liquidPurple" />
+          <Bottle id="S" x={-760} y={70} liquidClass="liquidCyan" />
+          <Valve id="V4" x={-600} y={-165} state="k1k2" />
 
           <Valve id="V6" x={-390} y={-30} state="k1k3" />
           <Valve id="V1" x={-170} y={-30} state="k1k3" />
           <Pump id="P1" x={30} y={-30} />
 
           <Valve id="V2" x={-170} y={165} state="closed" />
-          <Waste x={-170} y={300} />
           <Reactor x={270} y={165} />
 
           {/* P2 branch nodes */}
           <Valve id="V3" x={470} y={165} state="closed" />
           <Pump id="P2" x={660} y={165} />
-          <Valve id="V7" x={470} y={0} state="closed" />
+          <Valve id="V7" x={470} y={0} state="closed" rotation={90} />
           <Separator x={650} y={-210} />
-          <Valve id="V8" x={650} y={0} state="closed" />
+          <Valve id="V8" x={650} y={-65} state="closed" rotation={90} />
+          <Valve id="V5" x={800} y={0} state="closed" rotation={180} />
           <Column x={800} y={165} />
-          <Fractions x={840} y={295} />
+          <ColumnBottomValve x={800} y={270} />
+          <Waste x={650} y={300} />
+          <Fractions x={840} y={340} />
 
           <text x={-700} y={-350} className="sectionLabel">
             P1 input / reactor loading

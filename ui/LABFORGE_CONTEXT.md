@@ -56,7 +56,7 @@ The main visual idea is:
 The central UI element should be an SVG scheme showing:
 
 - reagent bottles
-- solvent bottles
+- one shared solvent bottle
 - 3-way valves
 - syringe pumps
 - reactor
@@ -149,7 +149,7 @@ Examples:
 Protocol steps should be human-readable:
 
     1. Add 2.0 ml B1 to reactor
-    2. Add 5.0 ml S1 to reactor
+    2. Add 5.0 ml S to reactor
     3. Wait 10 s
     4. Transfer reactor contents to SF
     5. Transfer SF bottom phase to column
@@ -211,12 +211,81 @@ The preferred visual layout is left-to-right.
 
 Preserve this visual flow:
 
-    B1 / S1 / B2 / S2
+    B1 / B2 / S
       -> P1 input branch
       -> P1 syringe pump
       -> Reactor
       -> P2 output branch
       -> Separatory funnel / Column / Fractions
+
+## Current fluid topology
+
+The current physical-flow model uses one shared Waste destination and one combined solvent source `S`.
+
+### P1 reagent / solvent loading branch
+
+Logical P1 connections:
+
+    B1 -> V4.k2
+    B2 -> V4.k3
+    V4.k1 -> V6.k3
+
+    S -> V6.k2
+    V6.k1 -> V1.k3
+
+    P1 -> V1.k1
+    V1.k2 -> V2.k1
+
+    V2.k3 -> Reactor
+    V2.k2 -> Waste
+
+Functional meaning:
+
+- `V4` selects `B1` or `B2`.
+- `V6` selects the `B1/B2` branch or solvent `S`.
+- `V1` switches between aspiration from the selected source and dispensing from `P1`.
+- `V2` selects `Reactor` or `Waste`.
+- `S` is the single solvent source used for both reaction dilution and washing.
+- `V2 -> Waste` can be used for priming, bubble removal, and washing liquid disposal.
+
+### P2 reactor / downstream branch
+
+Logical P2 connections:
+
+    Reactor R_OUT -> V3.k2
+    P2 -> V3.k1
+    V3.k3 -> V7.k1
+
+    V7.k2 -> SF_TOP_IN
+    V7.k3 -> V8.k1
+
+    V8.k2 -> SF_BOTTOM_OUT
+    V8.k3 -> V5.k1
+
+    V5.k2 -> Waste
+    V5.k3 -> Column
+
+    Column -> COLUMN_BOTTOM_VALVE -> Fractions / carousel
+
+Functional meaning:
+
+- `V3` switches `P2` between aspiration from the reactor and the downstream branch.
+- `V7` selects `SF_TOP_IN` or the downstream `V8` branch.
+- `V8` connects either `SF_BOTTOM_OUT` or the final destination branch.
+- `V5` is now in the P2 branch and selects `Waste` or `Column`.
+- The column bottom outlet does not connect to Waste.
+- The column bottom outlet routes through `COLUMN_BOTTOM_VALVE` to the fraction carousel.
+
+### Shared Waste and screening workflow
+
+- There is only one visual and logical `Waste` destination.
+- The shared Waste destination is only for `V2 -> Waste` and `V5 -> Waste`.
+- The column bottom outlet does not connect to Waste.
+- `Column -> COLUMN_BOTTOM_VALVE -> Fractions / carousel`.
+- `B1` and `B2` containers and exposed inlet tube ends are manually replaced and cleaned between different screening series.
+- During one screening series using the same stock solutions, the `B1` and `B2` inlet branches may remain primed.
+- Between screening runs, wash `P1`, the reactor, and the common path with solvent `S`.
+- Full `B1` and `B2` branch cleaning is done after the screening series, not necessarily between every run in the same series.
 
 The user likes the current left-to-right spacing. Do not compress the layout unnecessarily unless explicitly asked.
 
@@ -340,60 +409,37 @@ The UI should eventually represent aspirate/dispense phases.
 
 Current pump symbols are acceptable as early placeholders, but later they should look more clearly like syringe pumps.
 
-## Current physical topology
+## Physical topology protection
 
-### P1 branch
+The current physical topology is documented above in "Current fluid topology".
 
-    B1 -> V4.k2
-    S1 -> V4.k3
-    V4.k1 -> V6.k3
+Preserve these high-level constraints:
 
-    B2 -> V5.k2
-    S2 -> V5.k3
-    V5.k1 -> V6.k2
-
-    V6.k1 -> V1.k3
-    V1.k1 -> P1
-    V1.k2 -> V2.k1
-
-    V2.k3 -> R_IN / Reactor
-    V2.k2 -> Waste
+- `B1` and `B2` feed `V4`, not separate solvent branches.
+- `S` is the only solvent source and feeds `V6`.
+- `V5` belongs to the P2 branch as the `Column` / `Waste` selector.
+- There is only one shared `Waste` destination.
+- `P1` and `P2` are syringe pumps and must not be treated as inline pumps.
+- The left-to-right physical process direction should stay readable.
 
 ### Reactor
 
     R_IN -> Reactor -> R_OUT
 
-### P2 branch
-
-    R_OUT -> V3.k3
-    V3.k1 -> P2
-    V3.k2 -> V7.k1
-
-    V7.k2 -> SF_TOP_IN
-    V7.k3 -> V8.k1
-
-    V8.k2 -> SF_BOTTOM_OUT
-    V8.k3 -> COLUMN_IN
-
-    COLUMN -> COLUMN_BOTTOM_VALVE -> FRACTIONS / W
-
-## Important visual correction
-
-B1 and S1 must visibly connect to different ports of V4.
-
-Correct topology:
+Important P1 visual correction:
 
     B1 -> V4.k2
-    S1 -> V4.k3
+    B2 -> V4.k3
     V4.k1 -> V6.k3
+    S -> V6.k2
 
-The visual should not make B1 and S1 look like they enter the same port.
+Important P2 visual correction:
 
-B2 and S2 are conceptually okay, but port labels should make the mapping obvious:
+    V8.k3 -> V5.k1
+    V5.k2 -> Waste
+    V5.k3 -> Column
 
-    B2 -> V5.k2
-    S2 -> V5.k3
-    V5.k1 -> V6.k2
+The visual should not show multiple Waste bottles or legacy split solvent bottles.
 
 ## Current implementation status
 
@@ -474,5 +520,6 @@ Do not:
 - redesign unrelated UI when fixing one issue
 - compress the left-to-right layout unless asked
 - make valve labels too small
-- make B1 and S1 look like they share the same V4 port
+- show obsolete split solvent bottles
+- put `V5` back into the P1 input branch
 - bypass backend safety/parser architecture in future command or voice features
