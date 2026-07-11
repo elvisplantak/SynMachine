@@ -1,9 +1,57 @@
 import "./App.css";
 
 type ValveState = "closed" | "k1k3" | "k1k2";
+type ValvePort = "k1" | "k2" | "k3";
+type ValveStubPosition = "right" | "left" | "top";
+type ValvePortMap = Record<ValvePort, ValveStubPosition>;
 
 function Pipe({ d, active = false }: { d: string; active?: boolean }) {
   return <path d={d} className={active ? "pipe activePipe" : "pipe"} />;
+}
+
+const defaultValvePortMap: ValvePortMap = {
+  k1: "right",
+  k2: "left",
+  k3: "top",
+};
+
+const valveStubGeometry: Record<
+  ValveStubPosition,
+  {
+    line: { x1: number; y1: number; x2: number; y2: number };
+    collar: { x: number; y: number };
+    label: { x: number; y: number };
+  }
+> = {
+  right: {
+    line: { x1: 58, y1: 0, x2: 105, y2: 0 },
+    collar: { x: 91, y: -14 },
+    label: { x: 137, y: 8 },
+  },
+  left: {
+    line: { x1: -58, y1: 0, x2: -105, y2: 0 },
+    collar: { x: -119, y: -14 },
+    label: { x: -137, y: 8 },
+  },
+  top: {
+    line: { x1: 0, y1: -58, x2: 0, y2: -105 },
+    collar: { x: -14, y: -119 },
+    label: { x: 0, y: -137 },
+  },
+};
+
+function getInternalPath(from: ValveStubPosition, to: ValveStubPosition) {
+  const key = [from, to].sort().join("-");
+
+  if (key === "left-right") {
+    return <line x1={-50} y1={0} x2={50} y2={0} className="internalPath" />;
+  }
+
+  if (key === "right-top") {
+    return <path d="M 0 -50 L 0 0 L 50 0" className="internalPath" />;
+  }
+
+  return <path d="M -50 0 L 0 0 L 0 -50" className="internalPath" />;
 }
 
 function Valve({
@@ -12,59 +60,47 @@ function Valve({
   y,
   state = "closed",
   rotation = 0,
+  portMap = defaultValvePortMap,
 }: {
   id: string;
   x: number;
   y: number;
   state?: ValveState;
   rotation?: number;
+  portMap?: ValvePortMap;
 }) {
   const activeK1 = state === "k1k3" || state === "k1k2";
   const activeK2 = state === "k1k2";
   const activeK3 = state === "k1k3";
+  const activePorts: ValvePort[] = [
+    ...(activeK1 ? (["k1"] as const) : []),
+    ...(activeK2 ? (["k2"] as const) : []),
+    ...(activeK3 ? (["k3"] as const) : []),
+  ];
+  const activeStubPositions = activePorts.map((port) => portMap[port]);
 
   return (
     <g transform={`translate(${x} ${y}) scale(0.62)`}>
       <g transform={`rotate(${rotation})`}>
-      {/* default port stubs: k1 right, k2 left, k3 top */}
-      <line x1={58} y1={0} x2={105} y2={0} className="valveStub" />
-      <line x1={-58} y1={0} x2={-105} y2={0} className="valveStub" />
-      <line x1={0} y1={-58} x2={0} y2={-105} className="valveStub" />
+      {Object.entries(valveStubGeometry).map(([position, geometry]) => (
+        <line key={position} {...geometry.line} className="valveStub" />
+      ))}
 
-      {activeK1 && (
-        <line x1={58} y1={0} x2={105} y2={0} className="valveStubActive" />
-      )}
-      {activeK2 && (
-        <line x1={-58} y1={0} x2={-105} y2={0} className="valveStubActive" />
-      )}
-      {activeK3 && (
-        <line x1={0} y1={-58} x2={0} y2={-105} className="valveStubActive" />
-      )}
+      {activeStubPositions.map((position) => (
+        <line key={position} {...valveStubGeometry[position].line} className="valveStubActive" />
+      ))}
 
-      <rect
-        x={91}
-        y={-14}
-        width={28}
-        height={28}
-        rx={7}
-        className={activeK1 ? "collar activeCollar" : "collar"}
-      />
-      <rect
-        x={-119}
-        y={-14}
-        width={28}
-        height={28}
-        rx={7}
-        className={activeK2 ? "collar activeCollar" : "collar"}
-      />
-      <rect
-        x={-14}
-        y={-119}
-        width={28}
-        height={28}
-        rx={7}
-        className={activeK3 ? "collar activeCollar" : "collar"}
-      />
+      {(Object.keys(valveStubGeometry) as ValveStubPosition[]).map((position) => (
+        <rect
+          key={position}
+          x={valveStubGeometry[position].collar.x}
+          y={valveStubGeometry[position].collar.y}
+          width={28}
+          height={28}
+          rx={7}
+          className={activeStubPositions.includes(position) ? "collar activeCollar" : "collar"}
+        />
+      ))}
 
       <path
         d="M -72 -48 Q -72 -66 -54 -75 L 54 -75 Q 72 -66 72 -48 L 72 48 Q 72 66 54 75 L -54 75 Q -72 66 -72 48 Z"
@@ -89,14 +125,14 @@ function Valve({
 
       {state === "k1k2" && (
         <>
-          <line x1={-50} y1={0} x2={50} y2={0} className="internalPath" />
+          {getInternalPath(portMap.k1, portMap.k2)}
           <circle cx={0} cy={0} r={7} className="hubDot activeDot" />
         </>
       )}
 
       {state === "k1k3" && (
         <>
-          <path d="M 0 -50 L 0 0 L 50 0" className="internalPath" />
+          {getInternalPath(portMap.k1, portMap.k3)}
           <circle cx={0} cy={0} r={7} className="hubDot activeDot" />
         </>
       )}
@@ -116,33 +152,22 @@ function Valve({
         {id}
       </text>
 
-      <text
-        x={137}
-        y={8}
-        textAnchor="middle"
-        className="portHint"
-        transform={`rotate(${-rotation} 137 8)`}
-      >
-        k1
-      </text>
-      <text
-        x={-137}
-        y={8}
-        textAnchor="middle"
-        className="portHint"
-        transform={`rotate(${-rotation} -137 8)`}
-      >
-        k2
-      </text>
-      <text
-        x={0}
-        y={-137}
-        textAnchor="middle"
-        className="portHint"
-        transform={`rotate(${-rotation} 0 -137)`}
-      >
-        k3
-      </text>
+      {(Object.keys(portMap) as ValvePort[]).map((port) => {
+        const label = valveStubGeometry[portMap[port]].label;
+
+        return (
+          <text
+            key={port}
+            x={label.x}
+            y={label.y}
+            textAnchor="middle"
+            className="portHint"
+            transform={`rotate(${-rotation} ${label.x} ${label.y})`}
+          >
+            {port}
+          </text>
+        );
+      })}
       </g>
     </g>
   );
@@ -378,7 +403,13 @@ export default function App() {
           <Reactor x={270} y={165} />
 
           {/* P2 branch nodes */}
-          <Valve id="V3" x={470} y={165} state="closed" />
+          <Valve
+            id="V3"
+            x={470}
+            y={165}
+            state="closed"
+            portMap={{ k1: "right", k2: "top", k3: "left" }}
+          />
           <Pump id="P2" x={660} y={165} />
           <Valve id="V7" x={470} y={0} state="closed" rotation={90} />
           <Separator x={650} y={-210} />

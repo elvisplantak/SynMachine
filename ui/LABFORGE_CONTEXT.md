@@ -252,9 +252,9 @@ Functional meaning:
 
 Logical P2 connections:
 
-    Reactor R_OUT -> V3.k2
+    Reactor R_OUT -> V3.k3
     P2 -> V3.k1
-    V3.k3 -> V7.k1
+    V3.k2 -> V7.k1
 
     V7.k2 -> SF_TOP_IN
     V7.k3 -> V8.k1
