@@ -218,13 +218,38 @@ Preserve this visual flow:
       -> P2 output branch
       -> Separatory funnel / Column / Fractions
 
-## Current fluid topology
+## Current physical machine state
 
-The current physical-flow model uses one shared Waste destination and one combined solvent source `S`.
+The machine has not yet been rewired to the approved LabForge v1 P1 topology. Its current physical P1 wiring is:
 
-### P1 reagent / solvent loading branch
+    B1 -> V4.k2
+    S1 -> V4.k3
+    V4.k1 -> V6.k3
 
-Logical P1 connections:
+    B2 -> V5.k2
+    S2 -> V5.k3
+    V5.k1 -> V6.k2
+
+    V6.k1 -> V1.k3
+    P1 -> V1.k1
+    V1.k2 -> V2.k1
+
+    V2.k3 -> Reactor
+    V2.k2 -> Waste
+
+The current physical V3 mapping is:
+
+    P2 -> V3.k1
+    V3.k2 -> free / not connected
+    Reactor R_OUT -> V3.k3
+
+The physical `P2` and `Reactor R_OUT` port assignments already align with the current UI and approved target topology, but `V3.k2` is not yet physically connected to `V7.k1`.
+
+## Approved target LabForge v1 topology
+
+The approved target uses one shared Waste destination and one shared solvent source `S`. This is the target topology, not the current physical P1 wiring.
+
+### Target P1 reagent / solvent loading branch
 
     B1 -> V4.k2
     B2 -> V4.k3
@@ -242,15 +267,15 @@ Logical P1 connections:
 Functional meaning:
 
 - `V4` selects `B1` or `B2`.
-- `V6` selects the `B1/B2` branch or solvent `S`.
+- `V6` selects the `B1/B2` branch or shared solvent `S`.
 - `V1` switches between aspiration from the selected source and dispensing from `P1`.
 - `V2` selects `Reactor` or `Waste`.
 - `S` is the single solvent source used for both reaction dilution and washing.
 - `V2 -> Waste` can be used for priming, bubble removal, and washing liquid disposal.
 
-### P2 reactor / downstream branch
+### Target P2 reactor / downstream branch
 
-Logical P2 connections:
+The approved target P2 topology is:
 
     Reactor R_OUT -> V3.k3
     P2 -> V3.k1
@@ -275,6 +300,29 @@ Functional meaning:
 - `V5` is now in the P2 branch and selects `Waste` or `Column`.
 - The column bottom outlet does not connect to Waste.
 - The column bottom outlet routes through `COLUMN_BOTTOM_VALVE` to the fraction carousel.
+
+## UI implementation status
+
+The current UI already represents the approved target LabForge v1 topology for both P1 and P2. In particular, it shows `B2 -> V4.k3`, one shared solvent source `S -> V6.k2`, and `V5` in the P2 branch. The UI therefore does not represent the machine's still-current physical P1 wiring.
+
+The V3 mapping shown in the UI represents the approved target topology:
+
+    Reactor R_OUT -> V3.k3
+    P2 -> V3.k1
+    V3.k2 -> V7.k1
+
+## Pending physical rewiring
+
+To align the physical machine with the approved target LabForge v1 topology:
+
+- remove `S1` from `V4.k3`
+- move `B2` from `V5.k2` to `V4.k3`
+- disconnect `V5.k1` from `V6.k2`
+- connect one shared solvent source `S` directly to `V6.k2`
+- free `V5` for the P2 branch
+- connect `V3.k2` to `V7.k1`
+
+Until this rewiring is completed and confirmed, the approved target P1 topology must not be described as the current physical topology.
 
 ### Shared Waste and screening workflow
 
