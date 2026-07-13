@@ -1,3 +1,4 @@
+import { useState } from "react";
 import "./App.css";
 
 type ValveState = "closed" | "k1k3" | "k1k2";
@@ -312,6 +313,46 @@ function Fractions({ x, y }: { x: number; y: number }) {
 }
 
 export default function App() {
+  const [activeScreen, setActiveScreen] = useState<"dashboard" | "protocolBuilder">("dashboard");
+
+  if (activeScreen === "protocolBuilder") {
+    return (
+      <main className="appShell">
+        <header className="topBar">
+          <div>
+            <div className="brand">LABFORGE SCHEME DRAFT</div>
+            <div className="subBrand">Define and prepare screening runs</div>
+          </div>
+
+          <button
+            className="navigationButton"
+            type="button"
+            onClick={() => setActiveScreen("dashboard")}
+          >
+            Back to Dashboard
+          </button>
+        </header>
+
+        <section className="protocolBuilderShell" aria-labelledby="protocol-builder-title">
+          <div className="experimentalLabel">Experimental</div>
+          <h1 id="protocol-builder-title" className="protocolBuilderTitle">
+            Protocol Builder
+          </h1>
+          <p className="protocolBuilderDescription">
+            This screen will be used to define a screening run.
+          </p>
+          <button
+            className="navigationButton"
+            type="button"
+            onClick={() => setActiveScreen("dashboard")}
+          >
+            Back to Dashboard
+          </button>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="appShell">
       <header className="topBar">
@@ -322,7 +363,16 @@ export default function App() {
           </div>
         </div>
 
-        <div className="statusPill">SCHEME PREVIEW</div>
+        <div className="topBarActions">
+          <button
+            className="navigationButton"
+            type="button"
+            onClick={() => setActiveScreen("protocolBuilder")}
+          >
+            Protocol Builder
+          </button>
+          <div className="statusPill">SCHEME PREVIEW</div>
+        </div>
       </header>
 
       <section className="workspaceGrid">

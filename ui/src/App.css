@@ -60,6 +60,70 @@ body {
   background: rgba(7, 15, 28, 0.95);
 }
 
+.topBarActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.navigationButton {
+  border: 1px solid rgba(50, 202, 255, 0.55);
+  border-radius: 12px;
+  min-height: 42px;
+  padding: 9px 14px;
+  color: #dff1ff;
+  background: rgba(50, 202, 255, 0.12);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.navigationButton:hover,
+.navigationButton:focus-visible {
+  border-color: #32caff;
+  background: rgba(50, 202, 255, 0.2);
+}
+
+.protocolBuilderShell {
+  min-height: calc(100vh - 114px);
+  margin-top: 12px;
+  border: 1px solid rgba(89, 134, 197, 0.42);
+  border-radius: 18px;
+  padding: 48px;
+  background: rgba(8, 13, 24, 0.92);
+  box-shadow:
+    0 12px 35px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.experimentalLabel {
+  width: fit-content;
+  border: 1px solid rgba(176, 108, 255, 0.55);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #e7d8ff;
+  background: rgba(176, 108, 255, 0.12);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.protocolBuilderTitle {
+  margin: 18px 0 8px;
+  color: #e3f2ff;
+  font-size: 36px;
+  font-weight: 900;
+  letter-spacing: normal;
+}
+
+.protocolBuilderDescription {
+  margin-bottom: 24px;
+  color: #9fb2cd;
+  font-size: 16px;
+}
+
 .workspaceGrid {
   margin-top: 12px;
   display: grid;
