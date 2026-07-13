@@ -312,44 +312,728 @@ function Fractions({ x, y }: { x: number; y: number }) {
   );
 }
 
+type ProtocolStepType = "Dose" | "Wait" | "Set mixing" | "Set temperature" | "Reaction hold";
+type DoseSource = "" | "B1" | "B2" | "S";
+type TimeUnit = "s" | "min";
+type PreRunCheckKey =
+  | "sourcesAvailable"
+  | "p1AndValvesHomed"
+  | "reactorEmptyAndClean"
+  | "wasteCapacityAvailable";
+type PreRunChecks = Record<PreRunCheckKey, boolean>;
+
+type DoseStep = {
+  id: number;
+  type: "Dose";
+  source: DoseSource;
+  volume: string;
+  aspirationRate: string;
+  dispenseRate: string;
+  transitionPolicy: "" | "None" | "Purge to Waste" | "Direct chase to Reactor";
+  mixingDuringAddition: "Unchanged" | "On" | "Off";
+  delayAfterCompletion: string;
+  delayUnit: TimeUnit;
+};
+
+type WaitStep = {
+  id: number;
+  type: "Wait";
+  duration: string;
+  durationUnit: TimeUnit;
+};
+
+type SetMixingStep = {
+  id: number;
+  type: "Set mixing";
+  state: "On" | "Off";
+  mixingSpeed: string;
+};
+
+type SetTemperatureStep = {
+  id: number;
+  type: "Set temperature";
+  targetTemperature: string;
+  continueRule: "Continue immediately" | "Wait until target is reached";
+};
+
+type ReactionHoldStep = {
+  id: number;
+  type: "Reaction hold";
+  duration: string;
+  durationUnit: TimeUnit | "h";
+  startTimer:
+    | ""
+    | "After reactive addition completes"
+    | "After all additions complete"
+    | "After target temperature is reached";
+};
+
+type ProtocolStep =
+  | DoseStep
+  | WaitStep
+  | SetMixingStep
+  | SetTemperatureStep
+  | ReactionHoldStep;
+
+const initialProtocolSteps: ProtocolStep[] = [
+  { id: 1, type: "Set mixing", state: "On", mixingSpeed: "" },
+  {
+    id: 2,
+    type: "Set temperature",
+    targetTemperature: "",
+    continueRule: "Continue immediately",
+  },
+  {
+    id: 3,
+    type: "Dose",
+    source: "B1",
+    volume: "",
+    aspirationRate: "",
+    dispenseRate: "",
+    transitionPolicy: "",
+    mixingDuringAddition: "Unchanged",
+    delayAfterCompletion: "",
+    delayUnit: "s",
+  },
+  {
+    id: 4,
+    type: "Dose",
+    source: "B2",
+    volume: "",
+    aspirationRate: "",
+    dispenseRate: "",
+    transitionPolicy: "",
+    mixingDuringAddition: "Unchanged",
+    delayAfterCompletion: "",
+    delayUnit: "s",
+  },
+  {
+    id: 5,
+    type: "Dose",
+    source: "S",
+    volume: "",
+    aspirationRate: "",
+    dispenseRate: "",
+    transitionPolicy: "",
+    mixingDuringAddition: "Unchanged",
+    delayAfterCompletion: "",
+    delayUnit: "s",
+  },
+  {
+    id: 6,
+    type: "Reaction hold",
+    duration: "",
+    durationUnit: "min",
+    startTimer: "",
+  },
+];
+
+function createProtocolStep(type: ProtocolStepType, id: number): ProtocolStep {
+  if (type === "Dose") {
+    return {
+      id,
+      type,
+      source: "",
+      volume: "",
+      aspirationRate: "",
+      dispenseRate: "",
+      transitionPolicy: "",
+      mixingDuringAddition: "Unchanged",
+      delayAfterCompletion: "",
+      delayUnit: "s",
+    };
+  }
+
+  if (type === "Wait") {
+    return { id, type, duration: "", durationUnit: "s" };
+  }
+
+  if (type === "Set mixing") {
+    return { id, type, state: "On", mixingSpeed: "" };
+  }
+
+  if (type === "Set temperature") {
+    return { id, type, targetTemperature: "", continueRule: "Continue immediately" };
+  }
+
+  return { id, type, duration: "", durationUnit: "min", startTimer: "" };
+}
+
+function ProtocolStepFields({
+  step,
+  onChange,
+}: {
+  step: ProtocolStep;
+  onChange: (step: ProtocolStep) => void;
+}) {
+  const fieldId = (field: string) => `step-${step.id}-${field}`;
+
+  if (step.type === "Dose") {
+    return (
+      <div className="protocolFieldGrid protocolDoseFields">
+        <label className="protocolField" htmlFor={fieldId("source")}>
+          <span>Source</span>
+          <select
+            id={fieldId("source")}
+            value={step.source}
+            onChange={(event) => onChange({ ...step, source: event.target.value as DoseSource })}
+          >
+            <option value="">Not selected</option>
+            <option value="B1">B1</option>
+            <option value="B2">B2</option>
+            <option value="S">S</option>
+          </select>
+        </label>
+
+        <label className="protocolField" htmlFor={fieldId("volume")}>
+          <span>Volume</span>
+          <div className="protocolInputWithUnit">
+            <input
+              id={fieldId("volume")}
+              type="number"
+              min="0"
+              value={step.volume}
+              onChange={(event) => onChange({ ...step, volume: event.target.value })}
+            />
+            <span>ml</span>
+          </div>
+        </label>
+
+        <label className="protocolField" htmlFor={fieldId("aspiration-rate")}>
+          <span>Aspiration rate</span>
+          <input
+            id={fieldId("aspiration-rate")}
+            type="number"
+            min="0"
+            value={step.aspirationRate}
+            onChange={(event) => onChange({ ...step, aspirationRate: event.target.value })}
+          />
+          <small>unit TBD</small>
+        </label>
+
+        <label className="protocolField" htmlFor={fieldId("dispense-rate")}>
+          <span>Dispense rate</span>
+          <input
+            id={fieldId("dispense-rate")}
+            type="number"
+            min="0"
+            value={step.dispenseRate}
+            onChange={(event) => onChange({ ...step, dispenseRate: event.target.value })}
+          />
+          <small>unit TBD</small>
+        </label>
+
+        <label className="protocolField" htmlFor={fieldId("transition-policy")}>
+          <span>Transition policy</span>
+          <select
+            id={fieldId("transition-policy")}
+            value={step.transitionPolicy}
+            onChange={(event) =>
+              onChange({
+                ...step,
+                transitionPolicy: event.target.value as DoseStep["transitionPolicy"],
+              })
+            }
+          >
+            <option value="">Not selected</option>
+            <option value="None">None</option>
+            <option value="Purge to Waste">Purge to Waste</option>
+            <option value="Direct chase to Reactor">Direct chase to Reactor</option>
+          </select>
+        </label>
+
+        <label className="protocolField" htmlFor={fieldId("mixing-during-addition")}>
+          <span>Mixing during addition</span>
+          <select
+            id={fieldId("mixing-during-addition")}
+            value={step.mixingDuringAddition}
+            onChange={(event) =>
+              onChange({
+                ...step,
+                mixingDuringAddition: event.target.value as DoseStep["mixingDuringAddition"],
+              })
+            }
+          >
+            <option value="Unchanged">Unchanged</option>
+            <option value="On">On</option>
+            <option value="Off">Off</option>
+          </select>
+        </label>
+
+        <label className="protocolField" htmlFor={fieldId("delay")}>
+          <span>Delay after completion</span>
+          <div className="protocolInputWithUnit">
+            <input
+              id={fieldId("delay")}
+              type="number"
+              min="0"
+              value={step.delayAfterCompletion}
+              onChange={(event) => onChange({ ...step, delayAfterCompletion: event.target.value })}
+            />
+            <select
+              aria-label={`Step ${step.id} delay unit`}
+              value={step.delayUnit}
+              onChange={(event) =>
+                onChange({ ...step, delayUnit: event.target.value as DoseStep["delayUnit"] })
+              }
+            >
+              <option value="s">s</option>
+              <option value="min">min</option>
+            </select>
+          </div>
+        </label>
+      </div>
+    );
+  }
+
+  if (step.type === "Wait") {
+    return (
+      <div className="protocolFieldGrid">
+        <label className="protocolField" htmlFor={fieldId("duration")}>
+          <span>Duration</span>
+          <div className="protocolInputWithUnit">
+            <input
+              id={fieldId("duration")}
+              type="number"
+              min="0"
+              value={step.duration}
+              onChange={(event) => onChange({ ...step, duration: event.target.value })}
+            />
+            <select
+              aria-label={`Step ${step.id} duration unit`}
+              value={step.durationUnit}
+              onChange={(event) =>
+                onChange({ ...step, durationUnit: event.target.value as WaitStep["durationUnit"] })
+              }
+            >
+              <option value="s">s</option>
+              <option value="min">min</option>
+            </select>
+          </div>
+        </label>
+      </div>
+    );
+  }
+
+  if (step.type === "Set mixing") {
+    return (
+      <div className="protocolFieldGrid">
+        <label className="protocolField" htmlFor={fieldId("state")}>
+          <span>State</span>
+          <select
+            id={fieldId("state")}
+            value={step.state}
+            onChange={(event) =>
+              onChange({ ...step, state: event.target.value as SetMixingStep["state"] })
+            }
+          >
+            <option value="On">On</option>
+            <option value="Off">Off</option>
+          </select>
+        </label>
+
+        <label className="protocolField" htmlFor={fieldId("mixing-speed")}>
+          <span>Mixing speed <small>Optional</small></span>
+          <input
+            id={fieldId("mixing-speed")}
+            type="number"
+            min="0"
+            value={step.mixingSpeed}
+            onChange={(event) => onChange({ ...step, mixingSpeed: event.target.value })}
+          />
+          <small>unit TBD</small>
+        </label>
+      </div>
+    );
+  }
+
+  if (step.type === "Set temperature") {
+    return (
+      <div className="protocolFieldGrid">
+        <label className="protocolField" htmlFor={fieldId("target-temperature")}>
+          <span>Target temperature</span>
+          <div className="protocolInputWithUnit">
+            <input
+              id={fieldId("target-temperature")}
+              type="number"
+              value={step.targetTemperature}
+              onChange={(event) => onChange({ ...step, targetTemperature: event.target.value })}
+            />
+            <span>°C</span>
+          </div>
+        </label>
+
+        <label className="protocolField" htmlFor={fieldId("continue-rule")}>
+          <span>Continue rule</span>
+          <select
+            id={fieldId("continue-rule")}
+            value={step.continueRule}
+            onChange={(event) =>
+              onChange({
+                ...step,
+                continueRule: event.target.value as SetTemperatureStep["continueRule"],
+              })
+            }
+          >
+            <option value="Continue immediately">Continue immediately</option>
+            <option value="Wait until target is reached">Wait until target is reached</option>
+          </select>
+        </label>
+      </div>
+    );
+  }
+
+  return (
+    <div className="protocolFieldGrid">
+      <label className="protocolField" htmlFor={fieldId("duration")}>
+        <span>Duration</span>
+        <div className="protocolInputWithUnit">
+          <input
+            id={fieldId("duration")}
+            type="number"
+            min="0"
+            value={step.duration}
+            onChange={(event) => onChange({ ...step, duration: event.target.value })}
+          />
+          <select
+            aria-label={`Step ${step.id} duration unit`}
+            value={step.durationUnit}
+            onChange={(event) =>
+              onChange({ ...step, durationUnit: event.target.value as ReactionHoldStep["durationUnit"] })
+            }
+          >
+            <option value="s">s</option>
+            <option value="min">min</option>
+            <option value="h">h</option>
+          </select>
+        </div>
+      </label>
+
+      <label className="protocolField" htmlFor={fieldId("start-timer")}>
+        <span>Start timer</span>
+        <select
+          id={fieldId("start-timer")}
+          value={step.startTimer}
+          onChange={(event) =>
+            onChange({
+              ...step,
+              startTimer: event.target.value as ReactionHoldStep["startTimer"],
+            })
+          }
+        >
+          <option value="">Not selected</option>
+          <option value="After reactive addition completes">After reactive addition completes</option>
+          <option value="After all additions complete">After all additions complete</option>
+          <option value="After target temperature is reached">
+            After target temperature is reached
+          </option>
+        </select>
+      </label>
+    </div>
+  );
+}
+
+function ProtocolStepCard({
+  step,
+  index,
+  stepCount,
+  onChange,
+  onMove,
+  onRemove,
+}: {
+  step: ProtocolStep;
+  index: number;
+  stepCount: number;
+  onChange: (step: ProtocolStep) => void;
+  onMove: (index: number, direction: -1 | 1) => void;
+  onRemove: (id: number) => void;
+}) {
+  return (
+    <article className="protocolStepCard">
+      <div className="protocolStepHeader">
+        <div>
+          <span className="protocolStepNumber">Step {index + 1}</span>
+          <h3>{step.type}</h3>
+        </div>
+        <div className="protocolStepActions" aria-label={`Step ${index + 1} controls`}>
+          <button type="button" disabled={index === 0} onClick={() => onMove(index, -1)}>
+            Move up
+          </button>
+          <button
+            type="button"
+            disabled={index === stepCount - 1}
+            onClick={() => onMove(index, 1)}
+          >
+            Move down
+          </button>
+          <button className="protocolRemoveButton" type="button" onClick={() => onRemove(step.id)}>
+            Remove
+          </button>
+        </div>
+      </div>
+      <ProtocolStepFields step={step} onChange={onChange} />
+    </article>
+  );
+}
+
+function ProtocolBuilder({
+  runName,
+  preRunChecks,
+  steps,
+  onRunNameChange,
+  onCheckChange,
+  onAddStep,
+  onStepChange,
+  onMoveStep,
+  onRemoveStep,
+  onBack,
+}: {
+  runName: string;
+  preRunChecks: PreRunChecks;
+  steps: ProtocolStep[];
+  onRunNameChange: (value: string) => void;
+  onCheckChange: (key: PreRunCheckKey, checked: boolean) => void;
+  onAddStep: (type: ProtocolStepType) => void;
+  onStepChange: (step: ProtocolStep) => void;
+  onMoveStep: (index: number, direction: -1 | 1) => void;
+  onRemoveStep: (id: number) => void;
+  onBack: () => void;
+}) {
+  const doseSteps = steps.filter((step): step is DoseStep => step.type === "Dose");
+  const doseOrder = doseSteps
+    .map((step) => step.source)
+    .filter((source): source is Exclude<DoseSource, ""> => source !== "")
+    .join(" → ");
+  const configuredVolumes = doseSteps
+    .map((step) => step.volume.trim())
+    .filter((value) => value !== "")
+    .map(Number)
+    .filter((value) => Number.isFinite(value) && value > 0);
+  const totalVolume = configuredVolumes.reduce((total, volume) => total + volume, 0);
+  const totalVolumeLabel =
+    configuredVolumes.length === 0
+      ? "Not configured"
+      : `${Number(totalVolume.toFixed(6))} ml${
+          configuredVolumes.length < doseSteps.length ? " (incomplete)" : ""
+        }`;
+  const reactionHoldRule = steps.find(
+    (step): step is ReactionHoldStep => step.type === "Reaction hold" && step.startTimer !== "",
+  )?.startTimer;
+
+  return (
+    <main className="appShell">
+      <header className="topBar protocolBuilderTopBar">
+        <div>
+          <div className="protocolBuilderHeadingRow">
+            <div className="brand">Protocol Builder</div>
+            <div className="experimentalLabel">Experimental</div>
+          </div>
+          <div className="subBrand">Define one P1 screening run</div>
+        </div>
+
+        <div className="protocolBuilderHeaderActions">
+          <div className="draftNotice">Draft only — no hardware execution</div>
+          <button className="navigationButton" type="button" onClick={onBack}>
+            Back to Dashboard
+          </button>
+        </div>
+      </header>
+
+      <div className="protocolBuilderLayout">
+        <div className="protocolBuilderMainColumn">
+          <section className="protocolBuilderCard" aria-labelledby="run-setup-title">
+            <div className="protocolCardHeading">
+              <h2 id="run-setup-title">Run setup</h2>
+              <p>Basic context for this experimental P1 screening draft.</p>
+            </div>
+            <label className="protocolField" htmlFor="run-name">
+              <span>Run name</span>
+              <input
+                id="run-name"
+                type="text"
+                value={runName}
+                placeholder="Untitled screening run"
+                onChange={(event) => onRunNameChange(event.target.value)}
+              />
+            </label>
+            <div className="seriesContext" aria-label="Series context">
+              <div className="protocolSectionLabel">Series context</div>
+              <div className="seriesContextGrid">
+                {(["B1", "B2", "S"] as const).map((source) => (
+                  <div key={source}>
+                    <strong>{source}</strong>
+                    <span>Not configured</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="protocolBuilderCard" aria-labelledby="pre-run-checks-title">
+            <div className="protocolCardHeading">
+              <h2 id="pre-run-checks-title">Pre-run checks</h2>
+              <p>Some checks will later be confirmed by the system and others by the chemist.</p>
+            </div>
+            <div className="preRunCheckGrid">
+              {(
+                [
+                  ["sourcesAvailable", "Sources available"],
+                  ["p1AndValvesHomed", "P1 and valves homed"],
+                  ["reactorEmptyAndClean", "Reactor empty and clean"],
+                  ["wasteCapacityAvailable", "Waste capacity available"],
+                ] as const
+              ).map(([key, label]) => (
+                <label key={key} className="preRunCheck">
+                  <input
+                    type="checkbox"
+                    checked={preRunChecks[key]}
+                    onChange={(event) => onCheckChange(key, event.target.checked)}
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
+          </section>
+
+          <section className="protocolBuilderCard" aria-labelledby="protocol-steps-title">
+            <div className="protocolCardHeading">
+              <h2 id="protocol-steps-title">Protocol steps</h2>
+              <p>High-level draft actions only. No physical routes or hardware commands are generated.</p>
+            </div>
+            <div className="addStepControls" aria-label="Add protocol step">
+              {(["Dose", "Wait", "Set mixing", "Set temperature", "Reaction hold"] as const).map(
+                (type) => (
+                  <button key={type} type="button" onClick={() => onAddStep(type)}>
+                    + {type}
+                  </button>
+                ),
+              )}
+            </div>
+            <div className="protocolStepList">
+              {steps.map((step, index) => (
+                <ProtocolStepCard
+                  key={step.id}
+                  step={step}
+                  index={index}
+                  stepCount={steps.length}
+                  onChange={onStepChange}
+                  onMove={onMoveStep}
+                  onRemove={onRemoveStep}
+                />
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <aside className="protocolBuilderSidebar" aria-label="Run summary and assumptions">
+          <section className="protocolBuilderCard">
+            <div className="protocolCardHeading">
+              <h2>Run summary</h2>
+            </div>
+            <dl className="runSummaryList">
+              <div>
+                <dt>Run name</dt>
+                <dd>{runName.trim() || "Not configured"}</dd>
+              </div>
+              <div>
+                <dt>Step count</dt>
+                <dd>{steps.length}</dd>
+              </div>
+              <div>
+                <dt>Dose order</dt>
+                <dd>{doseOrder || "Not configured"}</dd>
+              </div>
+              <div>
+                <dt>Requested total volume</dt>
+                <dd>{totalVolumeLabel}</dd>
+              </div>
+              <div>
+                <dt>Reaction hold rule</dt>
+                <dd>{reactionHoldRule || "Not configured"}</dd>
+              </div>
+              <div>
+                <dt>Configuration status</dt>
+                <dd><span className="incompleteStatus">Incomplete</span></dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="protocolBuilderCard assumptionsCard">
+            <div className="protocolCardHeading">
+              <h2>Assumptions</h2>
+              <p>Explicit limitations of this experimental draft.</p>
+            </div>
+            <ul>
+              <li>Dead volumes are not measured</li>
+              <li>Prime and purge volumes are not validated</li>
+              <li>Aspiration and dispense rate units are not finalized</li>
+              <li>Delivered volume is not independently measured</li>
+              <li>This draft cannot execute hardware</li>
+            </ul>
+          </section>
+        </aside>
+      </div>
+    </main>
+  );
+}
+
 export default function App() {
   const [activeScreen, setActiveScreen] = useState<"dashboard" | "protocolBuilder">("dashboard");
+  const [runName, setRunName] = useState("");
+  const [preRunChecks, setPreRunChecks] = useState<PreRunChecks>({
+    sourcesAvailable: false,
+    p1AndValvesHomed: false,
+    reactorEmptyAndClean: false,
+    wasteCapacityAvailable: false,
+  });
+  const [protocolSteps, setProtocolSteps] = useState<ProtocolStep[]>(initialProtocolSteps);
+
+  const addProtocolStep = (type: ProtocolStepType) => {
+    setProtocolSteps((currentSteps) => {
+      const nextStepId = Math.max(0, ...currentSteps.map((step) => step.id)) + 1;
+      return [...currentSteps, createProtocolStep(type, nextStepId)];
+    });
+  };
+
+  const moveProtocolStep = (index: number, direction: -1 | 1) => {
+    setProtocolSteps((currentSteps) => {
+      const targetIndex = index + direction;
+
+      if (targetIndex < 0 || targetIndex >= currentSteps.length) {
+        return currentSteps;
+      }
+
+      const reorderedSteps = [...currentSteps];
+      [reorderedSteps[index], reorderedSteps[targetIndex]] = [
+        reorderedSteps[targetIndex],
+        reorderedSteps[index],
+      ];
+      return reorderedSteps;
+    });
+  };
 
   if (activeScreen === "protocolBuilder") {
     return (
-      <main className="appShell">
-        <header className="topBar">
-          <div>
-            <div className="brand">LABFORGE SCHEME DRAFT</div>
-            <div className="subBrand">Define and prepare screening runs</div>
-          </div>
-
-          <button
-            className="navigationButton"
-            type="button"
-            onClick={() => setActiveScreen("dashboard")}
-          >
-            Back to Dashboard
-          </button>
-        </header>
-
-        <section className="protocolBuilderShell" aria-labelledby="protocol-builder-title">
-          <div className="experimentalLabel">Experimental</div>
-          <h1 id="protocol-builder-title" className="protocolBuilderTitle">
-            Protocol Builder
-          </h1>
-          <p className="protocolBuilderDescription">
-            This screen will be used to define a screening run.
-          </p>
-          <button
-            className="navigationButton"
-            type="button"
-            onClick={() => setActiveScreen("dashboard")}
-          >
-            Back to Dashboard
-          </button>
-        </section>
-      </main>
+      <ProtocolBuilder
+        runName={runName}
+        preRunChecks={preRunChecks}
+        steps={protocolSteps}
+        onRunNameChange={setRunName}
+        onCheckChange={(key, checked) =>
+          setPreRunChecks((currentChecks) => ({ ...currentChecks, [key]: checked }))
+        }
+        onAddStep={addProtocolStep}
+        onStepChange={(updatedStep) =>
+          setProtocolSteps((currentSteps) =>
+            currentSteps.map((step) => (step.id === updatedStep.id ? updatedStep : step)),
+          )
+        }
+        onMoveStep={moveProtocolStep}
+        onRemoveStep={(id) =>
+          setProtocolSteps((currentSteps) => currentSteps.filter((step) => step.id !== id))
+        }
+        onBack={() => setActiveScreen("dashboard")}
+      />
     );
   }
 

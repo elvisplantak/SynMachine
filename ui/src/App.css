@@ -85,18 +85,6 @@ body {
   background: rgba(50, 202, 255, 0.2);
 }
 
-.protocolBuilderShell {
-  min-height: calc(100vh - 114px);
-  margin-top: 12px;
-  border: 1px solid rgba(89, 134, 197, 0.42);
-  border-radius: 18px;
-  padding: 48px;
-  background: rgba(8, 13, 24, 0.92);
-  box-shadow:
-    0 12px 35px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.03);
-}
-
 .experimentalLabel {
   width: fit-content;
   border: 1px solid rgba(176, 108, 255, 0.55);
@@ -105,23 +93,427 @@ body {
   color: #e7d8ff;
   background: rgba(176, 108, 255, 0.12);
   font-size: 12px;
+  line-height: 1;
   font-weight: 850;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-.protocolBuilderTitle {
-  margin: 18px 0 8px;
-  color: #e3f2ff;
-  font-size: 36px;
+.protocolBuilderTopBar {
+  height: auto;
+  min-height: 78px;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.protocolBuilderHeadingRow .brand {
+  font-size: 26px;
+  line-height: 1.15;
   font-weight: 900;
+}
+
+.protocolBuilderTopBar .subBrand {
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.protocolBuilderTopBar .navigationButton {
+  min-height: 44px;
+  padding: 10px 15px;
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.protocolBuilderHeadingRow,
+.protocolBuilderHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.protocolBuilderHeaderActions {
+  justify-content: flex-end;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.draftNotice {
+  border: 1px solid rgba(242, 190, 72, 0.5);
+  border-radius: 12px;
+  padding: 9px 12px;
+  color: #ffe6a3;
+  background: rgba(242, 190, 72, 0.1);
+  font-size: 14px;
+  line-height: 1.3;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.protocolBuilderLayout {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 12px;
+  align-items: start;
+}
+
+.protocolBuilderMainColumn,
+.protocolBuilderSidebar {
+  display: grid;
+  gap: 12px;
+}
+
+.protocolBuilderSidebar {
+  position: sticky;
+  top: 12px;
+}
+
+.protocolBuilderCard {
+  border: 1px solid rgba(89, 134, 197, 0.42);
+  border-radius: 18px;
+  padding: 18px;
+  background: rgba(8, 13, 24, 0.92);
+  box-shadow:
+    0 12px 35px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.protocolBuilderCard h2,
+.protocolBuilderCard h3 {
+  margin: 0;
+  color: #e3f2ff;
+  font-family: inherit;
   letter-spacing: normal;
 }
 
-.protocolBuilderDescription {
-  margin-bottom: 24px;
+.protocolBuilderCard h2 {
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 850;
+}
+
+.protocolBuilderCard h3 {
+  margin-top: 3px;
+  font-size: 18px;
+  line-height: 1.3;
+  font-weight: 850;
+}
+
+.protocolCardHeading {
+  margin-bottom: 18px;
+}
+
+.protocolCardHeading p {
+  margin-top: 6px;
+  color: #8ea3bf;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.protocolSectionLabel {
+  color: #8ea3bf;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.protocolStepNumber {
+  color: #8ea3bf;
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.protocolBuilderCard input,
+.protocolBuilderCard select {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  border: 1px solid rgba(89, 134, 197, 0.48);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #e3f2ff;
+  background: rgba(7, 15, 28, 0.92);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.protocolBuilderCard input::placeholder {
+  color: #71849f;
+}
+
+.protocolBuilderCard input:focus-visible,
+.protocolBuilderCard select:focus-visible {
+  border-color: #32caff;
+  outline: 2px solid rgba(50, 202, 255, 0.2);
+  outline-offset: 1px;
+}
+
+.protocolField {
+  display: grid;
+  gap: 8px;
+  color: #dbe7f5;
+  font-size: 14px;
+  line-height: 1.3;
+  font-weight: 750;
+}
+
+.protocolField small {
+  color: #8296b2;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 700;
+}
+
+.protocolFieldGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 14px;
+  row-gap: 16px;
+}
+
+.protocolDoseFields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.protocolInputWithUnit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.protocolInputWithUnit > span {
+  min-width: 30px;
   color: #9fb2cd;
+  font-size: 15px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.protocolInputWithUnit select {
+  width: auto;
+  min-width: 68px;
+}
+
+.seriesContext {
+  margin-top: 18px;
+}
+
+.seriesContextGrid {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.seriesContextGrid div {
+  border: 1px solid rgba(89, 134, 197, 0.3);
+  border-radius: 11px;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(7, 15, 28, 0.68);
+}
+
+.seriesContextGrid strong {
+  color: #e3f2ff;
   font-size: 16px;
+  line-height: 1.3;
+  font-weight: 850;
+}
+
+.seriesContextGrid span {
+  color: #8ea3bf;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.preRunCheckGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.preRunCheck {
+  border: 1px solid rgba(89, 134, 197, 0.3);
+  border-radius: 11px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #dbe7f5;
+  background: rgba(7, 15, 28, 0.68);
+  font-size: 15px;
+  line-height: 1.4;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.protocolBuilderCard .preRunCheck input {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 0;
+  accent-color: #32caff;
+}
+
+.addStepControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.addStepControls button,
+.protocolStepActions button {
+  border: 1px solid rgba(89, 134, 197, 0.44);
+  border-radius: 10px;
+  color: #dff1ff;
+  background: rgba(12, 23, 42, 0.95);
+  font: inherit;
+  cursor: pointer;
+}
+
+.addStepControls button {
+  min-height: 44px;
+  padding: 10px 14px;
+  border-color: rgba(50, 202, 255, 0.48);
+  background: rgba(50, 202, 255, 0.1);
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.protocolStepActions button {
+  min-height: 42px;
+  padding: 9px 13px;
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.addStepControls button:hover,
+.addStepControls button:focus-visible,
+.protocolStepActions button:hover:not(:disabled),
+.protocolStepActions button:focus-visible:not(:disabled) {
+  border-color: #32caff;
+  background: rgba(50, 202, 255, 0.18);
+}
+
+.protocolStepList {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.protocolStepCard {
+  border: 1px solid rgba(89, 134, 197, 0.32);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(7, 15, 28, 0.72);
+}
+
+.protocolStepHeader {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.protocolStepActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.protocolStepActions button:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.protocolStepActions .protocolRemoveButton {
+  border-color: rgba(255, 109, 109, 0.45);
+  color: #ffd9d9;
+}
+
+.runSummaryList {
+  margin: 0;
+  display: grid;
+  gap: 0;
+}
+
+.runSummaryList div {
+  border-bottom: 1px solid rgba(89, 134, 197, 0.18);
+  padding: 10px 0;
+  display: grid;
+  gap: 4px;
+}
+
+.runSummaryList div:first-child {
+  padding-top: 0;
+}
+
+.runSummaryList div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.runSummaryList dt {
+  color: #8ea3bf;
+  font-size: 13px;
+  line-height: 1.25;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.runSummaryList dd {
+  margin: 0;
+  color: #f1f7ff;
+  font-size: 16px;
+  line-height: 1.4;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.incompleteStatus {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid rgba(242, 190, 72, 0.45);
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #ffe6a3;
+  background: rgba(242, 190, 72, 0.1);
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 850;
+}
+
+.assumptionsCard {
+  border-color: rgba(176, 108, 255, 0.4);
+}
+
+.assumptionsCard ul {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 10px;
+  color: #b8c7dc;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.assumptionsCard .protocolCardHeading p {
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .workspaceGrid {
@@ -327,6 +719,19 @@ body {
 }
 
 @media (max-width: 1080px) {
+  .protocolBuilderLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .protocolBuilderSidebar {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .protocolDoseFields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .workspaceGrid {
     grid-template-columns: 1fr;
   }
@@ -346,6 +751,32 @@ body {
 
   .bottomBar {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .protocolBuilderTopBar,
+  .protocolBuilderHeaderActions,
+  .protocolStepHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .protocolBuilderHeaderActions,
+  .protocolStepActions {
+    justify-content: flex-start;
+  }
+
+  .protocolBuilderSidebar,
+  .protocolFieldGrid,
+  .protocolDoseFields,
+  .preRunCheckGrid,
+  .seriesContextGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .protocolBuilderCard {
+    padding: 14px;
   }
 }
 
