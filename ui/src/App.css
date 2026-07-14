@@ -66,23 +66,60 @@ body {
   gap: 10px;
 }
 
-.navigationButton {
-  border: 1px solid rgba(50, 202, 255, 0.55);
+.topNavigation {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid rgba(89, 134, 197, 0.32);
   border-radius: 12px;
-  min-height: 42px;
-  padding: 9px 14px;
-  color: #dff1ff;
-  background: rgba(50, 202, 255, 0.12);
+  padding: 3px;
+  background: rgba(5, 10, 21, 0.72);
+}
+
+.topNavigationItem {
+  min-height: 36px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 7px 10px;
+  color: #a9bad0;
+  background: transparent;
   font: inherit;
-  font-size: 14px;
-  font-weight: 850;
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 800;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.navigationButton:hover,
-.navigationButton:focus-visible {
-  border-color: #32caff;
-  background: rgba(50, 202, 255, 0.2);
+.topNavigationItem:hover:not(:disabled),
+.topNavigationItem:focus-visible:not(:disabled) {
+  border-color: rgba(50, 202, 255, 0.48);
+  color: #e3f2ff;
+  background: rgba(50, 202, 255, 0.1);
+}
+
+.topNavigationItem[aria-current="page"] {
+  border-color: rgba(50, 202, 255, 0.52);
+  color: #e3f2ff;
+  background: rgba(50, 202, 255, 0.14);
+}
+
+.topNavigationItem:disabled {
+  color: #65758a;
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.serviceNavigationItem {
+  margin-left: 4px;
+  border-left-color: rgba(176, 108, 255, 0.28);
+}
+
+.topNavigationUnavailable {
+  margin-left: 3px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .experimentalLabel {
@@ -115,14 +152,6 @@ body {
 .protocolBuilderTopBar .subBrand {
   font-size: 15px;
   line-height: 1.5;
-}
-
-.protocolBuilderTopBar .navigationButton {
-  min-height: 44px;
-  padding: 10px 15px;
-  font-size: 14px;
-  line-height: 1.2;
-  font-weight: 800;
 }
 
 .protocolBuilderHeadingRow,
@@ -777,6 +806,17 @@ body {
 
   .protocolBuilderCard {
     padding: 14px;
+  }
+
+  .topBar,
+  .topBarActions {
+    height: auto;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .topNavigation {
+    flex-wrap: wrap;
   }
 }
 

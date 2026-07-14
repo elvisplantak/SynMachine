@@ -321,6 +321,7 @@ type PreRunCheckKey =
   | "reactorEmptyAndClean"
   | "wasteCapacityAvailable";
 type PreRunChecks = Record<PreRunCheckKey, boolean>;
+type Screen = "dashboard" | "protocolBuilder";
 
 type DoseStep = {
   id: number;
@@ -776,6 +777,46 @@ function ProtocolStepCard({
   );
 }
 
+function TopNavigation({
+  activeScreen,
+  onNavigate,
+}: {
+  activeScreen: Screen;
+  onNavigate: (screen: Screen) => void;
+}) {
+  return (
+    <nav className="topNavigation" aria-label="Primary navigation">
+      <button
+        className="topNavigationItem"
+        type="button"
+        aria-current={activeScreen === "dashboard" ? "page" : undefined}
+        onClick={() => onNavigate("dashboard")}
+      >
+        Dashboard
+      </button>
+      <button
+        className="topNavigationItem"
+        type="button"
+        aria-current={activeScreen === "protocolBuilder" ? "page" : undefined}
+        onClick={() => onNavigate("protocolBuilder")}
+      >
+        Protocol Builder
+      </button>
+      <button className="topNavigationItem" type="button" disabled aria-disabled="true">
+        Logs <span className="topNavigationUnavailable">Soon</span>
+      </button>
+      <button
+        className="topNavigationItem serviceNavigationItem"
+        type="button"
+        disabled
+        aria-disabled="true"
+      >
+        Service <span className="topNavigationUnavailable">Soon</span>
+      </button>
+    </nav>
+  );
+}
+
 function ProtocolBuilder({
   runName,
   preRunChecks,
@@ -786,7 +827,7 @@ function ProtocolBuilder({
   onStepChange,
   onMoveStep,
   onRemoveStep,
-  onBack,
+  onNavigate,
 }: {
   runName: string;
   preRunChecks: PreRunChecks;
@@ -797,7 +838,7 @@ function ProtocolBuilder({
   onStepChange: (step: ProtocolStep) => void;
   onMoveStep: (index: number, direction: -1 | 1) => void;
   onRemoveStep: (id: number) => void;
-  onBack: () => void;
+  onNavigate: (screen: Screen) => void;
 }) {
   const doseSteps = steps.filter((step): step is DoseStep => step.type === "Dose");
   const doseOrder = doseSteps
@@ -832,10 +873,8 @@ function ProtocolBuilder({
         </div>
 
         <div className="protocolBuilderHeaderActions">
+          <TopNavigation activeScreen="protocolBuilder" onNavigate={onNavigate} />
           <div className="draftNotice">Draft only — no hardware execution</div>
-          <button className="navigationButton" type="button" onClick={onBack}>
-            Back to Dashboard
-          </button>
         </div>
       </header>
 
@@ -978,7 +1017,7 @@ function ProtocolBuilder({
 }
 
 export default function App() {
-  const [activeScreen, setActiveScreen] = useState<"dashboard" | "protocolBuilder">("dashboard");
+  const [activeScreen, setActiveScreen] = useState<Screen>("dashboard");
   const [runName, setRunName] = useState("");
   const [preRunChecks, setPreRunChecks] = useState<PreRunChecks>({
     sourcesAvailable: false,
@@ -1032,7 +1071,7 @@ export default function App() {
         onRemoveStep={(id) =>
           setProtocolSteps((currentSteps) => currentSteps.filter((step) => step.id !== id))
         }
-        onBack={() => setActiveScreen("dashboard")}
+        onNavigate={setActiveScreen}
       />
     );
   }
@@ -1048,13 +1087,7 @@ export default function App() {
         </div>
 
         <div className="topBarActions">
-          <button
-            className="navigationButton"
-            type="button"
-            onClick={() => setActiveScreen("protocolBuilder")}
-          >
-            Protocol Builder
-          </button>
+          <TopNavigation activeScreen="dashboard" onNavigate={setActiveScreen} />
           <div className="statusPill">SCHEME PREVIEW</div>
         </div>
       </header>
