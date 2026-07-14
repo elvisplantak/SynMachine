@@ -179,6 +179,318 @@ body {
   overflow-wrap: anywhere;
 }
 
+.logsTopBar {
+  height: auto;
+  min-height: 78px;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.logsHeadingRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logsHeadingRow .brand {
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.logsTopBar .subBrand {
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.exampleDataLabel {
+  border: 1px solid rgba(242, 190, 72, 0.5);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #ffe6a3;
+  background: rgba(242, 190, 72, 0.1);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.logsLayout {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: minmax(250px, 310px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.runHistoryPanel,
+.logsPanel {
+  border: 1px solid rgba(89, 134, 197, 0.42);
+  border-radius: 18px;
+  padding: 18px;
+  background: rgba(8, 13, 24, 0.92);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.runHistoryPanel {
+  position: sticky;
+  top: 12px;
+}
+
+.logsMainColumn {
+  display: grid;
+  gap: 12px;
+}
+
+.logsPanelHeading h2,
+.executionComparison h3 {
+  margin: 4px 0 0;
+  color: #e3f2ff;
+}
+
+.logsPanelHeading h2 {
+  font-size: 20px;
+  line-height: 1.3;
+}
+
+.runHistoryList {
+  margin-top: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.runHistoryItem {
+  width: 100%;
+  border: 1px solid rgba(89, 134, 197, 0.3);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+  color: #8ea3bf;
+  background: rgba(7, 15, 28, 0.72);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.runHistoryItem:hover,
+.runHistoryItem:focus-visible,
+.runHistoryItem[aria-pressed="true"] {
+  border-color: rgba(50, 202, 255, 0.55);
+  background: rgba(50, 202, 255, 0.1);
+}
+
+.runHistoryItemTop {
+  display: grid;
+  gap: 7px;
+}
+
+.runHistoryItem strong {
+  color: #e3f2ff;
+  font-size: 15px;
+}
+
+.runStatus {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 4px 7px;
+  color: #aeeecd;
+  background: rgba(46, 240, 167, 0.1);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.runStatusAborted,
+.runStatusCompletedwithwarnings {
+  color: #ffe6a3;
+  background: rgba(242, 190, 72, 0.1);
+}
+
+.exampleDataNote,
+.telemetryPlaceholder p,
+.mediaPlaceholder p {
+  margin: 14px 0 0;
+  color: #8296b2;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.selectedRunSummary {
+  margin: 16px 0 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.selectedRunSummary div {
+  display: grid;
+  gap: 5px;
+}
+
+.selectedRunSummary dt {
+  color: #8ea3bf;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.selectedRunSummary dd {
+  margin: 0;
+  color: #e3f2ff;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.timelineHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.logModeSwitch {
+  display: flex;
+  border: 1px solid rgba(89, 134, 197, 0.35);
+  border-radius: 10px;
+  padding: 3px;
+  background: rgba(5, 10, 21, 0.72);
+}
+
+.logModeSwitch button {
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 8px 11px;
+  color: #8ea3bf;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.logModeSwitch button[aria-pressed="true"] {
+  border-color: rgba(50, 202, 255, 0.5);
+  color: #e3f2ff;
+  background: rgba(50, 202, 255, 0.13);
+}
+
+.eventTimeline {
+  margin: 20px 0 0;
+  padding: 0;
+  display: grid;
+  list-style: none;
+}
+
+.eventTimeline li {
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 70px 18px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.eventTimeline time {
+  padding-top: 2px;
+  color: #8ea3bf;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.eventMarker {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  margin-top: 3px;
+  border: 2px solid #32caff;
+  border-radius: 50%;
+  background: #08101e;
+}
+
+.eventMarker::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  left: 2px;
+  width: 2px;
+  height: 46px;
+  background: rgba(89, 134, 197, 0.35);
+}
+
+.eventTimeline li:last-child .eventMarker::after {
+  display: none;
+}
+
+.eventContent {
+  display: grid;
+  gap: 5px;
+}
+
+.eventContent strong {
+  color: #e3f2ff;
+  font-size: 15px;
+}
+
+.eventContent span {
+  color: #8ea3bf;
+  font-size: 12px;
+}
+
+.executionComparisonGrid,
+.logsLowerGrid,
+.cameraPlaceholders {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.executionComparisonGrid > div,
+.cameraPlaceholders div {
+  border: 1px solid rgba(89, 134, 197, 0.28);
+  border-radius: 12px;
+  padding: 14px;
+  background: rgba(7, 15, 28, 0.68);
+}
+
+.executionComparison h3 {
+  font-size: 15px;
+}
+
+.executionComparison p {
+  margin: 8px 0 0;
+  color: #b8c7dc;
+  font-size: 14px;
+}
+
+.logsLowerGrid {
+  margin-top: 0;
+}
+
+.telemetryPlaceholder svg {
+  width: 100%;
+  margin-top: 14px;
+  border: 1px dashed rgba(89, 134, 197, 0.38);
+  border-radius: 12px;
+  background: rgba(7, 15, 28, 0.6);
+}
+
+.telemetryPlaceholder path {
+  fill: none;
+  stroke: #32caff;
+  stroke-width: 3;
+  stroke-dasharray: 7 6;
+  opacity: 0.7;
+}
+
+.cameraPlaceholders div {
+  min-height: 96px;
+  display: grid;
+  place-items: center;
+  color: #8ea3bf;
+  font-size: 14px;
+  text-align: center;
+}
+
 .protocolBuilderLayout {
   margin-top: 12px;
   display: grid;
@@ -748,6 +1060,14 @@ body {
 }
 
 @media (max-width: 1080px) {
+  .logsLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .runHistoryPanel {
+    position: static;
+  }
+
   .protocolBuilderLayout {
     grid-template-columns: 1fr;
   }
@@ -785,6 +1105,7 @@ body {
 
 @media (max-width: 700px) {
   .protocolBuilderTopBar,
+  .logsTopBar,
   .protocolBuilderHeaderActions,
   .protocolStepHeader {
     align-items: stretch;
@@ -797,6 +1118,10 @@ body {
   }
 
   .protocolBuilderSidebar,
+  .selectedRunSummary,
+  .executionComparisonGrid,
+  .logsLowerGrid,
+  .cameraPlaceholders,
   .protocolFieldGrid,
   .protocolDoseFields,
   .preRunCheckGrid,
@@ -817,6 +1142,11 @@ body {
 
   .topNavigation {
     flex-wrap: wrap;
+  }
+
+  .timelineHeader {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

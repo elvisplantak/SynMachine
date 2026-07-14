@@ -321,7 +321,106 @@ type PreRunCheckKey =
   | "reactorEmptyAndClean"
   | "wasteCapacityAvailable";
 type PreRunChecks = Record<PreRunCheckKey, boolean>;
-type Screen = "dashboard" | "protocolBuilder";
+type Screen = "dashboard" | "protocolBuilder" | "logs";
+type LogMode = "human" | "technical";
+type LogEvent = {
+  time: string;
+  message: string;
+  subsystem: string;
+  level?: "Info" | "Warning" | "Pause";
+};
+type ExampleRun = {
+  id: string;
+  name: string;
+  date: string;
+  status: "Completed" | "Aborted" | "Completed with warnings";
+  protocol: string;
+  started: string;
+  finished: string;
+  duration: string;
+  stepCount: number;
+  humanEvents: LogEvent[];
+  technicalEvents: LogEvent[];
+};
+
+const exampleRuns: ExampleRun[] = [
+  {
+    id: "screening-01",
+    name: "Screening run 01",
+    date: "14 Jul 2026, 09:20",
+    status: "Completed",
+    protocol: "P1 screening example",
+    started: "09:20:00",
+    finished: "10:04:18",
+    duration: "44 min 18 s",
+    stepCount: 7,
+    humanEvents: [
+      { time: "09:20:00", message: "Run preparation confirmed", subsystem: "Run" },
+      { time: "09:20:18", message: "Automatic initialization completed", subsystem: "System" },
+      { time: "09:21:04", message: "Mixing started", subsystem: "Reactor" },
+      { time: "09:24:32", message: "B1 addition completed", subsystem: "P1" },
+      { time: "09:31:10", message: "Target temperature reached", subsystem: "Reactor" },
+      { time: "09:31:12", message: "Reaction hold started", subsystem: "Protocol" },
+      { time: "10:04:18", message: "Run completed", subsystem: "Run" },
+    ],
+    technicalEvents: [
+      { time: "09:20:03", message: "V4 homing started", subsystem: "V4" },
+      { time: "09:20:07", message: "V4 home switch detected", subsystem: "V4" },
+      { time: "09:23:58", message: "P1 aspiration command accepted", subsystem: "P1" },
+      { time: "09:24:10", message: "P1 aspiration movement completed", subsystem: "P1" },
+      { time: "09:24:14", message: "P1 dispense command accepted", subsystem: "P1" },
+      { time: "09:31:10", message: "Example temperature sample recorded", subsystem: "Reactor" },
+    ],
+  },
+  {
+    id: "screening-02",
+    name: "Screening run 02",
+    date: "14 Jul 2026, 11:15",
+    status: "Completed with warnings",
+    protocol: "P1 screening example",
+    started: "11:15:00",
+    finished: "12:02:41",
+    duration: "47 min 41 s",
+    stepCount: 7,
+    humanEvents: [
+      { time: "11:15:00", message: "Run preparation confirmed", subsystem: "Run" },
+      { time: "11:15:22", message: "Automatic initialization completed", subsystem: "System" },
+      { time: "11:28:09", message: "Run paused for operator review", subsystem: "Run", level: "Pause" },
+      { time: "11:31:44", message: "Run resumed after manual confirmation", subsystem: "Run", level: "Warning" },
+      { time: "12:02:41", message: "Run completed with warnings", subsystem: "Run", level: "Warning" },
+    ],
+    technicalEvents: [
+      { time: "11:15:04", message: "V4 homing started", subsystem: "V4" },
+      { time: "11:15:08", message: "V4 home switch detected", subsystem: "V4" },
+      { time: "11:28:09", message: "Reported state changed to paused", subsystem: "Run", level: "Pause" },
+      { time: "11:31:44", message: "Manual intervention acknowledged in example log", subsystem: "Operator", level: "Warning" },
+      { time: "11:45:16", message: "Example temperature sample recorded", subsystem: "Reactor" },
+    ],
+  },
+  {
+    id: "cleaning-validation",
+    name: "Cleaning validation test",
+    date: "13 Jul 2026, 16:40",
+    status: "Aborted",
+    protocol: "Cleaning sequence draft",
+    started: "16:40:00",
+    finished: "16:48:27",
+    duration: "8 min 27 s",
+    stepCount: 4,
+    humanEvents: [
+      { time: "16:40:00", message: "Run preparation confirmed", subsystem: "Run" },
+      { time: "16:40:20", message: "Automatic initialization completed", subsystem: "System" },
+      { time: "16:47:51", message: "Run paused for operator review", subsystem: "Run", level: "Pause" },
+      { time: "16:48:27", message: "Run aborted by operator", subsystem: "Run", level: "Warning" },
+    ],
+    technicalEvents: [
+      { time: "16:40:04", message: "V4 homing started", subsystem: "V4" },
+      { time: "16:40:08", message: "V4 home switch detected", subsystem: "V4" },
+      { time: "16:47:51", message: "Reported state changed to paused", subsystem: "Run", level: "Pause" },
+      { time: "16:48:27", message: "Operator abort recorded as example event", subsystem: "Operator", level: "Warning" },
+    ],
+  },
+];
 
 type DoseStep = {
   id: number;
@@ -802,8 +901,13 @@ function TopNavigation({
       >
         Protocol Builder
       </button>
-      <button className="topNavigationItem" type="button" disabled aria-disabled="true">
-        Logs <span className="topNavigationUnavailable">Soon</span>
+      <button
+        className="topNavigationItem"
+        type="button"
+        aria-current={activeScreen === "logs" ? "page" : undefined}
+        onClick={() => onNavigate("logs")}
+      >
+        Logs
       </button>
       <button
         className="topNavigationItem serviceNavigationItem"
@@ -814,6 +918,128 @@ function TopNavigation({
         Service <span className="topNavigationUnavailable">Soon</span>
       </button>
     </nav>
+  );
+}
+
+function LogsScreen({ onNavigate }: { onNavigate: (screen: Screen) => void }) {
+  const [selectedRunId, setSelectedRunId] = useState(exampleRuns[0].id);
+  const [logMode, setLogMode] = useState<LogMode>("human");
+  const selectedRun = exampleRuns.find((run) => run.id === selectedRunId) ?? exampleRuns[0];
+  const visibleEvents = logMode === "human" ? selectedRun.humanEvents : selectedRun.technicalEvents;
+
+  return (
+    <main className="appShell">
+      <header className="topBar logsTopBar">
+        <div>
+          <div className="logsHeadingRow">
+            <div className="brand">Logs</div>
+            <div className="exampleDataLabel">Example data</div>
+          </div>
+          <div className="subBrand">Run history, event timeline, and technical diagnostics</div>
+        </div>
+        <div className="topBarActions">
+          <TopNavigation activeScreen="logs" onNavigate={onNavigate} />
+        </div>
+      </header>
+
+      <div className="logsLayout">
+        <aside className="runHistoryPanel" aria-labelledby="run-history-title">
+          <div className="logsPanelHeading">
+            <span className="panelEyebrow">Frontend example dataset</span>
+            <h2 id="run-history-title">Run history</h2>
+          </div>
+          <div className="runHistoryList">
+            {exampleRuns.map((run) => (
+              <button
+                key={run.id}
+                className="runHistoryItem"
+                type="button"
+                aria-pressed={selectedRun.id === run.id}
+                onClick={() => setSelectedRunId(run.id)}
+              >
+                <span className="runHistoryItemTop">
+                  <strong>{run.name}</strong>
+                  <span className={`runStatus runStatus${run.status.replaceAll(" ", "")}`}>
+                    {run.status}
+                  </span>
+                </span>
+                <span>{run.date}</span>
+                <span>{run.protocol}</span>
+              </button>
+            ))}
+          </div>
+          <p className="exampleDataNote">Local example content only. No run database is connected.</p>
+        </aside>
+
+        <div className="logsMainColumn">
+          <section className="logsPanel runSummaryPanel" aria-labelledby="selected-run-title">
+            <div className="logsPanelHeading">
+              <span className="panelEyebrow">Selected example run</span>
+              <h2 id="selected-run-title">{selectedRun.name}</h2>
+            </div>
+            <dl className="selectedRunSummary">
+              <div><dt>Protocol</dt><dd>{selectedRun.protocol}</dd></div>
+              <div><dt>Status</dt><dd>{selectedRun.status}</dd></div>
+              <div><dt>Started</dt><dd>{selectedRun.started}</dd></div>
+              <div><dt>Finished</dt><dd>{selectedRun.finished}</dd></div>
+              <div><dt>Duration</dt><dd>{selectedRun.duration}</dd></div>
+              <div><dt>Step count</dt><dd>{selectedRun.stepCount}</dd></div>
+            </dl>
+          </section>
+
+          <section className="logsPanel timelinePanel" aria-labelledby="event-timeline-title">
+            <div className="timelineHeader">
+              <div className="logsPanelHeading">
+                <span className="panelEyebrow">Example events</span>
+                <h2 id="event-timeline-title">Event timeline</h2>
+              </div>
+              <div className="logModeSwitch" aria-label="Log detail level">
+                <button type="button" aria-pressed={logMode === "human"} onClick={() => setLogMode("human")}>Human log</button>
+                <button type="button" aria-pressed={logMode === "technical"} onClick={() => setLogMode("technical")}>Technical log</button>
+              </div>
+            </div>
+            <ol className="eventTimeline">
+              {visibleEvents.map((event, index) => (
+                <li key={`${event.time}-${index}`}>
+                  <time>{event.time}</time>
+                  <div className="eventMarker" aria-hidden="true" />
+                  <div className="eventContent">
+                    <strong>{event.message}</strong>
+                    <span>{event.subsystem} · {event.level ?? "Info"}</span>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+
+          <section className="logsPanel executionComparison" aria-labelledby="execution-comparison-title">
+            <div className="logsPanelHeading">
+              <span className="panelEyebrow">Example distinction</span>
+              <h2 id="execution-comparison-title">Planned versus reported execution</h2>
+            </div>
+            <div className="executionComparisonGrid">
+              <div><h3>Planned</h3><p>Dose B1</p><p>Commanded volume: 2.0 ml</p></div>
+              <div><h3>Reported execution</h3><p>Pump movement completed</p><p>No independent delivered-volume measurement available</p></div>
+            </div>
+          </section>
+
+          <div className="logsLowerGrid">
+            <section className="logsPanel telemetryPlaceholder" aria-labelledby="telemetry-title">
+              <div className="logsPanelHeading"><span className="panelEyebrow">Example visualization</span><h2 id="telemetry-title">Reactor temperature telemetry</h2></div>
+              <svg viewBox="0 0 500 120" role="img" aria-label="Example temperature telemetry placeholder">
+                <path d="M 10 98 L 85 90 L 150 64 L 225 48 L 300 50 L 380 32 L 490 35" />
+              </svg>
+              <p>Actual telemetry is not connected.</p>
+            </section>
+            <section className="logsPanel mediaPlaceholder" aria-labelledby="media-title">
+              <div className="logsPanelHeading"><span className="panelEyebrow">Future run media</span><h2 id="media-title">Camera media</h2></div>
+              <div className="cameraPlaceholders"><div>Reactor camera media</div><div>Overview camera media</div></div>
+              <p>No recorded media in this frontend draft. Storage and playback are not implemented.</p>
+            </section>
+          </div>
+        </div>
+      </div>
+    </main>
   );
 }
 
@@ -1074,6 +1300,10 @@ export default function App() {
         onNavigate={setActiveScreen}
       />
     );
+  }
+
+  if (activeScreen === "logs") {
+    return <LogsScreen onNavigate={setActiveScreen} />;
   }
 
   return (
