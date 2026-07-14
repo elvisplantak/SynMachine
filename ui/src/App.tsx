@@ -321,7 +321,16 @@ type PreRunCheckKey =
   | "reactorEmptyAndClean"
   | "wasteCapacityAvailable";
 type PreRunChecks = Record<PreRunCheckKey, boolean>;
-type Screen = "dashboard" | "protocolBuilder" | "logs";
+type Screen = "dashboard" | "protocolBuilder" | "logs" | "service";
+type ServiceSection =
+  | "overview"
+  | "routeTest"
+  | "pumps"
+  | "valves"
+  | "mixerTemperature"
+  | "cameras"
+  | "diagnostics"
+  | "calibration";
 type LogMode = "human" | "technical";
 type LogEvent = {
   time: string;
@@ -912,12 +921,122 @@ function TopNavigation({
       <button
         className="topNavigationItem serviceNavigationItem"
         type="button"
-        disabled
-        aria-disabled="true"
+        aria-current={activeScreen === "service" ? "page" : undefined}
+        onClick={() => onNavigate("service")}
       >
-        Service <span className="topNavigationUnavailable">Soon</span>
+        Service
       </button>
     </nav>
+  );
+}
+
+const serviceSections: { id: ServiceSection; label: string }[] = [
+  { id: "overview", label: "System overview" },
+  { id: "routeTest", label: "Route test" },
+  { id: "pumps", label: "Pumps" },
+  { id: "valves", label: "Valves" },
+  { id: "mixerTemperature", label: "Mixer & temperature" },
+  { id: "cameras", label: "Cameras" },
+  { id: "diagnostics", label: "Diagnostics" },
+  { id: "calibration", label: "Calibration" },
+];
+
+function DisabledServiceButton({ children }: { children: string }) {
+  return <button type="button" disabled aria-disabled="true">{children}</button>;
+}
+
+function ServiceSectionContent({ section }: { section: ServiceSection }) {
+  if (section === "overview") {
+    const groups = [
+      ["Connections", ["Backend", "Arduino Mega"]],
+      ["P1 subsystem", ["P1", "V1", "V2", "V4", "V6"]],
+      ["P2 subsystem", ["P2", "V3", "V5", "V7", "V8"]],
+      ["Reactor", ["Mixer", "Reactor temperature"]],
+      ["Cameras", ["Reactor camera", "Overview camera"]],
+    ] as const;
+    return (
+      <>
+        <div className="serviceSectionHeading"><span className="panelEyebrow">Hardware structure</span><h2>System overview</h2><p>Confirmed subsystem placeholders for future connection and diagnostics.</p></div>
+        <div className="serviceOverviewGrid">
+          {groups.map(([group, items]) => (
+            <section key={group} className="serviceGroup"><h3>{group}</h3>{items.map((item) => <div className="serviceStatusRow" key={item}><strong>{item}</strong><span>Not connected</span></div>)}</section>
+          ))}
+        </div>
+        <div className="serviceInfoNote">Frontend placeholders only. These values are not live hardware data and do not confirm independent device feedback.</div>
+      </>
+    );
+  }
+
+  if (section === "routeTest") {
+    return (
+      <>
+        <div className="serviceSectionHeading"><span className="panelEyebrow">Structural draft</span><h2>Route test</h2><p>A future backend will validate physical route availability and safety.</p></div>
+        <div className="serviceFormGrid">
+          <label>Source<select disabled aria-disabled="true"><option>B1</option><option>B2</option><option>S</option><option>Reactor</option></select></label>
+          <label>Destination<select disabled aria-disabled="true"><option>Reactor</option><option>Waste</option><option>Separatory funnel</option><option>Column</option></select></label>
+          <label>Volume<input disabled aria-disabled="true" placeholder="Not configured" /></label>
+        </div>
+        <div className="routePreviewDraft"><span>Route preview</span><strong>Not calculated</strong><p>No source-to-destination combination is validated in this frontend draft.</p></div>
+        <div className="serviceActionRow"><DisabledServiceButton>Preview route</DisabledServiceButton><DisabledServiceButton>Run route test</DisabledServiceButton></div>
+      </>
+    );
+  }
+
+  if (section === "pumps") {
+    return (
+      <>
+        <div className="serviceSectionHeading"><span className="panelEyebrow">Syringe pump draft</span><h2>Pumps</h2><p>P1 and P2 use separate aspirate and dispense phases.</p></div>
+        <div className="serviceTwoColumn">{["P1", "P2"].map((pump) => <section className="serviceGroup" key={pump}><h3>{pump} syringe pump</h3><div className="serviceStatusList"><span>Homing state<strong>Unknown</strong></span><span>Syringe position<strong>Not connected</strong></span><span>Commanded volume<strong>Not configured</strong></span><span>Commanded rate<strong>Not configured</strong></span></div><div className="serviceActionRow"><DisabledServiceButton>Home</DisabledServiceButton><DisabledServiceButton>Aspirate</DisabledServiceButton><DisabledServiceButton>Dispense</DisabledServiceButton></div></section>)}</div>
+      </>
+    );
+  }
+
+  if (section === "valves") {
+    return (
+      <>
+        <div className="serviceSectionHeading"><span className="panelEyebrow">Valve control draft</span><h2>Valves</h2><p>Confirmed mapping: 0° closed, 90° k1 ↔ k3, 180° k1 ↔ k2.</p></div>
+        <div className="valveServiceGrid">{Array.from({ length: 8 }, (_, index) => `V${index + 1}`).map((valve) => <section className="serviceGroup valveServiceCard" key={valve}><div><h3>{valve}</h3><span>State: Unknown</span></div><div className="serviceActionRow"><DisabledServiceButton>Home</DisabledServiceButton><DisabledServiceButton>Closed</DisabledServiceButton><DisabledServiceButton>k1 ↔ k3</DisabledServiceButton><DisabledServiceButton>k1 ↔ k2</DisabledServiceButton></div></section>)}</div>
+      </>
+    );
+  }
+
+  if (section === "mixerTemperature") {
+    return (
+      <>
+        <div className="serviceSectionHeading"><span className="panelEyebrow">Reactor subsystem draft</span><h2>Mixer & temperature</h2><p>Backend safety rules remain active in Service mode.</p></div>
+        <div className="serviceTwoColumn"><section className="serviceGroup"><h3>Mixer</h3><div className="serviceStatusList"><span>Connection<strong>Not connected</strong></span><span>Commanded speed<strong>Not configured · unit TBD</strong></span></div><div className="serviceActionRow"><DisabledServiceButton>Start</DisabledServiceButton><DisabledServiceButton>Stop</DisabledServiceButton></div></section><section className="serviceGroup"><h3>Reactor temperature</h3><div className="serviceStatusList"><span>Target temperature<strong>Not configured</strong></span><span>Heater state<strong>Unknown</strong></span><span>Reported temperature<strong>Not connected</strong></span></div><div className="serviceActionRow"><DisabledServiceButton>Apply target</DisabledServiceButton></div></section></div>
+      </>
+    );
+  }
+
+  if (section === "cameras") {
+    return (
+      <>
+        <div className="serviceSectionHeading"><span className="panelEyebrow">Planned media hardware</span><h2>Cameras</h2><p>No live feed, storage, or playback is implemented.</p></div>
+        <div className="serviceTwoColumn">{[["Reactor camera", "Reactor observation"], ["Overview camera", "System overview"]].map(([camera, role]) => <section className="serviceGroup cameraServiceCard" key={camera}><div className="cameraServicePlaceholder">No video stream</div><h3>{camera}</h3><div className="serviceStatusList"><span>Role<strong>{role}</strong></span><span>Connection<strong>Not connected</strong></span><span>Stream<strong>Not implemented</strong></span><span>Recording<strong>Not implemented</strong></span></div></section>)}</div>
+      </>
+    );
+  }
+
+  if (section === "diagnostics") {
+    const diagnostics = [["Connection diagnostics", "Backend not connected"], ["Homing diagnostics", "No live diagnostic data"], ["Switch and input diagnostics", "No live diagnostic data"], ["Command history", "No command history in frontend draft"], ["Last reported fault", "No reported faults in frontend draft"]];
+    return <><div className="serviceSectionHeading"><span className="panelEyebrow">Future diagnostic structure</span><h2>Diagnostics</h2><p>No serial messages, raw inputs, or live fault data are available.</p></div><div className="diagnosticsList">{diagnostics.map(([name, state]) => <div key={name}><strong>{name}</strong><span>{state}</span></div>)}</div></>;
+  }
+
+  const calibrations = ["P1 volume calibration", "P2 volume calibration", "Valve home offsets", "Mixer calibration", "Reactor temperature calibration", "Camera calibration"];
+  return <><div className="serviceSectionHeading"><span className="panelEyebrow">Planning only</span><h2>Calibration</h2><p>No procedures or existing calibration values are defined.</p></div><div className="calibrationList">{calibrations.map((item) => <div key={item}><strong>{item}</strong><DisabledServiceButton>Unavailable</DisabledServiceButton></div>)}</div><div className="serviceWarningNote">Calibration values affect physical execution and will require validation before use.</div></>;
+}
+
+function ServiceScreen({ onNavigate }: { onNavigate: (screen: Screen) => void }) {
+  const [activeSection, setActiveSection] = useState<ServiceSection>("overview");
+  return (
+    <main className="appShell serviceShell">
+      <header className="topBar serviceTopBar"><div><div className="serviceHeadingRow"><div className="brand">Service</div><div className="serviceDraftLabel">Frontend draft — no hardware control</div></div><div className="subBrand">Manual control, diagnostics, and calibration</div></div><div className="topBarActions"><TopNavigation activeScreen="service" onNavigate={onNavigate} /></div></header>
+      <div className="serviceLayout">
+        <aside className="serviceNavigation" aria-label="Service sections"><span className="panelEyebrow">Technical workspace</span>{serviceSections.map((section) => <button key={section.id} type="button" aria-pressed={activeSection === section.id} onClick={() => setActiveSection(section.id)}>{section.label}</button>)}<p>Direct hardware control is not implemented. Service mode does not bypass backend safety rules.</p></aside>
+        <section className="serviceContent"><ServiceSectionContent section={activeSection} /></section>
+      </div>
+    </main>
   );
 }
 
@@ -1304,6 +1423,10 @@ export default function App() {
 
   if (activeScreen === "logs") {
     return <LogsScreen onNavigate={setActiveScreen} />;
+  }
+
+  if (activeScreen === "service") {
+    return <ServiceScreen onNavigate={setActiveScreen} />;
   }
 
   return (

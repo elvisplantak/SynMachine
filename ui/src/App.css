@@ -491,6 +491,289 @@ body {
   text-align: center;
 }
 
+.serviceShell {
+  background: radial-gradient(circle at 85% 0%, rgba(242, 190, 72, 0.08), transparent 28%), linear-gradient(180deg, #0a1020 0%, #050812 100%);
+}
+
+.serviceTopBar {
+  height: auto;
+  min-height: 78px;
+  gap: 20px;
+  flex-wrap: wrap;
+  border-color: rgba(242, 190, 72, 0.35);
+}
+
+.serviceHeadingRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.serviceHeadingRow .brand {
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.serviceTopBar .subBrand {
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.serviceDraftLabel {
+  border: 1px solid rgba(255, 109, 109, 0.52);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #ffd9d9;
+  background: rgba(255, 109, 109, 0.1);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.serviceLayout {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: minmax(220px, 270px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.serviceNavigation,
+.serviceContent {
+  border: 1px solid rgba(89, 134, 197, 0.42);
+  border-radius: 18px;
+  padding: 18px;
+  background: rgba(8, 13, 24, 0.92);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.serviceNavigation {
+  position: sticky;
+  top: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.serviceNavigation button {
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 8px 10px;
+  color: #9fb2cd;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.serviceNavigation button:hover,
+.serviceNavigation button:focus-visible,
+.serviceNavigation button[aria-pressed="true"] {
+  border-color: rgba(242, 190, 72, 0.42);
+  color: #fff0c2;
+  background: rgba(242, 190, 72, 0.09);
+}
+
+.serviceNavigation p {
+  margin: 12px 0 0;
+  color: #8296b2;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.serviceSectionHeading h2 {
+  margin: 4px 0 0;
+  color: #e3f2ff;
+  font-size: 22px;
+}
+
+.serviceSectionHeading p {
+  margin: 7px 0 0;
+  color: #8ea3bf;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.serviceOverviewGrid,
+.serviceTwoColumn,
+.valveServiceGrid {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.serviceGroup,
+.routePreviewDraft {
+  border: 1px solid rgba(89, 134, 197, 0.3);
+  border-radius: 12px;
+  padding: 14px;
+  background: rgba(7, 15, 28, 0.68);
+}
+
+.serviceGroup h3 {
+  margin: 0 0 12px;
+  color: #e3f2ff;
+  font-size: 16px;
+}
+
+.serviceStatusRow,
+.serviceStatusList span,
+.diagnosticsList div,
+.calibrationList div {
+  border-bottom: 1px solid rgba(89, 134, 197, 0.18);
+  padding: 8px 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #8ea3bf;
+  font-size: 13px;
+}
+
+.serviceStatusRow:last-child,
+.serviceStatusList span:last-child,
+.diagnosticsList div:last-child,
+.calibrationList div:last-child {
+  border-bottom: 0;
+}
+
+.serviceStatusRow strong,
+.serviceStatusList strong,
+.diagnosticsList strong,
+.calibrationList strong {
+  color: #dbe7f5;
+}
+
+.serviceStatusList {
+  display: grid;
+}
+
+.serviceStatusList span {
+  display: grid;
+}
+
+.serviceStatusList strong {
+  text-align: right;
+}
+
+.serviceInfoNote,
+.serviceWarningNote {
+  margin-top: 14px;
+  border: 1px solid rgba(242, 190, 72, 0.35);
+  border-radius: 11px;
+  padding: 11px 13px;
+  color: #d7c692;
+  background: rgba(242, 190, 72, 0.07);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.serviceFormGrid {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.serviceFormGrid label {
+  display: grid;
+  gap: 7px;
+  color: #dbe7f5;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.serviceFormGrid select,
+.serviceFormGrid input {
+  min-height: 44px;
+  border: 1px solid rgba(89, 134, 197, 0.3);
+  border-radius: 9px;
+  padding: 9px 11px;
+  color: #71849f;
+  background: rgba(7, 15, 28, 0.72);
+  font: inherit;
+}
+
+.routePreviewDraft {
+  margin-top: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.routePreviewDraft span,
+.valveServiceCard span {
+  color: #8ea3bf;
+  font-size: 12px;
+}
+
+.routePreviewDraft strong {
+  color: #e3f2ff;
+}
+
+.routePreviewDraft p {
+  margin: 0;
+  color: #8296b2;
+  font-size: 13px;
+}
+
+.serviceActionRow {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.serviceActionRow button,
+.calibrationList button {
+  min-height: 36px;
+  border: 1px solid rgba(89, 134, 197, 0.28);
+  border-radius: 8px;
+  padding: 7px 10px;
+  color: #65758a;
+  background: rgba(7, 15, 28, 0.55);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.valveServiceGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.valveServiceCard > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.valveServiceCard h3 {
+  margin: 0;
+}
+
+.cameraServicePlaceholder {
+  min-height: 130px;
+  margin-bottom: 14px;
+  border: 1px dashed rgba(89, 134, 197, 0.38);
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: #65758a;
+  background: rgba(5, 10, 21, 0.65);
+  font-size: 13px;
+}
+
+.diagnosticsList,
+.calibrationList {
+  margin-top: 18px;
+  display: grid;
+}
+
 .protocolBuilderLayout {
   margin-top: 12px;
   display: grid;
@@ -1060,6 +1343,20 @@ body {
 }
 
 @media (max-width: 1080px) {
+  .serviceLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .serviceNavigation {
+    position: static;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .serviceNavigation .panelEyebrow,
+  .serviceNavigation p {
+    grid-column: 1 / -1;
+  }
+
   .logsLayout {
     grid-template-columns: 1fr;
   }
@@ -1106,6 +1403,7 @@ body {
 @media (max-width: 700px) {
   .protocolBuilderTopBar,
   .logsTopBar,
+  .serviceTopBar,
   .protocolBuilderHeaderActions,
   .protocolStepHeader {
     align-items: stretch;
@@ -1118,6 +1416,10 @@ body {
   }
 
   .protocolBuilderSidebar,
+  .serviceOverviewGrid,
+  .serviceTwoColumn,
+  .valveServiceGrid,
+  .serviceFormGrid,
   .selectedRunSummary,
   .executionComparisonGrid,
   .logsLowerGrid,
@@ -1147,6 +1449,15 @@ body {
   .timelineHeader {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .serviceHeadingRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .serviceNavigation {
+    grid-template-columns: 1fr;
   }
 }
 
