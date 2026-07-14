@@ -312,6 +312,66 @@ function Fractions({ x, y }: { x: number; y: number }) {
   );
 }
 
+function FluidicScheme({ activeSegments = new Set(["b1-v4", "v4-v6", "v6-v1", "v1-p1"]) }: { activeSegments?: Set<string> }) {
+  const isActive = (segment: string) => activeSegments.has(segment);
+
+  return (
+    <svg className="schemeCanvas" viewBox="-900 -420 1800 840">
+      {/* P1 input pipes */}
+      <Pipe d="M -716 -230 L -690 -230 L -690 -165 L -665 -165" active={isActive("b1-v4")} />
+      <Pipe d="M -716 -100 L -640 -100 L -640 -230 L -600 -230" active={isActive("b2-v4")} />
+      <Pipe d="M -535 -165 L -455 -165 L -455 -95 L -390 -95" active={isActive("v4-v6")} />
+      <Pipe d="M -716 70 L -500 70 L -500 -30 L -455 -30" active={isActive("s-v6")} />
+      <Pipe d="M -325 -30 L -300 -30 L -300 -120 L -170 -120 L -170 -95" active={isActive("v6-v1")} />
+      <Pipe d="M -105 -30 L 2 -30" active={isActive("v1-p1")} />
+
+      {/* P1 output / reactor / waste pipes */}
+      <Pipe d="M -235 -30 L -280 -30 L -280 235 L -105 235 L -105 165" active={isActive("v1-v2")} />
+      <Pipe d="M -170 100 L 185 100 L 185 165 L 206 165" active={isActive("v2-reactor")} />
+      <Pipe d="M -235 165 L -320 165 L -320 300 L 608 300" active={isActive("v2-waste")} />
+
+      {/* P2 branch pipes */}
+      <Pipe d="M 335 165 L 405 165" active={isActive("reactor-v3")} />
+      <Pipe d="M 535 165 L 632 165" active={isActive("v3-p2")} />
+      <Pipe d="M 470 100 L 470 65" active={isActive("v3-v7")} />
+      <Pipe d="M 470 -65 L 470 -340 L 650 -340 L 650 -309" active={isActive("v7-sf")} />
+      <Pipe d="M 535 0 L 650 0" active={isActive("v7-v8")} />
+      <Pipe d="M 650 -130 L 650 -105" active={isActive("sf-v8")} />
+      <Pipe d="M 715 -65 L 735 -65 L 735 0" active={isActive("v8-v5")} />
+      <Pipe d="M 865 0 L 890 0 L 890 300 L 692 300" active={isActive("v5-waste")} />
+      <Pipe d="M 800 65 L 800 83" active={isActive("v5-column")} />
+      <Pipe d="M 800 247 L 800 239" active={isActive("column-bottom")} />
+      <Pipe d="M 842 270 L 880 270 L 880 304" active={isActive("bottom-fractions")} />
+
+      {/* P1 branch nodes */}
+      <Bottle id="B1" x={-760} y={-230} liquidClass="liquidBlue" />
+      <Bottle id="B2" x={-760} y={-100} liquidClass="liquidPurple" />
+      <Bottle id="S" x={-760} y={70} liquidClass="liquidCyan" />
+      <Valve id="V4" x={-600} y={-165} state="k1k2" />
+      <Valve id="V6" x={-390} y={-30} state="k1k3" />
+      <Valve id="V1" x={-170} y={-30} state="k1k3" />
+      <Pump id="P1" x={30} y={-30} />
+      <Valve id="V2" x={-170} y={165} state="closed" />
+      <Reactor x={270} y={165} />
+
+      {/* P2 branch nodes */}
+      <Valve id="V3" x={470} y={165} state="closed" portMap={{ k1: "right", k2: "top", k3: "left" }} />
+      <Pump id="P2" x={660} y={165} />
+      <Valve id="V7" x={470} y={0} state="closed" rotation={90} />
+      <Separator x={650} y={-210} />
+      <Valve id="V8" x={650} y={-65} state="closed" rotation={90} />
+      <Valve id="V5" x={800} y={0} state="closed" rotation={180} />
+      <Column x={800} y={165} />
+      <ColumnBottomValve x={800} y={270} />
+      <Waste x={650} y={300} />
+      <Fractions x={840} y={340} />
+
+      <text x={-700} y={-350} className="sectionLabel">P1 input / reactor loading</text>
+      <text x={410} y={-380} className="sectionLabel">P2 output / SF / column</text>
+    </svg>
+  );
+}
+
 type ProtocolStepType = "Dose" | "Wait" | "Set mixing" | "Set temperature" | "Reaction hold";
 type DoseSource = "" | "B1" | "B2" | "S";
 type TimeUnit = "s" | "min";
@@ -321,7 +381,9 @@ type PreRunCheckKey =
   | "reactorEmptyAndClean"
   | "wasteCapacityAvailable";
 type PreRunChecks = Record<PreRunCheckKey, boolean>;
-type Screen = "dashboard" | "protocolBuilder" | "logs" | "service";
+type Screen = "dashboard" | "protocolBuilder" | "logs" | "service" | "guidedDemo";
+type DemoStage = "configure" | "review" | "live";
+type AdditionOrder = "B1 then B2" | "B2 then B1";
 type ServiceSection =
   | "overview"
   | "routeTest"
@@ -1162,6 +1224,129 @@ function LogsScreen({ onNavigate }: { onNavigate: (screen: Screen) => void }) {
   );
 }
 
+function GuidedDemo({ onExit }: { onExit: () => void }) {
+  const [stage, setStage] = useState<DemoStage>("configure");
+  const [ratioB1, setRatioB1] = useState(40);
+  const [totalVolume, setTotalVolume] = useState("10");
+  const [combinedVolume, setCombinedVolume] = useState("4");
+  const [additionOrder, setAdditionOrder] = useState<AdditionOrder>("B1 then B2");
+  const [additionSpeed, setAdditionSpeed] = useState(50);
+  const [reactorMixing, setReactorMixing] = useState(60);
+  const [sfMixing, setSfMixing] = useState(40);
+  const [simulatedTemperature, setSimulatedTemperature] = useState("25");
+  const [reactionDuration, setReactionDuration] = useState("10");
+  const [delayBetweenAdditions, setDelayBetweenAdditions] = useState("5");
+  const [additionalOpen, setAdditionalOpen] = useState(false);
+  const [previewStarted, setPreviewStarted] = useState(false);
+  const [phaseIndex, setPhaseIndex] = useState(0);
+  const [reactorPrimary, setReactorPrimary] = useState(true);
+
+  const total = Number(totalVolume);
+  const combined = Number(combinedVolume);
+  const volumesValid = Number.isFinite(total) && total > 0 && Number.isFinite(combined) && combined > 0 && combined <= total;
+  const b1Volume = volumesValid ? combined * (ratioB1 / 100) : 0;
+  const b2Volume = volumesValid ? combined - b1Volume : 0;
+  const solventVolume = volumesValid ? Math.max(0, total - combined) : 0;
+  const firstLiquid = additionOrder === "B1 then B2" ? "B1" : "B2";
+  const secondLiquid = firstLiquid === "B1" ? "B2" : "B1";
+  const formatVolume = (value: number) => Number(value.toFixed(2));
+  const speedLabel = additionSpeed < 34 ? "Slow" : additionSpeed < 67 ? "Medium" : "Fast";
+  const phases = [
+    "Ready",
+    "Aspirate S into P1",
+    "Dispense S to Reactor",
+    `Aspirate ${firstLiquid} into P1`,
+    `Dispense ${firstLiquid} to Reactor`,
+    "Delay between additions",
+    `Aspirate ${secondLiquid} into P1`,
+    `Dispense ${secondLiquid} to Reactor`,
+    "Reaction hold",
+    "Aspirate Reactor contents into P2",
+    "Dispense P2 into SF",
+    "SF mixing",
+    "Completed",
+  ];
+  const isAdditionPhase = [1, 2, 3, 4, 6, 7].includes(phaseIndex);
+  const isReactorPhase = phaseIndex >= 1 && phaseIndex <= 8;
+  const isReactionHold = phaseIndex === 8;
+  const isSfMixingPhase = phaseIndex === 11;
+  const demoActiveSegments = (() => {
+    if (phaseIndex === 1) return new Set(["s-v6", "v6-v1", "v1-p1"]);
+    if (phaseIndex === 2 || phaseIndex === 4 || phaseIndex === 7) return new Set(["v1-p1", "v1-v2", "v2-reactor"]);
+    if (phaseIndex === 3 || phaseIndex === 6) {
+      const liquid = phaseIndex === 3 ? firstLiquid : secondLiquid;
+      return new Set([liquid === "B1" ? "b1-v4" : "b2-v4", "v4-v6", "v6-v1", "v1-p1"]);
+    }
+    if (phaseIndex === 9) return new Set(["reactor-v3", "v3-p2"]);
+    if (phaseIndex === 10) return new Set(["v3-p2", "v3-v7", "v7-sf"]);
+    return new Set<string>();
+  })();
+
+  const volumeSummary = (
+    <div className="demoVolumeSummary" aria-label="Calculated configured volumes">
+      <div><span>B1</span><strong>{formatVolume(b1Volume)} ml</strong></div>
+      <div><span>B2</span><strong>{formatVolume(b2Volume)} ml</strong></div>
+      <div><span>S</span><strong>{formatVolume(solventVolume)} ml</strong></div>
+      <div><span>Total</span><strong>{volumesValid ? formatVolume(total) : 0} ml</strong></div>
+    </div>
+  );
+
+  return (
+    <main className="appShell guidedDemoShell">
+      <header className="guidedDemoHeader">
+        <div><div className="guidedDemoTitleRow"><div className="brand">LabForge Guided Demo</div><span>Frontend preview — no hardware control</span></div><p>Configure one colored-liquid run and preview remote controls</p></div>
+        <button type="button" onClick={onExit}>Exit demo</button>
+      </header>
+
+      <ol className="demoStageIndicator" aria-label="Guided Demo stages">
+        {(["configure", "review", "live"] as DemoStage[]).map((item, index) => <li key={item} className={stage === item ? "active" : ""}><span>{index + 1}</span>{item === "configure" ? "Configure" : item === "review" ? "Review" : "Live control preview"}</li>)}
+      </ol>
+
+      {stage === "configure" && (
+        <div className="demoConfigureLayout">
+          <div className="demoSettingsColumn">
+            <section className="demoPanel"><div className="demoSectionHeading"><span>Main settings</span><h2>Define the colored-liquid run</h2></div><div className="demoMainSettings">
+              <label className="demoRangeField"><span>B1:B2 volume ratio <strong>B1 {ratioB1} : {100 - ratioB1} B2</strong></span><input type="range" min="0" max="100" value={ratioB1} onChange={(event) => setRatioB1(Number(event.target.value))} /></label>
+              <label>Total mixture volume<div className="demoInputWithUnit"><input type="number" min="0" step="0.1" value={totalVolume} onChange={(event) => setTotalVolume(event.target.value)} /><span>ml</span></div></label>
+              <label>Addition order<select value={additionOrder} onChange={(event) => setAdditionOrder(event.target.value as AdditionOrder)}><option>B1 then B2</option><option>B2 then B1</option></select></label>
+              <label>Reaction duration<div className="demoInputWithUnit"><input type="number" min="0" value={reactionDuration} onChange={(event) => setReactionDuration(event.target.value)} /><span>min</span></div></label>
+            </div></section>
+            <section className="demoPanel"><div className="demoSectionHeading"><span>Process settings</span><h2>Preview control commands</h2></div><div className="demoProcessSettings">
+              <label className="demoRangeField"><span>Addition speed command <strong>{speedLabel} · {additionSpeed}%</strong></span><input type="range" min="0" max="100" value={additionSpeed} onChange={(event) => setAdditionSpeed(Number(event.target.value))} /></label>
+              <label className="demoRangeField"><span>Reactor mixing command <strong>{reactorMixing}%</strong></span><input type="range" min="0" max="100" value={reactorMixing} onChange={(event) => setReactorMixing(Number(event.target.value))} /></label>
+              <label className="demoRangeField"><span>SF mixing command <strong>{sfMixing}%</strong></span><input type="range" min="0" max="100" value={sfMixing} onChange={(event) => setSfMixing(Number(event.target.value))} /></label>
+              <label>Simulated target temperature <small>Simulated · Heating disabled</small><div className="demoInputWithUnit"><input type="number" value={simulatedTemperature} onChange={(event) => setSimulatedTemperature(event.target.value)} /><span>°C</span></div></label>
+            </div></section>
+            <section className="demoPanel demoAdditionalPanel"><button type="button" aria-expanded={additionalOpen} onClick={() => setAdditionalOpen((open) => !open)}>Additional settings <span>{additionalOpen ? "Hide" : "Show"}</span></button>{additionalOpen && <div className="demoAdditionalSettings"><label>Combined B1+B2 volume<div className="demoInputWithUnit"><input type="number" min="0" step="0.1" value={combinedVolume} onChange={(event) => setCombinedVolume(event.target.value)} /><span>ml</span></div></label><label>Delay between additions<div className="demoInputWithUnit"><input type="number" min="0" value={delayBetweenAdditions} onChange={(event) => setDelayBetweenAdditions(event.target.value)} /><span>s</span></div></label></div>}</section>
+            <section className="demoPanel demoMachinePanel"><div className="demoSectionHeading"><span>Complete machine view</span><h2>LabForge fluidic scheme</h2></div><FluidicScheme activeSegments={new Set()} /></section>
+          </div>
+          <aside className="demoConfigureAside"><section className="demoPanel"><div className="demoSectionHeading"><span>Calculated volumes</span><h2>Configured fluid plan</h2></div>{volumeSummary}{!volumesValid && <p className="demoValidationMessage">Combined B1+B2 volume must be greater than zero and no larger than total volume.</p>}</section><section className="demoScopePanel"><strong>Demo scope</strong><ul><li>Colored liquids only</li><li>One run</li><li>Heating disabled; temperature simulated</li><li>Approved P2/SF demo workflow</li><li>Remote access and local operator approval not implemented</li></ul></section><button className="demoPrimaryButton" type="button" disabled={!volumesValid} onClick={() => setStage("review")}>Review configured run</button></aside>
+        </div>
+      )}
+
+      {stage === "review" && (
+        <div className="demoReviewLayout"><section className="demoPanel"><div className="demoSectionHeading"><span>Configured volume plan</span><h2>Review one colored-liquid run</h2></div>{volumeSummary}<dl className="demoReviewSettings"><div><dt>Addition order</dt><dd>{additionOrder}</dd></div><div><dt>Addition speed command</dt><dd>{speedLabel} · {additionSpeed}%</dd></div><div><dt>Reactor mixing command</dt><dd>{reactorMixing}%</dd></div><div><dt>SF mixing command</dt><dd>{sfMixing}%</dd></div><div><dt>Simulated temperature</dt><dd>{simulatedTemperature} °C · Heating disabled</dd></div><div><dt>Reaction duration</dt><dd>{reactionDuration} min</dd></div><div><dt>Delay between additions</dt><dd>{delayBetweenAdditions} s</dd></div></dl></section><section className="demoPanel"><div className="demoSectionHeading"><span>Human-readable protocol</span><h2>Preview timeline</h2></div><ol className="demoProtocolTimeline"><li>Aspirate S into P1</li><li>Dispense S to Reactor</li><li>Aspirate {firstLiquid} into P1</li><li>Dispense {firstLiquid} to Reactor</li><li>Delay {delayBetweenAdditions} s</li><li>Aspirate {secondLiquid} into P1</li><li>Dispense {secondLiquid} to Reactor</li><li>Reaction hold · {reactionDuration} min</li><li>Aspirate Reactor contents into P2</li><li>Dispense P2 into SF</li><li>SF mixing</li></ol></section><section className="demoPanel demoReviewScheme"><div className="demoSectionHeading"><span>Read-only machine view</span><h2>Complete fluidic scheme</h2></div><FluidicScheme activeSegments={new Set()} /></section><div className="demoReviewActions"><button type="button" onClick={() => setStage("configure")}>Back to settings</button><button className="demoPrimaryButton" type="button" onClick={() => setStage("live")}>Start UI preview</button></div></div>
+      )}
+
+      {stage === "live" && (
+        <div className="demoLiveLayout">
+          <section className="demoLiveStatus demoPanel"><div><span>UI preview · No hardware connected</span><h2>{phases[phaseIndex]}</h2></div><div className="demoPreviewActions"><button type="button" disabled={previewStarted} onClick={() => { setPreviewStarted(true); setPhaseIndex(1); }}>Start preview</button><button type="button" disabled={!previewStarted || phaseIndex === phases.length - 1} onClick={() => setPhaseIndex((current) => Math.min(current + 1, phases.length - 1))}>Next phase</button><button type="button" onClick={() => { setPreviewStarted(false); setPhaseIndex(0); }}>Reset preview</button></div></section>
+          <div className="demoPhaseProgress">{phases.map((phase, index) => <div key={phase} className={index === phaseIndex ? "active" : index < phaseIndex ? "complete" : ""}><span>{index + 1}</span><small>{phase}</small></div>)}</div>
+          <section className="demoPanel demoLiveScheme"><div className="demoSectionHeading"><span>Frontend active-route visualization</span><h2>Complete fluidic scheme</h2></div><FluidicScheme activeSegments={demoActiveSegments} /></section>
+          <section className={`demoCameras ${reactorPrimary ? "" : "swapped"}`}><div className="demoCameraPrimary"><span>{reactorPrimary ? "Reactor camera" : "Overview camera"}</span><strong>Stream not connected</strong><small>No live video in frontend preview</small></div><div className="demoCameraSecondary"><span>{reactorPrimary ? "Overview camera" : "Reactor camera"}</span><strong>Stream not connected</strong><small>No live video in frontend preview</small></div><button type="button" onClick={() => setReactorPrimary((primary) => !primary)}>Swap cameras</button></section>
+          <div className="demoLiveLower"><section className="demoPanel"><div className="demoSectionHeading"><span>Real-time control preview</span><h2>Phase-aware local controls</h2></div><div className="demoLiveControls">
+            <label className="demoRangeField"><span>Addition speed <strong>{speedLabel} · {additionSpeed}%</strong></span><input type="range" min="0" max="100" value={additionSpeed} disabled={!isAdditionPhase} onChange={(event) => setAdditionSpeed(Number(event.target.value))} /><small>{isAdditionPhase ? "Editable in this UI preview phase" : "Available during liquid addition phases"}</small></label>
+            <label className="demoRangeField"><span>Reactor mixing <strong>{reactorMixing}%</strong></span><input type="range" min="0" max="100" value={reactorMixing} disabled={!isReactorPhase} onChange={(event) => setReactorMixing(Number(event.target.value))} /><small>{isReactorPhase ? "Editable in this UI preview phase" : "Available during reactor-related phases"}</small></label>
+            <label className="demoRangeField"><span>SF mixing command <strong>{sfMixing}%</strong></span><input type="range" min="0" max="100" value={sfMixing} disabled={!isSfMixingPhase} onChange={(event) => setSfMixing(Number(event.target.value))} /><small>{isSfMixingPhase ? "Editable in the SF mixing preview phase" : "Available during the SF mixing phase"}</small></label>
+            <label>Simulated temperature <small>Heating disabled · Display-only simulation</small><div className="demoInputWithUnit"><input type="number" value={simulatedTemperature} disabled={!isReactionHold} onChange={(event) => setSimulatedTemperature(event.target.value)} /><span>°C</span></div></label>
+            <label>Reaction duration / remaining time <small>Static local preview value</small><div className="demoInputWithUnit"><input type="number" min="0" value={reactionDuration} disabled={!isReactionHold} onChange={(event) => setReactionDuration(event.target.value)} /><span>min</span></div></label>
+          </div></section><aside className="demoPanel"><div className="demoSectionHeading"><span>Locked fluid plan</span><h2>Current settings</h2></div>{volumeSummary}<p className="demoLockedNote">Ratio, configured volumes, calculated volumes, and addition order define the physical fluid plan and would be locked after execution begins.</p><dl className="demoReviewSettings compact"><div><dt>B1:B2</dt><dd>{ratioB1}:{100 - ratioB1}</dd></div><div><dt>Addition order</dt><dd>{additionOrder}</dd></div></dl></aside></div>
+        </div>
+      )}
+    </main>
+  );
+}
+
 function ProtocolBuilder({
   runName,
   preRunChecks,
@@ -1429,6 +1614,10 @@ export default function App() {
     return <ServiceScreen onNavigate={setActiveScreen} />;
   }
 
+  if (activeScreen === "guidedDemo") {
+    return <GuidedDemo onExit={() => setActiveScreen("dashboard")} />;
+  }
+
   return (
     <main className="appShell">
       <header className="topBar">
@@ -1440,6 +1629,7 @@ export default function App() {
         </div>
 
         <div className="topBarActions">
+          <button className="guidedDemoLaunch" type="button" onClick={() => setActiveScreen("guidedDemo")}>Open Guided Demo</button>
           <TopNavigation activeScreen="dashboard" onNavigate={setActiveScreen} />
           <div className="statusPill">SCHEME PREVIEW</div>
         </div>
@@ -1482,71 +1672,7 @@ export default function App() {
         </aside>
 
         <section className="schemePanel" aria-label="Physical scheme">
-          <svg className="schemeCanvas" viewBox="-900 -420 1800 840">
-          {/* P1 input pipes */}
-          <Pipe d="M -716 -230 L -690 -230 L -690 -165 L -665 -165" active />
-          <Pipe d="M -716 -100 L -640 -100 L -640 -230 L -600 -230" />
-          <Pipe d="M -535 -165 L -455 -165 L -455 -95 L -390 -95" active />
-          <Pipe d="M -716 70 L -500 70 L -500 -30 L -455 -30" />
-          <Pipe d="M -325 -30 L -300 -30 L -300 -120 L -170 -120 L -170 -95" active />
-          <Pipe d="M -105 -30 L 2 -30" active />
-
-          {/* P1 output / reactor / waste pipes */}
-          <Pipe d="M -235 -30 L -280 -30 L -280 235 L -105 235 L -105 165" />
-          <Pipe d="M -170 100 L 185 100 L 185 165 L 206 165" />
-          <Pipe d="M -235 165 L -320 165 L -320 300 L 608 300" />
-
-          {/* P2 branch pipes */}
-          <Pipe d="M 335 165 L 405 165" />
-          <Pipe d="M 535 165 L 632 165" />
-          <Pipe d="M 470 100 L 470 65" />
-          <Pipe d="M 470 -65 L 470 -340 L 650 -340 L 650 -309" />
-          <Pipe d="M 535 0 L 650 0" />
-          <Pipe d="M 650 -130 L 650 -105" />
-          <Pipe d="M 715 -65 L 735 -65 L 735 0" />
-          <Pipe d="M 865 0 L 890 0 L 890 300 L 692 300" />
-          <Pipe d="M 800 65 L 800 83" />
-          <Pipe d="M 800 247 L 800 239" />
-          <Pipe d="M 842 270 L 880 270 L 880 304" />
-
-          {/* P1 branch nodes */}
-          <Bottle id="B1" x={-760} y={-230} liquidClass="liquidBlue" />
-          <Bottle id="B2" x={-760} y={-100} liquidClass="liquidPurple" />
-          <Bottle id="S" x={-760} y={70} liquidClass="liquidCyan" />
-          <Valve id="V4" x={-600} y={-165} state="k1k2" />
-
-          <Valve id="V6" x={-390} y={-30} state="k1k3" />
-          <Valve id="V1" x={-170} y={-30} state="k1k3" />
-          <Pump id="P1" x={30} y={-30} />
-
-          <Valve id="V2" x={-170} y={165} state="closed" />
-          <Reactor x={270} y={165} />
-
-          {/* P2 branch nodes */}
-          <Valve
-            id="V3"
-            x={470}
-            y={165}
-            state="closed"
-            portMap={{ k1: "right", k2: "top", k3: "left" }}
-          />
-          <Pump id="P2" x={660} y={165} />
-          <Valve id="V7" x={470} y={0} state="closed" rotation={90} />
-          <Separator x={650} y={-210} />
-          <Valve id="V8" x={650} y={-65} state="closed" rotation={90} />
-          <Valve id="V5" x={800} y={0} state="closed" rotation={180} />
-          <Column x={800} y={165} />
-          <ColumnBottomValve x={800} y={270} />
-          <Waste x={650} y={300} />
-          <Fractions x={840} y={340} />
-
-          <text x={-700} y={-350} className="sectionLabel">
-            P1 input / reactor loading
-          </text>
-          <text x={410} y={-380} className="sectionLabel">
-            P2 output / SF / column
-          </text>
-          </svg>
+          <FluidicScheme />
         </section>
 
         <aside className="sidePanel rightPanel" aria-label="Hardware status">

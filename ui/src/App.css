@@ -774,6 +774,156 @@ body {
   display: grid;
 }
 
+.guidedDemoLaunch,
+.guidedDemoHeader button,
+.demoReviewActions button,
+.demoPreviewActions button,
+.demoCameras button {
+  border: 1px solid rgba(50, 202, 255, 0.48);
+  border-radius: 10px;
+  padding: 9px 13px;
+  color: #dff1ff;
+  background: rgba(50, 202, 255, 0.1);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.guidedDemoShell {
+  background: radial-gradient(circle at 50% 0%, rgba(50, 202, 255, 0.12), transparent 34%), linear-gradient(180deg, #0a1020, #050812);
+}
+
+.guidedDemoHeader {
+  border: 1px solid rgba(50, 202, 255, 0.42);
+  border-radius: 18px;
+  padding: 18px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  background: rgba(10, 16, 32, 0.88);
+}
+
+.guidedDemoTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.guidedDemoTitleRow .brand {
+  font-size: 24px;
+}
+
+.guidedDemoTitleRow > span {
+  border: 1px solid rgba(242, 190, 72, 0.5);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #ffe6a3;
+  background: rgba(242, 190, 72, 0.1);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.guidedDemoHeader p {
+  margin-top: 5px;
+  color: #8ea3bf;
+  font-size: 14px;
+}
+
+.demoStageIndicator {
+  max-width: 760px;
+  margin: 18px auto;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  list-style: none;
+}
+
+.demoStageIndicator li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #71849f;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.demoStageIndicator li::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  left: 38px;
+  height: 1px;
+  background: rgba(89, 134, 197, 0.35);
+}
+
+.demoStageIndicator li:last-child::after { display: none; }
+.demoStageIndicator span { z-index: 1; width: 28px; height: 28px; border: 1px solid rgba(89, 134, 197, 0.4); border-radius: 50%; display: grid; place-items: center; background: #08101e; }
+.demoStageIndicator .active { color: #e3f2ff; }
+.demoStageIndicator .active span { border-color: #32caff; color: #32caff; box-shadow: 0 0 12px rgba(50, 202, 255, 0.25); }
+
+.demoConfigureLayout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 330px); gap: 12px; align-items: start; }
+.demoSettingsColumn, .demoConfigureAside, .demoReviewLayout, .demoLiveLayout { display: grid; gap: 12px; }
+.demoConfigureAside { position: sticky; top: 12px; }
+.demoPanel, .demoScopePanel, .demoLiveStatus, .demoCameras { border: 1px solid rgba(89, 134, 197, 0.4); border-radius: 18px; padding: 18px; background: rgba(8, 13, 24, 0.92); box-shadow: 0 12px 35px rgba(0, 0, 0, 0.22); }
+.demoSectionHeading > span, .demoLiveStatus span { color: #8ea3bf; font-size: 11px; font-weight: 850; letter-spacing: 0.12em; text-transform: uppercase; }
+.demoSectionHeading h2, .demoLiveStatus h2 { margin: 4px 0 0; color: #e3f2ff; font-size: 21px; }
+.demoMainSettings, .demoProcessSettings, .demoAdditionalSettings, .demoLiveControls { margin-top: 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.demoMainSettings label, .demoProcessSettings label, .demoAdditionalSettings label, .demoLiveControls label { display: grid; align-content: start; gap: 8px; color: #dbe7f5; font-size: 14px; font-weight: 750; }
+.demoRangeField { grid-column: 1 / -1; }
+.demoRangeField > span { display: flex; justify-content: space-between; gap: 12px; }
+.demoRangeField strong { color: #7ee3ff; }
+.demoRangeField small, .demoProcessSettings small, .demoLiveControls small { color: #8296b2; font-size: 12px; font-weight: 650; }
+.demoRangeField input[type="range"] { width: 100%; accent-color: #32caff; }
+.demoInputWithUnit { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.demoInputWithUnit input, .demoMainSettings select { width: 100%; min-width: 0; min-height: 44px; border: 1px solid rgba(89, 134, 197, 0.45); border-radius: 10px; padding: 9px 11px; color: #e3f2ff; background: rgba(7, 15, 28, 0.9); font: inherit; }
+.demoInputWithUnit span { color: #9fb2cd; }
+.demoAdditionalPanel > button { width: 100%; border: 0; padding: 0; display: flex; justify-content: space-between; color: #e3f2ff; background: transparent; font: inherit; font-size: 16px; font-weight: 850; cursor: pointer; }
+.demoVolumeSummary { margin-top: 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.demoVolumeSummary div { border: 1px solid rgba(89, 134, 197, 0.27); border-radius: 10px; padding: 10px; display: grid; gap: 4px; background: rgba(7, 15, 28, 0.68); }
+.demoVolumeSummary span { color: #8ea3bf; font-size: 12px; }
+.demoVolumeSummary strong { color: #e3f2ff; font-size: 16px; }
+.demoValidationMessage { margin-top: 12px; color: #ffb4b4; font-size: 13px; }
+.demoScopePanel { color: #b8c7dc; font-size: 13px; }
+.demoScopePanel strong { color: #e3f2ff; }
+.demoScopePanel ul { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 6px; }
+.demoPrimaryButton { min-height: 44px; border: 1px solid rgba(50, 202, 255, 0.62); border-radius: 11px; padding: 10px 14px; color: #e3f2ff; background: rgba(50, 202, 255, 0.16); font: inherit; font-weight: 850; cursor: pointer; }
+.demoPrimaryButton:disabled, .demoPreviewActions button:disabled { color: #65758a; border-color: rgba(89, 134, 197, 0.25); background: rgba(7, 15, 28, 0.6); cursor: not-allowed; }
+
+.demoReviewLayout { max-width: 1050px; margin: 0 auto; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.demoReviewSettings { margin: 16px 0 0; display: grid; gap: 0; }
+.demoReviewSettings div { border-bottom: 1px solid rgba(89, 134, 197, 0.18); padding: 9px 0; display: flex; justify-content: space-between; gap: 12px; }
+.demoReviewSettings dt { color: #8ea3bf; font-size: 13px; }
+.demoReviewSettings dd { margin: 0; color: #e3f2ff; font-size: 13px; font-weight: 800; text-align: right; }
+.demoProtocolTimeline { margin: 16px 0 0; padding-left: 26px; display: grid; gap: 10px; color: #dbe7f5; }
+.demoReviewActions { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 12px; }
+.demoReviewScheme { grid-column: 1 / -1; }
+.demoMachinePanel .schemeCanvas,
+.demoReviewScheme .schemeCanvas { height: auto; min-height: 420px; margin-top: 14px; }
+
+.demoLiveStatus { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.demoPreviewActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.demoPhaseProgress { display: grid; grid-template-columns: repeat(13, minmax(86px, 1fr)); gap: 5px; overflow-x: auto; padding-bottom: 4px; }
+.demoPhaseProgress div { min-width: 0; border-top: 2px solid rgba(89, 134, 197, 0.3); padding-top: 7px; display: grid; gap: 4px; color: #65758a; }
+.demoPhaseProgress .active { border-color: #32caff; color: #dff1ff; }
+.demoPhaseProgress .complete { border-color: rgba(46, 240, 167, 0.55); color: #9fb2cd; }
+.demoPhaseProgress span { font-size: 12px; font-weight: 850; }
+.demoPhaseProgress small { font-size: 10px; line-height: 1.3; overflow-wrap: anywhere; }
+.demoCameras { position: relative; display: grid; grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr); gap: 10px; }
+.demoCameraPrimary, .demoCameraSecondary { min-height: 300px; border: 1px dashed rgba(89, 134, 197, 0.42); border-radius: 13px; display: grid; place-content: center; gap: 6px; color: #8ea3bf; background: radial-gradient(circle, rgba(50, 202, 255, 0.05), rgba(5, 10, 21, 0.8)); text-align: center; }
+.demoCameraSecondary { min-height: 180px; }
+.demoCameras strong { color: #dbe7f5; }
+.demoCameras small { color: #65758a; }
+.demoCameras button { position: absolute; right: 28px; bottom: 28px; }
+.demoLiveScheme .schemeCanvas { height: auto; min-height: 620px; margin-top: 14px; }
+.demoLiveLower { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 330px); gap: 12px; align-items: start; }
+.demoLiveControls input:disabled { opacity: 0.45; cursor: not-allowed; }
+.demoLockedNote { margin-top: 14px; color: #d7c692; font-size: 12px; line-height: 1.5; }
+.demoReviewSettings.compact { margin-top: 12px; }
+
 .protocolBuilderLayout {
   margin-top: 12px;
   display: grid;
@@ -1343,6 +1493,9 @@ body {
 }
 
 @media (max-width: 1080px) {
+  .demoConfigureLayout,
+  .demoLiveLower { grid-template-columns: 1fr; }
+  .demoConfigureAside { position: static; }
   .serviceLayout {
     grid-template-columns: 1fr;
   }
@@ -1401,6 +1554,22 @@ body {
 }
 
 @media (max-width: 700px) {
+  .guidedDemoHeader,
+  .guidedDemoTitleRow,
+  .demoLiveStatus { align-items: stretch; flex-direction: column; }
+  .demoStageIndicator { grid-template-columns: 1fr; gap: 8px; }
+  .demoStageIndicator li::after { display: none; }
+  .demoMainSettings,
+  .demoProcessSettings,
+  .demoAdditionalSettings,
+  .demoLiveControls,
+  .demoReviewLayout,
+  .demoCameras { grid-template-columns: 1fr; }
+  .demoReviewActions { grid-column: auto; }
+  .demoMachinePanel .schemeCanvas,
+  .demoReviewScheme .schemeCanvas,
+  .demoLiveScheme .schemeCanvas { min-height: 420px; }
+  .demoCameras button { position: static; grid-column: 1; }
   .protocolBuilderTopBar,
   .logsTopBar,
   .serviceTopBar,
