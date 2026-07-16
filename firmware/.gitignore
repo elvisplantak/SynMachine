@@ -1,0 +1,13 @@
+.vscode/
+.idea/
+.pio/
+build/
+out/
+*.elf
+*.hex
+*.map
+*.o
+*.d
+*.tmp
+*~
+.DS_Store

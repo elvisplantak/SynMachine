@@ -1,0 +1,1470 @@
+C:\Users\Elvis\Documents\chemputer kod\punjenje reaktora.txt
+// ============================================================
+// CHEMPUTER KONTROLER ZA ARDUINO MEGA
+// ============================================================
+// Sustav:
+// - STEP/DIR driveri za ventile i pumpe
+// - Arduino Mega
+// - neblokiraju
+e klase Valve i Pump
+// - loop() stalno zove update() za sve osi
+// Konvencija pinova:
+//   parni pin   = STEP / PUL+
+//   neparni pin = DIR+
+// Driver wiring:
+//   Arduino STEP pin -> PUL+
+//   Arduino DIR pin  -> DIR+
+//   Arduino GND      -> PUL- i DIR-
+// VA
+//   Mora postojati zajedni
+ki GND izme
+u Arduino Mega i svih drivera.
+// Prekida
+//   Arduino input pin ---- L-D / NC prekida
+ ---- GND
+//   pinMode(pin, INPUT_PULLUP)
+// Logika prekida
+a u ovom projektu:
+//   nije stisnut = LOW
+//   stisnut     = HIGH
+// Ovo NIJE uobi
+ajena limit switch logika.
+// Ovdje je namjerno tako jer su prekida
+i spojeni kao L-D / NC.
+// ============================================================
+// ============================================================
+// PORT ENUM
+// ============================================================
+enum Port {
+  K1,
+  K2,
+  K3
+// ============================================================
+// PO
+ETAK KLASE VALVE
+// ============================================================
+// Ventil je 3-portni rotacijski ventil.
+// Pozicije:
+//   0
+   = svi portovi zatvoreni / home pozicija
+//   90
+  = k1 <-> k3
+//   180
+ = k1 <-> k2
+// Bitna odluka:
+//   Ventil se homea samo jednom nakon paljenja/resetiranja.
+//   Nakon toga pamti poziciju i mi
+e se relativno:
+//   0 -> 90
+//   90 -> 180
+//   180 -> 90
+//   180 -> 0
+// startGoTo90() i startGoTo180() NE rade ponovno homing.
+// Ako se izgubi pozicija, treba ponovno startHome().
+// ============================================================
+class Valve {
+public:
+  enum State {
+    IDLE,
+    HOMING_RELEASE,
+    HOMING_BACKOFF,
+    HOMING_SEARCH,
+    MOVING,
+    ERROR_STATE
+  };
+  Valve(const char* name,
+        uint8_t stepPin,
+        uint8_t dirPin,
+        uint8_t switchPin,
+        bool invertHomingDirection,
+        long stepsFor90Deg,
+        const char* k1Connection,
+        const char* k2Connection,
+        const char* k3Connection,
+        unsigned long stepIntervalUs = 3000,
+        unsigned int stepPulseUs = 20,
+        unsigned long homingTimeoutMs = 30000,
+        unsigned long moveTimeoutMs = 60000,
+        long homeBackoffSteps = 30,
+        unsigned long switchDebounceMs = 5)
+    : _name(name),
+      _stepPin(stepPin),
+      _dirPin(dirPin),
+      _switchPin(switchPin),
+      _invertHomingDirection(invertHomingDirection),
+      _stepsFor90Deg(stepsFor90Deg),
+      _k1Connection(k1Connection),
+      _k2Connection(k2Connection),
+      _k3Connection(k3Connection),
+      _stepIntervalUs(stepIntervalUs),
+      _stepPulseUs(stepPulseUs),
+      _homingTimeoutMs(homingTimeoutMs),
+      _moveTimeoutMs(moveTimeoutMs),
+      _homeBackoffSteps(homeBackoffSteps),
+      _switchDebounceMs(switchDebounceMs),
+      _currentPositionDeg(-1),
+      _targetPositionDeg(-1),
+      _remainingSteps(0),
+      _backoffStepsRemaining(0),
+      _isHomed(false),
+      _state(IDLE),
+      _lastStepUs(0),
+      _stateStartMs(0),
+      _lastRawSwitchPressed(false),
+      _stableSwitchPressed(false),
+      _lastSwitchChangeMs(0) {
+  void begin() {
+    pinMode(_stepPin, OUTPUT);
+    pinMode(_dirPin, OUTPUT);
+    // L-D / NC + INPUT_PULLUP:
+    // nije stisnut = LOW
+    // stisnut     = HIGH
+    pinMode(_switchPin, INPUT_PULLUP);
+    digitalWrite(_stepPin, LOW);
+    digitalWrite(_dirPin, LOW);
+    resetSwitchDebounce();
+    Serial.print(F("[Valve begin] "));
+    Serial.print(_name);
+    Serial.print(F(" STEP="));
+    Serial.print(_stepPin);
+    Serial.print(F(" DIR="));
+    Serial.print(_dirPin);
+    Serial.print(F(" SW="));
+    Serial.println(_switchPin);
+  void update() {
+    updateSwitchDebounce();
+    if (_state == IDLE || _state == ERROR_STATE) {
+      return;
+    }
+    if (stateTimedOut()) {
+      fail(F("timeout"));
+      return;
+    }
+    if (!timeForNextStep()) {
+      return;
+    }
+    switch (_state) {
+      case HOMING_RELEASE:
+        updateHomingRelease();
+        break;
+      case HOMING_BACKOFF:
+        updateHomingBackoff();
+        break;
+      case HOMING_SEARCH:
+        updateHomingSearch();
+        break;
+      case MOVING:
+        updateMoving();
+        break;
+      default:
+        break;
+    }
+  bool startHome() {
+    if (_state != IDLE) {
+      return false;
+    }
+    resetMotionState();
+    _isHomed = false;
+    _currentPositionDeg = -1;
+    _targetPositionDeg = -1;
+    resetSwitchDebounce();
+    bool towardHomeDir = homingDirectionLevel();
+    bool awayFromHomeDir = awayFromHomeDirectionLevel();
+    if (switchPressed()) {
+      Serial.print(F("[Valve home] "));
+      Serial.print(_name);
+      Serial.println(F(" prekidac je vec stisnut; odmicem se od homea"));
+      setDirectionLevel(awayFromHomeDir);
+      enterState(HOMING_RELEASE);
+    } else {
+      Serial.print(F("[Valve home] "));
+      Serial.print(_name);
+      Serial.println(F(" trazim home"));
+      setDirectionLevel(towardHomeDir);
+      enterState(HOMING_SEARCH);
+    }
+    return true;
+  bool startMoveTo(int targetDeg) {
+    if (!_isHomed) {
+      Serial.print(F("[Valve reject] "));
+      Serial.print(_name);
+      Serial.println(F(" nije homean"));
+      return false;
+    }
+    if (_state != IDLE) {
+      Serial.print(F("[Valve reject] "));
+      Serial.print(_name);
+      Serial.println(F(" zauzet"));
+      return false;
+    }
+    if (targetDeg != 0 && targetDeg != 90 && targetDeg != 180) {
+      Serial.print(F("[Valve reject] "));
+      Serial.print(_name);
+      Serial.println(F(" neispravna ciljna pozicija"));
+      return false;
+    }
+    if (targetDeg == _currentPositionDeg) {
+      Serial.print(F("[Valve move] "));
+      Serial.print(_name);
+      Serial.print(F(" vec je na "));
+      Serial.print(targetDeg);
+      Serial.println(F(" stupnjeva"));
+      return true;
+    }
+    int deltaDeg = targetDeg - _currentPositionDeg;
+    long deltaSteps = (deltaDeg / 90L) * _stepsFor90Deg;
+    if (deltaSteps == 0) {
+      return false;
+    }
+    if (deltaSteps > 0) {
+      setDirectionLevel(awayFromHomeDirectionLevel());
+    } else {
+      setDirectionLevel(homingDirectionLevel());
+      deltaSteps = -deltaSteps;
+    }
+    _targetPositionDeg = targetDeg;
+    _remainingSteps = deltaSteps;
+    Serial.print(F("[Valve move] "));
+    Serial.print(_name);
+    Serial.print(F(" "));
+    Serial.print(_currentPositionDeg);
+    Serial.print(F(" -> "));
+    Serial.print(_targetPositionDeg);
+    Serial.print(F(" stupnjeva, koraci="));
+    Serial.println(_remainingSteps);
+    enterState(MOVING);
+    return true;
+  bool startGoTo0() {
+    return startMoveTo(0);
+  bool startGoTo90() {
+    return startMoveTo(90);
+  bool startGoTo180() {
+    return startMoveTo(180);
+  bool startSetPosition(int degrees) {
+    if (degrees == 0) return startGoTo0();
+    if (degrees == 90) return startGoTo90();
+    if (degrees == 180) return startGoTo180();
+    return false;
+  bool startOpenK1To(Port targetPort) {
+    if (targetPort == K1) {
+      Serial.print(F("[Valve reject] "));
+      Serial.print(_name);
+      Serial.println(F(" ne moze otvoriti K1 prema K1"));
+      return false;
+    }
+    if (targetPort == K2) {
+      return startGoTo180();
+    }
+    if (targetPort == K3) {
+      return startGoTo90();
+    }
+    return false;
+  void stop() {
+    Serial.print(F("[Valve stop] "));
+    Serial.print(_name);
+    Serial.println(F(" zaustavljen; pozicija vise nije sigurna"));
+    resetMotionState();
+    _isHomed = false;
+    _currentPositionDeg = -1;
+    _targetPositionDeg = -1;
+    _state = IDLE;
+  void emergencyStop() {
+    Serial.print(F("[Valve EMERGENCY STOP] "));
+    Serial.print(_name);
+    Serial.println(F(" zaustavljen; pozicija vise nije sigurna"));
+    resetMotionState();
+    _isHomed = false;
+    _currentPositionDeg = -1;
+    _targetPositionDeg = -1;
+    _state = ERROR_STATE;
+  bool isBusy() const {
+    return _state != IDLE && _state != ERROR_STATE;
+  bool hasError() const {
+    return _state == ERROR_STATE;
+  bool isHomed() const {
+    return _isHomed;
+  int getPosition() const {
+    return _currentPositionDeg;
+  State getState() const {
+    return _state;
+  const char* getName() const {
+    return _name;
+  void clearError() {
+    if (_state == ERROR_STATE) {
+      resetMotionState();
+      _isHomed = false;
+      _currentPositionDeg = -1;
+      _targetPositionDeg = -1;
+      _state = IDLE;
+    }
+  void printActiveConnection() const {
+    Serial.print(F("[Valve connection] "));
+    Serial.print(_name);
+    Serial.print(F(" @ "));
+    Serial.print(_currentPositionDeg);
+    Serial.print(F(" deg: "));
+    if (_currentPositionDeg == 0) {
+      Serial.println(F("sve zatvoreno"));
+    } else if (_currentPositionDeg == 90) {
+      Serial.print(F("k1 <-> k3 ("));
+      Serial.print(_k1Connection);
+      Serial.print(F(" <-> "));
+      Serial.print(_k3Connection);
+      Serial.println(F(")"));
+    } else if (_currentPositionDeg == 180) {
+      Serial.print(F("k1 <-> k2 ("));
+      Serial.print(_k1Connection);
+      Serial.print(F(" <-> "));
+      Serial.print(_k2Connection);
+      Serial.println(F(")"));
+    } else {
+      Serial.println(F("nepoznato"));
+    }
+  void connectTo(Port myPort, const Valve& otherValve, Port otherPort) const {
+    Serial.print(F("[Vanjski spoj] "));
+    Serial.print(_name);
+    Serial.print(F("."));
+    Serial.print(portToText(myPort));
+    Serial.print(F(" <-> "));
+    Serial.print(otherValve._name);
+    Serial.print(F("."));
+    Serial.println(portToText(otherPort));
+private:
+  const char* _name;
+  uint8_t _stepPin;
+  uint8_t _dirPin;
+  uint8_t _switchPin;
+  bool _invertHomingDirection;
+  long _stepsFor90Deg;
+  const char* _k1Connection;
+  const char* _k2Connection;
+  const char* _k3Connection;
+  unsigned long _stepIntervalUs;
+  unsigned int _stepPulseUs;
+  unsigned long _homingTimeoutMs;
+  unsigned long _moveTimeoutMs;
+  long _homeBackoffSteps;
+  unsigned long _switchDebounceMs;
+  int _currentPositionDeg;
+  int _targetPositionDeg;
+  long _remainingSteps;
+  long _backoffStepsRemaining;
+  bool _isHomed;
+  State _state;
+  unsigned long _lastStepUs;
+  unsigned long _stateStartMs;
+  bool _lastRawSwitchPressed;
+  bool _stableSwitchPressed;
+  unsigned long _lastSwitchChangeMs;
+  static const unsigned int DIR_SETUP_US = 20;
+  void updateHomingRelease() {
+    if (!switchPressed()) {
+      Serial.print(F("[Valve home] "));
+      Serial.print(_name);
+      Serial.println(F(" prekidac otpusten; radim backoff"));
+      _backoffStepsRemaining = _homeBackoffSteps;
+      enterState(HOMING_BACKOFF);
+      return;
+    }
+    pulseStep();
+  void updateHomingBackoff() {
+    if (_backoffStepsRemaining <= 0) {
+      Serial.print(F("[Valve home] "));
+      Serial.print(_name);
+      Serial.println(F(" ponovno prilazim home prekidacu"));
+      setDirectionLevel(homingDirectionLevel());
+      enterState(HOMING_SEARCH);
+      return;
+    }
+    pulseStep();
+    _backoffStepsRemaining--;
+  void updateHomingSearch() {
+    if (switchPressed()) {
+      finishHoming();
+      return;
+    }
+    pulseStep();
+  void finishHoming() {
+    _isHomed = true;
+    _currentPositionDeg = 0;
+    _targetPositionDeg = 0;
+    _remainingSteps = 0;
+    _state = IDLE;
+    Serial.print(F("[Valve home] "));
+    Serial.print(_name);
+    Serial.println(F(" home pronaden na 0 stupnjeva"));
+    printActiveConnection();
+  void updateMoving() {
+    if (_remainingSteps <= 0) {
+      finishMove();
+      return;
+    }
+    pulseStep();
+    _remainingSteps--;
+    if (_remainingSteps <= 0) {
+      finishMove();
+    }
+  void finishMove() {
+    _currentPositionDeg = _targetPositionDeg;
+    _remainingSteps = 0;
+    _state = IDLE;
+    Serial.print(F("[Valve move] "));
+    Serial.print(_name);
+    Serial.print(F(" dosao na "));
+    Serial.print(_currentPositionDeg);
+    Serial.println(F(" stupnjeva"));
+    printActiveConnection();
+  bool stateTimedOut() const {
+    unsigned long timeoutMs = 0;
+    if (_state == HOMING_RELEASE ||
+        _state == HOMING_BACKOFF ||
+        _state == HOMING_SEARCH) {
+      timeoutMs = _homingTimeoutMs;
+    } else if (_state == MOVING) {
+      timeoutMs = _moveTimeoutMs;
+    }
+    if (timeoutMs == 0) {
+      return false;
+    }
+    return millis() - _stateStartMs >= timeoutMs;
+  void enterState(State newState) {
+    _state = newState;
+    _stateStartMs = millis();
+    _lastStepUs = micros();
+  void resetMotionState() {
+    _remainingSteps = 0;
+    _backoffStepsRemaining = 0;
+    _targetPositionDeg = -1;
+  void fail(const __FlashStringHelper* reason) {
+    Serial.print(F("[Valve ERROR] "));
+    Serial.print(_name);
+    Serial.print(F(" "));
+    Serial.println(reason);
+    resetMotionState();
+    _isHomed = false;
+    _currentPositionDeg = -1;
+    _state = ERROR_STATE;
+  bool homingDirectionLevel() const {
+    return _invertHomingDirection ? HIGH : LOW;
+  bool awayFromHomeDirectionLevel() const {
+    return !homingDirectionLevel();
+  bool timeForNextStep() {
+    unsigned long now = micros();
+    if (now - _lastStepUs >= _stepIntervalUs) {
+      _lastStepUs = now;
+      return true;
+    }
+    return false;
+  bool switchPressed() const {
+    return _stableSwitchPressed;
+  bool readSwitchRaw() const {
+    return digitalRead(_switchPin) == HIGH;
+  void resetSwitchDebounce() {
+    _lastRawSwitchPressed = readSwitchRaw();
+    _stableSwitchPressed = _lastRawSwitchPressed;
+    _lastSwitchChangeMs = millis();
+  void updateSwitchDebounce() {
+    bool raw = readSwitchRaw();
+    unsigned long now = millis();
+    if (raw != _lastRawSwitchPressed) {
+      _lastRawSwitchPressed = raw;
+      _lastSwitchChangeMs = now;
+      return;
+    }
+    if (now - _lastSwitchChangeMs >= _switchDebounceMs) {
+      _stableSwitchPressed = raw;
+    }
+  void setDirectionLevel(bool level) {
+    digitalWrite(_dirPin, level ? HIGH : LOW);
+    delayMicroseconds(DIR_SETUP_US);
+  void pulseStep() const {
+    digitalWrite(_stepPin, HIGH);
+    delayMicroseconds(_stepPulseUs);
+    digitalWrite(_stepPin, LOW);
+  const char* portToText(Port p) const {
+    if (p == K1) return "k1";
+    if (p == K2) return "k2";
+    return "k3";
+// ============================================================
+// KRAJ KLASE VALVE
+// ============================================================
+// ============================================================
+// PO
+ETAK KLASE PUMP
+// ============================================================
+// Konvencija pozicije pumpe:
+//   0 koraka = home prekidac
+//   ve
+i broj koraka = dalje od homea
+//   aspiracija = pomak od homea prema van
+//   dispense   = pomak prema homeu
+// Bitna razlika u odnosu na staru verziju:
+//   Pumpa sada a
+urira poziciju nakon svakog STEP impulsa.
+// Ako se pozove stop() usred pokreta:
+//   - pozicija se proglasi nepoznatom
+//   - _isHomed = false
+//   - prije novog pomaka mora se ponovno napraviti home
+// ============================================================
+class Pump {
+public:
+  enum State {
+    IDLE,
+    HOMING_RELEASE,
+    HOMING_BACKOFF,
+    HOMING_SEARCH,
+    MOVING,
+    ERROR_STATE
+  };
+  Pump(const char* name,
+       uint8_t stepPin,
+       uint8_t dirPin,
+       uint8_t switchPin,
+       bool invertHomingDirection,
+       long maxStepsFromHome,
+       unsigned long stepIntervalUs = 1500,
+       unsigned int stepPulseUs = 20,
+       unsigned long homingTimeoutMs = 30000,
+       unsigned long moveTimeoutMs = 120000,
+       long homeBackoffSteps = 50,
+       unsigned long switchDebounceMs = 5)
+    : _name(name),
+      _stepPin(stepPin),
+      _dirPin(dirPin),
+      _switchPin(switchPin),
+      _invertHomingDirection(invertHomingDirection),
+      _maxStepsFromHome(maxStepsFromHome),
+      _stepIntervalUs(stepIntervalUs),
+      _stepPulseUs(stepPulseUs),
+      _homingTimeoutMs(homingTimeoutMs),
+      _moveTimeoutMs(moveTimeoutMs),
+      _homeBackoffSteps(homeBackoffSteps),
+      _switchDebounceMs(switchDebounceMs),
+      _currentStepsFromHome(-1),
+      _targetStepsFromHome(-1),
+      _remainingSteps(0),
+      _backoffStepsRemaining(0),
+      _isHomed(false),
+      _state(IDLE),
+      _lastStepUs(0),
+      _stateStartMs(0),
+      _movingTowardHome(false),
+      _lastRawSwitchPressed(false),
+      _stableSwitchPressed(false),
+      _lastSwitchChangeMs(0) {
+  void begin() {
+    pinMode(_stepPin, OUTPUT);
+    pinMode(_dirPin, OUTPUT);
+    // L-D / NC + INPUT_PULLUP:
+    // nije stisnut = LOW
+    // stisnut     = HIGH
+    pinMode(_switchPin, INPUT_PULLUP);
+    digitalWrite(_stepPin, LOW);
+    digitalWrite(_dirPin, LOW);
+    resetSwitchDebounce();
+    Serial.print(F("[Pump begin] "));
+    Serial.print(_name);
+    Serial.print(F(" STEP="));
+    Serial.print(_stepPin);
+    Serial.print(F(" DIR="));
+    Serial.print(_dirPin);
+    Serial.print(F(" SW="));
+    Serial.println(_switchPin);
+  void update() {
+    updateSwitchDebounce();
+    if (_state == IDLE || _state == ERROR_STATE) {
+      return;
+    }
+    if (stateTimedOut()) {
+      fail(F("timeout"));
+      return;
+    }
+    if (!timeForNextStep()) {
+      return;
+    }
+    switch (_state) {
+      case HOMING_RELEASE:
+        updateHomingRelease();
+        break;
+      case HOMING_BACKOFF:
+        updateHomingBackoff();
+        break;
+      case HOMING_SEARCH:
+        updateHomingSearch();
+        break;
+      case MOVING:
+        updateMoving();
+        break;
+      default:
+        break;
+    }
+  bool startHome() {
+    if (_state != IDLE) {
+      return false;
+    }
+    resetMotionState();
+    _isHomed = false;
+    _currentStepsFromHome = -1;
+    _targetStepsFromHome = -1;
+    resetSwitchDebounce();
+    if (switchPressed()) {
+      Serial.print(F("[Pump home] "));
+      Serial.print(_name);
+      Serial.println(F(" prekidac je vec stisnut; odmicem se od homea"));
+      setDirectionLevel(awayFromHomeDirectionLevel());
+      _movingTowardHome = false;
+      enterState(HOMING_RELEASE);
+    } else {
+      Serial.print(F("[Pump home] "));
+      Serial.print(_name);
+      Serial.println(F(" trazim home"));
+      setDirectionLevel(homingDirectionLevel());
+      _movingTowardHome = true;
+      enterState(HOMING_SEARCH);
+    }
+    return true;
+  bool startMoveTo(long targetStepsFromHome) {
+    if (!_isHomed) {
+      Serial.print(F("[Pump reject] "));
+      Serial.print(_name);
+      Serial.println(F(" nije homeana"));
+      return false;
+    }
+    if (_state != IDLE) {
+      Serial.print(F("[Pump reject] "));
+      Serial.print(_name);
+      Serial.println(F(" zauzeta"));
+      return false;
+    }
+    if (targetStepsFromHome < 0 || targetStepsFromHome > _maxStepsFromHome) {
+      Serial.print(F("[Pump reject] "));
+      Serial.print(_name);
+      Serial.println(F(" cilj je izvan dozvoljenog hoda"));
+      return false;
+    }
+    if (targetStepsFromHome == _currentStepsFromHome) {
+      Serial.print(F("[Pump move] "));
+      Serial.print(_name);
+      Serial.print(F(" vec je na "));
+      Serial.println(targetStepsFromHome);
+      return true;
+    }
+    long deltaSteps = targetStepsFromHome - _currentStepsFromHome;
+    _movingTowardHome = deltaSteps < 0;
+    if (_movingTowardHome) {
+      _remainingSteps = -deltaSteps;
+      setDirectionLevel(homingDirectionLevel());
+    } else {
+      _remainingSteps = deltaSteps;
+      setDirectionLevel(awayFromHomeDirectionLevel());
+    }
+    _targetStepsFromHome = targetStepsFromHome;
+    Serial.print(F("[Pump move] "));
+    Serial.print(_name);
+    Serial.print(F(" "));
+    Serial.print(_currentStepsFromHome);
+    Serial.print(F(" -> "));
+    Serial.print(_targetStepsFromHome);
+    Serial.print(F(" koraka, preostalo="));
+    Serial.println(_remainingSteps);
+    enterState(MOVING);
+    return true;
+  bool startMoveBy(long deltaSteps) {
+    if (!_isHomed || _state != IDLE) {
+      return false;
+    }
+    return startMoveTo(_currentStepsFromHome + deltaSteps);
+  bool startMoveAwayFromHome(long steps) {
+    if (steps < 0) {
+      return false;
+    }
+    return startMoveBy(steps);
+  bool startMoveToEnd() {
+    return startMoveTo(_maxStepsFromHome);
+  bool startMoveToHomePosition() {
+    return startMoveTo(0);
+  bool startAspirateSteps(long steps) {
+    if (steps < 0) {
+      return false;
+    }
+    return startMoveBy(steps);
+  bool startDispenseSteps(long steps) {
+    if (steps < 0) {
+      return false;
+    }
+    return startMoveBy(-steps);
+  void stop() {
+    // Ako se pumpa zaustavi usred pokreta,
+    // ne vjerujemo vise softverskoj poziciji.
+    // Mora se ponovno napraviti home prije novog pomaka.
+    Serial.print(F("[Pump stop] "));
+    Serial.print(_name);
+    Serial.println(F(" zaustavljena; pozicija vise nije sigurna"));
+    resetMotionState();
+    _isHomed = false;
+    _currentStepsFromHome = -1;
+    _targetStepsFromHome = -1;
+    _state = IDLE;
+  void emergencyStop() {
+    Serial.print(F("[Pump EMERGENCY STOP] "));
+    Serial.print(_name);
+    Serial.println(F(" zaustavljena; pozicija vise nije sigurna"));
+    resetMotionState();
+    _isHomed = false;
+    _currentStepsFromHome = -1;
+    _targetStepsFromHome = -1;
+    _state = ERROR_STATE;
+  bool isBusy() const {
+    return _state != IDLE && _state != ERROR_STATE;
+  bool hasError() const {
+    return _state == ERROR_STATE;
+  bool isHomed() const {
+    return _isHomed;
+  long getPositionSteps() const {
+    return _currentStepsFromHome;
+  long getMaxStepsFromHome() const {
+    return _maxStepsFromHome;
+  State getState() const {
+    return _state;
+  const char* getName() const {
+    return _name;
+  void setMaxStepsFromHome(long maxStepsFromHome) {
+    if (maxStepsFromHome >= 0) {
+      _maxStepsFromHome = maxStepsFromHome;
+    }
+  void setStepIntervalUs(unsigned long stepIntervalUs) {
+    if (stepIntervalUs > _stepPulseUs) {
+      _stepIntervalUs = stepIntervalUs;
+    }
+  void setMoveTimeout(unsigned long moveTimeoutMs) {
+    _moveTimeoutMs = moveTimeoutMs;
+  void clearError() {
+    if (_state == ERROR_STATE) {
+      resetMotionState();
+      _isHomed = false;
+      _currentStepsFromHome = -1;
+      _targetStepsFromHome = -1;
+      _state = IDLE;
+    }
+private:
+  const char* _name;
+  uint8_t _stepPin;
+  uint8_t _dirPin;
+  uint8_t _switchPin;
+  bool _invertHomingDirection;
+  long _maxStepsFromHome;
+  unsigned long _stepIntervalUs;
+  unsigned int _stepPulseUs;
+  unsigned long _homingTimeoutMs;
+  unsigned long _moveTimeoutMs;
+  long _homeBackoffSteps;
+  unsigned long _switchDebounceMs;
+  long _currentStepsFromHome;
+  long _targetStepsFromHome;
+  long _remainingSteps;
+  long _backoffStepsRemaining;
+  bool _isHomed;
+  State _state;
+  unsigned long _lastStepUs;
+  unsigned long _stateStartMs;
+  bool _movingTowardHome;
+  bool _lastRawSwitchPressed;
+  bool _stableSwitchPressed;
+  unsigned long _lastSwitchChangeMs;
+  static const unsigned int DIR_SETUP_US = 20;
+  void updateHomingRelease() {
+    if (!switchPressed()) {
+      Serial.print(F("[Pump home] "));
+      Serial.print(_name);
+      Serial.println(F(" prekidac otpusten; radim backoff"));
+      _backoffStepsRemaining = _homeBackoffSteps;
+      enterState(HOMING_BACKOFF);
+      return;
+    }
+    pulseStep();
+  void updateHomingBackoff() {
+    if (_backoffStepsRemaining <= 0) {
+      Serial.print(F("[Pump home] "));
+      Serial.print(_name);
+      Serial.println(F(" ponovno prilazim home prekidacu"));
+      setDirectionLevel(homingDirectionLevel());
+      _movingTowardHome = true;
+      enterState(HOMING_SEARCH);
+      return;
+    }
+    pulseStep();
+    _backoffStepsRemaining--;
+  void updateHomingSearch() {
+    if (switchPressed()) {
+      finishHoming();
+      return;
+    }
+    pulseStep();
+  void finishHoming() {
+    _currentStepsFromHome = 0;
+    _targetStepsFromHome = 0;
+    _remainingSteps = 0;
+    _isHomed = true;
+    _state = IDLE;
+    Serial.print(F("[Pump home] "));
+    Serial.print(_name);
+    Serial.println(F(" home pronaden na 0 koraka"));
+  void updateMoving() {
+    if (_remainingSteps <= 0) {
+      finishMove();
+      return;
+    }
+    if (_movingTowardHome && switchPressed()) {
+      // Ako se pri kretanju prema homeu prekidac aktivira ranije
+      // nego sto je software ocekivao, vjerujemo prekidacu.
+      _currentStepsFromHome = 0;
+      _targetStepsFromHome = 0;
+      _remainingSteps = 0;
+      _isHomed = true;
+      _state = IDLE;
+      Serial.print(F("[Pump move] "));
+      Serial.print(_name);
+      Serial.println(F(" home prekidac aktiviran tijekom pomaka"));
+      return;
+    }
+    pulseStep();
+    _remainingSteps--;
+    if (_movingTowardHome) {
+      _currentStepsFromHome--;
+      if (_currentStepsFromHome < 0) {
+        _currentStepsFromHome = 0;
+      }
+    } else {
+      _currentStepsFromHome++;
+      if (_currentStepsFromHome > _maxStepsFromHome) {
+        fail(F("pozicija presla maksimalni hod"));
+        return;
+      }
+    }
+    if (_remainingSteps <= 0) {
+      finishMove();
+    }
+  void finishMove() {
+    _currentStepsFromHome = _targetStepsFromHome;
+    _remainingSteps = 0;
+    _state = IDLE;
+    Serial.print(F("[Pump move] "));
+    Serial.print(_name);
+    Serial.print(F(" dosla na "));
+    Serial.println(_currentStepsFromHome);
+  bool stateTimedOut() const {
+    unsigned long timeoutMs = 0;
+    if (_state == MOVING) {
+      timeoutMs = _moveTimeoutMs;
+    } else {
+      timeoutMs = _homingTimeoutMs;
+    }
+    if (timeoutMs == 0) {
+      return false;
+    }
+    return millis() - _stateStartMs >= timeoutMs;
+  void enterState(State newState) {
+    _state = newState;
+    _stateStartMs = millis();
+    _lastStepUs = micros();
+  void resetMotionState() {
+    _remainingSteps = 0;
+    _backoffStepsRemaining = 0;
+    _targetStepsFromHome = -1;
+    _movingTowardHome = false;
+  void fail(const __FlashStringHelper* reason) {
+    Serial.print(F("[Pump ERROR] "));
+    Serial.print(_name);
+    Serial.print(F(" "));
+    Serial.println(reason);
+    resetMotionState();
+    _isHomed = false;
+    _currentStepsFromHome = -1;
+    _state = ERROR_STATE;
+  bool homingDirectionLevel() const {
+    return _invertHomingDirection ? HIGH : LOW;
+  bool awayFromHomeDirectionLevel() const {
+    return !homingDirectionLevel();
+  bool timeForNextStep() {
+    unsigned long now = micros();
+    if (now - _lastStepUs >= _stepIntervalUs) {
+      _lastStepUs = now;
+      return true;
+    }
+    return false;
+  bool switchPressed() const {
+    return _stableSwitchPressed;
+  bool readSwitchRaw() const {
+    return digitalRead(_switchPin) == HIGH;
+  void resetSwitchDebounce() {
+    _lastRawSwitchPressed = readSwitchRaw();
+    _stableSwitchPressed = _lastRawSwitchPressed;
+    _lastSwitchChangeMs = millis();
+  void updateSwitchDebounce() {
+    bool raw = readSwitchRaw();
+    unsigned long now = millis();
+    if (raw != _lastRawSwitchPressed) {
+      _lastRawSwitchPressed = raw;
+      _lastSwitchChangeMs = now;
+      return;
+    }
+    if (now - _lastSwitchChangeMs >= _switchDebounceMs) {
+      _stableSwitchPressed = raw;
+    }
+  void setDirectionLevel(bool level) {
+    digitalWrite(_dirPin, level ? HIGH : LOW);
+    delayMicroseconds(DIR_SETUP_US);
+  void pulseStep() const {
+    digitalWrite(_stepPin, HIGH);
+    delayMicroseconds(_stepPulseUs);
+    digitalWrite(_stepPin, LOW);
+// ============================================================
+// KRAJ KLASE PUMP
+// ============================================================
+// ============================================================
+// PO
+ETAK GLAVNOG PROGRAMA
+// ============================================================
+// Ovaj dio ide ISPOD klasa Valve i Pump.
+// Cilj:
+//   simulacija dovodjenja kemikalije iz B1 u R
+//   uz sigurniji pocetak:
+//   1. home ventila
+//   2. otvori P1 -> W
+//   3. home P1 dok je otvorena prema W
+//   4. P1 ide naprijed 0 -> 20000 kroz W
+//   5. otvori B1 -> P1
+//   6. P1 ide nazad 20000 -> 10000 i uvlaci iz B1
+//   7. zatvori B1 granu
+//   8. otvori P1 -> R
+//   9. P1 ide naprijed 10000 -> 20000 i gura u R
+//   10. otvori P1 -> W
+//   11. P1 ide nazad 20000 -> 10000 kroz W
+//   12. kraj
+// Definicija smjera pumpe:
+//   naprijed = od homea, broj koraka raste
+//   nazad    = prema homeu, broj koraka pada
+// Potvrdjena topologija:
+//   B1 ---- V4.k2
+//   S1 ---- V4.k3
+//           V4.k1 ---- V6.k3
+//   B2 ---- V5.k2
+//   S2 ---- V5.k3
+//           V5.k1 ---- V6.k2
+//   V6.k1 ---- V1.k3
+//   P1 ---- V1.k1
+//           V1.k2 ---- V2.k1
+//   V2.k2 ---- W
+//   V2.k3 ---- R
+// Pravilo ventila:
+//   0 deg   = zatvoreno
+//   90 deg  = k1 <-> k3
+//   180 deg = k1 <-> k2
+// ============================================================
+// ============================================================
+// MEGA 2560 OBJEKTI: VENTILI I PUMPE
+// ============================================================
+// Ako neki ventil ide krivo prema homeu,
+// promijeni invertHomingDirection true/false u njegovom konstruktoru.
+// V1 invert homing = true.
+// V4 invert homing = true.
+// Ostali su trenutno false.
+// stepsFor90Deg = 400 je zadrzano iz dosadasnjih testova.
+// ============================================================
+Valve V1("V1", 22, 23, 39, true,  400, "P1",    "V2.k1", "V6.k1");
+Valve V2("V2", 24, 25, 38, false, 400, "V1.k2", "W",     "R");
+// V3 postoji hardverski, ali se u ovoj shemi ne koristi.
+Valve V3("V3", 26, 27, 43, false, 400, "UNUSED", "UNUSED", "UNUSED");
+// V4 smjer hominga je TRUE.
+Valve V4("V4", 28, 29, 40, true,  400, "V6.k3", "B1",    "S1");
+Valve V5("V5", 30, 31, 41, false, 400, "V6.k2", "B2",    "S2");
+Valve V6("V6", 32, 33, 42, false, 400, "V1.k3", "V5.k1", "V4.k1");
+Pump P1("P1", 46, 47, 45, false, 20500);
+// P2 postoji hardverski, ali se u ovoj shemi ne koristi.
+Pump P2("P2", 48, 49, 44, false, 20500);
+// ============================================================
+// STATE MACHINE ZA TEST: B1 -> R, SA WASTE PRIPREMOM
+// ============================================================
+enum DemoState {
+  DEMO_STARTUP_WAIT,
+  DEMO_HOME_VALVES_START,
+  DEMO_HOME_VALVES_WAIT,
+  DEMO_OPEN_WASTE_FOR_PUMP_START,
+  DEMO_OPEN_WASTE_FOR_PUMP_WAIT,
+  DEMO_HOME_P1_START,
+  DEMO_HOME_P1_WAIT,
+  DEMO_P1_PREPARE_20000_START,
+  DEMO_P1_PREPARE_20000_WAIT,
+  DEMO_OPEN_B1_TO_P1_START,
+  DEMO_OPEN_B1_TO_P1_WAIT,
+  DEMO_PULL_FROM_B1_TO_10000_START,
+  DEMO_PULL_FROM_B1_TO_10000_WAIT,
+  DEMO_CLOSE_B1_BRANCH_START,
+  DEMO_CLOSE_B1_BRANCH_WAIT,
+  DEMO_OPEN_P1_TO_REACTOR_START,
+  DEMO_OPEN_P1_TO_REACTOR_WAIT,
+  DEMO_PUSH_TO_REACTOR_START,
+  DEMO_PUSH_TO_REACTOR_WAIT,
+  DEMO_OPEN_WASTE_END_START,
+  DEMO_OPEN_WASTE_END_WAIT,
+  DEMO_P1_FINAL_TO_10000_START,
+  DEMO_P1_FINAL_TO_10000_WAIT,
+  DEMO_DONE,
+  DEMO_ERROR
+DemoState demoState = DEMO_STARTUP_WAIT;
+// ============================================================
+// POSTAVKE TESTA
+// ============================================================
+const unsigned long STARTUP_DELAY_MS = 5000;
+// Pumpa:
+//   0 -> 20000      naprijed kroz W
+//   20000 -> 10000  nazad, uvlacenje iz B1
+//   10000 -> 20000  naprijed, guranje u R
+//   20000 -> 10000  nazad kroz W
+const long P1_PREPARE_POSITION_STEPS = 20000;
+const long P1_B1_PULL_POSITION_STEPS = 10000;
+const long P1_REACTOR_PUSH_POSITION_STEPS = 20000;
+const long P1_FINAL_WASTE_POSITION_STEPS = 10000;
+unsigned long startupStartMs = 0;
+// ============================================================
+// POMOCNE FUNKCIJE
+// ============================================================
+void updateAllAxes() {
+  V1.update();
+  V2.update();
+  V3.update();
+  V4.update();
+  V5.update();
+  V6.update();
+  P1.update();
+  P2.update();
+bool activeAxesBusy() {
+  return V1.isBusy() ||
+         V2.isBusy() ||
+         V4.isBusy() ||
+         V6.isBusy() ||
+         P1.isBusy();
+bool activeAxesError() {
+  return V1.hasError() ||
+         V2.hasError() ||
+         V4.hasError() ||
+         V6.hasError() ||
+         P1.hasError();
+void setDemoError(const __FlashStringHelper* reason) {
+  if (demoState == DEMO_ERROR) {
+    return;
+  Serial.print(F("[DEMO ERROR] "));
+  Serial.println(reason);
+  demoState = DEMO_ERROR;
+// ============================================================
+// GLAVNA NEBLOKIRAJUCA DEMO SEKVENCA
+// ============================================================
+void updateDemo() {
+  if (demoState != DEMO_ERROR && activeAxesError()) {
+    setDemoError(F("greska na osi"));
+    return;
+  switch (demoState) {
+    // --------------------------------------------------------
+    // Startup delay
+    // --------------------------------------------------------
+    case DEMO_STARTUP_WAIT:
+      if (millis() - startupStartMs >= STARTUP_DELAY_MS) {
+        Serial.println(F("[DEMO] startup delay zavrsen"));
+        demoState = DEMO_HOME_VALVES_START;
+      }
+      break;
+    // --------------------------------------------------------
+    // 1. Home ventila
+    // --------------------------------------------------------
+    case DEMO_HOME_VALVES_START:
+      Serial.println(F("[DEMO] home V1, V2, V4, V6"));
+      if (!V1.startHome()) {
+        setDemoError(F("ne mogu pokrenuti homing V1"));
+        return;
+      }
+      if (!V2.startHome()) {
+        setDemoError(F("ne mogu pokrenuti homing V2"));
+        return;
+      }
+      if (!V4.startHome()) {
+        setDemoError(F("ne mogu pokrenuti homing V4"));
+        return;
+      }
+      if (!V6.startHome()) {
+        setDemoError(F("ne mogu pokrenuti homing V6"));
+        return;
+      }
+      demoState = DEMO_HOME_VALVES_WAIT;
+      break;
+    case DEMO_HOME_VALVES_WAIT:
+      if (!activeAxesBusy()) {
+        if (!V1.isHomed() || !V2.isHomed() || !V4.isHomed() || !V6.isHomed()) {
+          setDemoError(F("neki od ventila nije homean"));
+          return;
+        }
+        Serial.println(F("[DEMO] V1, V2, V4, V6 su homeani"));
+        demoState = DEMO_OPEN_WASTE_FOR_PUMP_START;
+      }
+      break;
+    // --------------------------------------------------------
+    // 2. Otvori P1 -> W za homing pumpe i pripremu pumpe
+    // --------------------------------------------------------
+    //
+    // P1 -> V1.k1
+    // V1.k1 <-> V1.k2
+    // V1.k2 -> V2.k1
+    // V2.k1 <-> V2.k2
+    // V2.k2 -> W
+    //
+    // V1 = 180 deg
+    // V2 = 180 deg
+    // --------------------------------------------------------
+    case DEMO_OPEN_WASTE_FOR_PUMP_START:
+      Serial.println(F("[DEMO] otvaram put P1 -> W za homing pumpe"));
+      Serial.println(F("[DEMO] V1=180, V2=180"));
+      if (!V1.startOpenK1To(K2)) {
+        setDemoError(F("ne mogu postaviti V1 prema V2"));
+        return;
+      }
+      if (!V2.startOpenK1To(K2)) {
+        setDemoError(F("ne mogu postaviti V2 prema W"));
+        return;
+      }
+      demoState = DEMO_OPEN_WASTE_FOR_PUMP_WAIT;
+      break;
+    case DEMO_OPEN_WASTE_FOR_PUMP_WAIT:
+      if (!activeAxesBusy()) {
+        if (V1.getPosition() != 180 || V2.getPosition() != 180) {
+          setDemoError(F("put P1 -> W nije ispravno postavljen"));
+          return;
+        }
+        Serial.println(F("[DEMO] put P1 -> W je otvoren"));
+        demoState = DEMO_HOME_P1_START;
+      }
+      break;
+    // --------------------------------------------------------
+    // 3. Home P1 dok je spojena prema waste
+    // --------------------------------------------------------
+    case DEMO_HOME_P1_START:
+      Serial.println(F("[DEMO] home P1 dok je otvorena prema W"));
+      if (!P1.startHome()) {
+        setDemoError(F("ne mogu pokrenuti homing P1"));
+        return;
+      }
+      demoState = DEMO_HOME_P1_WAIT;
+      break;
+    case DEMO_HOME_P1_WAIT:
+      if (!activeAxesBusy()) {
+        if (!P1.isHomed()) {
+          setDemoError(F("P1 nije homeana"));
+          return;
+        }
+        Serial.println(F("[DEMO] P1 je homeana"));
+        demoState = DEMO_P1_PREPARE_20000_START;
+      }
+      break;
+    // --------------------------------------------------------
+    // 4. P1 ide NAPRIJED: 0 -> 20000 dok je jos spojena na W
+    // --------------------------------------------------------
+    //
+    // Ovo je priprema pumpe.
+    // Pumpa ide od homea prema van.
+    // --------------------------------------------------------
+    case DEMO_P1_PREPARE_20000_START:
+      Serial.println(F("[DEMO] P1 ide NAPRIJED na 20000 dok je spojena na W"));
+      if (!P1.startMoveTo(P1_PREPARE_POSITION_STEPS)) {
+        setDemoError(F("ne mogu pokrenuti P1 na 20000"));
+        return;
+      }
+      demoState = DEMO_P1_PREPARE_20000_WAIT;
+      break;
+    case DEMO_P1_PREPARE_20000_WAIT:
+      if (!activeAxesBusy()) {
+        if (P1.getPositionSteps() != P1_PREPARE_POSITION_STEPS) {
+          setDemoError(F("P1 nije dosla na 20000"));
+          return;
+        }
+        Serial.println(F("[DEMO] P1 je na 20000"));
+        demoState = DEMO_OPEN_B1_TO_P1_START;
+      }
+      break;
+    // --------------------------------------------------------
+    // 5. Otvori B1 -> P1
+    // --------------------------------------------------------
+    //
+    // B1 -> V4.k2
+    // V4.k2 <-> V4.k1
+    // V4.k1 -> V6.k3
+    // V6.k3 <-> V6.k1
+    // V6.k1 -> V1.k3
+    // V1.k3 <-> V1.k1
+    // V1.k1 -> P1
+    //
+    // V4 = 180 deg
+    // V6 = 90 deg
+    // V1 = 90 deg
+    //
+    // V2 zatvaramo na 0 deg jer vise ne zelimo waste put.
+    // --------------------------------------------------------
+    case DEMO_OPEN_B1_TO_P1_START:
+      Serial.println(F("[DEMO] otvaram put B1 -> P1"));
+      Serial.println(F("[DEMO] V4=180, V6=90, V1=90, V2=0"));
+      if (!V4.startOpenK1To(K2)) {
+        setDemoError(F("ne mogu postaviti V4 prema B1"));
+        return;
+      }
+      if (!V6.startOpenK1To(K3)) {
+        setDemoError(F("ne mogu postaviti V6 prema V4"));
+        return;
+      }
+      if (!V1.startOpenK1To(K3)) {
+        setDemoError(F("ne mogu postaviti V1 prema V6"));
+        return;
+      }
+      if (!V2.startGoTo0()) {
+        setDemoError(F("ne mogu zatvoriti V2"));
+        return;
+      }
+      demoState = DEMO_OPEN_B1_TO_P1_WAIT;
+      break;
+    case DEMO_OPEN_B1_TO_P1_WAIT:
+      if (!activeAxesBusy()) {
+        if (V4.getPosition() != 180 ||
+            V6.getPosition() != 90 ||
+            V1.getPosition() != 90 ||
+            V2.getPosition() != 0) {
+          setDemoError(F("put B1 -> P1 nije ispravno postavljen"));
+          return;
+        }
+        Serial.println(F("[DEMO] put B1 -> P1 je otvoren"));
+        demoState = DEMO_PULL_FROM_B1_TO_10000_START;
+      }
+      break;
+    // --------------------------------------------------------
+    // 6. P1 ide NAZAD: 20000 -> 10000 dok je spojena na B1
+    // --------------------------------------------------------
+    //
+    // Po tvojoj definiciji:
+    //   nazad = prema homeu = broj koraka pada
+    //
+    // Ovo je faza uvlacenja iz B1.
+    // --------------------------------------------------------
+    case DEMO_PULL_FROM_B1_TO_10000_START:
+      Serial.println(F("[DEMO] P1 ide NAZAD sa 20000 na 10000 i uvlaci iz B1"));
+      if (!P1.startMoveTo(P1_B1_PULL_POSITION_STEPS)) {
+        setDemoError(F("ne mogu pokrenuti P1 na 10000"));
+        return;
+      }
+      demoState = DEMO_PULL_FROM_B1_TO_10000_WAIT;
+      break;
+    case DEMO_PULL_FROM_B1_TO_10000_WAIT:
+      if (!activeAxesBusy()) {
+        if (P1.getPositionSteps() != P1_B1_PULL_POSITION_STEPS) {
+          setDemoError(F("P1 nije dosla na 10000 nakon B1 faze"));
+          return;
+        }
+        Serial.println(F("[DEMO] B1 faza zavrsena, P1 je na 10000"));
+        demoState = DEMO_CLOSE_B1_BRANCH_START;
+      }
+      break;
+    // --------------------------------------------------------
+    // 7. Zatvori B1 granu prije otvaranja reaktora
+    // --------------------------------------------------------
+    //
+    // V4 = 0 deg
+    // V6 = 0 deg
+    //
+    // Time izoliramo B1 granu.
+    // --------------------------------------------------------
+    case DEMO_CLOSE_B1_BRANCH_START:
+      Serial.println(F("[DEMO] zatvaram B1 granu"));
+      Serial.println(F("[DEMO] V4=0, V6=0"));
+      if (!V4.startGoTo0()) {
+        setDemoError(F("ne mogu zatvoriti V4"));
+        return;
+      }
+      if (!V6.startGoTo0()) {
+        setDemoError(F("ne mogu zatvoriti V6"));
+        return;
+      }
+      demoState = DEMO_CLOSE_B1_BRANCH_WAIT;
+      break;
+    case DEMO_CLOSE_B1_BRANCH_WAIT:
+      if (!activeAxesBusy()) {
+        if (V4.getPosition() != 0 || V6.getPosition() != 0) {
+          setDemoError(F("B1 grana nije zatvorena"));
+          return;
+        }
+        Serial.println(F("[DEMO] B1 grana je zatvorena"));
+        demoState = DEMO_OPEN_P1_TO_REACTOR_START;
+      }
+      break;
+    // --------------------------------------------------------
+    // 8. Otvori P1 -> R
+    // --------------------------------------------------------
+    //
+    // P1 -> V1.k1
+    // V1.k1 <-> V1.k2
+    // V1.k2 -> V2.k1
+    // V2.k1 <-> V2.k3
+    // V2.k3 -> R
+    //
+    // V1 = 180 deg
+    // V2 = 90 deg
+    // --------------------------------------------------------
+    case DEMO_OPEN_P1_TO_REACTOR_START:
+      Serial.println(F("[DEMO] otvaram put P1 -> R"));
+      Serial.println(F("[DEMO] V1=180, V2=90"));
+      if (!V1.startOpenK1To(K2)) {
+        setDemoError(F("ne mogu postaviti V1 prema V2"));
+        return;
+      }
+      if (!V2.startOpenK1To(K3)) {
+        setDemoError(F("ne mogu postaviti V2 prema R"));
+        return;
+      }
+      demoState = DEMO_OPEN_P1_TO_REACTOR_WAIT;
+      break;
+    case DEMO_OPEN_P1_TO_REACTOR_WAIT:
+      if (!activeAxesBusy()) {
+        if (V1.getPosition() != 180 || V2.getPosition() != 90) {
+          setDemoError(F("put P1 -> R nije ispravno postavljen"));
+          return;
+        }
+        Serial.println(F("[DEMO] put P1 -> R je otvoren"));
+        demoState = DEMO_PUSH_TO_REACTOR_START;
+      }
+      break;
+    // --------------------------------------------------------
+    // 9. P1 ide NAPRIJED: 10000 -> 20000 i gura prema R
+    // --------------------------------------------------------
+    //
+    // Po tvojoj definiciji:
+    //   naprijed = od homea = broj koraka raste
+    //
+    // Ovo je faza izbacivanja/guranja u reaktor.
+    // --------------------------------------------------------
+    case DEMO_PUSH_TO_REACTOR_START:
+      Serial.println(F("[DEMO] P1 ide NAPRIJED sa 10000 na 20000 i gura prema R"));
+      if (!P1.startMoveTo(P1_REACTOR_PUSH_POSITION_STEPS)) {
+        setDemoError(F("ne mogu pokrenuti P1 prema 20000 za R"));
+        return;
+      }
+      demoState = DEMO_PUSH_TO_REACTOR_WAIT;
+      break;
+    case DEMO_PUSH_TO_REACTOR_WAIT:
+      if (!activeAxesBusy()) {
+        if (P1.getPositionSteps() != P1_REACTOR_PUSH_POSITION_STEPS) {
+          setDemoError(F("P1 nije dosla na 20000 nakon R faze"));
+          return;
+        }
+        Serial.println(F("[DEMO] R faza zavrsena, P1 je na 20000"));
+        demoState = DEMO_OPEN_WASTE_END_START;
+      }
+      break;
+    // --------------------------------------------------------
+    // 10. Otvori P1 -> W nakon reaktora
+    // --------------------------------------------------------
+    //
+    // V1 = 180 deg
+    // V2 = 180 deg
+    // --------------------------------------------------------
+    case DEMO_OPEN_WASTE_END_START:
+      Serial.println(F("[DEMO] otvaram put P1 -> W nakon R faze"));
+      Serial.println(F("[DEMO] V1=180, V2=180"));
+      if (!V1.startOpenK1To(K2)) {
+        setDemoError(F("ne mogu postaviti V1 prema V2 za W"));
+        return;
+      }
+      if (!V2.startOpenK1To(K2)) {
+        setDemoError(F("ne mogu postaviti V2 prema W"));
+        return;
+      }
+      demoState = DEMO_OPEN_WASTE_END_WAIT;
+      break;
+    case DEMO_OPEN_WASTE_END_WAIT:
+      if (!activeAxesBusy()) {
+        if (V1.getPosition() != 180 || V2.getPosition() != 180) {
+          setDemoError(F("put P1 -> W na kraju nije ispravno postavljen"));
+          return;
+        }
+        Serial.println(F("[DEMO] zavrsni put P1 -> W je otvoren"));
+        demoState = DEMO_P1_FINAL_TO_10000_START;
+      }
+      break;
+    // --------------------------------------------------------
+    // 11. P1 ide NAZAD: 20000 -> 10000 kroz W
+    // --------------------------------------------------------
+    case DEMO_P1_FINAL_TO_10000_START:
+      Serial.println(F("[DEMO] P1 ide NAZAD sa 20000 na 10000 kroz W"));
+      if (!P1.startMoveTo(P1_FINAL_WASTE_POSITION_STEPS)) {
+        setDemoError(F("ne mogu pokrenuti zavrsni P1 pomak na 10000"));
+        return;
+      }
+      demoState = DEMO_P1_FINAL_TO_10000_WAIT;
+      break;
+    case DEMO_P1_FINAL_TO_10000_WAIT:
+      if (!activeAxesBusy()) {
+        if (P1.getPositionSteps() != P1_FINAL_WASTE_POSITION_STEPS) {
+          setDemoError(F("P1 nije dosla na 10000 na kraju"));
+          return;
+        }
+        Serial.println(F("[DEMO] program zavrsen"));
+        Serial.print(F("[DEMO] finalna pozicija P1 = "));
+        Serial.println(P1.getPositionSteps());
+        demoState = DEMO_DONE;
+      }
+      break;
+    // --------------------------------------------------------
+    // Kraj ili greska
+    // --------------------------------------------------------
+    case DEMO_DONE:
+      // Program namjerno ne radi nista nakon zavrsetka.
+      // Resetiraj Arduino ako zelis ponoviti sekvencu.
+      break;
+    case DEMO_ERROR:
+      // Program stoji u gresci.
+      // Otvori Serial Monitor, vidi poruku, popravi problem i resetiraj Arduino.
+      break;
+    default:
+      setDemoError(F("nepoznato demo stanje"));
+      break;
+// ============================================================
+// SETUP I LOOP
+// ============================================================
+void setup() {
+  Serial.begin(115200);
+  // Vazno:
+  // Nema while(!Serial).
+  // Program mora krenuti sam nakon resetiranja Arduina,
+  // cak i ako Serial Monitor nije otvoren.
+  delay(300);
+  Serial.println();
+  Serial.println(F("============================================================"));
+  Serial.println(F("Chemputer test: B1 -> R sa waste pripremom"));
+  Serial.println(F("Prvo upali napajanje drivera/motora, zatim resetiraj Arduino Mega."));
+  Serial.println(F("Program ne ceka Serial Monitor."));
+  Serial.println(F("============================================================"));
+  V1.begin();
+  V2.begin();
+  V3.begin();
+  V4.begin();
+  V5.begin();
+  V6.begin();
+  P1.begin();
+  P2.begin();
+  // Potvrdjeni vanjski spojevi:
+  V1.connectTo(K2, V2, K1);
+  V1.connectTo(K3, V6, K1);
+  V6.connectTo(K3, V4, K1);
+  V6.connectTo(K2, V5, K1);
+  startupStartMs = millis();
+  demoState = DEMO_STARTUP_WAIT;
+  Serial.print(F("[DEMO] startup delay ms = "));
+  Serial.println(STARTUP_DELAY_MS);
+void loop() {
+  updateAllAxes();
+  updateDemo();
+// ============================================================
+// KRAJ GLAVNOG PROGRAMA
+// ============================================================
