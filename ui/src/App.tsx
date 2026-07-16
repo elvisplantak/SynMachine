@@ -383,6 +383,7 @@ type PreRunCheckKey =
 type PreRunChecks = Record<PreRunCheckKey, boolean>;
 type Screen = "dashboard" | "protocolBuilder" | "logs" | "service" | "guidedDemo";
 type DemoStage = "configure" | "review" | "live";
+type DemoSection = "cockpit" | "log";
 type AdditionOrder = "B1 then B2" | "B2 then B1";
 type ServiceSection =
   | "overview"
@@ -1224,7 +1225,22 @@ function LogsScreen({ onNavigate }: { onNavigate: (screen: Screen) => void }) {
   );
 }
 
+function GuidedDemoNavigation({ activeSection, onNavigate, onExit }: { activeSection: DemoSection; onNavigate: (section: DemoSection) => void; onExit: () => void }) {
+  return <nav className="guidedDemoNavigation" aria-label="Guided Demo navigation"><button type="button" aria-current={activeSection === "cockpit" ? "page" : undefined} onClick={() => onNavigate("cockpit")}>Guided Demo</button><button type="button" aria-current={activeSection === "log" ? "page" : undefined} onClick={() => onNavigate("log")}>Demo Log</button><button type="button" onClick={onExit}>Exit demo</button></nav>;
+}
+
+function DemoLog({ phases, firstLiquid, secondLiquid, values, onNavigate, onExit }: { phases: string[]; firstLiquid: string; secondLiquid: string; values: { b1Volume: number; b2Volume: number; solventVolume: number; totalVolume: number; ratioB1: number; additionOrder: AdditionOrder; additionSpeed: number; reactorMixing: number; sfMixing: number; simulatedTemperature: string; reactionDuration: string; delayBetweenAdditions: string }; onNavigate: (section: DemoSection) => void; onExit: () => void }) {
+  const [technicalOpen, setTechnicalOpen] = useState(false);
+  const humanEvents = [["09:20:00", "Demo configuration confirmed"], ["09:20:08", "UI preview started"], ["09:20:24", "S aspiration completed"], ["09:20:39", "S dispense to Reactor completed"], ["09:21:02", `${firstLiquid} aspiration completed`], ["09:21:18", `${firstLiquid} dispense to Reactor completed`], ["09:21:26", "Reactor mixing command changed"], ["09:21:35", "Delay completed"], ["09:22:04", `${secondLiquid} dispense to Reactor completed`], ["09:22:12", "Reaction hold started"], ["09:22:20", "Simulated temperature changed"], ["09:32:24", "Reactor contents aspiration into P2 completed"], ["09:32:43", "P2 dispense into SF completed"], ["09:32:51", "SF mixing command changed"], ["09:33:20", "Demo completed"]];
+  const technicalEvents = [["09:20:08", "Command accepted"], ["09:20:09", "Operation started"], ["09:20:24", "Operation reported complete"], ["09:21:26", "Control update accepted"], ["09:21:34", "Example timeout"], ["09:21:35", "Example fault"]];
+  const changes = [["09:21:26", "Reactor mixing command", "50%", "65%", `Dispense ${firstLiquid} to Reactor`], ["09:21:58", "Addition speed command", "40%", "55%", `Dispense ${secondLiquid} to Reactor`], ["09:22:20", "Simulated temperature", "25 °C", "35 °C", "Reaction hold"], ["09:32:51", "SF mixing command", "40%", "55%", "SF mixing"]];
+  const summary = [["Status", "Reported completion"], ["Started", "09:20:00"], ["Finished", "09:33:20"], ["Duration", "13 min 20 s"], ["B1 configured volume", `${values.b1Volume} ml`], ["B2 configured volume", `${values.b2Volume} ml`], ["S configured volume", `${values.solventVolume} ml`], ["Total configured volume", `${values.totalVolume} ml`], ["B1:B2 volume ratio", `${values.ratioB1}:${100 - values.ratioB1}`], ["Addition order", values.additionOrder], ["Initial addition speed", `${values.additionSpeed}% commanded level`], ["Initial Reactor mixing", `${values.reactorMixing}% commanded level`], ["Initial SF mixing", `${values.sfMixing}% commanded level`], ["Simulated temperature", `${values.simulatedTemperature} °C`], ["Reaction duration", `${values.reactionDuration} min`], ["Delay between additions", `${values.delayBetweenAdditions} s`]];
+
+  return <main className="appShell guidedDemoShell demoLogShell"><header className="guidedDemoHeader"><div><div className="guidedDemoTitleRow"><div className="brand">Demo Log</div><span>Example data — no backend storage</span></div><p>Configured values, run events, and recorded demo activity</p></div><GuidedDemoNavigation activeSection="log" onNavigate={onNavigate} onExit={onExit} /></header><p className="demoLogDataNotice">All values and events below are example frontend data. Configured volumes are not measured or confirmed delivered volumes.</p><section className="demoLogPanel demoLogSummary"><div className="demoSectionHeading"><span>Selected example demo run</span><h2>Run summary</h2></div><dl>{summary.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></section><div className="demoLogMainGrid"><section className="demoLogPanel demoLogTimeline"><div className="demoSectionHeading"><span>Example events</span><h2>Human event timeline</h2></div><ol>{humanEvents.map(([time, event]) => <li key={`${time}-${event}`}><time>{time}</time><span>{event}</span></li>)}</ol></section><aside className="demoLogSideColumn"><section className="demoLogPanel"><div className="demoSectionHeading"><span>Example command updates</span><h2>Control-change history</h2></div><div className="demoControlHistory">{changes.map(([time, control, previous, next, phase]) => <div key={`${time}-${control}`}><time>{time}</time><strong>{control}</strong><span>{previous} → {next}</span><small>{phase} · Command only; physical response not confirmed</small></div>)}</div></section><section className="demoLogPanel"><button className="demoTechnicalToggle" type="button" aria-expanded={technicalOpen} onClick={() => setTechnicalOpen((open) => !open)}>Show technical details <span>{technicalOpen ? "Hide" : "Expand"}</span></button>{technicalOpen && <ol className="demoTechnicalEvents">{technicalEvents.map(([time, event]) => <li key={`${time}-${event}`}><time>{time}</time><span>{event}</span></li>)}</ol>}</section></aside></div><section className="demoLogPanel"><div className="demoSectionHeading"><span>Example phase record</span><h2>Phase progress</h2></div><ol className="demoLogPhases">{phases.map((phase, index) => <li className={index < phases.length - 1 ? "complete" : "current"} key={phase}><span>{index + 1}</span><small>{phase}</small></li>)}</ol></section><section className="demoLogMedia" aria-label="Future camera media"><div><strong>Reactor camera media</strong><span>No recorded media in frontend draft</span><small>Storage and playback not implemented</small></div><div><strong>Overview camera media</strong><span>No recorded media in frontend draft</span><small>Storage and playback not implemented</small></div></section></main>;
+}
+
 function GuidedDemo({ onExit }: { onExit: () => void }) {
+  const [demoSection, setDemoSection] = useState<DemoSection>("cockpit");
   const [stage, setStage] = useState<DemoStage>("configure");
   const [ratioB1, setRatioB1] = useState(40);
   const [totalVolume, setTotalVolume] = useState("10");
@@ -1292,11 +1308,15 @@ function GuidedDemo({ onExit }: { onExit: () => void }) {
     </div>
   );
 
+  if (demoSection === "log") {
+    return <DemoLog phases={phases} firstLiquid={firstLiquid} secondLiquid={secondLiquid} values={{ b1Volume: formatVolume(b1Volume), b2Volume: formatVolume(b2Volume), solventVolume: formatVolume(solventVolume), totalVolume: volumesValid ? formatVolume(total) : 0, ratioB1, additionOrder, additionSpeed, reactorMixing, sfMixing, simulatedTemperature, reactionDuration, delayBetweenAdditions }} onNavigate={setDemoSection} onExit={onExit} />;
+  }
+
   return (
     <main className="appShell guidedDemoShell">
       <header className="guidedDemoHeader">
         <div><div className="guidedDemoTitleRow"><div className="brand">LabForge Guided Demo</div><span>Frontend preview — no hardware control</span></div><p>Configure one colored-liquid run and preview remote controls</p></div>
-        <button type="button" onClick={onExit}>Exit demo</button>
+        <GuidedDemoNavigation activeSection="cockpit" onNavigate={setDemoSection} onExit={onExit} />
       </header>
 
       <ol className="demoStageIndicator" aria-label="Guided Demo stages">

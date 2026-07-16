@@ -832,6 +832,38 @@ body {
   font-size: 14px;
 }
 
+.guidedDemoNavigation { display: flex; align-items: center; gap: 4px; border: 1px solid rgba(89, 134, 197, 0.32); border-radius: 11px; padding: 3px; background: rgba(5, 10, 21, 0.72); }
+.guidedDemoNavigation button { border-color: transparent; padding: 7px 10px; background: transparent; }
+.guidedDemoNavigation button[aria-current="page"] { border-color: rgba(50, 202, 255, 0.52); background: rgba(50, 202, 255, 0.14); }
+.demoLogDataNotice { margin: 10px 2px; color: #d7c692; font-size: 14px; line-height: 1.5; }
+.demoLogPanel, .demoLogMedia > div { border: 1px solid rgba(89, 134, 197, 0.4); border-radius: 14px; padding: 14px; background: rgba(8, 13, 24, 0.92); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); }
+.demoLogSummary dl { margin: 12px 0 0; display: grid; grid-template-columns: repeat(8, minmax(105px, 1fr)); gap: 7px; }
+.demoLogSummary dl div { border-left: 2px solid rgba(50, 202, 255, 0.34); padding: 4px 7px; display: grid; gap: 3px; }
+.demoLogSummary dt { color: #8ea3bf; font-size: 12px; line-height: 1.35; font-weight: 800; text-transform: uppercase; }
+.demoLogSummary dd { margin: 0; color: #e3f2ff; font-size: 14px; line-height: 1.4; font-weight: 800; }
+.demoLogMainGrid { margin-top: 10px; display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.8fr); gap: 10px; align-items: start; }
+.demoLogSideColumn { display: grid; gap: 10px; }
+.demoLogTimeline ol, .demoTechnicalEvents { margin: 14px 0 0; padding: 0; display: grid; list-style: none; }
+.demoLogTimeline li, .demoTechnicalEvents li { min-height: 34px; border-left: 1px solid rgba(50, 202, 255, 0.35); padding: 3px 0 8px 14px; display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 8px; color: #dbe7f5; font-size: 15px; line-height: 1.45; }
+.demoLogTimeline time, .demoTechnicalEvents time, .demoControlHistory time { color: #7ee3ff; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.45; }
+.demoControlHistory { margin-top: 12px; display: grid; gap: 8px; }
+.demoControlHistory > div { border-bottom: 1px solid rgba(89, 134, 197, 0.18); padding-bottom: 8px; display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; gap: 4px 8px; }
+.demoControlHistory strong { color: #dbe7f5; font-size: 14px; line-height: 1.4; }
+.demoControlHistory span { color: #7ee3ff; font-size: 14px; line-height: 1.4; font-weight: 800; }
+.demoControlHistory small { grid-column: 2 / -1; color: #8296b2; font-size: 12px; line-height: 1.45; }
+.demoTechnicalToggle { width: 100%; border: 0; padding: 0; display: flex; justify-content: space-between; color: #e3f2ff; background: transparent; font: inherit; font-size: 14px; line-height: 1.4; font-weight: 850; cursor: pointer; }
+.demoLogPhases { margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: repeat(13, minmax(92px, 1fr)); gap: 5px; overflow-x: auto; list-style: none; }
+.demoLogPhases li { border-top: 2px solid rgba(89, 134, 197, 0.3); padding-top: 6px; display: grid; gap: 3px; color: #65758a; }
+.demoLogPhases .complete { border-color: rgba(46, 240, 167, 0.55); color: #9fb2cd; }
+.demoLogPhases .current { border-color: #32caff; color: #dff1ff; }
+.demoLogPhases span { font-size: 12px; line-height: 1.35; font-weight: 850; }
+.demoLogPhases small { font-size: 12px; line-height: 1.4; }
+.demoLogMedia { margin-top: 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.demoLogMedia > div { min-height: 130px; display: grid; place-content: center; gap: 5px; text-align: center; }
+.demoLogMedia strong { color: #dbe7f5; font-size: 15px; line-height: 1.4; }
+.demoLogMedia span { color: #8ea3bf; font-size: 14px; line-height: 1.45; }
+.demoLogMedia small { color: #65758a; font-size: 13px; line-height: 1.45; }
+
 .demoStageIndicator {
   max-width: 760px;
   margin: 8px auto;
@@ -1505,6 +1537,8 @@ body {
 }
 
 @media (max-width: 1080px) {
+  .demoLogSummary dl { grid-template-columns: repeat(4, minmax(105px, 1fr)); }
+  .demoLogMainGrid { grid-template-columns: 1fr; }
   .demoCockpitVisuals,
   .demoSettingsColumn,
   .demoConfigureFooter,
@@ -1571,6 +1605,10 @@ body {
 }
 
 @media (max-width: 700px) {
+  .guidedDemoHeader, .guidedDemoTitleRow { align-items: flex-start; flex-direction: column; }
+  .guidedDemoNavigation { width: 100%; flex-wrap: wrap; }
+  .demoLogSummary dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .demoLogMedia { grid-template-columns: 1fr; }
   .guidedDemoHeader,
   .guidedDemoTitleRow,
   .demoLiveStatus { align-items: stretch; flex-direction: column; }
