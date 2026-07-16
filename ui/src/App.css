@@ -778,7 +778,7 @@ body {
 .guidedDemoHeader button,
 .demoReviewActions button,
 .demoPreviewActions button,
-.demoCameras button {
+.demoPersistentCameras button {
   border: 1px solid rgba(50, 202, 255, 0.48);
   border-radius: 10px;
   padding: 9px 13px;
@@ -797,7 +797,7 @@ body {
 .guidedDemoHeader {
   border: 1px solid rgba(50, 202, 255, 0.42);
   border-radius: 18px;
-  padding: 18px 20px;
+  padding: 11px 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -827,14 +827,14 @@ body {
 }
 
 .guidedDemoHeader p {
-  margin-top: 5px;
+  margin-top: 3px;
   color: #8ea3bf;
   font-size: 14px;
 }
 
 .demoStageIndicator {
   max-width: 760px;
-  margin: 18px auto;
+  margin: 8px auto;
   padding: 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -865,15 +865,23 @@ body {
 .demoStageIndicator .active { color: #e3f2ff; }
 .demoStageIndicator .active span { border-color: #32caff; color: #32caff; box-shadow: 0 0 12px rgba(50, 202, 255, 0.25); }
 
-.demoConfigureLayout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 330px); gap: 12px; align-items: start; }
-.demoSettingsColumn, .demoConfigureAside, .demoReviewLayout, .demoLiveLayout { display: grid; gap: 12px; }
-.demoConfigureAside { position: sticky; top: 12px; }
-.demoPanel, .demoScopePanel, .demoLiveStatus, .demoCameras { border: 1px solid rgba(89, 134, 197, 0.4); border-radius: 18px; padding: 18px; background: rgba(8, 13, 24, 0.92); box-shadow: 0 12px 35px rgba(0, 0, 0, 0.22); }
+.demoCockpitVisuals { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(260px, 0.9fr); gap: 10px; }
+.demoCockpitScheme, .demoPersistentCameras { border: 1px solid rgba(89, 134, 197, 0.4); border-radius: 16px; padding: 8px; background: rgba(8, 13, 24, 0.92); box-shadow: 0 12px 35px rgba(0, 0, 0, 0.22); }
+.demoCockpitScheme .schemeCanvas { height: min(43vh, 430px); min-height: 340px; }
+.demoPersistentCameras { display: grid; grid-template-rows: auto minmax(0, 1.65fr) minmax(0, 1fr); gap: 6px; }
+.demoPersistentCameras .demoCameraPrimary, .demoPersistentCameras .demoCameraSecondary { min-height: 0; }
+.demoCameraHeader { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #8ea3bf; font-size: 11px; font-weight: 850; letter-spacing: 0.1em; text-transform: uppercase; }
+.demoCameraHeader button { padding: 5px 9px; font-size: 11px; line-height: 1.2; letter-spacing: normal; text-transform: none; }
+.demoControlTray { margin-top: 10px; }
+.demoConfigureLayout { display: grid; gap: 8px; align-items: start; }
+.demoSettingsColumn { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.demoReviewLayout, .demoLiveLayout { display: grid; gap: 8px; }
+.demoPanel, .demoScopePanel, .demoLiveStatus { border: 1px solid rgba(89, 134, 197, 0.4); border-radius: 14px; padding: 12px; background: rgba(8, 13, 24, 0.92); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); }
 .demoSectionHeading > span, .demoLiveStatus span { color: #8ea3bf; font-size: 11px; font-weight: 850; letter-spacing: 0.12em; text-transform: uppercase; }
 .demoSectionHeading h2, .demoLiveStatus h2 { margin: 4px 0 0; color: #e3f2ff; font-size: 21px; }
-.demoMainSettings, .demoProcessSettings, .demoAdditionalSettings, .demoLiveControls { margin-top: 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.demoMainSettings, .demoProcessSettings, .demoAdditionalSettings, .demoLiveControls { margin-top: 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .demoMainSettings label, .demoProcessSettings label, .demoAdditionalSettings label, .demoLiveControls label { display: grid; align-content: start; gap: 8px; color: #dbe7f5; font-size: 14px; font-weight: 750; }
-.demoRangeField { grid-column: 1 / -1; }
+.demoRangeField { grid-column: 1 / -1; max-width: 360px; }
 .demoRangeField > span { display: flex; justify-content: space-between; gap: 12px; }
 .demoRangeField strong { color: #7ee3ff; }
 .demoRangeField small, .demoProcessSettings small, .demoLiveControls small { color: #8296b2; font-size: 12px; font-weight: 650; }
@@ -881,7 +889,9 @@ body {
 .demoInputWithUnit { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
 .demoInputWithUnit input, .demoMainSettings select { width: 100%; min-width: 0; min-height: 44px; border: 1px solid rgba(89, 134, 197, 0.45); border-radius: 10px; padding: 9px 11px; color: #e3f2ff; background: rgba(7, 15, 28, 0.9); font: inherit; }
 .demoInputWithUnit span { color: #9fb2cd; }
-.demoAdditionalPanel > button { width: 100%; border: 0; padding: 0; display: flex; justify-content: space-between; color: #e3f2ff; background: transparent; font: inherit; font-size: 16px; font-weight: 850; cursor: pointer; }
+.demoAdditionalPanel { border: 1px solid rgba(89, 134, 197, 0.34); border-radius: 10px; padding: 7px 10px; background: rgba(8, 13, 24, 0.84); }
+.demoAdditionalPanel > button { width: 100%; min-height: 28px; border: 0; padding: 0; display: flex; justify-content: space-between; align-items: center; color: #e3f2ff; background: transparent; font: inherit; font-size: 13px; font-weight: 850; cursor: pointer; }
+.demoAdditionalPanel .demoAdditionalSettings { margin-top: 8px; max-width: 760px; }
 .demoVolumeSummary { margin-top: 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .demoVolumeSummary div { border: 1px solid rgba(89, 134, 197, 0.27); border-radius: 10px; padding: 10px; display: grid; gap: 4px; background: rgba(7, 15, 28, 0.68); }
 .demoVolumeSummary span { color: #8ea3bf; font-size: 12px; }
@@ -892,18 +902,23 @@ body {
 .demoScopePanel ul { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 6px; }
 .demoPrimaryButton { min-height: 44px; border: 1px solid rgba(50, 202, 255, 0.62); border-radius: 11px; padding: 10px 14px; color: #e3f2ff; background: rgba(50, 202, 255, 0.16); font: inherit; font-weight: 850; cursor: pointer; }
 .demoPrimaryButton:disabled, .demoPreviewActions button:disabled { color: #65758a; border-color: rgba(89, 134, 197, 0.25); background: rgba(7, 15, 28, 0.6); cursor: not-allowed; }
+.demoConfigureFooter { min-height: 60px; border: 1px solid rgba(89, 134, 197, 0.36); border-radius: 12px; padding: 7px 9px; display: grid; grid-template-columns: minmax(360px, 1fr) minmax(380px, 1.2fr) auto; gap: 10px; align-items: center; background: rgba(8, 13, 24, 0.9); }
+.demoFooterLabel { color: #8ea3bf; font-size: 10px; font-weight: 850; letter-spacing: 0.1em; text-transform: uppercase; }
+.demoConfigureFooter .demoVolumeSummary { margin-top: 4px; grid-template-columns: repeat(4, minmax(70px, 1fr)); gap: 5px; }
+.demoConfigureFooter .demoVolumeSummary div { padding: 5px 7px; display: flex; justify-content: space-between; align-items: center; gap: 5px; }
+.demoConfigureFooter .demoVolumeSummary strong { font-size: 13px; }
+.demoConfigureFooter .demoValidationMessage { margin-top: 4px; font-size: 11px; }
+.demoScopeStrip { display: flex; flex-wrap: wrap; gap: 5px; }
+.demoScopeStrip span { border: 1px solid rgba(89, 134, 197, 0.25); border-radius: 999px; padding: 3px 7px; color: #9fb2cd; background: rgba(7, 15, 28, 0.62); font-size: 10px; line-height: 1.25; white-space: nowrap; }
+.demoConfigureFooter .demoPrimaryButton { min-height: 38px; white-space: nowrap; }
 
-.demoReviewLayout { max-width: 1050px; margin: 0 auto; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.demoReviewLayout { grid-template-columns: 1.25fr 0.75fr; }
 .demoReviewSettings { margin: 16px 0 0; display: grid; gap: 0; }
 .demoReviewSettings div { border-bottom: 1px solid rgba(89, 134, 197, 0.18); padding: 9px 0; display: flex; justify-content: space-between; gap: 12px; }
 .demoReviewSettings dt { color: #8ea3bf; font-size: 13px; }
 .demoReviewSettings dd { margin: 0; color: #e3f2ff; font-size: 13px; font-weight: 800; text-align: right; }
 .demoProtocolTimeline { margin: 16px 0 0; padding-left: 26px; display: grid; gap: 10px; color: #dbe7f5; }
 .demoReviewActions { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 12px; }
-.demoReviewScheme { grid-column: 1 / -1; }
-.demoMachinePanel .schemeCanvas,
-.demoReviewScheme .schemeCanvas { height: auto; min-height: 420px; margin-top: 14px; }
-
 .demoLiveStatus { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .demoPreviewActions { display: flex; flex-wrap: wrap; gap: 8px; }
 .demoPhaseProgress { display: grid; grid-template-columns: repeat(13, minmax(86px, 1fr)); gap: 5px; overflow-x: auto; padding-bottom: 4px; }
@@ -912,13 +927,10 @@ body {
 .demoPhaseProgress .complete { border-color: rgba(46, 240, 167, 0.55); color: #9fb2cd; }
 .demoPhaseProgress span { font-size: 12px; font-weight: 850; }
 .demoPhaseProgress small { font-size: 10px; line-height: 1.3; overflow-wrap: anywhere; }
-.demoCameras { position: relative; display: grid; grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr); gap: 10px; }
 .demoCameraPrimary, .demoCameraSecondary { min-height: 300px; border: 1px dashed rgba(89, 134, 197, 0.42); border-radius: 13px; display: grid; place-content: center; gap: 6px; color: #8ea3bf; background: radial-gradient(circle, rgba(50, 202, 255, 0.05), rgba(5, 10, 21, 0.8)); text-align: center; }
 .demoCameraSecondary { min-height: 180px; }
-.demoCameras strong { color: #dbe7f5; }
-.demoCameras small { color: #65758a; }
-.demoCameras button { position: absolute; right: 28px; bottom: 28px; }
-.demoLiveScheme .schemeCanvas { height: auto; min-height: 620px; margin-top: 14px; }
+.demoPersistentCameras strong { color: #dbe7f5; }
+.demoPersistentCameras small { color: #65758a; }
 .demoLiveLower { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 330px); gap: 12px; align-items: start; }
 .demoLiveControls input:disabled { opacity: 0.45; cursor: not-allowed; }
 .demoLockedNote { margin-top: 14px; color: #d7c692; font-size: 12px; line-height: 1.5; }
@@ -1493,9 +1505,14 @@ body {
 }
 
 @media (max-width: 1080px) {
-  .demoConfigureLayout,
+  .demoCockpitVisuals,
+  .demoSettingsColumn,
+  .demoConfigureFooter,
   .demoLiveLower { grid-template-columns: 1fr; }
-  .demoConfigureAside { position: static; }
+  .demoPersistentCameras { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto auto; }
+  .demoCameraHeader { grid-column: 1 / -1; }
+  .demoPersistentCameras .demoCameraPrimary,
+  .demoPersistentCameras .demoCameraSecondary { min-height: 180px; }
   .serviceLayout {
     grid-template-columns: 1fr;
   }
@@ -1564,12 +1581,10 @@ body {
   .demoAdditionalSettings,
   .demoLiveControls,
   .demoReviewLayout,
-  .demoCameras { grid-template-columns: 1fr; }
+  .demoPersistentCameras { grid-template-columns: 1fr; }
   .demoReviewActions { grid-column: auto; }
-  .demoMachinePanel .schemeCanvas,
-  .demoReviewScheme .schemeCanvas,
-  .demoLiveScheme .schemeCanvas { min-height: 420px; }
-  .demoCameras button { position: static; grid-column: 1; }
+  .demoCockpitScheme .schemeCanvas { height: auto; min-height: 420px; }
+  .demoCameraHeader { grid-column: 1; }
   .protocolBuilderTopBar,
   .logsTopBar,
   .serviceTopBar,
