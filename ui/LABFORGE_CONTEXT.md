@@ -523,6 +523,115 @@ Later, once the design stabilizes, these should be split into separate files, fo
 
 Do not refactor into many files unless asked. First keep the UI stable.
 
+## Current Guided Demo system decisions — 2026-07-16
+
+### Current frontend state and implementation focus
+
+The experimental frontend branch contains Dashboard, Protocol Builder, the full Logs draft, the Service draft, the Guided Demo cockpit, and a Guided Demo-specific `Demo Log`. Relevant checkpoints are:
+
+- `377694b Refine Guided Demo cockpit layout`
+- `d4e0841 Add Guided Demo log draft`
+
+The complete normal interface remains in the repository. Dashboard, Protocol Builder, full Logs, and Service have not been deleted or abandoned. Current implementation focus is temporarily narrowed to Guided Demo, Demo Log, and the backend and firmware required by those two views.
+
+### Guided Demo purpose and scope
+
+Guided Demo is intended for one authorized remote user to configure and observe one real-time run using colored, low-risk liquids. The current implementation remains frontend-only and does not control hardware.
+
+The intended real demo uses one run, `B1`, `B2`, shared solvent `S`, `P1` transfer into the Reactor, Reactor mixing, `P2` transfer from the Reactor into `SF`, SF mixing, a Reactor camera, and an Overview camera. Physical heating is disabled. Temperature remains a simulated/display-only parameter for demonstrating future UI behavior; it must not produce a heater command.
+
+The ten configured parameters are:
+
+1. B1:B2 volume ratio
+2. Total mixture volume
+3. Combined B1+B2 volume
+4. Addition order
+5. Addition speed command
+6. Reactor mixing command
+7. SF mixing command
+8. Simulated target temperature
+9. Reaction duration
+10. Delay between additions
+
+The system calculates B1 volume, B2 volume, S volume, and total volume. The current ratio is a volume ratio, not a molar ratio, because stock concentrations are not configured.
+
+The thirteen high-level phases are:
+
+1. Ready
+2. Aspirate S into P1
+3. Dispense S to Reactor
+4. Aspirate first selected liquid into P1
+5. Dispense first selected liquid to Reactor
+6. Delay between additions
+7. Aspirate second selected liquid into P1
+8. Dispense second selected liquid to Reactor
+9. Reaction hold
+10. Aspirate Reactor contents into P2
+11. Dispense P2 into SF
+12. SF mixing
+13. Completed
+
+The first and second liquids depend on the selected B1/B2 addition order. `P1` and `P2` remain syringe pumps with separate aspiration and dispense phases and must never be treated as inline pumps.
+
+### Parameter locking and phase permissions
+
+After physical execution starts, permanently lock the B1:B2 ratio, total mixture volume, combined B1+B2 volume, calculated B1/B2/S volumes, and addition order.
+
+Phase-dependent controls are:
+
+- Addition speed: editable only during P1 dispense-to-Reactor phases.
+- Reactor mixing: editable during Reactor-related phases.
+- Delay: editable only during the delay phase.
+- Simulated temperature: editable only during Reaction hold.
+- Reaction duration / remaining time: editable during Reaction hold.
+- SF mixing: editable only during SF mixing.
+
+The preferred UI convention for unavailable controls is a disabled control, a visible lock icon, and a short explanation. A color change is optional. The backend must independently enforce all locks and phase permissions; frontend disabled state is not a safety boundary.
+
+### Topology and pending hardware confirmation
+
+Guided Demo displays the complete approved target P1 and P2/SF topology. The approved target topology and Guided Demo workflow are defined. The user intends to connect the physical P2/SF branch according to that design and expects this work shortly, but final physical connection and detailed verification remain pending user confirmation. Do not record the physical P2/SF installation as verified until that confirmation exists.
+
+### Demo Log and persistence scope
+
+Guided Demo has a separate simplified `Demo Log` for the remote user. It is distinct from the full application Logs screen and is intended to show configured run values, a human-readable phase/event timeline, control-command changes, phase progress, optional technical details, and future Reactor and Overview camera media.
+
+The current Demo Log uses clearly marked example data and has no backend storage. Initial backend persistence should cover data required by Guided Demo and Demo Log rather than the entire future logging platform.
+
+### Minimal backend focus
+
+The next development focus is a minimal real backend core for Guided Demo and Demo Log, implemented independently of UI component details. Its responsibilities include:
+
+- Guided Demo configuration validation and B1/B2/S volume calculation
+- an immutable fluid plan after start
+- a run state machine and phase-dependent control policy
+- an explicit verified route catalog and operation execution
+- serial communication with Arduino Mega
+- run and event persistence
+- state and event delivery to Guided Demo and Demo Log
+
+Do not implement a universal route planner or complete general protocol engine at this stage. The backend should use logical identifiers such as `P1`, `P2`, `V1`–`V8`, `REACTOR_MIXER`, `SF_MIXER`, and `CAROUSEL`. It must not know Arduino pin numbers. Pin assignments and low-level motor configuration belong in firmware configuration and can be added later without changing the backend state-machine design.
+
+The current project organization plan uses three neighboring but separate Git repositories:
+
+- `~/Documents/labforge-ui`
+- `~/Documents/labforge-backend`
+- `~/Documents/labforge-firmware`
+
+Together they form one LabForge system, but they are not currently planned as one Git repository.
+
+### Firmware and hardware development
+
+The user has experimentally validated, non-blocking Arduino C++ `Pump` and `Valve` classes. Complete original working files will be supplied later and must be reviewed conservatively before modification; do not assume they require a rewrite. Review should focus on public API, `update()` behavior, homing, debounce, timeout, stop/abort handling, busy/done/error states, volume-to-step conversion, speed updates during movement, and serial integration.
+
+A `Carousel` firmware class will also be required. Do not invent its final behavior before confirming the number of positions, home/index sensing, steps per position, direction policy, and mechanical alignment behavior.
+
+`P1` and `P2` may be developed and tested in parallel. The user intends early testing against the real machine with colored liquids. A detailed user-facing simulated machine is not a priority because P2 is expected to be physically ready shortly. Small test doubles or fake command results remain acceptable for automated backend tests, but must not become a separate simulated product or delay real hardware integration.
+
+### Cameras
+
+Guided Demo uses exactly two planned cameras: Reactor camera and Overview camera. The camera system is separate from the hardware safety-command path. Loss of video must not prevent the local backend from safely controlling or stopping the machine.
+
 ## Desired coding workflow
 
 When changing UI code:
