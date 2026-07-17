@@ -632,6 +632,123 @@ A `Carousel` firmware class will also be required. Do not invent its final behav
 
 Guided Demo uses exactly two planned cameras: Reactor camera and Overview camera. The camera system is separate from the hardware safety-command path. Loss of video must not prevent the local backend from safely controlling or stopping the machine.
 
+## Current colored-liquid demo machine, recovery, flush, and commissioning decisions — 2026-07-17
+
+These decisions apply to the current colored-liquid Guided Demo scope. They are intentionally optimized for a fast, low-risk demo and are not a complete serious-chemistry safety protocol. Exact physical routes must match the approved topology and be physically verified before hardware execution.
+
+### Confirmed P1 and P2 hardware facts and pending calibration
+
+- `P1` and `P2` both use 10 mL syringes and have the same user-confirmed mechanical syringe orientation.
+- Position `0` is the home-switch end. Near `0`, the plunger is maximally retracted and syringe chamber volume is maximal.
+- Position `20500` is the recovered approximate pushed-plunger position, where chamber volume is minimal.
+- Movement toward `0` physically aspirates; movement toward `20500` physically dispenses. These facts apply to both pumps and supersede the older statement that P2 orientation was unconfirmed.
+- `20500` is a confirmed recovered software travel value, not a validated volumetric calibration. `steps/ml`, `working_full_position_steps`, and `working_empty_position_steps` remain pending experimental measurement or selection. Working positions must remain slightly inside the physical endpoints.
+- Reliable pump speed limits and final step intervals remain pending experimental testing. Speed should later be operator-adjustable only within experimentally validated limits.
+
+### Startup and homing policy
+
+- Normal cold startup requires homing all confirmed motorized valves and both syringe pumps.
+- Homing is not repeated before every normal aspiration, dispense, prime, or flush stroke. Normal cycles use the calibrated working stroke inside the physical endpoints.
+- Re-homing is required after loss of trusted position, including a power interruption or interrupted low-level motion.
+- Pump homing is fluidic: movement toward `0` increases chamber volume and can aspirate from the selected route. A verified safe fluidic route must be configured before homing either pump.
+- Exact low-level valve positions for safe pump-homing routes remain pending final physical verification.
+- The Column bottom valve homing direction and open/closed mapping remain pending physical confirmation. Its pins, direction, steps, and positions are not yet defined.
+
+### `RunStatus` and `MachineState`
+
+`RunStatus` describes one experiment and retains the lifecycle `CREATED`, `RUNNING`, `PAUSED`, `ABORTING`, `ABORTED`, `COMPLETED`, and `FAULTED`.
+
+The separate colored-demo `MachineState` describes whether the complete machine can accept another operation: `STARTING`, `READY`, `BUSY`, `RECOVERING`, `FLUSH_REQUIRED`, and `FLUSHING`. An old run may remain `ABORTED` or `FAULTED` after the machine later returns to `READY`. A machine-level `FAULTED` state is not defined for this narrow demo; failure of recovery or flushing is deferred to the serious-system design.
+
+- A new run may start only in `READY`; starting it changes the machine to `BUSY`.
+- Normal completion returns the machine to `READY`.
+- Automatic flushing after every successful run is not required. The operator may manually run `Flush system` when useful.
+
+### `Stop demo`
+
+The user-facing action is named `Stop demo`, not `Stop system`.
+
+1. The user requests `Stop demo` and the run enters `ABORTING`.
+2. The current atomic operation is allowed to finish; no next atomic operation starts.
+3. The run becomes `ABORTED` and the machine becomes `FLUSH_REQUIRED`.
+4. The old run cannot resume. The operator must manually complete `Flush system` before starting a new run.
+
+`Pump.stop()` or `Valve.stop()` must not implement normal `Stop demo` during active motion because that would lose trusted position. An Emergency Stop button and workflow are outside the current Guided Demo scope.
+
+### Automatic recovery after power loss
+
+If power is lost during an active or incomplete run, that run must not resume. On the next startup it is marked `FAULTED`, the machine enters `RECOVERING`, and colored-demo recovery runs automatically:
+
+1. Detect that the previous run or atomic operation did not finish cleanly.
+2. Mark the old run `FAULTED`.
+3. Restore known valve positions through homing.
+4. Configure verified safe routes for the pumps.
+5. Home `P1` and `P2`.
+6. Empty unknown pump contents toward Waste.
+7. Stop automatic recovery.
+8. Enter `FLUSH_REQUIRED`.
+
+Recovery does not automatically run the full rinse protocol. The operator must manually start `Flush system`, and a new run is forbidden until it finishes successfully. Exact valve positions and low-level recovery operations remain future executor and firmware work.
+
+The Waste tube will terminate near the top of the Waste bottle, above the maximum permitted liquid level, and the container must not be hermetically sealed. Aspirating through the Waste route is intended to draw air, not liquid Waste; this air-gap route supports safe pump recovery concepts and the final air purge. This is a colored-liquid demo decision, not a validated serious-chemistry waste design.
+
+### Manually triggered `Flush system`
+
+`Flush system` is a high-level local-operator action allowed only in `READY` or `FLUSH_REQUIRED`. Its transitions are `READY` or `FLUSH_REQUIRED` -> `FLUSHING` -> `READY` after successful completion. It is unavailable during an active run, automatic recovery, or another flush.
+
+The default colored-demo plan uses two liquid flush cycles. Each cycle contains:
+
+1. SF/Waste-path pass: `S -> P1 -> Reactor -> P2 -> SF/Waste path -> Waste`.
+2. Column-path pass: `S -> P1 -> Reactor -> P2 -> Column -> carousel rinse tube`.
+
+After both cycles, a final air purge uses air aspirated through the Waste air-gap route and passes through the verified cleaned paths. `P1` and `P2` are syringe pumps, so every pass consists of separate aspiration and dispense operations, never inline continuous flow. Each liquid pass should use almost the complete working syringe stroke, slightly inside `0` and `20500`; working stroke, exact flush volume, speed, and air-purge stroke remain pending calibration. Pumps are not re-homed before every flush stroke.
+
+### Column flushing and carousel tubes
+
+- The demo Column is gravity-driven and is not operated as a pressurized column.
+- During normal flushing, the Column bottom valve may remain open. It closes while the carousel changes tubes and reopens after the next rinse tube is positioned.
+- Carousel tubes have a nominal 10 mL capacity. Four initial positions are reserved for Column rinse cycle 1, Column rinse cycle 2, Column air purge, and spare/overflow.
+- Exact slot numbers, steps per slot, home sensing, safe working fill volume, and carousel motion calibration remain pending physical measurement.
+- A full 10 mL must not be described as safely collectible in one tube until the working syringe stroke and tube fill margin are experimentally confirmed.
+
+### Pump priming
+
+`P1` is the precision-dosing pump and is primed with solvent `S`, not `B1` or `B2`. Its route is `S -> P1 -> Waste`; priming output must go to Waste, never back into the S bottle. The default is two cycles, with the prime stroke pending calibration. The purpose is to remove air from the common P1 dosing path before precise B1/B2 dosing.
+
+`P2` is primarily a transport pump but is still primed to reduce air. Priming occurs after S has been dispensed into the Reactor and before reaction-mixture transfer, using `Reactor S -> P2 -> Reactor`. The default is two cycles, with the prime stroke pending calibration. A technical Demo Log event may later report completion.
+
+Neither P1 nor P2 priming adds a new top-level Guided Demo phase.
+
+### `Flush B1/B2 source lines`
+
+This operator-assisted local Service/Maintenance procedure supports changing colored liquids, removing carryover, and end-of-demo cleaning; it is not part of the remote Guided Demo cockpit:
+
+1. Replace the B1 and B2 bottles with rinse solvent and confirm both rinse sources are connected.
+2. Aspirate rinse solvent through the B1 source line and dispense it to Waste, using the current default of two cycles.
+3. Repeat the two-cycle rinse for the B2 source line.
+4. Lift both intake tubes above the rinse liquid or place them in clean empty bottles, then confirm that air purge may begin.
+5. Aspirate air through each source line and dispense it toward Waste.
+
+Exact rinse stroke and speed remain pending calibration.
+
+### Service-screen pump commissioning
+
+Pump experiments and calibration will use the existing Service screen, not a separate temporary application or screen. A `Pump commissioning` section for P1 and P2 may initially use raw steps and step intervals. Hardware-action buttons remain unavailable until backend and firmware integration exists.
+
+Values still requiring experimental determination are:
+
+- `working_full_position_steps` and `working_empty_position_steps`
+- `steps/ml`
+- P1 and P2 prime strokes
+- minimum reliable, maximum useful, and default step intervals
+- flush speed range and air-purge stroke
+- carousel positions and motion calibration
+- Column bottom valve homing direction and open/closed mapping
+
+### Deferred serious-system scope
+
+The full protocol for serious chemistry remains deferred, including chemical incompatibilities, emergency-stop handling, pressure hazards, toxic or volatile solvents, advanced fault recovery, and handling of a recovery or flush operation that itself fails.
+
 ## Desired coding workflow
 
 When changing UI code:
