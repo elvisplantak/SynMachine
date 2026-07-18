@@ -200,6 +200,16 @@ class SQLiteStore:
     ) -> None:
         if any(event.run_id != run.run_id for event in events):
             raise PersistenceConflictError("run event run_id does not match snapshot run_id")
+        if events:
+            final_event = events[-1]
+            if final_event.run_status != run.status:
+                raise PersistenceConflictError(
+                    "final run event status does not match snapshot status"
+                )
+            if final_event.run_phase != run.phase:
+                raise PersistenceConflictError(
+                    "final run event phase does not match snapshot phase"
+                )
         self._persist_transition(
             aggregate_type=RUN_AGGREGATE,
             aggregate_id=run.run_id,
@@ -210,6 +220,10 @@ class SQLiteStore:
     def persist_machine_transition(
         self, machine: MachineSnapshot, events: Sequence[MachineEvent]
     ) -> None:
+        if events and events[-1].machine_state != machine.state:
+            raise PersistenceConflictError(
+                "final machine event state does not match snapshot state"
+            )
         self._persist_transition(
             aggregate_type=MACHINE_AGGREGATE,
             aggregate_id=MACHINE_AGGREGATE_ID,

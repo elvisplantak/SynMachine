@@ -9,7 +9,10 @@ from app.demo.events import DomainEvent
 from app.demo.lifecycle import create_demo_run, start_run
 from app.demo.machine_events import MachineEvent
 from app.demo.machine_lifecycle import complete_startup, create_machine
+from app.demo.machine_models import MachineState
 from app.demo.models import AdditionOrder, DemoConfiguration
+from app.demo.phases import RunPhase
+from app.demo.run_models import RunStatus
 from app.persistence.sqlite_store import (
     PersistenceConflictError,
     PersistenceDataError,
@@ -69,6 +72,39 @@ def test_machine_snapshot_round_trip() -> None:
     with SQLiteStore() as store:
         store.persist_machine_transition(created.machine, created.events)
         assert store.load_machine_snapshot() == created.machine
+
+
+@pytest.mark.parametrize(
+    ("event_update", "error"),
+    [
+        ({"run_status": RunStatus.RUNNING}, "final run event status"),
+        ({"run_phase": RunPhase.P1_ASPIRATE_S}, "final run event phase"),
+    ],
+)
+def test_final_run_event_must_match_snapshot_without_writing(
+    configuration: DemoConfiguration, event_update: dict, error: str
+) -> None:
+    created = create_demo_run("run-1", configuration, NOW)
+    mismatched_event = created.events[-1].model_copy(update=event_update)
+
+    with SQLiteStore() as store:
+        with pytest.raises(PersistenceConflictError, match=error):
+            store.persist_run_transition(created.run, (mismatched_event,))
+        assert store.load_demo_run("run-1") is None
+        assert store.load_events() == ()
+
+
+def test_final_machine_event_must_match_snapshot_without_writing() -> None:
+    created = create_machine(NOW)
+    mismatched_event = created.events[-1].model_copy(
+        update={"machine_state": MachineState.READY}
+    )
+
+    with SQLiteStore() as store:
+        with pytest.raises(PersistenceConflictError, match="final machine event state"):
+            store.persist_machine_transition(created.machine, (mismatched_event,))
+        assert store.load_machine_snapshot() is None
+        assert store.load_events() == ()
 
 
 def test_run_and_machine_events_round_trip_in_mixed_append_only_table(
