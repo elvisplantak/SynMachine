@@ -774,6 +774,311 @@ body {
   display: grid;
 }
 
+.pumpCommissioning {
+  margin-top: 28px;
+  border-top: 1px solid rgba(89, 134, 197, 0.3);
+  padding-top: 28px;
+  display: grid;
+  gap: 18px;
+}
+
+.servicePumpsHeading h2 {
+  font-size: 28px;
+}
+
+.servicePumpsHeading p {
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.servicePumpsHeading .panelEyebrow {
+  font-size: 15px;
+}
+
+.pumpSummaryGrid {
+  gap: 16px;
+}
+
+.pumpSummaryGrid .serviceGroup {
+  padding: 20px;
+}
+
+.pumpSummaryGrid .serviceGroup h3 {
+  margin-bottom: 16px;
+  font-size: 23px;
+}
+
+.pumpSummaryGrid .serviceStatusList span {
+  padding: 11px 0;
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.pumpSummaryGrid .serviceActionRow button,
+.pumpCommissioning .serviceActionRow button {
+  min-height: 50px;
+  padding: 12px 16px;
+  font-size: 17px;
+  line-height: 1.3;
+  opacity: 0.58;
+}
+
+.commissioningHeading,
+.commissioningBlockTitle {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.commissioningHeading h2 {
+  margin: 4px 0 0;
+  color: #e3f2ff;
+  font-size: 26px;
+  line-height: 1.25;
+}
+
+.commissioningHeading p,
+.commissioningExplanation {
+  margin: 7px 0 0;
+  color: #8ea3bf;
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.commissioningBadge {
+  width: fit-content;
+  border: 1px solid rgba(89, 134, 197, 0.4);
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.confirmedBadge {
+  border-color: rgba(76, 210, 157, 0.45);
+  color: #b8f5d9;
+  background: rgba(76, 210, 157, 0.09);
+}
+
+.pendingBadge {
+  border-color: rgba(242, 190, 72, 0.45);
+  color: #ffe6a3;
+  background: rgba(242, 190, 72, 0.09);
+}
+
+.referenceBadge {
+  border-color: rgba(50, 202, 255, 0.4);
+  color: #c8f3ff;
+  background: rgba(50, 202, 255, 0.08);
+}
+
+.pumpSelector {
+  display: flex;
+  gap: 10px;
+}
+
+.pumpSelector button {
+  min-width: 132px;
+  min-height: 56px;
+  border: 2px solid rgba(89, 134, 197, 0.42);
+  border-radius: 11px;
+  padding: 9px 14px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+  color: #9fb2cd;
+  background: rgba(5, 10, 21, 0.86);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.pumpSelector button:hover,
+.pumpSelector button:focus-visible {
+  border-color: rgba(50, 202, 255, 0.72);
+  color: #e3f2ff;
+  background: rgba(50, 202, 255, 0.15);
+}
+
+.pumpSelector button[aria-pressed="true"] {
+  border-color: #32caff;
+  color: #ffffff;
+  background: linear-gradient(180deg, rgba(50, 202, 255, 0.32), rgba(35, 112, 201, 0.28));
+  box-shadow: 0 0 0 1px rgba(50, 202, 255, 0.28), 0 8px 22px rgba(23, 128, 185, 0.22);
+}
+
+.pumpSelector small {
+  border-radius: 999px;
+  padding: 3px 7px;
+  color: #06101b;
+  background: #aeeeff;
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.commissioningNotice {
+  border: 1px solid rgba(255, 109, 109, 0.42);
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: #ffd9d9;
+  background: rgba(255, 109, 109, 0.08);
+  font-size: 17px;
+  line-height: 1.5;
+  font-weight: 800;
+}
+
+.commissioningBlock {
+  border: 1px solid rgba(89, 134, 197, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+  background: rgba(7, 15, 28, 0.68);
+}
+
+.commissioningBlockTitle h3 {
+  margin: 0;
+  color: #e3f2ff;
+  font-size: 22px;
+  line-height: 1.3;
+}
+
+.commissioningInfoGrid,
+.commissioningFieldGrid,
+.commissioningTwoColumn {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.commissioningInfoGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.commissioningInfoGrid div,
+.commissioningCompactList div {
+  border-bottom: 1px solid rgba(89, 134, 197, 0.18);
+  padding: 10px 0;
+  display: grid;
+  gap: 6px;
+}
+
+.commissioningInfoGrid dt,
+.commissioningCompactList dt {
+  color: #8296b2;
+  font-size: 15px;
+  line-height: 1.35;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.commissioningInfoGrid dd,
+.commissioningCompactList dd {
+  margin: 0;
+  color: #dbe7f5;
+  font-size: 17px;
+  line-height: 1.5;
+  font-weight: 750;
+}
+
+.commissioningFieldGrid label,
+.commissioningSingleField {
+  display: grid;
+  gap: 9px;
+  color: #dbe7f5;
+  font-size: 16px;
+  line-height: 1.4;
+  font-weight: 800;
+}
+
+.commissioningFieldGrid input,
+.commissioningSingleField input {
+  width: 100%;
+  min-height: 54px;
+  border: 1px solid rgba(89, 134, 197, 0.36);
+  border-radius: 9px;
+  padding: 12px 14px;
+  color: #e3f2ff;
+  background: rgba(5, 10, 21, 0.82);
+  font: inherit;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.commissioningFieldGrid input::placeholder {
+  color: #65758a;
+  font-size: 17px;
+}
+
+.commissioningFieldGrid input:read-only {
+  color: #b8c7dc;
+  background: rgba(11, 18, 32, 0.82);
+}
+
+.calibrationFields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.commissioningValidation {
+  margin: 12px 0 0;
+  color: #ffb9b9;
+  font-size: 16px;
+  line-height: 1.45;
+  font-weight: 800;
+}
+
+.commissioningCompactList {
+  margin: 14px 0 16px;
+  display: grid;
+}
+
+.commissioningSingleField {
+  max-width: 240px;
+}
+
+.commissioningEngineeringNote {
+  border: 1px solid rgba(176, 108, 255, 0.38);
+  border-radius: 12px;
+  padding: 18px 20px;
+  color: #c7b9db;
+  background: rgba(176, 108, 255, 0.07);
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.commissioningEngineeringNote strong {
+  color: #eadfff;
+  font-size: 20px;
+}
+
+.commissioningEngineeringNote ul {
+  margin: 10px 0 0;
+  padding-left: 24px;
+}
+
+.serviceNavigation button {
+  min-height: 46px;
+  padding: 10px 12px;
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+.serviceNavigation .panelEyebrow {
+  font-size: 14px;
+}
+
+.serviceNavigation p {
+  font-size: 15px;
+  line-height: 1.6;
+}
+
 .guidedDemoLaunch,
 .guidedDemoHeader button,
 .demoReviewActions button,
@@ -1561,6 +1866,10 @@ body {
     grid-column: 1 / -1;
   }
 
+  .commissioningInfoGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .logsLayout {
     grid-template-columns: 1fr;
   }
@@ -1676,6 +1985,19 @@ body {
   .serviceHeadingRow {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .commissioningHeading,
+  .commissioningBlockTitle {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .commissioningInfoGrid,
+  .commissioningFieldGrid,
+  .commissioningTwoColumn,
+  .calibrationFields {
+    grid-template-columns: 1fr;
   }
 
   .serviceNavigation {

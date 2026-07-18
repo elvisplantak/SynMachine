@@ -394,6 +394,19 @@ type ServiceSection =
   | "cameras"
   | "diagnostics"
   | "calibration";
+type CommissioningPump = "P1" | "P2";
+type PumpCommissioningFields = {
+  workingFull: string;
+  workingEmpty: string;
+  relativeMove: string;
+  targetPosition: string;
+  stepInterval: string;
+  minimumInterval: string;
+  maximumInterval: string;
+  defaultInterval: string;
+  testStroke: string;
+  measuredVolume: string;
+};
 type LogMode = "human" | "technical";
 type LogEvent = {
   time: string;
@@ -1008,6 +1021,139 @@ function DisabledServiceButton({ children }: { children: string }) {
   return <button type="button" disabled aria-disabled="true">{children}</button>;
 }
 
+const emptyPumpCommissioningFields: PumpCommissioningFields = {
+  workingFull: "",
+  workingEmpty: "",
+  relativeMove: "",
+  targetPosition: "",
+  stepInterval: "",
+  minimumInterval: "",
+  maximumInterval: "",
+  defaultInterval: "",
+  testStroke: "",
+  measuredVolume: "",
+};
+
+function PumpCommissioning() {
+  const [selectedPump, setSelectedPump] = useState<CommissioningPump>("P1");
+  const [pumpFields, setPumpFields] = useState<Record<CommissioningPump, PumpCommissioningFields>>({
+    P1: { ...emptyPumpCommissioningFields },
+    P2: { ...emptyPumpCommissioningFields },
+  });
+  const [primeCycles, setPrimeCycles] = useState<Record<CommissioningPump, string>>({ P1: "2", P2: "2" });
+  const fields = pumpFields[selectedPump];
+  const stroke = Number(fields.testStroke);
+  const volume = Number(fields.measuredVolume);
+  const hasCalibrationInput = fields.testStroke !== "" || fields.measuredVolume !== "";
+  const calibrationValid = stroke > 0 && volume > 0;
+  const calculatedStepsPerMl = calibrationValid ? (stroke / volume).toFixed(2) : "";
+
+  const updateField = (field: keyof PumpCommissioningFields, value: string) => {
+    setPumpFields((current) => ({
+      ...current,
+      [selectedPump]: { ...current[selectedPump], [field]: value },
+    }));
+  };
+
+  return (
+    <section className="pumpCommissioning" aria-labelledby="pump-commissioning-heading">
+      <div className="commissioningHeading">
+        <div>
+          <span className="panelEyebrow">Local engineering draft</span>
+          <h2 id="pump-commissioning-heading">Pump commissioning — {selectedPump}</h2>
+          <p>Raw-step preparation for later experimental calibration and controlled pump testing.</p>
+        </div>
+        <span className="commissioningBadge pendingBadge">Pending calibration</span>
+      </div>
+
+      <div className="pumpSelector" aria-label="Pump selection">
+        {(["P1", "P2"] as const).map((pump) => (
+          <button key={pump} type="button" aria-pressed={selectedPump === pump} onClick={() => setSelectedPump(pump)}>
+            <span>{pump}</span>
+            {selectedPump === pump && <small>Selected</small>}
+          </button>
+        ))}
+      </div>
+
+      <div className="commissioningNotice" role="note">Hardware actions are unavailable in this frontend draft.</div>
+
+      <section className="commissioningBlock">
+        <div className="commissioningBlockTitle"><h3>Current information</h3><span className="commissioningBadge confirmedBadge">Confirmed orientation</span></div>
+        <dl className="commissioningInfoGrid">
+          <div><dt>Selected pump</dt><dd>{selectedPump}</dd></div>
+          <div><dt>Hardware connection</dt><dd>Not connected to backend</dd></div>
+          <div><dt>Homing state</dt><dd>Unknown — frontend draft</dd></div>
+          <div><dt>Current position</dt><dd>Unavailable</dd></div>
+          <div><dt>Syringe capacity</dt><dd>10 mL</dd></div>
+          <div><dt>Home position</dt><dd>0 steps</dd></div>
+          <div><dt>Recovered max travel</dt><dd>20500 steps</dd></div>
+          <div><dt>Aspiration direction</dt><dd>Toward 0</dd></div>
+          <div><dt>Dispense direction</dt><dd>Toward 20500</dd></div>
+        </dl>
+        <p className="commissioningExplanation">Near 0 the syringe chamber volume is maximal; near 20500 it is minimal and the syringe is practically empty. Both pumps share this confirmed orientation. The 20500-step endpoint is a recovered software travel limit, not a validated volume calibration.</p>
+      </section>
+
+      <div className="commissioningTwoColumn">
+        <section className="commissioningBlock">
+          <div className="commissioningBlockTitle"><h3>Position commissioning</h3><span className="commissioningBadge referenceBadge">Recovered interval: 0–20500 steps</span></div>
+          <div className="commissioningFieldGrid">
+            <label>Working full position, steps<input type="number" value={fields.workingFull} placeholder="Not calibrated" onChange={(event) => updateField("workingFull", event.target.value)} /></label>
+            <label>Working empty position, steps<input type="number" value={fields.workingEmpty} placeholder="Not calibrated" onChange={(event) => updateField("workingEmpty", event.target.value)} /></label>
+            <label>Relative move, steps<input type="number" value={fields.relativeMove} placeholder="Enter steps" onChange={(event) => updateField("relativeMove", event.target.value)} /></label>
+            <label>Target position, steps<input type="number" value={fields.targetPosition} placeholder="Enter 0–20500" onChange={(event) => updateField("targetPosition", event.target.value)} /></label>
+          </div>
+          <p className="commissioningExplanation">Working positions will later be chosen experimentally inside the physical endpoints; no endpoint margins are assumed here.</p>
+          <div className="serviceActionRow"><DisabledServiceButton>Home selected pump</DisabledServiceButton><DisabledServiceButton>Move relative</DisabledServiceButton><DisabledServiceButton>Move to position</DisabledServiceButton><DisabledServiceButton>Stop motion</DisabledServiceButton></div>
+        </section>
+
+        <section className="commissioningBlock">
+          <div className="commissioningBlockTitle"><h3>Speed commissioning</h3><span className="commissioningBadge pendingBadge">Limits not validated</span></div>
+          <div className="commissioningFieldGrid">
+            <label>Step interval, µs<input type="number" value={fields.stepInterval} placeholder="Enter interval" onChange={(event) => updateField("stepInterval", event.target.value)} /></label>
+            <label>Minimum tested interval, µs<input type="number" value={fields.minimumInterval} placeholder="Not calibrated" onChange={(event) => updateField("minimumInterval", event.target.value)} /></label>
+            <label>Maximum tested interval, µs<input type="number" value={fields.maximumInterval} placeholder="Not calibrated" onChange={(event) => updateField("maximumInterval", event.target.value)} /></label>
+            <label>Default interval, µs<input type="number" value={fields.defaultInterval} placeholder="Not calibrated" onChange={(event) => updateField("defaultInterval", event.target.value)} /></label>
+          </div>
+          <div className="serviceActionRow"><DisabledServiceButton>Apply speed</DisabledServiceButton><DisabledServiceButton>Run speed test</DisabledServiceButton></div>
+        </section>
+      </div>
+
+      <section className="commissioningBlock">
+        <div className="commissioningBlockTitle"><h3>Volume calibration</h3><span className="commissioningBadge pendingBadge">Experimental only</span></div>
+        <div className="commissioningFieldGrid calibrationFields">
+          <label>Test stroke, steps<input type="number" min="0" value={fields.testStroke} placeholder="Enter positive steps" onChange={(event) => updateField("testStroke", event.target.value)} /></label>
+          <label>Measured volume, mL<input type="number" min="0" step="any" value={fields.measuredVolume} placeholder="Enter positive volume" onChange={(event) => updateField("measuredVolume", event.target.value)} /></label>
+          <label>Calculated steps/mL<input type="text" readOnly value={calculatedStepsPerMl} placeholder="Not calculated" /></label>
+        </div>
+        {hasCalibrationInput && !calibrationValid && <p className="commissioningValidation" role="alert">Test stroke and measured volume must both be positive.</p>}
+        <p className="commissioningExplanation">Experimental calibration only — not saved or applied to firmware. This draft does not claim volumetric accuracy.</p>
+        <div className="serviceActionRow"><DisabledServiceButton>Run calibration stroke</DisabledServiceButton></div>
+      </section>
+
+      <div className="commissioningTwoColumn primingGrid">
+        <section className="commissioningBlock">
+          <div className="commissioningBlockTitle"><h3>P1 priming configuration</h3><span className="commissioningBadge confirmedBadge">Confirmed demo plan</span></div>
+          <dl className="commissioningCompactList"><div><dt>Route</dt><dd>S → P1 → Waste</dd></div><div><dt>Prime stroke</dt><dd>Pending calibration</dd></div><div><dt>Purpose</dt><dd>Remove air before precision B1/B2 dosing</dd></div></dl>
+          <label className="commissioningSingleField">Prime cycles<input type="number" min="1" value={primeCycles.P1} onChange={(event) => setPrimeCycles((current) => ({ ...current, P1: event.target.value }))} /></label>
+          <p className="commissioningExplanation">Priming content goes to Waste, never back into the S bottle.</p>
+          <div className="serviceActionRow"><DisabledServiceButton>Run P1 prime test</DisabledServiceButton></div>
+        </section>
+        <section className="commissioningBlock">
+          <div className="commissioningBlockTitle"><h3>P2 priming configuration</h3><span className="commissioningBadge confirmedBadge">Confirmed demo plan</span></div>
+          <dl className="commissioningCompactList"><div><dt>Route</dt><dd>Reactor S → P2 → Reactor</dd></div><div><dt>Prime stroke</dt><dd>Pending calibration</dd></div><div><dt>Timing</dt><dd>After S enters Reactor, before reaction-liquid transfer</dd></div><div><dt>Purpose</dt><dd>Reduce air in P2 and the Reactor-to-P2 inlet path</dd></div></dl>
+          <label className="commissioningSingleField">Prime cycles<input type="number" min="1" value={primeCycles.P2} onChange={(event) => setPrimeCycles((current) => ({ ...current, P2: event.target.value }))} /></label>
+          <div className="serviceActionRow"><DisabledServiceButton>Run P2 prime test</DisabledServiceButton></div>
+        </section>
+      </div>
+
+      <aside className="commissioningEngineeringNote">
+        <strong>Startup and homing note</strong>
+        <ul><li>Normal cold startup requires homing all confirmed motorized valves and both pumps.</li><li>Pump homing is not repeated before every normal stroke.</li><li>Re-homing is required after loss of trusted position, including power interruption or interrupted motion.</li><li>The Column bottom valve homing direction and open/closed mapping remain pending physical confirmation.</li></ul>
+      </aside>
+    </section>
+  );
+}
+
 function ServiceSectionContent({ section }: { section: ServiceSection }) {
   if (section === "overview") {
     const groups = [
@@ -1048,8 +1194,9 @@ function ServiceSectionContent({ section }: { section: ServiceSection }) {
   if (section === "pumps") {
     return (
       <>
-        <div className="serviceSectionHeading"><span className="panelEyebrow">Syringe pump draft</span><h2>Pumps</h2><p>P1 and P2 use separate aspirate and dispense phases.</p></div>
-        <div className="serviceTwoColumn">{["P1", "P2"].map((pump) => <section className="serviceGroup" key={pump}><h3>{pump} syringe pump</h3><div className="serviceStatusList"><span>Homing state<strong>Unknown</strong></span><span>Syringe position<strong>Not connected</strong></span><span>Commanded volume<strong>Not configured</strong></span><span>Commanded rate<strong>Not configured</strong></span></div><div className="serviceActionRow"><DisabledServiceButton>Home</DisabledServiceButton><DisabledServiceButton>Aspirate</DisabledServiceButton><DisabledServiceButton>Dispense</DisabledServiceButton></div></section>)}</div>
+        <div className="serviceSectionHeading servicePumpsHeading"><span className="panelEyebrow">Syringe pump draft</span><h2>Pumps</h2><p>P1 and P2 use separate aspirate and dispense phases.</p></div>
+        <div className="serviceTwoColumn pumpSummaryGrid">{["P1", "P2"].map((pump) => <section className="serviceGroup" key={pump}><h3>{pump} syringe pump</h3><div className="serviceStatusList"><span>Homing state<strong>Unknown</strong></span><span>Syringe position<strong>Not connected</strong></span><span>Commanded volume<strong>Not configured</strong></span><span>Commanded rate<strong>Not configured</strong></span></div><div className="serviceActionRow"><DisabledServiceButton>Home</DisabledServiceButton><DisabledServiceButton>Aspirate</DisabledServiceButton><DisabledServiceButton>Dispense</DisabledServiceButton></div></section>)}</div>
+        <PumpCommissioning />
       </>
     );
   }
