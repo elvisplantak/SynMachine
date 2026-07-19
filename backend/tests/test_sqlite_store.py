@@ -8,7 +8,11 @@ import pytest
 from app.demo.events import DomainEvent
 from app.demo.lifecycle import create_demo_run, start_run
 from app.demo.machine_events import MachineEvent
-from app.demo.machine_lifecycle import complete_startup, create_machine
+from app.demo.machine_lifecycle import (
+    complete_startup,
+    create_machine,
+    start_run as start_machine_run,
+)
 from app.demo.machine_models import MachineState
 from app.demo.models import AdditionOrder, DemoConfiguration, DemoExecutionSettings
 from app.demo.phases import RunPhase
@@ -528,3 +532,114 @@ def test_snapshot_and_final_event_sequence_must_match(
             store.persist_run_transition(stale_snapshot, created.events)
         assert store.load_demo_run("run-1") is None
         assert store.load_events() == ()
+
+
+def _persist_created_run_and_ready_machine(
+    store: SQLiteStore, configuration: DemoConfiguration
+):
+    created_run = create_demo_run(
+        "run-1", configuration, EXECUTION_SETTINGS, NOW
+    )
+    created_machine = create_machine(NOW)
+    ready_machine = complete_startup(
+        created_machine.machine, NOW + timedelta(seconds=1)
+    )
+    store.persist_run_transition(created_run.run, created_run.events)
+    store.persist_machine_transition(created_machine.machine, created_machine.events)
+    store.persist_machine_transition(ready_machine.machine, ready_machine.events)
+    return created_run, ready_machine
+
+
+def test_atomic_run_and_machine_transition_succeeds(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        created, ready = _persist_created_run_and_ready_machine(store, configuration)
+        started_run = start_run(created.run, NOW + timedelta(seconds=2))
+        busy_machine = start_machine_run(
+            ready.machine, "run-1", NOW + timedelta(seconds=2)
+        )
+
+        store.persist_run_and_machine_transition(
+            started_run.run,
+            started_run.events,
+            busy_machine.machine,
+            busy_machine.events,
+        )
+
+        assert store.load_demo_run("run-1") == started_run.run
+        assert store.load_machine_snapshot() == busy_machine.machine
+        assert store.load_events("RUN", "run-1") == (
+            *created.events,
+            *started_run.events,
+        )
+        assert store.load_events("MACHINE", "machine")[-1] == busy_machine.events[-1]
+
+
+def test_atomic_transition_run_conflict_leaves_machine_unchanged(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        created, ready = _persist_created_run_and_ready_machine(store, configuration)
+        busy_machine = start_machine_run(ready.machine, "run-1", NOW)
+
+        with pytest.raises(PersistenceConflictError, match="sequence"):
+            store.persist_run_and_machine_transition(
+                created.run,
+                created.events,
+                busy_machine.machine,
+                busy_machine.events,
+            )
+
+        assert store.load_demo_run("run-1") == created.run
+        assert store.load_machine_snapshot() == ready.machine
+
+
+def test_atomic_transition_machine_conflict_leaves_run_unchanged(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        created, ready = _persist_created_run_and_ready_machine(store, configuration)
+        started_run = start_run(created.run, NOW)
+
+        with pytest.raises(PersistenceConflictError, match="sequence"):
+            store.persist_run_and_machine_transition(
+                started_run.run,
+                started_run.events,
+                ready.machine,
+                ready.events,
+            )
+
+        assert store.load_demo_run("run-1") == created.run
+        assert store.load_machine_snapshot() == ready.machine
+
+
+def test_atomic_transition_second_snapshot_failure_rolls_back_everything(
+    tmp_path, configuration: DemoConfiguration
+) -> None:
+    database = tmp_path / "dual-snapshot-rollback.db"
+    with SQLiteStore(database) as store:
+        created, ready = _persist_created_run_and_ready_machine(store, configuration)
+
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "CREATE TRIGGER reject_dual_machine_update "
+            "BEFORE UPDATE ON machine_snapshot WHEN NEW.event_sequence = 3 "
+            "BEGIN SELECT RAISE(ABORT, 'forced dual machine failure'); END"
+        )
+
+    started_run = start_run(created.run, NOW)
+    busy_machine = start_machine_run(ready.machine, "run-1", NOW)
+    with SQLiteStore(database) as store:
+        original_events = store.load_events()
+        with pytest.raises(sqlite3.IntegrityError, match="forced dual machine failure"):
+            store.persist_run_and_machine_transition(
+                started_run.run,
+                started_run.events,
+                busy_machine.machine,
+                busy_machine.events,
+            )
+
+        assert store.load_demo_run("run-1") == created.run
+        assert store.load_machine_snapshot() == ready.machine
+        assert store.load_events() == original_events

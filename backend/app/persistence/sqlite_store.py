@@ -198,6 +198,57 @@ class SQLiteStore:
     def persist_run_transition(
         self, run: DemoRun, events: Sequence[DomainEvent]
     ) -> None:
+        self._validate_run_transition(run, events)
+        self._persist_transition(
+            aggregate_type=RUN_AGGREGATE,
+            aggregate_id=run.run_id,
+            snapshot=run,
+            events=events,
+        )
+
+    def persist_machine_transition(
+        self, machine: MachineSnapshot, events: Sequence[MachineEvent]
+    ) -> None:
+        self._validate_machine_transition(machine, events)
+        self._persist_transition(
+            aggregate_type=MACHINE_AGGREGATE,
+            aggregate_id=MACHINE_AGGREGATE_ID,
+            snapshot=machine,
+            events=events,
+        )
+
+    def persist_run_and_machine_transition(
+        self,
+        run: DemoRun,
+        run_events: Sequence[DomainEvent],
+        machine: MachineSnapshot,
+        machine_events: Sequence[MachineEvent],
+    ) -> None:
+        self._validate_run_transition(run, run_events)
+        self._validate_machine_transition(machine, machine_events)
+        normalized_run_events = self._normalize_events(run_events)
+        normalized_machine_events = self._normalize_events(machine_events)
+
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            self._write_transition(
+                RUN_AGGREGATE, run.run_id, run, normalized_run_events
+            )
+            self._write_transition(
+                MACHINE_AGGREGATE,
+                MACHINE_AGGREGATE_ID,
+                machine,
+                normalized_machine_events,
+            )
+            self._connection.execute("COMMIT")
+        except Exception:
+            self._connection.execute("ROLLBACK")
+            raise
+
+    @staticmethod
+    def _validate_run_transition(
+        run: DemoRun, events: Sequence[DomainEvent]
+    ) -> None:
         if any(event.run_id != run.run_id for event in events):
             raise PersistenceConflictError("run event run_id does not match snapshot run_id")
         if events:
@@ -210,26 +261,15 @@ class SQLiteStore:
                 raise PersistenceConflictError(
                     "final run event phase does not match snapshot phase"
                 )
-        self._persist_transition(
-            aggregate_type=RUN_AGGREGATE,
-            aggregate_id=run.run_id,
-            snapshot=run,
-            events=events,
-        )
 
-    def persist_machine_transition(
-        self, machine: MachineSnapshot, events: Sequence[MachineEvent]
+    @staticmethod
+    def _validate_machine_transition(
+        machine: MachineSnapshot, events: Sequence[MachineEvent]
     ) -> None:
         if events and events[-1].machine_state != machine.state:
             raise PersistenceConflictError(
                 "final machine event state does not match snapshot state"
             )
-        self._persist_transition(
-            aggregate_type=MACHINE_AGGREGATE,
-            aggregate_id=MACHINE_AGGREGATE_ID,
-            snapshot=machine,
-            events=events,
-        )
 
     def _initialize_or_validate_schema(self) -> None:
         version = self._connection.execute("PRAGMA user_version").fetchone()[0]
@@ -300,34 +340,50 @@ class SQLiteStore:
         snapshot: DemoRun | MachineSnapshot,
         events: Sequence[DomainEvent] | Sequence[MachineEvent],
     ) -> None:
-        if not events:
-            raise PersistenceConflictError("transition must contain at least one event")
-        normalized_events = tuple(self._normalize_event(event) for event in events)
+        normalized_events = self._normalize_events(events)
 
         self._connection.execute("BEGIN IMMEDIATE")
         try:
-            current_sequence = self._current_sequence(aggregate_type, aggregate_id)
-            expected_sequences = tuple(
-                range(current_sequence + 1, current_sequence + len(normalized_events) + 1)
+            self._write_transition(
+                aggregate_type, aggregate_id, snapshot, normalized_events
             )
-            actual_sequences = tuple(event.sequence_number for event in normalized_events)
-            if actual_sequences != expected_sequences:
-                raise PersistenceConflictError(
-                    f"event sequence conflict for {aggregate_type}/{aggregate_id}: "
-                    f"expected {expected_sequences}, got {actual_sequences}"
-                )
-            if snapshot.event_sequence != actual_sequences[-1]:
-                raise PersistenceConflictError(
-                    "snapshot event_sequence must equal the final event sequence"
-                )
-
-            for event in normalized_events:
-                self._insert_event(aggregate_type, aggregate_id, event)
-            self._write_snapshot(aggregate_type, aggregate_id, snapshot, current_sequence)
             self._connection.execute("COMMIT")
         except Exception:
             self._connection.execute("ROLLBACK")
             raise
+
+    def _write_transition(
+        self,
+        aggregate_type: Literal["RUN", "MACHINE"],
+        aggregate_id: str,
+        snapshot: DemoRun | MachineSnapshot,
+        events: Sequence[DomainEvent] | Sequence[MachineEvent],
+    ) -> None:
+        current_sequence = self._current_sequence(aggregate_type, aggregate_id)
+        expected_sequences = tuple(
+            range(current_sequence + 1, current_sequence + len(events) + 1)
+        )
+        actual_sequences = tuple(event.sequence_number for event in events)
+        if actual_sequences != expected_sequences:
+            raise PersistenceConflictError(
+                f"event sequence conflict for {aggregate_type}/{aggregate_id}: "
+                f"expected {expected_sequences}, got {actual_sequences}"
+            )
+        if snapshot.event_sequence != actual_sequences[-1]:
+            raise PersistenceConflictError(
+                "snapshot event_sequence must equal the final event sequence"
+            )
+
+        for event in events:
+            self._insert_event(aggregate_type, aggregate_id, event)
+        self._write_snapshot(aggregate_type, aggregate_id, snapshot, current_sequence)
+
+    def _normalize_events(
+        self, events: Sequence[DomainEvent] | Sequence[MachineEvent]
+    ) -> tuple[DomainEvent | MachineEvent, ...]:
+        if not events:
+            raise PersistenceConflictError("transition must contain at least one event")
+        return tuple(self._normalize_event(event) for event in events)
 
     def _current_sequence(
         self, aggregate_type: Literal["RUN", "MACHINE"], aggregate_id: str
