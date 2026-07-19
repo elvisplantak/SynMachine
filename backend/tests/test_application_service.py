@@ -1,3 +1,4 @@
+import sqlite3
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -10,14 +11,16 @@ from app.demo.events import DomainEventType
 from app.demo.machine_events import MachineEventType
 from app.demo.machine_lifecycle import (
     MachineTransitionError,
+    complete_recovery,
     complete_startup,
     create_machine,
+    detect_interrupted_startup,
 )
 from app.demo.machine_models import MachineState
 from app.demo.models import AdditionOrder, DemoConfiguration, DemoExecutionSettings
 from app.demo.phases import RunPhase
 from app.demo.run_models import RunStatus
-from app.persistence.sqlite_store import SQLiteStore
+from app.persistence.sqlite_store import PersistenceDataError, SQLiteStore
 
 NOW = datetime(2026, 7, 19, 12, 0, tzinfo=UTC)
 SETTINGS = DemoExecutionSettings(
@@ -56,6 +59,150 @@ def create_and_start_run(
 ):
     service.create_run("run-1", configuration, SETTINGS, NOW)
     return service.start_run("run-1", NOW + timedelta(seconds=2))
+
+
+def persist_flush_required_machine(store: SQLiteStore) -> None:
+    created = create_machine(NOW)
+    recovering = detect_interrupted_startup(
+        created.machine, "run-interrupted", NOW + timedelta(seconds=1)
+    )
+    flush_required = complete_recovery(
+        recovering.machine, NOW + timedelta(seconds=2)
+    )
+    store.persist_machine_transition(created.machine, created.events)
+    store.persist_machine_transition(recovering.machine, recovering.events)
+    store.persist_machine_transition(flush_required.machine, flush_required.events)
+
+
+def test_initialize_machine_persists_starting_without_creating_run() -> None:
+    with SQLiteStore() as store:
+        service = GuidedDemoApplicationService(store)
+
+        result = service.initialize_machine(NOW)
+
+        assert result.machine.state is MachineState.STARTING
+        assert result.machine.event_sequence == 1
+        assert result.machine_events[0].event_type is MachineEventType.MACHINE_CREATED
+        assert result.machine_events[0].occurred_at == NOW
+        assert result.machine_events[0].sequence_number == 1
+        assert store.load_machine_snapshot() == result.machine
+        assert store.load_demo_run("run-1") is None
+
+
+def test_duplicate_machine_initialization_is_rejected_without_writes() -> None:
+    with SQLiteStore() as store:
+        service = GuidedDemoApplicationService(store)
+        initialized = service.initialize_machine(NOW)
+        original_events = store.load_events()
+
+        with pytest.raises(GuidedDemoApplicationError, match="already exists"):
+            service.initialize_machine(NOW + timedelta(seconds=1))
+
+        assert store.load_machine_snapshot() == initialized.machine
+        assert store.load_events() == original_events
+
+
+def test_initialize_machine_preserves_corrupt_snapshot_error(tmp_path) -> None:
+    database = tmp_path / "corrupt-machine.db"
+    with SQLiteStore(database) as store:
+        GuidedDemoApplicationService(store).initialize_machine(NOW)
+    with sqlite3.connect(database) as connection:
+        connection.execute("UPDATE machine_snapshot SET snapshot_json = '{broken'")
+
+    with SQLiteStore(database) as store:
+        service = GuidedDemoApplicationService(store)
+        with pytest.raises(PersistenceDataError, match="invalid machine snapshot JSON"):
+            service.initialize_machine(NOW)
+
+
+def test_complete_startup_is_rejected_when_machine_is_missing() -> None:
+    with SQLiteStore() as store:
+        service = GuidedDemoApplicationService(store)
+
+        with pytest.raises(GuidedDemoApplicationError, match="machine snapshot"):
+            service.complete_startup(NOW)
+
+        assert store.load_machine_snapshot() is None
+        assert store.load_events() == ()
+
+
+def test_complete_startup_persists_ready_with_caller_timestamp_and_sequence() -> None:
+    with SQLiteStore() as store:
+        service = GuidedDemoApplicationService(store)
+        service.initialize_machine(NOW)
+        completed_at = NOW + timedelta(seconds=1)
+
+        result = service.complete_startup(completed_at)
+
+        assert result.machine.state is MachineState.READY
+        assert result.machine.event_sequence == 2
+        assert result.machine_events[0].event_type is MachineEventType.STARTUP_COMPLETED
+        assert result.machine_events[0].occurred_at == completed_at
+        assert result.machine_events[0].sequence_number == 2
+        assert store.load_machine_snapshot() == result.machine
+
+
+def test_start_and_complete_flush_from_ready() -> None:
+    with SQLiteStore() as store:
+        service = GuidedDemoApplicationService(store)
+        service.initialize_machine(NOW)
+        service.complete_startup(NOW)
+
+        started = service.start_flush(NOW + timedelta(seconds=1))
+        completed = service.complete_flush(NOW + timedelta(seconds=2))
+
+        assert started.machine.state is MachineState.FLUSHING
+        assert started.machine.interrupted_run_id is None
+        assert started.machine_events[0].event_type is MachineEventType.FLUSH_STARTED
+        assert completed.machine.state is MachineState.READY
+        assert completed.machine.interrupted_run_id is None
+        assert completed.machine_events[0].event_type is MachineEventType.FLUSH_COMPLETED
+        assert store.load_machine_snapshot() == completed.machine
+
+
+def test_flush_required_preserves_interrupted_run_until_flush_completes() -> None:
+    with SQLiteStore() as store:
+        persist_flush_required_machine(store)
+        service = GuidedDemoApplicationService(store)
+        started_at = NOW + timedelta(seconds=3)
+
+        started = service.start_flush(started_at)
+
+        assert started.machine.state is MachineState.FLUSHING
+        assert started.machine.interrupted_run_id == "run-interrupted"
+        assert started.machine_events[0].run_id == "run-interrupted"
+        assert started.machine_events[0].occurred_at == started_at
+        assert started.machine_events[0].sequence_number == 5
+        completed = service.complete_flush(NOW + timedelta(seconds=4))
+        assert completed.machine.state is MachineState.READY
+        assert completed.machine.interrupted_run_id is None
+        assert completed.machine_events[0].sequence_number == 6
+
+
+@pytest.mark.parametrize(
+    ("operation", "ready_required"),
+    [
+        ("complete_startup", True),
+        ("start_flush", False),
+        ("complete_flush", True),
+    ],
+)
+def test_invalid_machine_operation_preserves_snapshot_and_events(
+    operation: str, ready_required: bool
+) -> None:
+    with SQLiteStore() as store:
+        service = GuidedDemoApplicationService(store)
+        service.initialize_machine(NOW)
+        if ready_required:
+            service.complete_startup(NOW)
+        original_machine = store.load_machine_snapshot()
+        original_events = store.load_events()
+
+        with pytest.raises(MachineTransitionError):
+            getattr(service, operation)(NOW)
+
+        assert store.load_machine_snapshot() == original_machine
+        assert store.load_events() == original_events
 
 
 def test_create_run_persists_run_without_creating_machine(

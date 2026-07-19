@@ -25,11 +25,62 @@ class GuidedDemoApplicationResult(BaseModel):
     machine_events: tuple[MachineEvent, ...] = ()
 
 
+class GuidedDemoMachineApplicationResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    machine: MachineSnapshot
+    machine_events: tuple[MachineEvent, ...]
+
+
 class GuidedDemoApplicationService:
     """Synchronous orchestration for Guided Demo domain transitions."""
 
     def __init__(self, store: SQLiteStore) -> None:
         self._store = store
+
+    def initialize_machine(
+        self, occurred_at: datetime
+    ) -> GuidedDemoMachineApplicationResult:
+        if self._store.load_machine_snapshot() is not None:
+            raise GuidedDemoApplicationError("machine snapshot already exists")
+        result = machine_lifecycle.create_machine(occurred_at)
+        self._store.persist_machine_transition(result.machine, result.events)
+        return GuidedDemoMachineApplicationResult(
+            machine=result.machine,
+            machine_events=result.events,
+        )
+
+    def complete_startup(
+        self, occurred_at: datetime
+    ) -> GuidedDemoMachineApplicationResult:
+        result = machine_lifecycle.complete_startup(
+            self._load_machine(), occurred_at
+        )
+        self._store.persist_machine_transition(result.machine, result.events)
+        return GuidedDemoMachineApplicationResult(
+            machine=result.machine,
+            machine_events=result.events,
+        )
+
+    def start_flush(
+        self, occurred_at: datetime
+    ) -> GuidedDemoMachineApplicationResult:
+        result = machine_lifecycle.start_flush(self._load_machine(), occurred_at)
+        self._store.persist_machine_transition(result.machine, result.events)
+        return GuidedDemoMachineApplicationResult(
+            machine=result.machine,
+            machine_events=result.events,
+        )
+
+    def complete_flush(
+        self, occurred_at: datetime
+    ) -> GuidedDemoMachineApplicationResult:
+        result = machine_lifecycle.complete_flush(self._load_machine(), occurred_at)
+        self._store.persist_machine_transition(result.machine, result.events)
+        return GuidedDemoMachineApplicationResult(
+            machine=result.machine,
+            machine_events=result.events,
+        )
 
     def create_run(
         self,
