@@ -3,7 +3,7 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict
 
 from app.demo.fluid_plan import FluidPlan
-from app.demo.models import DemoConfiguration
+from app.demo.models import DemoConfiguration, DemoExecutionSettings
 from app.demo.phases import RunPhase
 
 
@@ -24,6 +24,7 @@ class DemoRun(BaseModel):
 
     run_id: str
     configuration: DemoConfiguration
+    execution_settings: DemoExecutionSettings
     fluid_plan: FluidPlan
     status: RunStatus
     phase: RunPhase

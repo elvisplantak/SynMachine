@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.demo.events import DomainEvent, DomainEventType
 from app.demo.fluid_plan import build_fluid_plan
-from app.demo.models import DemoConfiguration
+from app.demo.models import DemoConfiguration, DemoExecutionSettings
 from app.demo.phases import RunPhase
 from app.demo.run_models import DemoRun, RunStatus
 
@@ -84,7 +84,10 @@ def _result(
 
 
 def create_demo_run(
-    run_id: str, configuration: DemoConfiguration, occurred_at: datetime
+    run_id: str,
+    configuration: DemoConfiguration,
+    execution_settings: DemoExecutionSettings,
+    occurred_at: datetime,
 ) -> TransitionResult:
     if not run_id.strip():
         raise ValueError("run_id must not be empty")
@@ -92,6 +95,7 @@ def create_demo_run(
     run = DemoRun(
         run_id=run_id,
         configuration=configuration,
+        execution_settings=execution_settings,
         fluid_plan=build_fluid_plan(configuration),
         status=RunStatus.CREATED,
         phase=RunPhase.READY,

@@ -16,11 +16,16 @@ from app.demo.lifecycle import (
     resume_run,
     start_run,
 )
-from app.demo.models import AdditionOrder, DemoConfiguration
+from app.demo.models import AdditionOrder, DemoConfiguration, DemoExecutionSettings
 from app.demo.phases import RunPhase
 from app.demo.run_models import DemoRun, RunStatus
 
 NOW = datetime(2026, 7, 16, 12, 0, tzinfo=UTC)
+EXECUTION_SETTINGS = DemoExecutionSettings(
+    sf_settling_duration_seconds="12.345",
+    fraction_count=6,
+    fraction_duration_seconds="45.678",
+)
 WORKFLOW_PHASES = (
     RunPhase.P1_ASPIRATE_S,
     RunPhase.P1_DISPENSE_S_TO_REACTOR,
@@ -62,7 +67,7 @@ def configuration() -> DemoConfiguration:
 
 
 def created_run(configuration: DemoConfiguration) -> DemoRun:
-    return create_demo_run("run-1", configuration, NOW).run
+    return create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW).run
 
 
 def running_at(configuration: DemoConfiguration, phase: RunPhase) -> DemoRun:
@@ -75,11 +80,12 @@ def running_at(configuration: DemoConfiguration, phase: RunPhase) -> DemoRun:
 def test_creation_builds_immutable_run_and_configured_fluid_plan(
     configuration: DemoConfiguration,
 ) -> None:
-    result = create_demo_run("run-1", configuration, NOW)
+    result = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
 
     assert result.run.status is RunStatus.CREATED
     assert result.run.phase is RunPhase.READY
     assert result.run.configuration is configuration
+    assert result.run.execution_settings is EXECUTION_SETTINGS
     assert result.run.fluid_plan.b1_configured_volume_ml == Decimal("1.6")
     assert result.run.fluid_plan.b2_configured_volume_ml == Decimal("2.4")
     assert result.run.fluid_plan.s_configured_volume_ml == Decimal("6")
@@ -87,6 +93,74 @@ def test_creation_builds_immutable_run_and_configured_fluid_plan(
     assert [event.event_type for event in result.events] == [DomainEventType.RUN_CREATED]
     with pytest.raises(ValidationError):
         result.run.status = RunStatus.RUNNING
+
+
+def test_execution_settings_preserve_decimals_and_are_immutable() -> None:
+    settings = DemoExecutionSettings(
+        sf_settling_duration_seconds="0.0001",
+        fraction_count=3,
+        fraction_duration_seconds="10.123456789",
+    )
+
+    assert settings.sf_settling_duration_seconds == Decimal("0.0001")
+    assert settings.fraction_duration_seconds == Decimal("10.123456789")
+    with pytest.raises(ValidationError):
+        settings.fraction_count = 4
+
+
+def test_zero_settling_duration_is_accepted() -> None:
+    settings = DemoExecutionSettings(
+        sf_settling_duration_seconds="0",
+        fraction_count=1,
+        fraction_duration_seconds="1",
+    )
+
+    assert settings.sf_settling_duration_seconds == Decimal("0")
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"sf_settling_duration_seconds": "-0.1"},
+        {"fraction_duration_seconds": "0"},
+        {"fraction_duration_seconds": "-0.1"},
+        {"sf_settling_duration_seconds": "NaN"},
+        {"fraction_duration_seconds": "Infinity"},
+        {"fraction_count": 0},
+        {"fraction_count": -1},
+    ],
+)
+def test_invalid_execution_settings_are_rejected(values: dict) -> None:
+    valid_values = {
+        "sf_settling_duration_seconds": "1",
+        "fraction_count": 1,
+        "fraction_duration_seconds": "1",
+    }
+
+    with pytest.raises(ValidationError):
+        DemoExecutionSettings(**(valid_values | values))
+
+
+def test_runs_snapshot_execution_settings_independently(
+    configuration: DemoConfiguration,
+) -> None:
+    first_settings = DemoExecutionSettings(
+        sf_settling_duration_seconds="10.1",
+        fraction_count=4,
+        fraction_duration_seconds="20.2",
+    )
+    second_settings = DemoExecutionSettings(
+        sf_settling_duration_seconds="30.3",
+        fraction_count=8,
+        fraction_duration_seconds="40.4",
+    )
+
+    first = create_demo_run("run-1", configuration, first_settings, NOW).run
+    second = create_demo_run("run-2", configuration, second_settings, NOW).run
+
+    assert first.execution_settings == first_settings
+    assert second.execution_settings == second_settings
+    assert first.execution_settings != second.execution_settings
 
 
 def test_start_enters_first_phase_and_emits_ordered_events(
@@ -310,7 +384,7 @@ def test_fault_requires_non_empty_reason(configuration: DemoConfiguration) -> No
 
 
 def test_events_use_caller_timestamp_and_strict_sequence(configuration: DemoConfiguration) -> None:
-    created = create_demo_run("run-1", configuration, NOW)
+    created = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
     later = NOW + timedelta(seconds=1)
     started = start_run(created.run, later)
 

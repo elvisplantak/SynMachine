@@ -2,12 +2,40 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 
 class AdditionOrder(StrEnum):
     B1_THEN_B2 = "B1_THEN_B2"
     B2_THEN_B1 = "B2_THEN_B1"
+
+
+class DemoExecutionSettings(BaseModel):
+    """Immutable Service settings snapshot for one Guided Demo run."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sf_settling_duration_seconds: Decimal
+    fraction_count: int = Field(ge=1)
+    fraction_duration_seconds: Decimal
+
+    @field_validator("sf_settling_duration_seconds", "fraction_duration_seconds")
+    @classmethod
+    def validate_duration(cls, value: Decimal, info: ValidationInfo) -> Decimal:
+        if not value.is_finite():
+            raise ValueError("duration must be finite")
+        if info.field_name == "sf_settling_duration_seconds" and value < 0:
+            raise ValueError("SF settling duration must not be negative")
+        if info.field_name == "fraction_duration_seconds" and value <= 0:
+            raise ValueError("fraction duration must be greater than zero")
+        return value
 
 
 class DemoConfiguration(BaseModel):

@@ -10,7 +10,7 @@ from app.demo.lifecycle import create_demo_run, start_run
 from app.demo.machine_events import MachineEvent
 from app.demo.machine_lifecycle import complete_startup, create_machine
 from app.demo.machine_models import MachineState
-from app.demo.models import AdditionOrder, DemoConfiguration
+from app.demo.models import AdditionOrder, DemoConfiguration, DemoExecutionSettings
 from app.demo.phases import RunPhase
 from app.demo.run_models import RunStatus
 from app.persistence.sqlite_store import (
@@ -21,6 +21,11 @@ from app.persistence.sqlite_store import (
 )
 
 NOW = datetime(2026, 7, 18, 12, 0, tzinfo=UTC)
+EXECUTION_SETTINGS = DemoExecutionSettings(
+    sf_settling_duration_seconds="12.3456789",
+    fraction_count=7,
+    fraction_duration_seconds="45.0000001",
+)
 
 
 @pytest.fixture
@@ -49,7 +54,7 @@ def test_empty_initialized_storage_has_no_snapshots_or_events() -> None:
 def test_demo_run_snapshot_round_trip_preserves_domain_values(
     configuration: DemoConfiguration,
 ) -> None:
-    created = create_demo_run("run-1", configuration, NOW)
+    created = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
 
     with SQLiteStore() as store:
         store.persist_run_transition(created.run, created.events)
@@ -64,6 +69,11 @@ def test_demo_run_snapshot_round_trip_preserves_domain_values(
     )
     assert isinstance(loaded.fluid_plan.b1_b2_volume_ratio, tuple)
     assert loaded.configuration.addition_order is AdditionOrder.B2_THEN_B1
+    assert loaded.execution_settings.sf_settling_duration_seconds == Decimal(
+        "12.3456789"
+    )
+    assert loaded.execution_settings.fraction_count == 7
+    assert loaded.execution_settings.fraction_duration_seconds == Decimal("45.0000001")
 
 
 def test_machine_snapshot_round_trip() -> None:
@@ -84,7 +94,7 @@ def test_machine_snapshot_round_trip() -> None:
 def test_final_run_event_must_match_snapshot_without_writing(
     configuration: DemoConfiguration, event_update: dict, error: str
 ) -> None:
-    created = create_demo_run("run-1", configuration, NOW)
+    created = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
     mismatched_event = created.events[-1].model_copy(update=event_update)
 
     with SQLiteStore() as store:
@@ -110,7 +120,7 @@ def test_final_machine_event_must_match_snapshot_without_writing() -> None:
 def test_run_and_machine_events_round_trip_in_mixed_append_only_table(
     configuration: DemoConfiguration,
 ) -> None:
-    run = create_demo_run("run-1", configuration, NOW)
+    run = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
     machine = create_machine(NOW + timedelta(seconds=1))
 
     with SQLiteStore() as store:
@@ -130,7 +140,7 @@ def test_aware_event_timestamp_is_normalized_to_utc_in_metadata_and_json(
 ) -> None:
     database = tmp_path / "utc.db"
     local_time = datetime(2026, 7, 18, 14, 30, tzinfo=timezone(timedelta(hours=2)))
-    created = create_demo_run("run-1", configuration, local_time)
+    created = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, local_time)
 
     with SQLiteStore(database) as store:
         store.persist_run_transition(created.run, created.events)
@@ -150,7 +160,7 @@ def test_aware_event_timestamp_is_normalized_to_utc_in_metadata_and_json(
 def test_naive_event_timestamp_is_rejected_without_writing(
     configuration: DemoConfiguration,
 ) -> None:
-    created = create_demo_run("run-1", configuration, NOW)
+    created = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
     naive_event = created.events[0].model_copy(
         update={"occurred_at": datetime(2026, 7, 18, 12, 0)}
     )
@@ -165,7 +175,7 @@ def test_naive_event_timestamp_is_rejected_without_writing(
 def test_sequence_continuity_accepts_next_transition(
     configuration: DemoConfiguration,
 ) -> None:
-    created = create_demo_run("run-1", configuration, NOW)
+    created = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
     started = start_run(created.run, NOW + timedelta(seconds=1))
 
     with SQLiteStore() as store:
@@ -180,7 +190,7 @@ def test_sequence_continuity_accepts_next_transition(
 def test_sequence_conflicts_leave_existing_data_unchanged(
     conflict: str, configuration: DemoConfiguration
 ) -> None:
-    created = create_demo_run("run-1", configuration, NOW)
+    created = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
     started = start_run(created.run, NOW + timedelta(seconds=1))
 
     with SQLiteStore() as store:
@@ -205,7 +215,7 @@ def test_sequence_conflicts_leave_existing_data_unchanged(
 
 
 def test_duplicate_event_batch_is_rejected(configuration: DemoConfiguration) -> None:
-    created = create_demo_run("run-1", configuration, NOW)
+    created = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
     duplicate_batch = (created.events[0], created.events[0])
     snapshot = created.run.model_copy(update={"event_sequence": 2})
 
@@ -220,7 +230,7 @@ def test_event_metadata_json_mismatch_fails_fast(
     tmp_path, configuration: DemoConfiguration
 ) -> None:
     database = tmp_path / "metadata.db"
-    created = create_demo_run("run-1", configuration, NOW)
+    created = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
     with SQLiteStore(database) as store:
         store.persist_run_transition(created.run, created.events)
 
@@ -238,7 +248,7 @@ def test_corrupt_json_fails_fast(
     tmp_path, configuration: DemoConfiguration, target: str
 ) -> None:
     database = tmp_path / f"corrupt-{target}.db"
-    created = create_demo_run("run-1", configuration, NOW)
+    created = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
     with SQLiteStore(database) as store:
         store.persist_run_transition(created.run, created.events)
 
@@ -261,7 +271,7 @@ def test_snapshot_metadata_json_mismatch_fails_fast(
     tmp_path, configuration: DemoConfiguration
 ) -> None:
     database = tmp_path / "snapshot-metadata.db"
-    created = create_demo_run("run-1", configuration, NOW)
+    created = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
     with SQLiteStore(database) as store:
         store.persist_run_transition(created.run, created.events)
 
@@ -278,7 +288,7 @@ def test_non_contiguous_persisted_event_history_fails_fast(
     tmp_path, configuration: DemoConfiguration
 ) -> None:
     database = tmp_path / "event-gap.db"
-    created = create_demo_run("run-1", configuration, NOW)
+    created = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
     started = start_run(created.run, NOW + timedelta(seconds=1))
     with SQLiteStore(database) as store:
         store.persist_run_transition(created.run, created.events)
@@ -362,7 +372,7 @@ def test_run_snapshot_read_rejects_missing_final_event(
     tmp_path, configuration: DemoConfiguration
 ) -> None:
     database = tmp_path / "run-sequence-mismatch.db"
-    created = create_demo_run("run-1", configuration, NOW)
+    created = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
     started = start_run(created.run, NOW + timedelta(seconds=1))
     with SQLiteStore(database) as store:
         store.persist_run_transition(created.run, created.events)
@@ -384,7 +394,7 @@ def test_specific_run_event_read_rejects_events_without_snapshot(
     tmp_path, configuration: DemoConfiguration
 ) -> None:
     database = tmp_path / "run-events-without-snapshot.db"
-    created = create_demo_run("run-1", configuration, NOW)
+    created = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
     with SQLiteStore(database) as store:
         store.persist_run_transition(created.run, created.events)
 
@@ -437,7 +447,7 @@ def test_transaction_rolls_back_partial_event_batch_and_snapshot(
     tmp_path, configuration: DemoConfiguration
 ) -> None:
     database = tmp_path / "rollback.db"
-    created = create_demo_run("run-1", configuration, NOW)
+    created = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
     started = start_run(created.run, NOW + timedelta(seconds=1))
 
     with SQLiteStore(database) as store:
@@ -461,7 +471,7 @@ def test_transaction_rolls_back_events_when_snapshot_update_fails(
     tmp_path, configuration: DemoConfiguration
 ) -> None:
     database = tmp_path / "snapshot-rollback.db"
-    created = create_demo_run("run-1", configuration, NOW)
+    created = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
     started = start_run(created.run, NOW + timedelta(seconds=1))
 
     with SQLiteStore(database) as store:
@@ -485,7 +495,7 @@ def test_file_backed_database_reopens_with_snapshots_and_events(
     tmp_path, configuration: DemoConfiguration
 ) -> None:
     database = tmp_path / "reopen.db"
-    run = create_demo_run("run-1", configuration, NOW)
+    run = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
     machine = create_machine(NOW)
 
     with SQLiteStore(database) as store:
@@ -510,7 +520,7 @@ def test_schema_version_is_one_and_initialization_creates_no_machine(tmp_path) -
 def test_snapshot_and_final_event_sequence_must_match(
     configuration: DemoConfiguration,
 ) -> None:
-    created = create_demo_run("run-1", configuration, NOW)
+    created = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
     stale_snapshot = created.run.model_copy(update={"event_sequence": 2})
 
     with SQLiteStore() as store:
