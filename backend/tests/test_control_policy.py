@@ -83,6 +83,18 @@ def test_completed_phase_has_no_editable_controls() -> None:
     assert editable_controls_for_phase(RunPhase.COMPLETED) == frozenset()
 
 
+@pytest.mark.parametrize(
+    "phase",
+    [
+        RunPhase.SF_SETTLING,
+        RunPhase.TRANSFER_SF_TO_COLUMN,
+        RunPhase.COLUMN_FRACTION_COLLECTION,
+    ],
+)
+def test_new_downstream_phases_have_no_editable_controls(phase: RunPhase) -> None:
+    assert editable_controls_for_phase(phase) == frozenset()
+
+
 def test_permanent_fluid_plan_lock_fields_are_complete() -> None:
     assert PERMANENTLY_LOCKED_FLUID_PLAN_FIELDS == frozenset(
         {

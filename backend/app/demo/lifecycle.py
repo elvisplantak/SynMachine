@@ -20,6 +20,9 @@ _ACTIVE_PHASES = (
     RunPhase.P2_ASPIRATE_REACTOR_CONTENTS,
     RunPhase.P2_DISPENSE_TO_SF,
     RunPhase.SF_MIXING,
+    RunPhase.SF_SETTLING,
+    RunPhase.TRANSFER_SF_TO_COLUMN,
+    RunPhase.COLUMN_FRACTION_COLLECTION,
 )
 _PAUSABLE_PHASES = frozenset(
     {RunPhase.DELAY_BETWEEN_ADDITIONS, RunPhase.REACTION_HOLD}
@@ -153,7 +156,7 @@ def complete_current_phase(run: DemoRun, occurred_at: datetime) -> TransitionRes
         phase=run.phase,
         message=f"Phase {run.phase.value} completed",
     )
-    if run.phase is RunPhase.SF_MIXING:
+    if run.phase is RunPhase.COLUMN_FRACTION_COLLECTION:
         run_completed = _event(
             run,
             offset=2,

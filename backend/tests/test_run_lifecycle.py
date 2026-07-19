@@ -21,8 +21,28 @@ from app.demo.phases import RunPhase
 from app.demo.run_models import DemoRun, RunStatus
 
 NOW = datetime(2026, 7, 16, 12, 0, tzinfo=UTC)
-WORKFLOW_PHASES = list(RunPhase)[1:-1]
+WORKFLOW_PHASES = (
+    RunPhase.P1_ASPIRATE_S,
+    RunPhase.P1_DISPENSE_S_TO_REACTOR,
+    RunPhase.P1_ASPIRATE_FIRST_LIQUID,
+    RunPhase.P1_DISPENSE_FIRST_LIQUID_TO_REACTOR,
+    RunPhase.DELAY_BETWEEN_ADDITIONS,
+    RunPhase.P1_ASPIRATE_SECOND_LIQUID,
+    RunPhase.P1_DISPENSE_SECOND_LIQUID_TO_REACTOR,
+    RunPhase.REACTION_HOLD,
+    RunPhase.P2_ASPIRATE_REACTOR_CONTENTS,
+    RunPhase.P2_DISPENSE_TO_SF,
+    RunPhase.SF_MIXING,
+    RunPhase.SF_SETTLING,
+    RunPhase.TRANSFER_SF_TO_COLUMN,
+    RunPhase.COLUMN_FRACTION_COLLECTION,
+)
 PAUSABLE_PHASES = {RunPhase.DELAY_BETWEEN_ADDITIONS, RunPhase.REACTION_HOLD}
+DOWNSTREAM_PHASES = (
+    RunPhase.SF_SETTLING,
+    RunPhase.TRANSFER_SF_TO_COLUMN,
+    RunPhase.COLUMN_FRACTION_COLLECTION,
+)
 
 
 @pytest.fixture
@@ -112,9 +132,49 @@ def test_completes_all_phases_in_strict_order(configuration: DemoConfiguration) 
         DomainEventType.RUN_COMPLETED,
     ]
     assert [(event.run_status, event.run_phase) for event in result.events] == [
-        (RunStatus.RUNNING, RunPhase.SF_MIXING),
+        (RunStatus.RUNNING, RunPhase.COLUMN_FRACTION_COLLECTION),
         (RunStatus.COMPLETED, RunPhase.COMPLETED),
     ]
+
+
+@pytest.mark.parametrize(
+    ("current_phase", "next_phase"),
+    [
+        (RunPhase.SF_MIXING, RunPhase.SF_SETTLING),
+        (RunPhase.SF_SETTLING, RunPhase.TRANSFER_SF_TO_COLUMN),
+        (RunPhase.TRANSFER_SF_TO_COLUMN, RunPhase.COLUMN_FRACTION_COLLECTION),
+        (RunPhase.COLUMN_FRACTION_COLLECTION, RunPhase.COMPLETED),
+    ],
+)
+def test_downstream_phases_advance_in_strict_order(
+    configuration: DemoConfiguration,
+    current_phase: RunPhase,
+    next_phase: RunPhase,
+) -> None:
+    run = running_at(configuration, current_phase)
+    result = complete_current_phase(run, NOW)
+
+    assert result.run.phase is next_phase
+    assert result.run.status is (
+        RunStatus.COMPLETED
+        if next_phase is RunPhase.COMPLETED
+        else RunStatus.RUNNING
+    )
+    assert result.run.event_sequence == run.event_sequence + 2
+    assert result.events[-1].run_phase is next_phase
+    assert result.events[-1].run_status is result.run.status
+
+
+def test_sf_mixing_cannot_advance_directly_to_completed(
+    configuration: DemoConfiguration,
+) -> None:
+    result = complete_current_phase(running_at(configuration, RunPhase.SF_MIXING), NOW)
+
+    assert (result.run.status, result.run.phase) == (
+        RunStatus.RUNNING,
+        RunPhase.SF_SETTLING,
+    )
+    assert all(event.event_type is not DomainEventType.RUN_COMPLETED for event in result.events)
 
 
 @pytest.mark.parametrize("status", [status for status in RunStatus if status is not RunStatus.RUNNING])
@@ -128,7 +188,7 @@ def test_phase_completion_requires_running_status(
 
 
 def test_phase_progression_after_completion_is_rejected(configuration: DemoConfiguration) -> None:
-    run = running_at(configuration, RunPhase.SF_MIXING)
+    run = running_at(configuration, RunPhase.COLUMN_FRACTION_COLLECTION)
     completed = complete_current_phase(run, NOW).run
 
     with pytest.raises(LifecycleTransitionError):
@@ -159,7 +219,9 @@ def test_pause_is_rejected_in_every_other_phase(
     if phase is RunPhase.READY:
         run = created_run(configuration)
     elif phase is RunPhase.COMPLETED:
-        run = complete_current_phase(running_at(configuration, RunPhase.SF_MIXING), NOW).run
+        run = complete_current_phase(
+            running_at(configuration, RunPhase.COLUMN_FRACTION_COLLECTION), NOW
+        ).run
     else:
         run = running_at(configuration, phase)
 
@@ -195,6 +257,31 @@ def test_abort_request_preserves_phase_and_requires_confirmation(
 def test_confirm_abort_requires_aborting_status(configuration: DemoConfiguration) -> None:
     with pytest.raises(LifecycleTransitionError, match="Cannot confirm abort"):
         confirm_abort(running_at(configuration, RunPhase.REACTION_HOLD), NOW)
+
+
+@pytest.mark.parametrize("phase", DOWNSTREAM_PHASES)
+def test_abort_remains_valid_in_new_active_phases(
+    configuration: DemoConfiguration, phase: RunPhase
+) -> None:
+    run = running_at(configuration, phase)
+
+    requested = request_abort(run, NOW)
+    confirmed = confirm_abort(requested.run, NOW)
+
+    assert (requested.run.status, requested.run.phase) == (RunStatus.ABORTING, phase)
+    assert (confirmed.run.status, confirmed.run.phase) == (RunStatus.ABORTED, phase)
+
+
+@pytest.mark.parametrize("phase", DOWNSTREAM_PHASES)
+def test_fault_remains_valid_in_new_active_phases(
+    configuration: DemoConfiguration, phase: RunPhase
+) -> None:
+    run = running_at(configuration, phase)
+
+    result = fault_run(run, NOW, "Operator interlock opened")
+
+    assert (result.run.status, result.run.phase) == (RunStatus.FAULTED, phase)
+    assert result.events[0].event_type is DomainEventType.RUN_FAULTED
 
 
 @pytest.mark.parametrize("status", [RunStatus.RUNNING, RunStatus.PAUSED, RunStatus.ABORTING])
