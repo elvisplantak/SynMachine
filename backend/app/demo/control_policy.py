@@ -22,22 +22,19 @@ class LockedFluidPlanField(StrEnum):
 
 PERMANENTLY_LOCKED_FLUID_PLAN_FIELDS = frozenset(LockedFluidPlanField)
 
-_P1_DISPENSE_TO_REACTOR_PHASES = frozenset(
+_P1_TRANSFER_TO_REACTOR_PHASES = frozenset(
     {
-        RunPhase.P1_DISPENSE_S_TO_REACTOR,
-        RunPhase.P1_DISPENSE_FIRST_LIQUID_TO_REACTOR,
-        RunPhase.P1_DISPENSE_SECOND_LIQUID_TO_REACTOR,
+        RunPhase.P1_TRANSFER_S_TO_REACTOR,
+        RunPhase.P1_TRANSFER_FIRST_LIQUID_TO_REACTOR,
+        RunPhase.P1_TRANSFER_SECOND_LIQUID_TO_REACTOR,
     }
 )
 
 _REACTOR_RELATED_PHASES = frozenset(
     {
-        RunPhase.P1_DISPENSE_S_TO_REACTOR,
-        RunPhase.P1_ASPIRATE_FIRST_LIQUID,
-        RunPhase.P1_DISPENSE_FIRST_LIQUID_TO_REACTOR,
+        RunPhase.P1_TRANSFER_FIRST_LIQUID_TO_REACTOR,
         RunPhase.DELAY_BETWEEN_ADDITIONS,
-        RunPhase.P1_ASPIRATE_SECOND_LIQUID,
-        RunPhase.P1_DISPENSE_SECOND_LIQUID_TO_REACTOR,
+        RunPhase.P1_TRANSFER_SECOND_LIQUID_TO_REACTOR,
         RunPhase.REACTION_HOLD,
     }
 )
@@ -46,7 +43,7 @@ _REACTOR_RELATED_PHASES = frozenset(
 def editable_controls_for_phase(phase: RunPhase) -> frozenset[ControlId]:
     controls: set[ControlId] = set()
 
-    if phase in _P1_DISPENSE_TO_REACTOR_PHASES:
+    if phase in _P1_TRANSFER_TO_REACTOR_PHASES:
         controls.add(ControlId.ADDITION_SPEED)
     if phase in _REACTOR_RELATED_PHASES:
         controls.add(ControlId.REACTOR_MIXING)

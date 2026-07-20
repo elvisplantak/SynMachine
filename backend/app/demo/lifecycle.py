@@ -9,19 +9,15 @@ from app.demo.phases import RunPhase
 from app.demo.run_models import DemoRun, RunStatus
 
 _ACTIVE_PHASES = (
-    RunPhase.P1_ASPIRATE_S,
-    RunPhase.P1_DISPENSE_S_TO_REACTOR,
-    RunPhase.P1_ASPIRATE_FIRST_LIQUID,
-    RunPhase.P1_DISPENSE_FIRST_LIQUID_TO_REACTOR,
+    RunPhase.P1_TRANSFER_S_TO_REACTOR,
+    RunPhase.P1_TRANSFER_FIRST_LIQUID_TO_REACTOR,
     RunPhase.DELAY_BETWEEN_ADDITIONS,
-    RunPhase.P1_ASPIRATE_SECOND_LIQUID,
-    RunPhase.P1_DISPENSE_SECOND_LIQUID_TO_REACTOR,
+    RunPhase.P1_TRANSFER_SECOND_LIQUID_TO_REACTOR,
     RunPhase.REACTION_HOLD,
-    RunPhase.P2_ASPIRATE_REACTOR_CONTENTS,
-    RunPhase.P2_DISPENSE_TO_SF,
+    RunPhase.P2_TRANSFER_REACTOR_TO_SF,
     RunPhase.SF_MIXING,
     RunPhase.SF_SETTLING,
-    RunPhase.TRANSFER_SF_TO_COLUMN,
+    RunPhase.P2_TRANSFER_SF_TO_COLUMN,
     RunPhase.COLUMN_FRACTION_COLLECTION,
 )
 _PAUSABLE_PHASES = frozenset(
@@ -134,13 +130,13 @@ def start_run(run: DemoRun, occurred_at: datetime) -> TransitionResult:
         occurred_at=occurred_at,
         event_type=DomainEventType.PHASE_STARTED,
         status=RunStatus.RUNNING,
-        phase=RunPhase.P1_ASPIRATE_S,
-        message="Phase P1_ASPIRATE_S started",
+        phase=RunPhase.P1_TRANSFER_S_TO_REACTOR,
+        message="Phase P1_TRANSFER_S_TO_REACTOR started",
     )
     return _result(
         run,
         status=RunStatus.RUNNING,
-        phase=RunPhase.P1_ASPIRATE_S,
+        phase=RunPhase.P1_TRANSFER_S_TO_REACTOR,
         events=(started, phase_started),
     )
 

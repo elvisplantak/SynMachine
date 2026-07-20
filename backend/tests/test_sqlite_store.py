@@ -92,7 +92,7 @@ def test_machine_snapshot_round_trip() -> None:
     ("event_update", "error"),
     [
         ({"run_status": RunStatus.RUNNING}, "final run event status"),
-        ({"run_phase": RunPhase.P1_ASPIRATE_S}, "final run event phase"),
+        ({"run_phase": RunPhase.P1_TRANSFER_S_TO_REACTOR}, "final run event phase"),
     ],
 )
 def test_final_run_event_must_match_snapshot_without_writing(
@@ -188,6 +188,21 @@ def test_sequence_continuity_accepts_next_transition(
 
         assert store.load_demo_run("run-1") == started.run
         assert tuple(event.sequence_number for event in store.load_events()) == (1, 2, 3)
+
+
+@pytest.mark.parametrize("phase", list(RunPhase))
+def test_run_phase_round_trip_preserves_new_enum_values(
+    configuration: DemoConfiguration, phase: RunPhase
+) -> None:
+    created = create_demo_run("run-1", configuration, EXECUTION_SETTINGS, NOW)
+    snapshot = created.run.model_copy(update={"phase": phase})
+    event = created.events[0].model_copy(update={"run_phase": phase})
+
+    with SQLiteStore() as store:
+        store.persist_run_transition(snapshot, (event,))
+
+        assert store.load_demo_run("run-1").phase is phase
+        assert store.load_events("RUN", "run-1")[0].run_phase is phase
 
 
 @pytest.mark.parametrize("conflict", ["replay", "skip", "overlap"])

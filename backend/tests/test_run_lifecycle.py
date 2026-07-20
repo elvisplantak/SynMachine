@@ -27,26 +27,24 @@ EXECUTION_SETTINGS = DemoExecutionSettings(
     fraction_duration_seconds="45.678",
 )
 WORKFLOW_PHASES = (
-    RunPhase.P1_ASPIRATE_S,
-    RunPhase.P1_DISPENSE_S_TO_REACTOR,
-    RunPhase.P1_ASPIRATE_FIRST_LIQUID,
-    RunPhase.P1_DISPENSE_FIRST_LIQUID_TO_REACTOR,
+    RunPhase.P1_TRANSFER_S_TO_REACTOR,
+    RunPhase.P1_TRANSFER_FIRST_LIQUID_TO_REACTOR,
     RunPhase.DELAY_BETWEEN_ADDITIONS,
-    RunPhase.P1_ASPIRATE_SECOND_LIQUID,
-    RunPhase.P1_DISPENSE_SECOND_LIQUID_TO_REACTOR,
+    RunPhase.P1_TRANSFER_SECOND_LIQUID_TO_REACTOR,
     RunPhase.REACTION_HOLD,
-    RunPhase.P2_ASPIRATE_REACTOR_CONTENTS,
-    RunPhase.P2_DISPENSE_TO_SF,
+    RunPhase.P2_TRANSFER_REACTOR_TO_SF,
     RunPhase.SF_MIXING,
     RunPhase.SF_SETTLING,
-    RunPhase.TRANSFER_SF_TO_COLUMN,
+    RunPhase.P2_TRANSFER_SF_TO_COLUMN,
     RunPhase.COLUMN_FRACTION_COLLECTION,
 )
 PAUSABLE_PHASES = {RunPhase.DELAY_BETWEEN_ADDITIONS, RunPhase.REACTION_HOLD}
-DOWNSTREAM_PHASES = (
-    RunPhase.SF_SETTLING,
-    RunPhase.TRANSFER_SF_TO_COLUMN,
-    RunPhase.COLUMN_FRACTION_COLLECTION,
+TRANSFER_PHASES = (
+    RunPhase.P1_TRANSFER_S_TO_REACTOR,
+    RunPhase.P1_TRANSFER_FIRST_LIQUID_TO_REACTOR,
+    RunPhase.P1_TRANSFER_SECOND_LIQUID_TO_REACTOR,
+    RunPhase.P2_TRANSFER_REACTOR_TO_SF,
+    RunPhase.P2_TRANSFER_SF_TO_COLUMN,
 )
 
 
@@ -75,6 +73,15 @@ def running_at(configuration: DemoConfiguration, phase: RunPhase) -> DemoRun:
     while run.phase is not phase:
         run = complete_current_phase(run, NOW).run
     return run
+
+
+def test_run_phase_contains_exact_new_ordered_set() -> None:
+    assert tuple(RunPhase) == (
+        RunPhase.READY,
+        *WORKFLOW_PHASES,
+        RunPhase.COMPLETED,
+    )
+    assert len(WORKFLOW_PHASES) == 10
 
 
 def test_creation_builds_immutable_run_and_configured_fluid_plan(
@@ -170,7 +177,7 @@ def test_start_enters_first_phase_and_emits_ordered_events(
 
     assert (result.run.status, result.run.phase) == (
         RunStatus.RUNNING,
-        RunPhase.P1_ASPIRATE_S,
+        RunPhase.P1_TRANSFER_S_TO_REACTOR,
     )
     assert [event.event_type for event in result.events] == [
         DomainEventType.RUN_STARTED,
@@ -178,7 +185,7 @@ def test_start_enters_first_phase_and_emits_ordered_events(
     ]
     assert [(event.run_status, event.run_phase) for event in result.events] == [
         (RunStatus.RUNNING, RunPhase.READY),
-        (RunStatus.RUNNING, RunPhase.P1_ASPIRATE_S),
+        (RunStatus.RUNNING, RunPhase.P1_TRANSFER_S_TO_REACTOR),
     ]
     assert [event.sequence_number for event in result.events] == [2, 3]
 
@@ -186,7 +193,10 @@ def test_start_enters_first_phase_and_emits_ordered_events(
 def test_second_start_is_rejected(configuration: DemoConfiguration) -> None:
     run = start_run(created_run(configuration), NOW).run
 
-    with pytest.raises(LifecycleTransitionError, match="Cannot start.*RUNNING.*P1_ASPIRATE_S"):
+    with pytest.raises(
+        LifecycleTransitionError,
+        match="Cannot start.*RUNNING.*P1_TRANSFER_S_TO_REACTOR",
+    ):
         start_run(run, NOW)
 
 
@@ -214,9 +224,18 @@ def test_completes_all_phases_in_strict_order(configuration: DemoConfiguration) 
 @pytest.mark.parametrize(
     ("current_phase", "next_phase"),
     [
+        (
+            RunPhase.P1_TRANSFER_FIRST_LIQUID_TO_REACTOR,
+            RunPhase.DELAY_BETWEEN_ADDITIONS,
+        ),
+        (
+            RunPhase.DELAY_BETWEEN_ADDITIONS,
+            RunPhase.P1_TRANSFER_SECOND_LIQUID_TO_REACTOR,
+        ),
+        (RunPhase.P2_TRANSFER_REACTOR_TO_SF, RunPhase.SF_MIXING),
         (RunPhase.SF_MIXING, RunPhase.SF_SETTLING),
-        (RunPhase.SF_SETTLING, RunPhase.TRANSFER_SF_TO_COLUMN),
-        (RunPhase.TRANSFER_SF_TO_COLUMN, RunPhase.COLUMN_FRACTION_COLLECTION),
+        (RunPhase.SF_SETTLING, RunPhase.P2_TRANSFER_SF_TO_COLUMN),
+        (RunPhase.P2_TRANSFER_SF_TO_COLUMN, RunPhase.COLUMN_FRACTION_COLLECTION),
         (RunPhase.COLUMN_FRACTION_COLLECTION, RunPhase.COMPLETED),
     ],
 )
@@ -333,8 +352,8 @@ def test_confirm_abort_requires_aborting_status(configuration: DemoConfiguration
         confirm_abort(running_at(configuration, RunPhase.REACTION_HOLD), NOW)
 
 
-@pytest.mark.parametrize("phase", DOWNSTREAM_PHASES)
-def test_abort_remains_valid_in_new_active_phases(
+@pytest.mark.parametrize("phase", TRANSFER_PHASES)
+def test_abort_remains_valid_in_transfer_phases(
     configuration: DemoConfiguration, phase: RunPhase
 ) -> None:
     run = running_at(configuration, phase)
@@ -346,8 +365,8 @@ def test_abort_remains_valid_in_new_active_phases(
     assert (confirmed.run.status, confirmed.run.phase) == (RunStatus.ABORTED, phase)
 
 
-@pytest.mark.parametrize("phase", DOWNSTREAM_PHASES)
-def test_fault_remains_valid_in_new_active_phases(
+@pytest.mark.parametrize("phase", TRANSFER_PHASES)
+def test_fault_remains_valid_in_transfer_phases(
     configuration: DemoConfiguration, phase: RunPhase
 ) -> None:
     run = running_at(configuration, phase)

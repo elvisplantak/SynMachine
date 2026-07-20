@@ -12,45 +12,37 @@ from app.demo.phases import RunPhase
 @pytest.mark.parametrize(
     "phase",
     [
-        RunPhase.P1_DISPENSE_S_TO_REACTOR,
-        RunPhase.P1_DISPENSE_FIRST_LIQUID_TO_REACTOR,
-        RunPhase.P1_DISPENSE_SECOND_LIQUID_TO_REACTOR,
+        RunPhase.P1_TRANSFER_S_TO_REACTOR,
+        RunPhase.P1_TRANSFER_FIRST_LIQUID_TO_REACTOR,
+        RunPhase.P1_TRANSFER_SECOND_LIQUID_TO_REACTOR,
     ],
 )
-def test_addition_speed_is_editable_in_p1_reactor_dispense_phases(phase: RunPhase) -> None:
+def test_addition_speed_is_editable_in_p1_reactor_transfer_phases(phase: RunPhase) -> None:
     assert ControlId.ADDITION_SPEED in editable_controls_for_phase(phase)
 
 
 @pytest.mark.parametrize(
     "phase",
     [
-        RunPhase.P1_ASPIRATE_S,
-        RunPhase.P1_ASPIRATE_FIRST_LIQUID,
-        RunPhase.P1_ASPIRATE_SECOND_LIQUID,
+        RunPhase.P2_TRANSFER_REACTOR_TO_SF,
+        RunPhase.P2_TRANSFER_SF_TO_COLUMN,
     ],
 )
-def test_addition_speed_is_not_editable_in_aspiration_phases(phase: RunPhase) -> None:
+def test_addition_speed_is_not_editable_in_p2_transfer_phases(phase: RunPhase) -> None:
     assert ControlId.ADDITION_SPEED not in editable_controls_for_phase(phase)
 
 
-def test_p1_aspirate_s_does_not_allow_reactor_mixing() -> None:
-    assert ControlId.REACTOR_MIXING not in editable_controls_for_phase(RunPhase.P1_ASPIRATE_S)
-
-
-def test_p1_dispense_s_to_reactor_allows_reactor_mixing() -> None:
-    assert ControlId.REACTOR_MIXING in editable_controls_for_phase(
-        RunPhase.P1_DISPENSE_S_TO_REACTOR
+def test_p1_transfer_s_to_reactor_does_not_allow_reactor_mixing() -> None:
+    assert ControlId.REACTOR_MIXING not in editable_controls_for_phase(
+        RunPhase.P1_TRANSFER_S_TO_REACTOR
     )
 
 
 def test_reactor_mixing_matches_agreed_phases() -> None:
     expected = {
-        RunPhase.P1_DISPENSE_S_TO_REACTOR,
-        RunPhase.P1_ASPIRATE_FIRST_LIQUID,
-        RunPhase.P1_DISPENSE_FIRST_LIQUID_TO_REACTOR,
+        RunPhase.P1_TRANSFER_FIRST_LIQUID_TO_REACTOR,
         RunPhase.DELAY_BETWEEN_ADDITIONS,
-        RunPhase.P1_ASPIRATE_SECOND_LIQUID,
-        RunPhase.P1_DISPENSE_SECOND_LIQUID_TO_REACTOR,
+        RunPhase.P1_TRANSFER_SECOND_LIQUID_TO_REACTOR,
         RunPhase.REACTION_HOLD,
     }
     actual = {
@@ -87,7 +79,7 @@ def test_completed_phase_has_no_editable_controls() -> None:
     "phase",
     [
         RunPhase.SF_SETTLING,
-        RunPhase.TRANSFER_SF_TO_COLUMN,
+        RunPhase.P2_TRANSFER_SF_TO_COLUMN,
         RunPhase.COLUMN_FRACTION_COLLECTION,
     ],
 )

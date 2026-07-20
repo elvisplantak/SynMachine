@@ -213,7 +213,7 @@ def test_start_and_intermediate_phase_completion_keep_machine_busy(
     started = client.post(f"{API}/runs/run-1/start", json=AWARE_COMMAND).json()
     assert (started["run"]["status"], started["run"]["phase"]) == (
         "RUNNING",
-        "P1_ASPIRATE_S",
+        "P1_TRANSFER_S_TO_REACTOR",
     )
     assert started["machine"]["state"] == "BUSY"
     assert started["machine"]["active_run_id"] == "run-1"
@@ -221,7 +221,7 @@ def test_start_and_intermediate_phase_completion_keep_machine_busy(
     advanced = client.post(
         f"{API}/runs/run-1/phases/current/complete", json=AWARE_COMMAND
     ).json()
-    assert advanced["run"]["phase"] == "P1_DISPENSE_S_TO_REACTOR"
+    assert advanced["run"]["phase"] == "P1_TRANSFER_FIRST_LIQUID_TO_REACTOR"
     assert advanced["machine"]["state"] == "BUSY"
 
 
@@ -231,7 +231,7 @@ def test_final_phase_confirmation_completes_run_and_releases_machine(
     initialize_ready_machine(client)
     create_and_start_run(client)
 
-    current_phase = "P1_ASPIRATE_S"
+    current_phase = "P1_TRANSFER_S_TO_REACTOR"
     while current_phase != RunPhase.COLUMN_FRACTION_COLLECTION:
         response = client.post(
             f"{API}/runs/run-1/phases/current/complete", json=AWARE_COMMAND

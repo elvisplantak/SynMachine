@@ -230,7 +230,7 @@ def test_start_run_atomically_starts_run_and_assigns_machine(
 
         assert (result.run.status, result.run.phase) == (
             RunStatus.RUNNING,
-            RunPhase.P1_ASPIRATE_S,
+            RunPhase.P1_TRANSFER_S_TO_REACTOR,
         )
         assert result.machine is not None
         assert (result.machine.state, result.machine.active_run_id) == (
@@ -302,7 +302,7 @@ def test_intermediate_phase_completion_changes_only_run(
 
         assert (result.run.status, result.run.phase) == (
             RunStatus.RUNNING,
-            RunPhase.P1_DISPENSE_S_TO_REACTOR,
+            RunPhase.P1_TRANSFER_FIRST_LIQUID_TO_REACTOR,
         )
         assert result.machine == started.machine
         assert result.machine_events == ()
