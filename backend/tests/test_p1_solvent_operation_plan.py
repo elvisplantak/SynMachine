@@ -6,14 +6,16 @@ from pydantic import ValidationError
 from app.demo.calibration_models import PumpCalibration, PumpCalibrationSet, PumpId
 from app.demo.fluid_plan import build_fluid_plan
 from app.demo.models import AdditionOrder, DemoConfiguration
-from app.demo.p1_solvent_operation_plan import (
+from app.demo.operation_models import (
     AspirateOperation,
     DispenseOperation,
     OperationKind,
-    P1SolventToReactorOperationPlan,
     SelectRouteOperation,
     SymbolicRouteId,
     TopologyId,
+)
+from app.demo.p1_solvent_operation_plan import (
+    P1SolventToReactorOperationPlan,
     plan_p1_solvent_to_reactor_operations,
 )
 from app.demo.phases import RunPhase
