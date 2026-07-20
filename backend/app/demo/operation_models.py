@@ -26,6 +26,8 @@ class SymbolicRouteId(StrEnum):
     B1_TO_P1 = "B1_TO_P1"
     B2_TO_P1 = "B2_TO_P1"
     P1_TO_REACTOR = "P1_TO_REACTOR"
+    REACTOR_TO_P2 = "REACTOR_TO_P2"
+    P2_TO_SF_TOP = "P2_TO_SF_TOP"
 
 
 class OperationKind(StrEnum):
