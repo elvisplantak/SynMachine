@@ -28,12 +28,100 @@ class SymbolicRouteId(StrEnum):
     P1_TO_REACTOR = "P1_TO_REACTOR"
     REACTOR_TO_P2 = "REACTOR_TO_P2"
     P2_TO_SF_TOP = "P2_TO_SF_TOP"
+    SF_BOTTOM_TO_P2 = "SF_BOTTOM_TO_P2"
+    P2_TO_COLUMN = "P2_TO_COLUMN"
 
 
 class OperationKind(StrEnum):
     SELECT_ROUTE = "SELECT_ROUTE"
     ASPIRATE = "ASPIRATE"
     DISPENSE = "DISPENSE"
+    PREPARE_SF_TO_COLUMN_TRANSFER = "PREPARE_SF_TO_COLUMN_TRANSFER"
+    ASPIRATE_FROM_SF = "ASPIRATE_FROM_SF"
+
+
+class PrepareSfToColumnAction(StrEnum):
+    CLOSE_SF_BOTTOM_VALVE = "SET SF_BOTTOM_VALVE CLOSED"
+    CLOSE_COLUMN_BOTTOM_VALVE = "SET COLUMN_BOTTOM_VALVE CLOSED"
+
+
+class AspirateFromSfAction(StrEnum):
+    OPEN_SF_BOTTOM_VALVE = "OPEN SF_BOTTOM_VALVE"
+    ASPIRATE_P2 = "ASPIRATE P2"
+    CLOSE_SF_BOTTOM_VALVE = "CLOSE SF_BOTTOM_VALVE"
+
+
+class PrepareSfToColumnTransferOperation(BaseModel):
+    """One protected scheduler operation; successful commands imply CLOSED.
+
+    Valve state is inferred from successful command execution, not independently
+    sensor-confirmed. This is accepted only for the low-risk colored-liquid demo.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    operation_kind: Literal[OperationKind.PREPARE_SF_TO_COLUMN_TRANSFER]
+    operation_number: Literal[1]
+    required_action_sequence: tuple[PrepareSfToColumnAction, ...] = (
+        PrepareSfToColumnAction.CLOSE_SF_BOTTOM_VALVE,
+        PrepareSfToColumnAction.CLOSE_COLUMN_BOTTOM_VALVE,
+    )
+
+    @model_validator(mode="after")
+    def validate_action_sequence(self) -> Self:
+        expected = (
+            PrepareSfToColumnAction.CLOSE_SF_BOTTOM_VALVE,
+            PrepareSfToColumnAction.CLOSE_COLUMN_BOTTOM_VALVE,
+        )
+        if self.required_action_sequence != expected:
+            raise ValueError(
+                "protected preparation actions must exactly match SF close then Column close"
+            )
+        return self
+
+
+class AspirateFromSfOperation(BaseModel):
+    """Atomic open/aspirate/required-close scheduler operation.
+
+    A failed required close fails this operation, and further plan execution must
+    stop; symbolic success does not prove physical valve movement.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    operation_kind: Literal[OperationKind.ASPIRATE_FROM_SF]
+    operation_number: StrictInt = Field(ge=1)
+    cycle_number: StrictInt = Field(ge=1)
+    cycle_count: StrictInt = Field(ge=1)
+    pump_id: Literal[PumpId.P2]
+    volume_ml: Decimal
+    required_action_sequence: tuple[AspirateFromSfAction, ...] = (
+        AspirateFromSfAction.OPEN_SF_BOTTOM_VALVE,
+        AspirateFromSfAction.ASPIRATE_P2,
+        AspirateFromSfAction.CLOSE_SF_BOTTOM_VALVE,
+    )
+
+    @field_validator("volume_ml")
+    @classmethod
+    def validate_volume(cls, value: Decimal) -> Decimal:
+        if not value.is_finite() or value <= 0:
+            raise ValueError("operation volume must be finite and greater than zero")
+        return value
+
+    @model_validator(mode="after")
+    def validate_semantics(self) -> Self:
+        if self.cycle_number > self.cycle_count:
+            raise ValueError("cycle number must not exceed cycle count")
+        expected = (
+            AspirateFromSfAction.OPEN_SF_BOTTOM_VALVE,
+            AspirateFromSfAction.ASPIRATE_P2,
+            AspirateFromSfAction.CLOSE_SF_BOTTOM_VALVE,
+        )
+        if self.required_action_sequence != expected:
+            raise ValueError(
+                "protected aspiration actions must exactly match open, aspirate, close"
+            )
+        return self
 
 
 class SelectRouteOperation(BaseModel):
@@ -101,7 +189,11 @@ class DispenseOperation(BaseModel):
 
 
 PlannedOperation = Annotated[
-    SelectRouteOperation | AspirateOperation | DispenseOperation,
+    SelectRouteOperation
+    | AspirateOperation
+    | DispenseOperation
+    | PrepareSfToColumnTransferOperation
+    | AspirateFromSfOperation,
     Field(discriminator="operation_kind"),
 ]
 

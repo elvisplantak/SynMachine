@@ -97,6 +97,8 @@ def test_shared_operation_models_and_routes_have_expected_ownership() -> None:
         SymbolicRouteId.P1_TO_REACTOR,
         SymbolicRouteId.REACTOR_TO_P2,
         SymbolicRouteId.P2_TO_SF_TOP,
+        SymbolicRouteId.SF_BOTTOM_TO_P2,
+        SymbolicRouteId.P2_TO_COLUMN,
     }
 
 
