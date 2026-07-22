@@ -1,5 +1,42 @@
 # Hardware confirmations
 
+## Confirmed present physical tubing topology — 2026-07-21
+
+The user explicitly confirmed that the physical tubing was connected according to the approved LabForge v1 target topology. This confirms the tubing connections only; it is not permission for hardware execution and does not confirm leak-tightness, valve actuation, liquid routing, calibration, firmware execution, or safety interlocks.
+
+### Confirmed valve and component connections
+
+- V1: `V1.k1 <-> P1`; `V1.k2 <-> V2.k1`; `V1.k3 <-> V6.k1`.
+- V2: `V2.k1 <-> V1.k2`; `V2.k2 <-> shared Waste`; `V2.k3 <-> Reactor R_IN`.
+- V3: `V3.k1 <-> P2`; `V3.k2 <-> V7.k1`; `V3.k3 <-> Reactor R_OUT`.
+- V4: `V4.k1 <-> V6.k3`; `V4.k2 <-> B1`; `V4.k3 <-> B2`.
+- V5: `V5.k1 <-> V8.k3`; `V5.k2 <-> shared Waste`; `V5.k3 <-> Column inlet`.
+- V6: `V6.k1 <-> V1.k3`; `V6.k2 <-> shared solvent S`; `V6.k3 <-> V4.k1`.
+- V7: `V7.k1 <-> V3.k2`; `V7.k2 <-> SF_TOP_IN`; `V7.k3 <-> V8.k1`.
+- V8: `V8.k1 <-> V7.k3`; `V8.k2 <-> SF_BOTTOM_OUT`; `V8.k3 <-> V5.k1`.
+- Confirmed SF bottom tubing path: `SF bottom -> SF_BOTTOM_VALVE -> SF_BOTTOM_OUT -> V8.k2`.
+- Confirmed Column bottom tubing path: `Column bottom -> COLUMN_BOTTOM_VALVE -> fractions / carousel`.
+- There is one shared Waste destination. The Column bottom outlet does not connect to Waste.
+
+### Approved Guided Demo bottom-valve operating rules
+
+- SF is unpressurized and is filled through `SF_TOP_IN` while `SF_BOTTOM_VALVE` is closed.
+- `SF_BOTTOM_VALVE` opens only during aspiration from SF and must close before route switching and dispensing.
+- `COLUMN_BOTTOM_VALVE` remains closed while the Column is filled and opens only during `COLUMN_FRACTION_COLLECTION`.
+- The current Guided Demo sends all nominal SF contents to the Column. This rule does not imply automatic phase detection or verified phase separation.
+- These are approved operating rules, not confirmation of actuator wiring, actuation, or execution.
+
+### Pending verification and commissioning
+
+- Leak testing and liquid route testing remain pending.
+- Verification of every valve angle, every physical valve route, and V1-V8 actuation remains pending.
+- Verification of `SF_BOTTOM_VALVE` and `COLUMN_BOTTOM_VALVE` actuation remains pending.
+- `COLUMN_BOTTOM_VALVE` driver wiring and Arduino pin assignment remain unconfirmed.
+- Pump volumetric calibration remains pending.
+- Safe execution interlocks and end-to-end hardware execution remain pending.
+- Automatic phase detection and automatic or actual liquid-phase separation are not confirmed.
+- Safe routes must be physically verified before pump homing or any liquid movement.
+
 ## Confirmed hardware behavior — 2026-07-16
 
 ### Confirmed facts: P1 and P2 syringe orientation
