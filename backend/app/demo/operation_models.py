@@ -38,6 +38,9 @@ class OperationKind(StrEnum):
     DISPENSE = "DISPENSE"
     PREPARE_SF_TO_COLUMN_TRANSFER = "PREPARE_SF_TO_COLUMN_TRANSFER"
     ASPIRATE_FROM_SF = "ASPIRATE_FROM_SF"
+    PREPARE_COLUMN_FRACTION_COLLECTION = "PREPARE_COLUMN_FRACTION_COLLECTION"
+    COLLECT_COLUMN_FRACTION = "COLLECT_COLUMN_FRACTION"
+    MOVE_CAROUSEL_TO_NEXT_FRACTION = "MOVE_CAROUSEL_TO_NEXT_FRACTION"
 
 
 class PrepareSfToColumnAction(StrEnum):
@@ -49,6 +52,115 @@ class AspirateFromSfAction(StrEnum):
     OPEN_SF_BOTTOM_VALVE = "OPEN SF_BOTTOM_VALVE"
     ASPIRATE_P2 = "ASPIRATE P2"
     CLOSE_SF_BOTTOM_VALVE = "CLOSE SF_BOTTOM_VALVE"
+
+
+class PrepareColumnFractionCollectionAction(StrEnum):
+    CLOSE_COLUMN_BOTTOM_VALVE = "SET COLUMN_BOTTOM_VALVE CLOSED"
+
+
+class CollectColumnFractionAction(StrEnum):
+    OPEN_COLUMN_BOTTOM_VALVE = "OPEN COLUMN_BOTTOM_VALVE"
+    COLLECT_UNTIL_DURATION_OR_STOP = "COLLECT UNTIL DURATION EXPIRES OR STOP"
+    CLOSE_COLUMN_BOTTOM_VALVE = "CLOSE COLUMN_BOTTOM_VALVE"
+
+
+class PrepareColumnFractionCollectionOperation(BaseModel):
+    """Protected close before collection; the valve must already be referenced."""
+
+    model_config = ConfigDict(frozen=True)
+
+    operation_kind: Literal[OperationKind.PREPARE_COLUMN_FRACTION_COLLECTION]
+    operation_number: Literal[1]
+    column_bottom_valve_referenced: Literal[True]
+    required_action_sequence: tuple[PrepareColumnFractionCollectionAction, ...] = (
+        PrepareColumnFractionCollectionAction.CLOSE_COLUMN_BOTTOM_VALVE,
+    )
+
+    @model_validator(mode="after")
+    def validate_action_sequence(self) -> Self:
+        expected = (
+            PrepareColumnFractionCollectionAction.CLOSE_COLUMN_BOTTOM_VALVE,
+        )
+        if self.required_action_sequence != expected:
+            raise ValueError("protected preparation must close COLUMN_BOTTOM_VALVE")
+        return self
+
+
+class CollectColumnFractionOperation(BaseModel):
+    """Protected Stop-aware collection whose required close has no Stop boundary.
+
+    Successful command completion implies logical valve state; it is not
+    independently sensor-confirmed. A failed required close fails this operation
+    and blocks further execution through the executor's existing fault mechanism.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    operation_kind: Literal[OperationKind.COLLECT_COLUMN_FRACTION]
+    operation_number: StrictInt = Field(ge=1)
+    fraction_number: StrictInt = Field(ge=1)
+    fraction_count: StrictInt = Field(ge=1)
+    configured_duration_seconds: Decimal
+    stop_interrupts_collection_timer: Literal[True]
+    required_close_follows_stop: Literal[True]
+    required_close_failure_blocks_further_operations: Literal[True]
+    required_action_sequence: tuple[CollectColumnFractionAction, ...] = (
+        CollectColumnFractionAction.OPEN_COLUMN_BOTTOM_VALVE,
+        CollectColumnFractionAction.COLLECT_UNTIL_DURATION_OR_STOP,
+        CollectColumnFractionAction.CLOSE_COLUMN_BOTTOM_VALVE,
+    )
+
+    @field_validator("configured_duration_seconds")
+    @classmethod
+    def validate_duration(cls, value: Decimal) -> Decimal:
+        if not value.is_finite() or value <= 0:
+            raise ValueError("fraction duration must be finite and greater than zero")
+        return value
+
+    @model_validator(mode="after")
+    def validate_semantics(self) -> Self:
+        if self.fraction_number > self.fraction_count:
+            raise ValueError("fraction number must not exceed fraction count")
+        expected = (
+            CollectColumnFractionAction.OPEN_COLUMN_BOTTOM_VALVE,
+            CollectColumnFractionAction.COLLECT_UNTIL_DURATION_OR_STOP,
+            CollectColumnFractionAction.CLOSE_COLUMN_BOTTOM_VALVE,
+        )
+        if self.required_action_sequence != expected:
+            raise ValueError(
+                "protected collection actions must exactly match open, collect, close"
+            )
+        return self
+
+
+class MoveCarouselToNextFractionOperation(BaseModel):
+    """One logical carousel advance after a successfully closed collection.
+
+    A failed movement leaves the valve logically closed, blocks the next fraction,
+    and is propagated through the executor's existing fault mechanism.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    operation_kind: Literal[OperationKind.MOVE_CAROUSEL_TO_NEXT_FRACTION]
+    operation_number: StrictInt = Field(ge=1)
+    fraction_count: StrictInt = Field(ge=2)
+    source_fraction_number: StrictInt = Field(ge=1)
+    destination_fraction_number: StrictInt = Field(ge=2)
+    requires_successful_collection: Literal[True]
+    requires_column_bottom_valve_closed: Literal[True]
+    movement_failure_leaves_column_bottom_valve_closed: Literal[True]
+    movement_failure_marks_carousel_position_untrusted: Literal[True]
+    movement_failure_blocks_next_fraction: Literal[True]
+    movement_failure_uses_existing_fault_mechanism: Literal[True]
+
+    @model_validator(mode="after")
+    def validate_positions(self) -> Self:
+        if self.destination_fraction_number != self.source_fraction_number + 1:
+            raise ValueError("carousel destination must be the next fraction")
+        if self.destination_fraction_number > self.fraction_count:
+            raise ValueError("carousel destination must not exceed fraction count")
+        return self
 
 
 class PrepareSfToColumnTransferOperation(BaseModel):
@@ -193,7 +305,10 @@ PlannedOperation = Annotated[
     | AspirateOperation
     | DispenseOperation
     | PrepareSfToColumnTransferOperation
-    | AspirateFromSfOperation,
+    | AspirateFromSfOperation
+    | PrepareColumnFractionCollectionOperation
+    | CollectColumnFractionOperation
+    | MoveCarouselToNextFractionOperation,
     Field(discriminator="operation_kind"),
 ]
 
