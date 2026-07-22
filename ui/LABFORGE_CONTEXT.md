@@ -665,27 +665,85 @@ Backend repository:
 
 Current completed backend branch and commit:
 
-    codex/guided-demo-p2-reactor-to-sf-operation-plan
-    ec68655 Add P2 reactor-to-SF operation plan
+    codex/guided-demo-p2-sf-to-column-operation-plan
+    2c18f0a460ec655bd69d917461feeda031717a07
+    2c18f0a Add P2 SF-to-Column operation plan
 
-The full backend test suite reports `492 passed`.
+Accepted verification for this commit:
+
+    508 passed
+    .venv/bin/ruff check . -> All checks passed!
+    git diff --check -> passed
+
+No push or merge was reported.
 
 Completed symbolic operation plans:
 
 - `P1` solvent to Reactor
 - `P1` `B1`/`B2` reagent transfers to Reactor
 - `P2` Reactor to `SF`
+- `P2` `SF` to Column
 
-These symbolic plans are planning artifacts, not permission or proof of hardware execution. The next planned backend task is a safety-aware symbolic operation plan for `P2_TRANSFER_SF_TO_COLUMN`. It must eventually represent:
+These symbolic plans are planning artifacts, not a hardware executor and not permission or proof of hardware execution.
 
-- `COLUMN_BOTTOM_VALVE` closed during Column filling
-- `SF_BOTTOM_VALVE` closed initially
-- `SF_BOTTOM_VALVE` opened only for `P2` aspiration
-- `SF_BOTTOM_VALVE` closed before route switching and dispensing
-- all nominal `SF` contents sent to the Column
-- no measured-volume, `SF`-empty, or automatic-phase-detection claim
+The completed `P2_TRANSFER_SF_TO_COLUMN` operation plan adds the logical routes `SF_BOTTOM_TO_P2` and `P2_TO_COLUMN`. These are logical route identifiers only; physical valve angles, Arduino pins, and motor steps are not part of the plan.
 
-The safety semantics of `Stop` and the exact operation grouping are not implemented and must not be described as completed.
+The exact scheduler-visible sequence is:
+
+    PREPARE_SF_TO_COLUMN_TRANSFER
+
+    for each transfer cycle:
+        SELECT_ROUTE SF_BOTTOM_TO_P2
+        ASPIRATE_FROM_SF cycle_volume
+        SELECT_ROUTE P2_TO_COLUMN
+        DISPENSE P2 cycle_volume
+
+`PREPARE_SF_TO_COLUMN_TRANSFER` is one protected scheduler operation with the required internal sequence:
+
+    SET SF_BOTTOM_VALVE CLOSED
+    SET COLUMN_BOTTOM_VALVE CLOSED
+
+There is no normal Stop checkpoint between those two actions. `SF_BOTTOM_VALVE` closes first because `SF` nominally contains liquid and presents the more immediate gravity-flow risk.
+
+`ASPIRATE_FROM_SF` is one protected scheduler operation for every `P2` aspiration cycle, with the required internal sequence:
+
+    OPEN SF_BOTTOM_VALVE
+    ASPIRATE P2 cycle volume
+    CLOSE SF_BOTTOM_VALVE
+
+There is no normal Stop checkpoint inside this operation. `SF_BOTTOM_VALVE` opens and closes during every aspiration cycle; it does not remain open during route switching or dispensing. `COLUMN_BOTTOM_VALVE` remains closed throughout this phase, and no Waste route is used.
+
+The requested nominal transfer volume is `fluid_plan.total_configured_volume_ml`. It remains a nominal open-loop value, not measured delivered volume. Successful completion must not be described as proof that `SF` is physically empty, measured delivery, automatic phase-boundary detection, or actual phase separation.
+
+Normal `Stop demo` semantics apply at scheduler-operation boundaries: the current scheduler operation may finish, but the next scheduler operation must not start. Therefore:
+
+- Stop during `PREPARE_SF_TO_COLUMN_TRANSFER` allows both required close actions to finish.
+- Stop before `ASPIRATE_FROM_SF` does not begin aspiration.
+- Stop during `ASPIRATE_FROM_SF` allows valve opening, aspiration, and the required close to finish.
+- After that Stop, `SELECT_ROUTE P2_TO_COLUMN` and `DISPENSE` do not begin.
+- `P2` may remain nominally full after an aborted protected aspiration; the system must not dispense merely to empty `P2` after Stop.
+- Stop during an already-started dispense may allow that dispense to finish, but no next cycle begins.
+- After normal abort, the existing lifecycle remains run `ABORTED` and machine `FLUSH_REQUIRED`.
+
+A failed required close is not a successful normal abort. A future executor must fail the protected operation, block route switching and dispensing, stop further plan execution, and propagate a fault. No completed machine-level fault-state redesign is claimed. The exact machine recovery/fault transition remains unresolved and must be completed before hardware execution.
+
+There are no independent valve-position feedback sensors. For the low-risk colored-liquid Guided Demo, after a valve command reports successful completion, software deliberately treats the valve as actually `OPEN` or `CLOSED`. This assumption does not prove physical movement and is not automatically acceptable for serious chemistry.
+
+For `P2_TRANSFER_SF_TO_COLUMN`, zero cycles are a validation error. A zero-volume or zero-cycle request must not succeed as an empty plan, become a close-only transfer plan, or continue toward fraction collection without transferring liquid. The generic `TransferCyclePlan` behavior was not globally changed.
+
+### Next backend safety-design task: `COLUMN_FRACTION_COLLECTION`
+
+The next task is functional and safety design only for `COLUMN_FRACTION_COLLECTION`; it is not implemented or fully designed here. The already accepted high-level intent is:
+
+1. Open `COLUMN_BOTTOM_VALVE`.
+2. Collect for the Service-configured fraction duration.
+3. Close `COLUMN_BOTTOM_VALVE`.
+4. Move the carousel.
+5. Reopen only after carousel motion completes.
+6. Never move the carousel while the outlet is open.
+7. Leave the outlet closed after the final fraction.
+
+Fraction count and fraction duration are Service-configured. Before implementation, discuss protected Stop boundaries around Column valve opening, collection, and closing; Stop while collecting; Column close failure; carousel movement failure; fraction timing semantics; the final-fraction completion race; zero-fraction configuration; whether more protected compound operations are required; exact logical state retained after abort; and interaction with `FLUSH_REQUIRED`.
 
 ### Firmware and hardware development
 
