@@ -220,34 +220,56 @@ Preserve this visual flow:
 
 ## Current physical machine state
 
-The machine has not yet been rewired to the approved LabForge v1 P1 topology. Its current physical P1 wiring is:
+As explicitly confirmed by the user on 2026-07-21, the physical tubing has been connected according to the approved LabForge v1 target topology. The confirmed present physical topology is:
 
-    B1 -> V4.k2
-    S1 -> V4.k3
-    V4.k1 -> V6.k3
+    V1.k1 <-> P1
+    V1.k2 <-> V2.k1
+    V1.k3 <-> V6.k1
 
-    B2 -> V5.k2
-    S2 -> V5.k3
-    V5.k1 -> V6.k2
+    V2.k1 <-> V1.k2
+    V2.k2 <-> shared Waste
+    V2.k3 <-> Reactor R_IN
 
-    V6.k1 -> V1.k3
-    P1 -> V1.k1
-    V1.k2 -> V2.k1
+    V3.k1 <-> P2
+    V3.k2 <-> V7.k1
+    V3.k3 <-> Reactor R_OUT
 
-    V2.k3 -> Reactor
-    V2.k2 -> Waste
+    V4.k1 <-> V6.k3
+    V4.k2 <-> B1
+    V4.k3 <-> B2
 
-The current physical V3 mapping is:
+    V5.k1 <-> V8.k3
+    V5.k2 <-> shared Waste
+    V5.k3 <-> Column inlet
 
-    P2 -> V3.k1
-    V3.k2 -> free / not connected
-    Reactor R_OUT -> V3.k3
+    V6.k1 <-> V1.k3
+    V6.k2 <-> shared solvent S
+    V6.k3 <-> V4.k1
 
-The physical `P2` and `Reactor R_OUT` port assignments already align with the current UI and approved target topology, but `V3.k2` is not yet physically connected to `V7.k1`.
+    V7.k1 <-> V3.k2
+    V7.k2 <-> SF_TOP_IN
+    V7.k3 <-> V8.k1
+
+    V8.k1 <-> V7.k3
+    V8.k2 <-> SF_BOTTOM_OUT
+    V8.k3 <-> V5.k1
+
+The confirmed bottom paths are:
+
+    SF bottom
+      -> SF_BOTTOM_VALVE
+      -> SF_BOTTOM_OUT
+      -> V8.k2
+
+    Column bottom
+      -> COLUMN_BOTTOM_VALVE
+      -> Fractions / carousel
+
+There is one shared Waste destination. The Column bottom does not connect to Waste.
 
 ## Approved target LabForge v1 topology
 
-The approved target uses one shared Waste destination and one shared solvent source `S`. This is the target topology, not the current physical P1 wiring.
+The approved logical topology uses one shared Waste destination and one shared solvent source `S`. The user-confirmed present physical tubing topology now matches this approved target. This agreement does not by itself verify valve angles, actuation, liquid delivery, calibration, interlocks, or end-to-end execution.
 
 ### Target P1 reagent / solvent loading branch
 
@@ -303,7 +325,7 @@ Functional meaning:
 
 ## UI implementation status
 
-The current UI already represents the approved target LabForge v1 topology for both P1 and P2. In particular, it shows `B2 -> V4.k3`, one shared solvent source `S -> V6.k2`, and `V5` in the P2 branch. The UI therefore does not represent the machine's still-current physical P1 wiring.
+The current UI represents the approved target LabForge v1 topology for both P1 and P2. In particular, it shows `B2 -> V4.k3`, one shared solvent source `S -> V6.k2`, and `V5` in the P2 branch. The user-confirmed present physical tubing topology now matches this representation.
 
 The V3 mapping shown in the UI represents the approved target topology:
 
@@ -311,18 +333,21 @@ The V3 mapping shown in the UI represents the approved target topology:
     P2 -> V3.k1
     V3.k2 -> V7.k1
 
-## Pending physical rewiring
+## Pending physical verification and commissioning
 
-To align the physical machine with the approved target LabForge v1 topology:
+The physical tubing rewiring is reported complete and explicitly confirmed by the user. The following remain separate pending checks and must not be inferred from that confirmation:
 
-- remove `S1` from `V4.k3`
-- move `B2` from `V5.k2` to `V4.k3`
-- disconnect `V5.k1` from `V6.k2`
-- connect one shared solvent source `S` directly to `V6.k2`
-- free `V5` for the P2 branch
-- connect `V3.k2` to `V7.k1`
+- leak testing
+- individual route testing with liquid
+- verification of every valve angle and physical route
+- verification of `SF_BOTTOM_VALVE` actuation
+- verification of `COLUMN_BOTTOM_VALVE` actuation
+- pump volumetric calibration
+- safe execution interlocks
+- end-to-end hardware execution
+- automatic phase detection
 
-Until this rewiring is completed and confirmed, the approved target P1 topology must not be described as the current physical topology.
+The confirmed topology is not hardware execution permission. Symbolic backend operation plans also do not authorize hardware execution.
 
 ### Shared Waste and screening workflow
 
@@ -459,7 +484,7 @@ Current pump symbols are acceptable as early placeholders, but later they should
 
 ## Physical topology protection
 
-The current physical topology is documented above in "Current fluid topology".
+The current physical topology is documented above in "Current physical machine state".
 
 Preserve these high-level constraints:
 
@@ -538,7 +563,7 @@ The complete normal interface remains in the repository. Dashboard, Protocol Bui
 
 Guided Demo is intended for one authorized remote user to configure and observe one real-time run using colored, low-risk liquids. The current implementation remains frontend-only and does not control hardware.
 
-The intended real demo uses one run, `B1`, `B2`, shared solvent `S`, `P1` transfer into the Reactor, Reactor mixing, `P2` transfer from the Reactor into `SF`, SF mixing, a Reactor camera, and an Overview camera. Physical heating is disabled. Temperature remains a simulated/display-only parameter for demonstrating future UI behavior; it must not produce a heater command.
+The intended real demo uses one run, `B1`, `B2`, shared solvent `S`, `P1` transfer into the Reactor, Reactor mixing, `P2` transfer from the Reactor into `SF`, SF mixing, SF settling, nominal transfer of all SF contents to the Column, Column fraction collection, a Reactor camera, and an Overview camera. The system must not claim automatic phase detection, actual phase separation, or measured delivered volume. Physical heating is disabled. Temperature remains a simulated/display-only parameter for demonstrating future UI behavior; it must not produce a heater command.
 
 The ten configured parameters are:
 
@@ -555,23 +580,22 @@ The ten configured parameters are:
 
 The system calculates B1 volume, B2 volume, S volume, and total volume. The current ratio is a volume ratio, not a molar ratio, because stock concentrations are not configured.
 
-The thirteen high-level phases are:
+The current top-level backend phase model is:
 
-1. Ready
-2. Aspirate S into P1
-3. Dispense S to Reactor
-4. Aspirate first selected liquid into P1
-5. Dispense first selected liquid to Reactor
-6. Delay between additions
-7. Aspirate second selected liquid into P1
-8. Dispense second selected liquid to Reactor
-9. Reaction hold
-10. Aspirate Reactor contents into P2
-11. Dispense P2 into SF
-12. SF mixing
-13. Completed
+1. `READY`
+2. `P1_TRANSFER_S_TO_REACTOR`
+3. `P1_TRANSFER_FIRST_LIQUID_TO_REACTOR`
+4. `DELAY_BETWEEN_ADDITIONS`
+5. `P1_TRANSFER_SECOND_LIQUID_TO_REACTOR`
+6. `REACTION_HOLD`
+7. `P2_TRANSFER_REACTOR_TO_SF`
+8. `SF_MIXING`
+9. `SF_SETTLING`
+10. `P2_TRANSFER_SF_TO_COLUMN`
+11. `COLUMN_FRACTION_COLLECTION`
+12. `COMPLETED`
 
-The first and second liquids depend on the selected B1/B2 addition order. `P1` and `P2` remain syringe pumps with separate aspiration and dispense phases and must never be treated as inline pumps.
+`P1` and `P2` are syringe pumps. Aspirate and dispense remain separate symbolic and physical operations inside the relevant transfer phase; they are no longer represented as separate top-level `RunPhase` values. The first and second liquid identities still depend on `AdditionOrder`.
 
 ### Parameter locking and phase permissions
 
@@ -579,7 +603,7 @@ After physical execution starts, permanently lock the B1:B2 ratio, total mixture
 
 Phase-dependent controls are:
 
-- Addition speed: editable only during P1 dispense-to-Reactor phases.
+- Addition speed: editable only during `P1_TRANSFER_FIRST_LIQUID_TO_REACTOR` and `P1_TRANSFER_SECOND_LIQUID_TO_REACTOR`.
 - Reactor mixing: editable during Reactor-related phases.
 - Delay: editable only during the delay phase.
 - Simulated temperature: editable only during Reaction hold.
@@ -588,9 +612,22 @@ Phase-dependent controls are:
 
 The preferred UI convention for unavailable controls is a disabled control, a visible lock icon, and a short explanation. A color change is optional. The backend must independently enforce all locks and phase permissions; frontend disabled state is not a safety boundary.
 
-### Topology and pending hardware confirmation
+### Topology and pending hardware verification
 
-Guided Demo displays the complete approved target P1 and P2/SF topology. The approved target topology and Guided Demo workflow are defined. The user intends to connect the physical P2/SF branch according to that design and expects this work shortly, but final physical connection and detailed verification remain pending user confirmation. Do not record the physical P2/SF installation as verified until that confirmation exists.
+Guided Demo displays the complete approved target P1 and P2/SF topology. The user explicitly confirmed on 2026-07-21 that the physical tubing, including `V3.k2 <-> V7.k1`, has been connected according to that topology. Leak testing, liquid route testing, every valve angle and route, bottom-valve actuation, calibration, interlocks, and end-to-end hardware execution remain pending verification.
+
+### Guided Demo SF-to-Column workflow decisions — 2026-07-22
+
+- `SF` is unpressurized.
+- Fill `SF` through `SF_TOP_IN` while `SF_BOTTOM_VALVE` is closed.
+- Open `SF_BOTTOM_VALVE` only during aspiration from `SF`.
+- Close `SF_BOTTOM_VALVE` before route switching and dispensing.
+- Keep `COLUMN_BOTTOM_VALVE` closed while the Column is being filled.
+- Open `COLUMN_BOTTOM_VALVE` only during `COLUMN_FRACTION_COLLECTION`.
+- Send all nominal `SF` contents to the Column in the current Guided Demo; there is no split to Waste.
+- Do not claim automatic phase detection or actual phase separation.
+- Keep the Reactor mixer OFF before, during, and after `P2_TRANSFER_REACTOR_TO_SF`.
+- Transfer volumes are nominal open-loop values, not measured delivered volumes.
 
 ### Demo Log and persistence scope
 
@@ -619,6 +656,36 @@ The current project organization plan uses three neighboring but separate Git re
 - `~/Documents/labforge-firmware`
 
 Together they form one LabForge system, but they are not currently planned as one Git repository.
+
+### Current backend planning progress — 2026-07-22
+
+Backend repository:
+
+    ~/Documents/labforge-backend
+
+Current completed backend branch and commit:
+
+    codex/guided-demo-p2-reactor-to-sf-operation-plan
+    ec68655 Add P2 reactor-to-SF operation plan
+
+The full backend test suite reports `492 passed`.
+
+Completed symbolic operation plans:
+
+- `P1` solvent to Reactor
+- `P1` `B1`/`B2` reagent transfers to Reactor
+- `P2` Reactor to `SF`
+
+These symbolic plans are planning artifacts, not permission or proof of hardware execution. The next planned backend task is a safety-aware symbolic operation plan for `P2_TRANSFER_SF_TO_COLUMN`. It must eventually represent:
+
+- `COLUMN_BOTTOM_VALVE` closed during Column filling
+- `SF_BOTTOM_VALVE` closed initially
+- `SF_BOTTOM_VALVE` opened only for `P2` aspiration
+- `SF_BOTTOM_VALVE` closed before route switching and dispensing
+- all nominal `SF` contents sent to the Column
+- no measured-volume, `SF`-empty, or automatic-phase-detection claim
+
+The safety semantics of `Stop` and the exact operation grouping are not implemented and must not be described as completed.
 
 ### Firmware and hardware development
 
