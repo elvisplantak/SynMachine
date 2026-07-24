@@ -15,5 +15,5 @@
 - Frontend disabled controls are not a hardware safety boundary.
 - P1 and P2 are syringe pumps with separate aspiration and dispense operations, never inline pumps.
 - Do not invent pins, valve ports, sensors, calibration values, or hardware capabilities.
-- P1 has a confirmed physical orientation documented in `HARDWARE_CONFIRMATIONS.md`. P2 orientation remains unconfirmed until physically tested.
+- P1 and P2 have the same confirmed physical orientation documented in `HARDWARE_CONFIRMATIONS.md`.
 - Pump homing may move fluid and therefore requires a verified safe fluidic route.
