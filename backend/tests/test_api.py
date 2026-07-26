@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime
 from json import dumps, loads
 from pathlib import Path
 from socket import AF_INET, SOCK_STREAM, socket
@@ -12,6 +13,13 @@ from fastapi import FastAPI
 from uvicorn import Config, Server
 
 import app.main as main_module
+from app.demo.machine_lifecycle import (
+    complete_startup,
+    create_machine,
+    record_runtime_hardware_fault,
+    start_run as start_machine_run,
+)
+from app.demo.machine_models import RuntimeHardwareFaultReason
 from app.demo.phases import RunPhase
 from app.main import create_app
 from app.persistence.sqlite_store import SQLiteStore
@@ -163,6 +171,9 @@ def test_machine_endpoints_are_explicit_and_persist_each_state(client: ApiClient
     initialized = client.post(f"{API}/machine/initialize", json=AWARE_COMMAND)
     assert initialized.status_code == 200
     assert initialized.json()["state"] == "STARTING"
+    assert initialized.json()["runtime_fault_reason"] is None
+    assert initialized.json()["hardware_outcome_unknown"] is False
+    assert initialized.json()["carousel_position_untrusted"] is False
     assert client.get(f"{API}/machine").json()["state"] == "STARTING"
 
     ready = client.post(f"{API}/machine/startup/complete", json=AWARE_COMMAND)
@@ -172,6 +183,38 @@ def test_machine_endpoints_are_explicit_and_persist_each_state(client: ApiClient
     assert client.get(f"{API}/machine").json()["state"] == "FLUSHING"
     completed = client.post(f"{API}/machine/flush/complete", json=AWARE_COMMAND)
     assert completed.json()["state"] == "READY"
+
+
+def test_persisted_runtime_hardware_fault_is_serialized_truthfully(
+    database: Path,
+) -> None:
+    created = create_machine(datetime.fromisoformat(AWARE_COMMAND["occurred_at"]))
+    ready = complete_startup(created.machine, created.events[0].occurred_at)
+    busy = start_machine_run(
+        ready.machine,
+        "run-1",
+        created.events[0].occurred_at,
+    )
+    fault = record_runtime_hardware_fault(
+        busy.machine,
+        run_id="run-1",
+        occurred_at=created.events[0].occurred_at,
+        reason=RuntimeHardwareFaultReason.CAROUSEL_MOVEMENT_FAILED,
+    )
+    with SQLiteStore(database) as store:
+        for transition in (created, ready, busy, fault):
+            store.persist_machine_transition(
+                transition.machine,
+                transition.events,
+            )
+
+    with ApiClient(create_app(database)) as client:
+        body = client.get(f"{API}/machine").json()
+
+    assert body["state"] == "RECOVERY_REQUIRED"
+    assert body["runtime_fault_reason"] == "CAROUSEL_MOVEMENT_FAILED"
+    assert body["hardware_outcome_unknown"] is True
+    assert body["carousel_position_untrusted"] is True
 
 
 def test_duplicate_initialize_and_invalid_machine_state_are_409_without_writes(

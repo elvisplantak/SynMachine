@@ -13,10 +13,15 @@ from app.demo.machine_lifecycle import (
     complete_stop_demo,
     create_machine,
     detect_interrupted_startup,
+    record_runtime_hardware_fault,
     start_flush,
     start_run,
 )
-from app.demo.machine_models import MachineSnapshot, MachineState
+from app.demo.machine_models import (
+    MachineSnapshot,
+    MachineState,
+    RuntimeHardwareFaultReason,
+)
 
 NOW = datetime(2026, 7, 18, 12, 0, tzinfo=UTC)
 
@@ -37,12 +42,27 @@ def recovering_machine(run_id: str = "run-interrupted") -> MachineSnapshot:
     return detect_interrupted_startup(starting_machine(), run_id, NOW).machine
 
 
+def recovery_required_machine(run_id: str = "run-1") -> MachineSnapshot:
+    return record_runtime_hardware_fault(
+        busy_machine(run_id),
+        run_id=run_id,
+        occurred_at=NOW,
+        reason=RuntimeHardwareFaultReason.HARDWARE_COMMAND_FAILED,
+    ).machine
+
+
 def _machine_for_state(state: MachineState) -> MachineSnapshot:
     if state is MachineState.BUSY:
         return MachineSnapshot(
             state=state, event_sequence=10, active_run_id="run-1"
         )
-    if state in {MachineState.RECOVERING, MachineState.FLUSH_REQUIRED, MachineState.FLUSHING}:
+    if state is MachineState.RECOVERY_REQUIRED:
+        return recovery_required_machine()
+    if state in {
+        MachineState.RECOVERING,
+        MachineState.FLUSH_REQUIRED,
+        MachineState.FLUSHING,
+    }:
         return MachineSnapshot(
             state=state,
             event_sequence=10,
@@ -56,6 +76,7 @@ def test_machine_state_contains_exactly_the_agreed_values() -> None:
         "STARTING",
         "READY",
         "BUSY",
+        "RECOVERY_REQUIRED",
         "RECOVERING",
         "FLUSH_REQUIRED",
         "FLUSHING",
@@ -166,6 +187,82 @@ def test_complete_stop_demo_is_rejected_outside_busy(state: MachineState) -> Non
         complete_stop_demo(machine, "run-1", NOW)
 
 
+@pytest.mark.parametrize(
+    ("reason", "carousel_position_untrusted"),
+    [
+        (RuntimeHardwareFaultReason.HARDWARE_COMMAND_FAILED, False),
+        (RuntimeHardwareFaultReason.REQUIRED_FOLLOWUP_FAILED, False),
+        (RuntimeHardwareFaultReason.CAROUSEL_MOVEMENT_FAILED, True),
+    ],
+)
+def test_runtime_hardware_fault_requires_recovery_with_truthful_metadata(
+    reason: RuntimeHardwareFaultReason,
+    carousel_position_untrusted: bool,
+) -> None:
+    result = record_runtime_hardware_fault(
+        busy_machine(),
+        run_id=" run-1 ",
+        occurred_at=NOW,
+        reason=reason,
+    )
+
+    assert result.machine.state is MachineState.RECOVERY_REQUIRED
+    assert result.machine.active_run_id is None
+    assert result.machine.interrupted_run_id == "run-1"
+    assert result.machine.runtime_fault_reason is reason
+    assert result.machine.hardware_outcome_unknown is True
+    assert (
+        result.machine.carousel_position_untrusted
+        is carousel_position_untrusted
+    )
+    assert len(result.events) == 1
+    event = result.events[0]
+    assert event.event_type is MachineEventType.RUNTIME_HARDWARE_FAULT_DETECTED
+    assert event.machine_state is result.machine.state
+    assert event.run_id == result.machine.interrupted_run_id
+    assert event.runtime_fault_reason is result.machine.runtime_fault_reason
+    assert event.hardware_outcome_unknown is result.machine.hardware_outcome_unknown
+    assert (
+        event.carousel_position_untrusted
+        is result.machine.carousel_position_untrusted
+    )
+    assert event.message == (
+        "Runtime hardware fault detected; Service recovery is required"
+    )
+    assert event.reason is None
+
+
+@pytest.mark.parametrize("run_id", ["", "   ", "run-other"])
+def test_runtime_hardware_fault_requires_matching_non_empty_run_id(
+    run_id: str,
+) -> None:
+    with pytest.raises(MachineTransitionError):
+        record_runtime_hardware_fault(
+            busy_machine(),
+            run_id=run_id,
+            occurred_at=NOW,
+            reason=RuntimeHardwareFaultReason.HARDWARE_COMMAND_FAILED,
+        )
+
+
+@pytest.mark.parametrize(
+    "state", [state for state in MachineState if state is not MachineState.BUSY]
+)
+def test_runtime_hardware_fault_is_rejected_outside_busy(
+    state: MachineState,
+) -> None:
+    with pytest.raises(
+        MachineTransitionError,
+        match=f"record runtime hardware fault.*{state.value}",
+    ):
+        record_runtime_hardware_fault(
+            _machine_for_state(state),
+            run_id="run-1",
+            occurred_at=NOW,
+            reason=RuntimeHardwareFaultReason.HARDWARE_COMMAND_FAILED,
+        )
+
+
 def test_interrupted_startup_emits_ordered_recovery_events() -> None:
     result = detect_interrupted_startup(
         starting_machine(), "run-interrupted", NOW, reason="Unclean shutdown marker"
@@ -238,7 +335,13 @@ def test_flush_may_start_from_ready_or_flush_required(state: MachineState) -> No
 
 @pytest.mark.parametrize(
     "state",
-    [MachineState.STARTING, MachineState.BUSY, MachineState.RECOVERING, MachineState.FLUSHING],
+    [
+        MachineState.STARTING,
+        MachineState.BUSY,
+        MachineState.RECOVERY_REQUIRED,
+        MachineState.RECOVERING,
+        MachineState.FLUSHING,
+    ],
 )
 def test_flush_is_rejected_from_disallowed_states(state: MachineState) -> None:
     machine = _machine_for_state(state)
@@ -287,6 +390,48 @@ def test_ready_snapshot_rejects_active_run_id() -> None:
             "RECOVERING requires interrupted_run_id",
         ),
         (
+            {"state": MachineState.RECOVERY_REQUIRED, "event_sequence": 1},
+            "RECOVERY_REQUIRED requires interrupted_run_id",
+        ),
+        (
+            {
+                "state": MachineState.RECOVERY_REQUIRED,
+                "event_sequence": 1,
+                "interrupted_run_id": "run-1",
+            },
+            "RECOVERY_REQUIRED requires runtime_fault_reason",
+        ),
+        (
+            {
+                "state": MachineState.RECOVERY_REQUIRED,
+                "event_sequence": 1,
+                "interrupted_run_id": "run-1",
+                "runtime_fault_reason": RuntimeHardwareFaultReason.HARDWARE_COMMAND_FAILED,
+            },
+            "RECOVERY_REQUIRED requires hardware_outcome_unknown",
+        ),
+        (
+            {
+                "state": MachineState.RECOVERY_REQUIRED,
+                "event_sequence": 1,
+                "interrupted_run_id": "run-1",
+                "runtime_fault_reason": RuntimeHardwareFaultReason.CAROUSEL_MOVEMENT_FAILED,
+                "hardware_outcome_unknown": True,
+            },
+            "carousel_position_untrusted must match",
+        ),
+        (
+            {
+                "state": MachineState.RECOVERY_REQUIRED,
+                "event_sequence": 1,
+                "interrupted_run_id": "run-1",
+                "runtime_fault_reason": RuntimeHardwareFaultReason.HARDWARE_COMMAND_FAILED,
+                "hardware_outcome_unknown": True,
+                "carousel_position_untrusted": True,
+            },
+            "carousel_position_untrusted must match",
+        ),
+        (
             {
                 "state": MachineState.RECOVERING,
                 "event_sequence": 1,
@@ -333,6 +478,32 @@ def test_machine_snapshot_rejects_invalid_domain_invariants(
     snapshot_data: dict, message: str
 ) -> None:
     with pytest.raises(ValidationError, match=message):
+        MachineSnapshot(**snapshot_data)
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        {"runtime_fault_reason": RuntimeHardwareFaultReason.HARDWARE_COMMAND_FAILED},
+        {"hardware_outcome_unknown": True},
+        {"carousel_position_untrusted": True},
+    ],
+)
+@pytest.mark.parametrize(
+    "state",
+    [state for state in MachineState if state is not MachineState.RECOVERY_REQUIRED],
+)
+def test_existing_states_reject_runtime_fault_metadata(
+    state: MachineState,
+    metadata: dict,
+) -> None:
+    snapshot_data = _machine_for_state(state).model_dump()
+    snapshot_data.update(metadata)
+
+    with pytest.raises(
+        ValidationError,
+        match=f"{state.value} requires default runtime fault metadata",
+    ):
         MachineSnapshot(**snapshot_data)
 
 
@@ -428,6 +599,15 @@ def _complete_stop_demo(machine: MachineSnapshot):
     return complete_stop_demo(machine, "run-1", NOW)
 
 
+def _record_runtime_hardware_fault(machine: MachineSnapshot):
+    return record_runtime_hardware_fault(
+        machine,
+        run_id="run-1",
+        occurred_at=NOW,
+        reason=RuntimeHardwareFaultReason.HARDWARE_COMMAND_FAILED,
+    )
+
+
 def _complete_recovery(machine: MachineSnapshot):
     return complete_recovery(machine, NOW)
 
@@ -453,6 +633,11 @@ TRANSITION_OPERATIONS = (
         "complete Stop demo",
         _complete_stop_demo,
         {MachineState.BUSY: MachineState.FLUSH_REQUIRED},
+    ),
+    (
+        "record runtime hardware fault",
+        _record_runtime_hardware_fault,
+        {MachineState.BUSY: MachineState.RECOVERY_REQUIRED},
     ),
     (
         "complete recovery",

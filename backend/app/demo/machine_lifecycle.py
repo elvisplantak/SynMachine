@@ -3,7 +3,11 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from app.demo.machine_events import MachineEvent, MachineEventType
-from app.demo.machine_models import MachineSnapshot, MachineState
+from app.demo.machine_models import (
+    MachineSnapshot,
+    MachineState,
+    RuntimeHardwareFaultReason,
+)
 
 
 class MachineTransitionResult(BaseModel):
@@ -58,6 +62,9 @@ def _event(
     message: str,
     run_id: str | None = None,
     reason: str | None = None,
+    runtime_fault_reason: RuntimeHardwareFaultReason | None = None,
+    hardware_outcome_unknown: bool = False,
+    carousel_position_untrusted: bool = False,
 ) -> MachineEvent:
     return MachineEvent(
         sequence_number=machine.event_sequence + offset,
@@ -67,6 +74,9 @@ def _event(
         run_id=run_id,
         message=message,
         reason=reason,
+        runtime_fault_reason=runtime_fault_reason,
+        hardware_outcome_unknown=hardware_outcome_unknown,
+        carousel_position_untrusted=carousel_position_untrusted,
     )
 
 
@@ -77,12 +87,18 @@ def _result(
     events: tuple[MachineEvent, ...],
     active_run_id: str | None = None,
     interrupted_run_id: str | None = None,
+    runtime_fault_reason: RuntimeHardwareFaultReason | None = None,
+    hardware_outcome_unknown: bool = False,
+    carousel_position_untrusted: bool = False,
 ) -> MachineTransitionResult:
     updated_machine = MachineSnapshot(
         state=state,
         event_sequence=machine.event_sequence + len(events),
         active_run_id=active_run_id,
         interrupted_run_id=interrupted_run_id,
+        runtime_fault_reason=runtime_fault_reason,
+        hardware_outcome_unknown=hardware_outcome_unknown,
+        carousel_position_untrusted=carousel_position_untrusted,
     )
     return MachineTransitionResult(machine=updated_machine, events=events)
 
@@ -177,6 +193,48 @@ def complete_stop_demo(
         message="Stop demo completed after the current atomic operation",
     )
     return _result(machine, state=MachineState.FLUSH_REQUIRED, events=(event,))
+
+
+def record_runtime_hardware_fault(
+    machine: MachineSnapshot,
+    *,
+    run_id: str,
+    occurred_at: datetime,
+    reason: RuntimeHardwareFaultReason,
+) -> MachineTransitionResult:
+    if machine.state is not MachineState.BUSY:
+        raise _reject(
+            "record runtime hardware fault",
+            machine,
+            "runtime hardware fault requires BUSY",
+        )
+    normalized_run_id = _require_active_run(
+        "record runtime hardware fault", machine, run_id
+    )
+    carousel_position_untrusted = (
+        reason is RuntimeHardwareFaultReason.CAROUSEL_MOVEMENT_FAILED
+    )
+    event = _event(
+        machine,
+        offset=1,
+        occurred_at=occurred_at,
+        event_type=MachineEventType.RUNTIME_HARDWARE_FAULT_DETECTED,
+        state=MachineState.RECOVERY_REQUIRED,
+        run_id=normalized_run_id,
+        message="Runtime hardware fault detected; Service recovery is required",
+        runtime_fault_reason=reason,
+        hardware_outcome_unknown=True,
+        carousel_position_untrusted=carousel_position_untrusted,
+    )
+    return _result(
+        machine,
+        state=MachineState.RECOVERY_REQUIRED,
+        interrupted_run_id=normalized_run_id,
+        runtime_fault_reason=reason,
+        hardware_outcome_unknown=True,
+        carousel_position_untrusted=carousel_position_untrusted,
+        events=(event,),
+    )
 
 
 def detect_interrupted_startup(

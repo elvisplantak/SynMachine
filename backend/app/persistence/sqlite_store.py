@@ -266,10 +266,32 @@ class SQLiteStore:
     def _validate_machine_transition(
         machine: MachineSnapshot, events: Sequence[MachineEvent]
     ) -> None:
-        if events and events[-1].machine_state != machine.state:
-            raise PersistenceConflictError(
-                "final machine event state does not match snapshot state"
+        if events:
+            final_event = events[-1]
+            comparisons = (
+                ("state", final_event.machine_state, machine.state),
+                (
+                    "runtime_fault_reason",
+                    final_event.runtime_fault_reason,
+                    machine.runtime_fault_reason,
+                ),
+                (
+                    "hardware_outcome_unknown",
+                    final_event.hardware_outcome_unknown,
+                    machine.hardware_outcome_unknown,
+                ),
+                (
+                    "carousel_position_untrusted",
+                    final_event.carousel_position_untrusted,
+                    machine.carousel_position_untrusted,
+                ),
             )
+            for field_name, event_value, snapshot_value in comparisons:
+                if event_value != snapshot_value:
+                    raise PersistenceConflictError(
+                        f"final machine event {field_name} does not match "
+                        f"snapshot {field_name}"
+                    )
 
     def _initialize_or_validate_schema(self) -> None:
         version = self._connection.execute("PRAGMA user_version").fetchone()[0]

@@ -6,14 +6,15 @@ from decimal import Decimal
 import pytest
 
 from app.demo.events import DomainEvent
-from app.demo.lifecycle import create_demo_run, start_run
+from app.demo.lifecycle import create_demo_run, fault_run, start_run
 from app.demo.machine_events import MachineEvent
 from app.demo.machine_lifecycle import (
     complete_startup,
     create_machine,
+    record_runtime_hardware_fault,
     start_run as start_machine_run,
 )
-from app.demo.machine_models import MachineState
+from app.demo.machine_models import MachineState, RuntimeHardwareFaultReason
 from app.demo.models import AdditionOrder, DemoConfiguration, DemoExecutionSettings
 from app.demo.phases import RunPhase
 from app.demo.run_models import RunStatus
@@ -88,6 +89,75 @@ def test_machine_snapshot_round_trip() -> None:
         assert store.load_machine_snapshot() == created.machine
 
 
+def test_runtime_hardware_fault_snapshot_and_event_round_trip() -> None:
+    created = create_machine(NOW)
+    ready = complete_startup(created.machine, NOW)
+    busy = start_machine_run(ready.machine, "run-1", NOW)
+    fault = record_runtime_hardware_fault(
+        busy.machine,
+        run_id="run-1",
+        occurred_at=NOW,
+        reason=RuntimeHardwareFaultReason.CAROUSEL_MOVEMENT_FAILED,
+    )
+
+    with SQLiteStore() as store:
+        for transition in (created, ready, busy, fault):
+            store.persist_machine_transition(
+                transition.machine,
+                transition.events,
+            )
+
+        assert store.load_machine_snapshot() == fault.machine
+        assert store.load_events("MACHINE", "machine")[-1] == fault.events[0]
+
+
+def test_legacy_machine_snapshot_and_event_json_use_runtime_fault_defaults(
+    tmp_path,
+) -> None:
+    database = tmp_path / "legacy-machine-json.db"
+    created = create_machine(NOW)
+    with SQLiteStore(database) as store:
+        store.persist_machine_transition(created.machine, created.events)
+
+    with sqlite3.connect(database) as connection:
+        snapshot_payload = json.loads(
+            connection.execute(
+                "SELECT snapshot_json FROM machine_snapshot"
+            ).fetchone()[0]
+        )
+        event_payload = json.loads(
+            connection.execute(
+                "SELECT payload_json FROM domain_events"
+            ).fetchone()[0]
+        )
+        for payload in (snapshot_payload, event_payload):
+            payload.pop("runtime_fault_reason")
+            payload.pop("hardware_outcome_unknown")
+            payload.pop("carousel_position_untrusted")
+        connection.execute(
+            "UPDATE machine_snapshot SET snapshot_json = ?",
+            (json.dumps(snapshot_payload),),
+        )
+        connection.execute(
+            "UPDATE domain_events SET payload_json = ?",
+            (json.dumps(event_payload),),
+        )
+
+    with SQLiteStore(database) as store:
+        loaded_machine = store.load_machine_snapshot()
+        loaded_event = store.load_events("MACHINE", "machine")[0]
+
+    assert loaded_machine == created.machine
+    assert loaded_event == created.events[0]
+    assert loaded_machine is not None
+    assert loaded_machine.runtime_fault_reason is None
+    assert loaded_machine.hardware_outcome_unknown is False
+    assert loaded_machine.carousel_position_untrusted is False
+    assert loaded_event.runtime_fault_reason is None
+    assert loaded_event.hardware_outcome_unknown is False
+    assert loaded_event.carousel_position_untrusted is False
+
+
 @pytest.mark.parametrize(
     ("event_update", "error"),
     [
@@ -119,6 +189,54 @@ def test_final_machine_event_must_match_snapshot_without_writing() -> None:
             store.persist_machine_transition(created.machine, (mismatched_event,))
         assert store.load_machine_snapshot() is None
         assert store.load_events() == ()
+
+
+@pytest.mark.parametrize(
+    ("event_update", "field_name"),
+    [
+        (
+            {
+                "runtime_fault_reason": (
+                    RuntimeHardwareFaultReason.HARDWARE_COMMAND_FAILED
+                )
+            },
+            "runtime_fault_reason",
+        ),
+        ({"hardware_outcome_unknown": False}, "hardware_outcome_unknown"),
+        ({"carousel_position_untrusted": False}, "carousel_position_untrusted"),
+    ],
+)
+def test_final_runtime_fault_event_metadata_must_match_snapshot_without_writing(
+    event_update: dict,
+    field_name: str,
+) -> None:
+    created = create_machine(NOW)
+    ready = complete_startup(created.machine, NOW)
+    busy = start_machine_run(ready.machine, "run-1", NOW)
+    fault = record_runtime_hardware_fault(
+        busy.machine,
+        run_id="run-1",
+        occurred_at=NOW,
+        reason=RuntimeHardwareFaultReason.CAROUSEL_MOVEMENT_FAILED,
+    )
+    mismatched_event = fault.events[-1].model_copy(update=event_update)
+
+    with SQLiteStore() as store:
+        for transition in (created, ready, busy):
+            store.persist_machine_transition(
+                transition.machine,
+                transition.events,
+            )
+        original_events = store.load_events("MACHINE", "machine")
+
+        with pytest.raises(PersistenceConflictError, match=field_name):
+            store.persist_machine_transition(
+                fault.machine,
+                (mismatched_event,),
+            )
+
+        assert store.load_machine_snapshot() == busy.machine
+        assert store.load_events("MACHINE", "machine") == original_events
 
 
 def test_run_and_machine_events_round_trip_in_mixed_append_only_table(
@@ -589,6 +707,47 @@ def test_atomic_run_and_machine_transition_succeeds(
             *started_run.events,
         )
         assert store.load_events("MACHINE", "machine")[-1] == busy_machine.events[-1]
+
+
+def test_atomic_transition_rejects_runtime_fault_metadata_conflict(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        created, ready = _persist_created_run_and_ready_machine(store, configuration)
+        started_run = start_run(created.run, NOW)
+        busy_machine = start_machine_run(ready.machine, "run-1", NOW)
+        store.persist_run_and_machine_transition(
+            started_run.run,
+            started_run.events,
+            busy_machine.machine,
+            busy_machine.events,
+        )
+        run_fault = fault_run(started_run.run, NOW, "Hardware command failed")
+        machine_fault = record_runtime_hardware_fault(
+            busy_machine.machine,
+            run_id="run-1",
+            occurred_at=NOW,
+            reason=RuntimeHardwareFaultReason.HARDWARE_COMMAND_FAILED,
+        )
+        mismatched_event = machine_fault.events[-1].model_copy(
+            update={"hardware_outcome_unknown": False}
+        )
+        original_events = store.load_events()
+
+        with pytest.raises(
+            PersistenceConflictError,
+            match="hardware_outcome_unknown",
+        ):
+            store.persist_run_and_machine_transition(
+                run_fault.run,
+                run_fault.events,
+                machine_fault.machine,
+                (mismatched_event,),
+            )
+
+        assert store.load_demo_run("run-1") == started_run.run
+        assert store.load_machine_snapshot() == busy_machine.machine
+        assert store.load_events() == original_events
 
 
 def test_atomic_transition_run_conflict_leaves_machine_unchanged(
