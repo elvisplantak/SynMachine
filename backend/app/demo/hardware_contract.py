@@ -21,6 +21,10 @@ class BottomValveState(StrEnum):
     CLOSED = "CLOSED"
 
 
+class HardwareCommandError(RuntimeError):
+    """Explicit failure reported by a hardware command implementation."""
+
+
 @dataclass(frozen=True)
 class SelectRouteCommand:
     route_id: SymbolicRouteId

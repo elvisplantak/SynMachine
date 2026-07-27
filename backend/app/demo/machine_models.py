@@ -122,6 +122,7 @@ class PhaseExecutionIntent(BaseModel):
     run_id: str
     phase: RunPhase
     claimed_at: datetime
+    start_committed_at: datetime | None = None
 
     @field_validator("execution_id")
     @classmethod
@@ -150,6 +151,26 @@ class PhaseExecutionIntent(BaseModel):
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("claimed_at must be timezone-aware")
         return value
+
+    @field_validator("start_committed_at")
+    @classmethod
+    def validate_start_committed_at(
+        cls, value: datetime | None
+    ) -> datetime | None:
+        if value is None:
+            return value
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("start_committed_at must be timezone-aware")
+        return value
+
+    @model_validator(mode="after")
+    def validate_start_commit_order(self) -> Self:
+        if (
+            self.start_committed_at is not None
+            and self.start_committed_at < self.claimed_at
+        ):
+            raise ValueError("start_committed_at must not precede claimed_at")
+        return self
 
 
 class MachineSnapshot(BaseModel):

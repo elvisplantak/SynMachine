@@ -5,9 +5,17 @@ from app.demo.column_fraction_collection_operation_plan import (
     ColumnFractionCollectionConfiguration,
     plan_column_fraction_collection_operations,
 )
-from app.demo.operation_models import PlannedOperation
+from app.demo.hardware_contract import HardwareCommandError
+from app.demo.machine_models import (
+    PhaseExecutionOutcome,
+    RuntimeHardwareFaultReason,
+)
+from app.demo.operation_models import MoveCarouselToNextFractionOperation, PlannedOperation
+from app.demo.operation_executor import ProtectedOperationError
 from app.demo.operation_plan_runner import (
+    OperationPlanExecutionError,
     OperationPlanRunner,
+    PlanRunOutcome,
     PlanRunResult,
 )
 from app.demo.p1_reagent_operation_plan import (
@@ -35,9 +43,22 @@ class ColumnFractionCollectionReadiness:
 
 
 @dataclass(frozen=True)
+class PreparedGuidedDemoPhase:
+    run_id: str
+    run_event_sequence: int
+    phase: RunPhase
+    operations: tuple[PlannedOperation, ...]
+
+
+@dataclass(frozen=True)
 class GuidedDemoPhaseExecutionResult:
     phase: RunPhase
-    plan_run_result: PlanRunResult
+    outcome: PhaseExecutionOutcome
+    plan_run_result: PlanRunResult | None = None
+    failure_reason: str | None = None
+    cleanup_failure_reason: str | None = None
+    primary_failure_reason: str | None = None
+    runtime_fault_reason: RuntimeHardwareFaultReason | None = None
 
 
 class UnsupportedGuidedDemoExecutionPhaseError(RuntimeError):
@@ -65,16 +86,97 @@ class GuidedDemoPhaseExecutor:
         *,
         column_readiness: ColumnFractionCollectionReadiness | None = None,
     ) -> GuidedDemoPhaseExecutionResult:
+        prepared = self.prepare_current_phase(
+            run,
+            calibrations,
+            column_readiness=column_readiness,
+        )
+        return self.execute_prepared_phase(prepared)
+
+    def prepare_current_phase(
+        self,
+        run: DemoRun,
+        calibrations: PumpCalibrationSet,
+        *,
+        column_readiness: ColumnFractionCollectionReadiness | None = None,
+    ) -> PreparedGuidedDemoPhase:
         operations = self._build_current_phase_operations(
             run,
             calibrations,
             column_readiness=column_readiness,
         )
-        plan_run_result = self._plan_runner.run(operations)
-        return GuidedDemoPhaseExecutionResult(
+        return PreparedGuidedDemoPhase(
+            run_id=run.run_id,
+            run_event_sequence=run.event_sequence,
             phase=run.phase,
+            operations=operations,
+        )
+
+    def execute_prepared_phase(
+        self,
+        prepared: PreparedGuidedDemoPhase,
+    ) -> GuidedDemoPhaseExecutionResult:
+        try:
+            plan_run_result = self._plan_runner.run(prepared.operations)
+        except OperationPlanExecutionError as error:
+            return self._map_plan_error(
+                prepared.phase, prepared.operations, error
+            )
+        outcome = (
+            PhaseExecutionOutcome.COMPLETED
+            if plan_run_result.outcome is PlanRunOutcome.COMPLETED
+            else PhaseExecutionOutcome.STOPPED_AT_SAFE_BOUNDARY
+        )
+        return GuidedDemoPhaseExecutionResult(
+            phase=prepared.phase,
+            outcome=outcome,
             plan_run_result=plan_run_result,
         )
+
+    @staticmethod
+    def _map_plan_error(
+        phase: RunPhase,
+        operations: tuple[PlannedOperation, ...],
+        error: OperationPlanExecutionError,
+    ) -> GuidedDemoPhaseExecutionResult:
+        original = error.original_error
+        if isinstance(original, HardwareCommandError) and getattr(
+            original, "_labforge_required_followup_failure", False
+        ):
+            return GuidedDemoPhaseExecutionResult(
+                phase=phase,
+                outcome=PhaseExecutionOutcome.REQUIRED_CLEANUP_FAILED,
+                cleanup_failure_reason=str(original),
+                runtime_fault_reason=(
+                    RuntimeHardwareFaultReason.REQUIRED_FOLLOWUP_FAILED
+                ),
+            )
+        if isinstance(original, ProtectedOperationError):
+            return GuidedDemoPhaseExecutionResult(
+                phase=phase,
+                outcome=PhaseExecutionOutcome.REQUIRED_CLEANUP_FAILED,
+                cleanup_failure_reason=str(original.followup_error),
+                primary_failure_reason=str(original.primary_error),
+                runtime_fault_reason=(
+                    RuntimeHardwareFaultReason.REQUIRED_FOLLOWUP_FAILED
+                ),
+            )
+        if isinstance(original, HardwareCommandError):
+            failed_operation = operations[error.failed_operation_number - 1]
+            runtime_reason = (
+                RuntimeHardwareFaultReason.CAROUSEL_MOVEMENT_FAILED
+                if isinstance(
+                    failed_operation, MoveCarouselToNextFractionOperation
+                )
+                else RuntimeHardwareFaultReason.HARDWARE_COMMAND_FAILED
+            )
+            return GuidedDemoPhaseExecutionResult(
+                phase=phase,
+                outcome=PhaseExecutionOutcome.HARDWARE_COMMAND_FAILED,
+                failure_reason=str(original),
+                runtime_fault_reason=runtime_reason,
+            )
+        raise error
 
     @staticmethod
     def _build_current_phase_operations(

@@ -7,6 +7,7 @@ from app.demo.hardware_contract import (
     BottomValveState,
     DispenseCommand,
     HardwareCommand,
+    HardwareCommandError,
     HardwareCommandKind,
     HardwareContract,
     MoveCarouselCommand,
@@ -27,7 +28,7 @@ class FailureSelection:
             raise ValueError("failure invocation must be at least 1")
 
 
-class SimulatedHardwareCommandError(RuntimeError):
+class SimulatedHardwareCommandError(HardwareCommandError):
     """Deterministic fake failure; it makes no claim about physical hardware."""
 
     def __init__(self, command: HardwareCommand, invocation: int) -> None:

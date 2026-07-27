@@ -7,6 +7,8 @@ import pytest
 
 from app.demo.execution_lifecycle import (
     PhaseExecutionClaimError,
+    PhaseExecutionStartCommitError,
+    PhaseExecutionStartCommitOutcome,
     claim_phase_execution,
 )
 from app.demo.events import DomainEvent
@@ -857,10 +859,13 @@ def test_atomic_phase_execution_claim_persists_event_and_snapshot(
             run_id="run-1",
             execution_id="execution-1",
             claimed_at=NOW,
+            expected_run_event_sequence=started.run.event_sequence,
+            expected_phase=started.run.phase,
         )
 
         machine = store.load_machine_snapshot()
         assert machine.active_execution == intent
+        assert intent.start_committed_at is None
         assert machine.event_sequence == busy.machine.event_sequence + 1
         assert store.load_demo_run("run-1") == started.run
         event = store.load_events("MACHINE", "machine")[-1]
@@ -870,6 +875,188 @@ def test_atomic_phase_execution_claim_persists_event_and_snapshot(
             intent.run_id,
             intent.phase,
         )
+
+
+def test_start_commit_is_atomic_audited_and_not_replayable(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        started, _ = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
+        intent = store.claim_phase_execution(
+            run_id="run-1",
+            execution_id="execution-start",
+            claimed_at=NOW,
+            expected_run_event_sequence=started.run.event_sequence,
+            expected_phase=started.run.phase,
+        )
+        committed_at = NOW + timedelta(seconds=1)
+
+        result = store.commit_phase_execution_start(
+            intent,
+            expected_run_event_sequence=started.run.event_sequence,
+            expected_phase=started.run.phase,
+            start_committed_at=committed_at,
+        )
+
+        assert result.outcome is PhaseExecutionStartCommitOutcome.START_COMMITTED
+        assert result.intent.start_committed_at == committed_at
+        assert store.load_machine_snapshot().active_execution == result.intent
+        event = store.load_events("MACHINE", "machine")[-1]
+        assert event.event_type is (
+            MachineEventType.PHASE_EXECUTION_START_COMMITTED
+        )
+        assert event.execution_id == intent.execution_id
+        assert event.occurred_at == committed_at
+
+        with pytest.raises(
+            PhaseExecutionStartCommitError, match="already committed"
+        ):
+            store.commit_phase_execution_start(
+                result.intent,
+                expected_run_event_sequence=started.run.event_sequence,
+                expected_phase=started.run.phase,
+                start_committed_at=committed_at,
+            )
+
+
+def test_start_commit_rejects_mismatched_token_without_writes(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        started, _ = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
+        intent = store.claim_phase_execution(
+            run_id="run-1",
+            execution_id="execution-start",
+            claimed_at=NOW,
+            expected_run_event_sequence=started.run.event_sequence,
+            expected_phase=started.run.phase,
+        )
+        mismatched = intent.model_copy(
+            update={"execution_id": "execution-other"}
+        )
+        events = store.load_events()
+
+        with pytest.raises(PhaseExecutionStartCommitError, match="does not match"):
+            store.commit_phase_execution_start(
+                mismatched,
+                expected_run_event_sequence=started.run.event_sequence,
+                expected_phase=started.run.phase,
+                start_committed_at=NOW + timedelta(seconds=1),
+            )
+
+        assert store.load_machine_snapshot().active_execution == intent
+        assert store.load_events() == events
+
+
+@pytest.mark.parametrize(
+    ("sequence_offset", "phase", "message"),
+    [
+        (-1, RunPhase.P1_TRANSFER_S_TO_REACTOR, "event_sequence"),
+        (0, RunPhase.P1_TRANSFER_FIRST_LIQUID_TO_REACTOR, "phase"),
+    ],
+)
+def test_start_commit_rejects_stale_preparation_without_writes(
+    configuration: DemoConfiguration,
+    sequence_offset: int,
+    phase: RunPhase,
+    message: str,
+) -> None:
+    with SQLiteStore() as store:
+        started, _ = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
+        intent = store.claim_phase_execution(
+            run_id="run-1",
+            execution_id="execution-stale",
+            claimed_at=NOW,
+            expected_run_event_sequence=started.run.event_sequence,
+            expected_phase=started.run.phase,
+        )
+        events = store.load_events()
+
+        with pytest.raises(PhaseExecutionStartCommitError, match=message):
+            store.commit_phase_execution_start(
+                intent,
+                expected_run_event_sequence=(
+                    started.run.event_sequence + sequence_offset
+                ),
+                expected_phase=phase,
+                start_committed_at=NOW + timedelta(seconds=1),
+            )
+
+        assert store.load_machine_snapshot().active_execution == intent
+        assert store.load_events() == events
+
+
+def test_stop_wins_before_start_without_start_write(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        started, _ = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
+        intent = store.claim_phase_execution(
+            run_id="run-1",
+            execution_id="execution-stop",
+            claimed_at=NOW,
+            expected_run_event_sequence=started.run.event_sequence,
+            expected_phase=started.run.phase,
+        )
+        stopped = request_abort(started.run, NOW + timedelta(seconds=1))
+        store.persist_run_transition_and_load_machine(
+            stopped.run, stopped.events
+        )
+        events = store.load_events()
+
+        result = store.commit_phase_execution_start(
+            intent,
+            expected_run_event_sequence=started.run.event_sequence,
+            expected_phase=started.run.phase,
+            start_committed_at=NOW + timedelta(seconds=2),
+        )
+
+        assert result.outcome is PhaseExecutionStartCommitOutcome.STOP_WON
+        assert result.intent.start_committed_at is None
+        assert store.load_machine_snapshot().active_execution == intent
+        assert store.load_events() == events
+
+
+@pytest.mark.parametrize(
+    ("expected_sequence_offset", "expected_phase", "message"),
+    [
+        (0, RunPhase.P1_TRANSFER_FIRST_LIQUID_TO_REACTOR, "phase"),
+        (-1, RunPhase.P1_TRANSFER_S_TO_REACTOR, "event sequence"),
+    ],
+)
+def test_atomic_claim_rejects_stale_prepared_run_without_writes(
+    configuration: DemoConfiguration,
+    expected_sequence_offset: int,
+    expected_phase: RunPhase,
+    message: str,
+) -> None:
+    with SQLiteStore() as store:
+        started, _ = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
+        original_events = store.load_events()
+
+        with pytest.raises(PersistenceConflictError, match=message):
+            store.claim_phase_execution(
+                run_id="run-1",
+                execution_id="stale-preparation",
+                claimed_at=NOW,
+                expected_run_event_sequence=(
+                    started.run.event_sequence + expected_sequence_offset
+                ),
+                expected_phase=expected_phase,
+            )
+
+        assert store.load_machine_snapshot().active_execution is None
+        assert store.load_events() == original_events
 
 
 @pytest.mark.parametrize("missing", ["run", "machine"])
@@ -892,6 +1079,14 @@ def test_atomic_claim_rejects_missing_state_without_writes(
                 run_id="run-1",
                 execution_id="execution-1",
                 claimed_at=NOW,
+                expected_run_event_sequence=(
+                    created.run.event_sequence if missing == "machine" else 0
+                ),
+                expected_phase=(
+                    created.run.phase
+                    if missing == "machine"
+                    else RunPhase.P1_TRANSFER_S_TO_REACTOR
+                ),
             )
 
         assert store.load_events() == original_events
@@ -901,11 +1096,15 @@ def test_duplicate_claim_allows_exactly_one_winner(
     configuration: DemoConfiguration,
 ) -> None:
     with SQLiteStore() as store:
-        _persist_running_run_and_busy_machine(store, configuration)
+        started, _ = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
         first = store.claim_phase_execution(
             run_id="run-1",
             execution_id="execution-1",
             claimed_at=NOW,
+            expected_run_event_sequence=started.run.event_sequence,
+            expected_phase=started.run.phase,
         )
         events_after_first = store.load_events()
 
@@ -914,6 +1113,8 @@ def test_duplicate_claim_allows_exactly_one_winner(
                 run_id="run-1",
                 execution_id="execution-2",
                 claimed_at=NOW,
+                expected_run_event_sequence=started.run.event_sequence,
+                expected_phase=started.run.phase,
             )
 
         assert store.load_machine_snapshot().active_execution == first
@@ -925,17 +1126,54 @@ def test_unresolved_execution_survives_database_reopen(
 ) -> None:
     database = tmp_path / "active-execution.db"
     with SQLiteStore(database) as store:
-        _persist_running_run_and_busy_machine(store, configuration)
+        started, _ = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
         intent = store.claim_phase_execution(
             run_id="run-1",
             execution_id="execution-1",
             claimed_at=NOW,
+            expected_run_event_sequence=started.run.event_sequence,
+            expected_phase=started.run.phase,
         )
 
     with SQLiteStore(database) as reopened:
         machine = reopened.load_machine_snapshot()
         assert machine.active_execution == intent
         assert machine.state is MachineState.BUSY
+
+
+def test_legacy_persisted_execution_defaults_start_commit_to_none(
+    tmp_path, configuration: DemoConfiguration
+) -> None:
+    database = tmp_path / "legacy-active-execution.db"
+    with SQLiteStore(database) as store:
+        started, _ = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
+        store.claim_phase_execution(
+            run_id="run-1",
+            execution_id="execution-legacy",
+            claimed_at=NOW,
+            expected_run_event_sequence=started.run.event_sequence,
+            expected_phase=started.run.phase,
+        )
+    with sqlite3.connect(database) as connection:
+        payload = json.loads(
+            connection.execute(
+                "SELECT snapshot_json FROM machine_snapshot"
+            ).fetchone()[0]
+        )
+        del payload["active_execution"]["start_committed_at"]
+        connection.execute(
+            "UPDATE machine_snapshot SET snapshot_json = ?",
+            (json.dumps(payload),),
+        )
+
+    with SQLiteStore(database) as reopened:
+        active = reopened.load_machine_snapshot().active_execution
+        assert active is not None
+        assert active.start_committed_at is None
 
 
 def test_forced_claim_snapshot_failure_rolls_back_event(
@@ -953,11 +1191,15 @@ def test_forced_claim_snapshot_failure_rolls_back_event(
 
     with SQLiteStore(database) as store:
         original_events = store.load_events()
+        run = store.load_demo_run("run-1")
+        assert run is not None
         with pytest.raises(sqlite3.IntegrityError, match="forced claim failure"):
             store.claim_phase_execution(
                 run_id="run-1",
                 execution_id="execution-1",
                 claimed_at=NOW,
+                expected_run_event_sequence=run.event_sequence,
+                expected_phase=run.phase,
             )
         assert store.load_machine_snapshot() == busy.machine
         assert store.load_events() == original_events
@@ -1206,6 +1448,8 @@ def test_run_transition_returns_existing_active_execution_unchanged(
             run_id="run-1",
             execution_id="execution-1",
             claimed_at=NOW,
+            expected_run_event_sequence=started.run.event_sequence,
+            expected_phase=started.run.phase,
         )
         machine_before_stop = store.load_machine_snapshot()
         machine_events = store.load_events("MACHINE", "machine")

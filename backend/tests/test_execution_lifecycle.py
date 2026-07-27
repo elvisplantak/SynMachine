@@ -5,6 +5,8 @@ from pydantic import ValidationError
 
 from app.demo.execution_lifecycle import (
     PhaseExecutionClaimError,
+    PhaseExecutionStartCommitError,
+    commit_phase_execution_start,
     claim_phase_execution,
 )
 from app.demo.lifecycle import create_demo_run, request_abort, start_run
@@ -14,7 +16,11 @@ from app.demo.machine_lifecycle import (
     create_machine,
     start_run as start_machine_run,
 )
-from app.demo.machine_models import MachineState
+from app.demo.machine_models import (
+    MachineSnapshot,
+    MachineState,
+    PhaseExecutionIntent,
+)
 from app.demo.models import (
     AdditionOrder,
     DemoConfiguration,
@@ -145,6 +151,92 @@ def test_claim_rejects_naive_claimed_at() -> None:
             execution_id="execution-1",
             claimed_at=datetime(2026, 7, 27, 12, 0),
         )
+
+
+def test_legacy_execution_intent_defaults_start_commit_to_none() -> None:
+    intent = PhaseExecutionIntent.model_validate(
+        {
+            "execution_id": "execution-legacy",
+            "run_id": "run-1",
+            "phase": RunPhase.P1_TRANSFER_S_TO_REACTOR,
+            "claimed_at": NOW,
+        }
+    )
+
+    assert intent.start_committed_at is None
+
+
+def test_stop_won_still_requires_matching_prepared_phase() -> None:
+    created = create_demo_run("run-1", CONFIGURATION, SETTINGS, NOW)
+    running = start_run(created.run, NOW).run
+    aborting = request_abort(running, NOW).run
+    machine = start_machine_run(
+        complete_startup(create_machine(NOW).machine, NOW).machine,
+        "run-1",
+        NOW,
+    ).machine
+    claimed = claim_phase_execution(
+        running,
+        machine,
+        execution_id="execution-1",
+        claimed_at=NOW,
+    )
+    intent = claimed.machine.active_execution
+    assert intent is not None
+
+    with pytest.raises(PhaseExecutionStartCommitError, match="active phase"):
+        commit_phase_execution_start(
+            aborting,
+            claimed.machine,
+            intent,
+            expected_run_event_sequence=running.event_sequence,
+            expected_phase=RunPhase.P1_TRANSFER_FIRST_LIQUID_TO_REACTOR,
+            start_committed_at=NOW,
+        )
+
+
+def test_start_commit_revalidates_machine_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    created = create_demo_run("run-1", CONFIGURATION, SETTINGS, NOW)
+    running = start_run(created.run, NOW).run
+    machine = start_machine_run(
+        complete_startup(create_machine(NOW).machine, NOW).machine,
+        "run-1",
+        NOW,
+    ).machine
+    claimed = claim_phase_execution(
+        running,
+        machine,
+        execution_id="execution-1",
+        claimed_at=NOW,
+    )
+    intent = claimed.machine.active_execution
+    assert intent is not None
+    original_validate = MachineSnapshot.model_validate
+    validated_values: list[object] = []
+
+    def recording_validate(value: object):
+        validated_values.append(value)
+        return original_validate(value)
+
+    monkeypatch.setattr(
+        MachineSnapshot,
+        "model_validate",
+        staticmethod(recording_validate),
+    )
+
+    result = commit_phase_execution_start(
+        running,
+        claimed.machine,
+        intent,
+        expected_run_event_sequence=running.event_sequence,
+        expected_phase=running.phase,
+        start_committed_at=NOW,
+    )
+
+    assert validated_values
+    assert result.machine.active_execution.start_committed_at == NOW
 
 
 def test_claim_rejects_non_busy_machine() -> None:

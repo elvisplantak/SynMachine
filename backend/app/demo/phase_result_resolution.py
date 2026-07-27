@@ -78,6 +78,21 @@ def resolve_phase_execution(
         raise InvalidExecutionResultError(
             "INVALID_EXECUTION_RESULT: safe stop requires ABORTING status"
         )
+    if (
+        intent.start_committed_at is None
+        and result.outcome
+        is not PhaseExecutionOutcome.STOPPED_AT_SAFE_BOUNDARY
+    ):
+        raise InvalidExecutionResultError(
+            "INVALID_EXECUTION_RESULT: execution start was not committed"
+        )
+    if (
+        intent.start_committed_at is not None
+        and result.reported_at < intent.start_committed_at
+    ):
+        raise InvalidExecutionResultError(
+            "INVALID_EXECUTION_RESULT: reported_at precedes start_committed_at"
+        )
 
     cleared = machine.model_copy(update={"active_execution": None})
     resolved_event = MachineEvent(

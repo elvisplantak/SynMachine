@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import FrozenInstanceError, dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
@@ -142,6 +142,38 @@ def test_supported_builder_cases_match_hardware_execution_phases() -> None:
     assert frozenset(phase for phase, _ in SUPPORTED_BUILDER_CASES) == (
         HARDWARE_EXECUTION_PHASES
     )
+
+
+def test_prepared_phase_is_immutable_and_executes_exact_operations(
+    monkeypatch: pytest.MonkeyPatch,
+    run: DemoRun,
+    calibrations: PumpCalibrationSet,
+    plan_result: PlanRunResult,
+) -> None:
+    operations: tuple[PlannedOperation, ...] = ()
+    monkeypatch.setattr(
+        phase_executor_module,
+        "plan_p1_solvent_to_reactor_operations",
+        lambda *args: SimpleNamespace(operations=operations),
+    )
+    runner = RecordingPlanRunner(plan_result)
+    executor = GuidedDemoPhaseExecutor(runner)
+    current_run = run.model_copy(
+        update={"phase": RunPhase.P1_TRANSFER_S_TO_REACTOR}
+    )
+
+    prepared = executor.prepare_current_phase(current_run, calibrations)
+
+    assert prepared.run_id == current_run.run_id
+    assert prepared.run_event_sequence == current_run.event_sequence
+    assert prepared.phase is current_run.phase
+    assert prepared.operations is operations
+    with pytest.raises(FrozenInstanceError):
+        prepared.phase = RunPhase.READY  # type: ignore[misc]
+
+    executor.execute_prepared_phase(prepared)
+
+    assert runner.calls[0] is prepared.operations
 
 
 @pytest.mark.parametrize(("phase", "builder_name"), SUPPORTED_BUILDER_CASES)

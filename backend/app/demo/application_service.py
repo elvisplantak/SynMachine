@@ -1,6 +1,4 @@
-from collections.abc import Callable
 from datetime import datetime
-from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict
 
@@ -11,18 +9,10 @@ from app.demo.machine_events import MachineEvent
 from app.demo.machine_models import (
     MachineSnapshot,
     MachineState,
-    PhaseExecutionIntent,
 )
 from app.demo.models import DemoConfiguration, DemoExecutionSettings
 from app.demo.run_models import DemoRun, RunStatus
 from app.persistence.sqlite_store import SQLiteStore
-
-ExecutionIdFactory = Callable[[], str]
-
-
-def _generate_execution_id() -> str:
-    return str(uuid4())
-
 
 class GuidedDemoApplicationError(RuntimeError):
     """Raised when persisted state cannot satisfy an orchestration precondition."""
@@ -47,13 +37,8 @@ class GuidedDemoMachineApplicationResult(BaseModel):
 class GuidedDemoApplicationService:
     """Synchronous orchestration for Guided Demo domain transitions."""
 
-    def __init__(
-        self,
-        store: SQLiteStore,
-        execution_id_factory: ExecutionIdFactory = _generate_execution_id,
-    ) -> None:
+    def __init__(self, store: SQLiteStore) -> None:
         self._store = store
-        self._execution_id_factory = execution_id_factory
 
     def initialize_machine(
         self, occurred_at: datetime
@@ -206,19 +191,6 @@ class GuidedDemoApplicationService:
             machine=machine_result.machine,
             run_events=run_result.events,
             machine_events=machine_result.events,
-        )
-
-    def claim_current_phase_execution(
-        self,
-        run_id: str,
-        *,
-        occurred_at: datetime,
-    ) -> PhaseExecutionIntent:
-        execution_id = self._execution_id_factory()
-        return self._store.claim_phase_execution(
-            run_id=run_id,
-            execution_id=execution_id,
-            claimed_at=occurred_at,
         )
 
     def _load_run(self, run_id: str) -> DemoRun:

@@ -61,6 +61,7 @@ def _execute_with_required_followup(
     except Exception as followup_error:
         if primary_error is not None:
             raise ProtectedOperationError(primary_error, followup_error) from followup_error
+        setattr(followup_error, "_labforge_required_followup_failure", True)
         raise
 
     if primary_error is not None:

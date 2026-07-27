@@ -3,7 +3,10 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from pydantic import ValidationError
 
-from app.demo.execution_lifecycle import claim_phase_execution
+from app.demo.execution_lifecycle import (
+    commit_phase_execution_start,
+    claim_phase_execution,
+)
 from app.demo.lifecycle import (
     complete_current_phase,
     create_demo_run,
@@ -54,7 +57,11 @@ SETTINGS = DemoExecutionSettings(
 )
 
 
-def _active_aggregate(phase: RunPhase = RunPhase.P1_TRANSFER_S_TO_REACTOR):
+def _active_aggregate(
+    phase: RunPhase = RunPhase.P1_TRANSFER_S_TO_REACTOR,
+    *,
+    start_committed_at: datetime | None = NOW,
+):
     created = create_demo_run("run-1", CONFIGURATION, SETTINGS, NOW)
     run = start_run(created.run, NOW).run
     while run.phase is not phase:
@@ -67,7 +74,17 @@ def _active_aggregate(phase: RunPhase = RunPhase.P1_TRANSFER_S_TO_REACTOR):
     claimed = claim_phase_execution(
         run, machine, execution_id="execution-1", claimed_at=NOW
     )
-    return run, claimed.machine
+    if start_committed_at is None:
+        return run, claimed.machine
+    started = commit_phase_execution_start(
+        run,
+        claimed.machine,
+        claimed.machine.active_execution,
+        expected_run_event_sequence=run.event_sequence,
+        expected_phase=run.phase,
+        start_committed_at=start_committed_at,
+    )
+    return run, started.machine
 
 
 @pytest.mark.parametrize(
@@ -200,7 +217,7 @@ def test_aborting_result_completes_stop_without_advancing(
 
 
 def test_safe_stop_without_request_is_rejected() -> None:
-    run, machine = _active_aggregate()
+    run, machine = _active_aggregate(start_committed_at=None)
     with pytest.raises(InvalidExecutionResultError, match="requires ABORTING"):
         resolve_phase_execution(
             run,
@@ -211,6 +228,97 @@ def test_safe_stop_without_request_is_rejected() -> None:
                 reported_at=NOW,
             ),
         )
+
+
+@pytest.mark.parametrize(
+    ("outcome", "metadata"),
+    [
+        (PhaseExecutionOutcome.COMPLETED, {}),
+        (
+            PhaseExecutionOutcome.HARDWARE_COMMAND_FAILED,
+            {
+                "failure_reason": "pump failed",
+                "runtime_fault_reason": (
+                    RuntimeHardwareFaultReason.HARDWARE_COMMAND_FAILED
+                ),
+            },
+        ),
+        (
+            PhaseExecutionOutcome.REQUIRED_CLEANUP_FAILED,
+            {
+                "cleanup_failure_reason": "close failed",
+                "runtime_fault_reason": (
+                    RuntimeHardwareFaultReason.REQUIRED_FOLLOWUP_FAILED
+                ),
+            },
+        ),
+        (
+            PhaseExecutionOutcome.HARDWARE_COMMAND_FAILED,
+            {
+                "failure_reason": "carousel failed",
+                "runtime_fault_reason": (
+                    RuntimeHardwareFaultReason.CAROUSEL_MOVEMENT_FAILED
+                ),
+            },
+        ),
+    ],
+)
+def test_hardware_derived_result_requires_start_commit(
+    outcome: PhaseExecutionOutcome,
+    metadata: dict[str, object],
+) -> None:
+    run, machine = _active_aggregate(start_committed_at=None)
+
+    with pytest.raises(InvalidExecutionResultError, match="not committed"):
+        resolve_phase_execution(
+            run,
+            machine,
+            PhaseExecutionResult(
+                execution_id="execution-1",
+                outcome=outcome,
+                reported_at=NOW,
+                **metadata,
+            ),
+        )
+
+    assert machine.active_execution is not None
+    assert machine.active_execution.start_committed_at is None
+
+
+def test_prestart_safe_stop_is_accepted_for_aborting_run() -> None:
+    run, machine = _active_aggregate(start_committed_at=None)
+    aborting = request_abort(run, NOW).run
+
+    resolution = resolve_phase_execution(
+        aborting,
+        machine,
+        PhaseExecutionResult(
+            execution_id="execution-1",
+            outcome=PhaseExecutionOutcome.STOPPED_AT_SAFE_BOUNDARY,
+            reported_at=NOW,
+        ),
+    )
+
+    assert resolution.run.status is RunStatus.ABORTED
+
+
+def test_started_result_rejects_report_before_start_and_accepts_exact_start() -> None:
+    committed_at = NOW + timedelta(seconds=1)
+    run, machine = _active_aggregate(start_committed_at=committed_at)
+    early = PhaseExecutionResult(
+        execution_id="execution-1",
+        outcome=PhaseExecutionOutcome.COMPLETED,
+        reported_at=NOW,
+    )
+    with pytest.raises(InvalidExecutionResultError, match="start_committed_at"):
+        resolve_phase_execution(run, machine, early)
+
+    resolution = resolve_phase_execution(
+        run,
+        machine,
+        early.model_copy(update={"reported_at": committed_at}),
+    )
+    assert resolution.machine.active_execution is None
 
 
 @pytest.mark.parametrize(

@@ -1,6 +1,7 @@
+import json
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from threading import Barrier
 
 import pytest
@@ -23,6 +24,7 @@ from app.demo.phase_result_resolution import (
     ExecutionAlreadyResolvedError,
     NoActiveExecutionError,
 )
+from app.demo.phases import RunPhase
 from app.persistence.sqlite_store import (
     PersistenceConflictError,
     PersistenceDataError,
@@ -50,7 +52,7 @@ SETTINGS = DemoExecutionSettings(
 )
 
 
-def _persist_claim(store: SQLiteStore) -> None:
+def _persist_claim(store: SQLiteStore, *, start: bool = True) -> None:
     created = create_demo_run("run-1", CONFIGURATION, SETTINGS, NOW)
     started = start_run(created.run, NOW)
     machine = create_machine(NOW)
@@ -62,9 +64,20 @@ def _persist_claim(store: SQLiteStore) -> None:
     store.persist_run_and_machine_transition(
         started.run, started.events, busy.machine, busy.events
     )
-    store.claim_phase_execution(
-        run_id="run-1", execution_id="execution-1", claimed_at=NOW
+    intent = store.claim_phase_execution(
+        run_id="run-1",
+        execution_id="execution-1",
+        claimed_at=NOW,
+        expected_run_event_sequence=started.run.event_sequence,
+        expected_phase=started.run.phase,
     )
+    if start:
+        store.commit_phase_execution_start(
+            intent,
+            expected_run_event_sequence=started.run.event_sequence,
+            expected_phase=started.run.phase,
+            start_committed_at=NOW,
+        )
 
 
 def _completed_result() -> PhaseExecutionResult:
@@ -186,13 +199,13 @@ def test_second_matching_submission_has_exactly_one_winner() -> None:
         (
             "CREATE TRIGGER reject_resolution_machine_event "
             "BEFORE INSERT ON domain_events "
-            "WHEN NEW.aggregate_type = 'MACHINE' AND NEW.event_sequence = 5 "
+            "WHEN NEW.aggregate_type = 'MACHINE' AND NEW.event_sequence = 6 "
             "BEGIN SELECT RAISE(ABORT, 'forced resolution machine failure'); END",
             "forced resolution machine failure",
         ),
         (
             "CREATE TRIGGER reject_resolution_machine_snapshot "
-            "BEFORE UPDATE ON machine_snapshot WHEN NEW.event_sequence = 5 "
+            "BEFORE UPDATE ON machine_snapshot WHEN NEW.event_sequence = 6 "
             "BEGIN SELECT RAISE(ABORT, 'forced resolution snapshot failure'); END",
             "forced resolution snapshot failure",
         ),
@@ -248,10 +261,14 @@ def test_resolved_execution_id_cannot_be_reused_after_reopen(tmp_path) -> None:
             reopened.load_events(),
         )
         with pytest.raises(ExecutionIdAlreadyUsedError, match="already used"):
+            run = reopened.load_demo_run("run-1")
+            assert run is not None
             reopened.claim_phase_execution(
                 run_id="run-1",
                 execution_id="execution-1",
                 claimed_at=NOW,
+                expected_run_event_sequence=run.event_sequence,
+                expected_phase=run.phase,
             )
         assert (
             reopened.load_demo_run("run-1"),
@@ -270,10 +287,14 @@ def test_resolved_execution_id_cannot_be_reused_in_same_session() -> None:
             store.load_events(),
         )
         with pytest.raises(ExecutionIdAlreadyUsedError, match="already used"):
+            run = store.load_demo_run("run-1")
+            assert run is not None
             store.claim_phase_execution(
                 run_id="run-1",
                 execution_id="execution-1",
                 claimed_at=NOW,
+                expected_run_event_sequence=run.event_sequence,
+                expected_phase=run.phase,
             )
         assert (
             store.load_demo_run("run-1"),
@@ -307,6 +328,93 @@ def test_historically_resolved_active_token_is_persisted_corruption(
         with pytest.raises(PersistenceDataError, match="historically resolved"):
             store.resolve_phase_execution(_completed_result())
         assert store.load_events() == events
+
+
+def test_start_committed_active_token_requires_matching_start_event(
+    tmp_path,
+) -> None:
+    database = tmp_path / "missing-start-event.db"
+    with SQLiteStore(database) as store:
+        _persist_claim(store, start=False)
+    with sqlite3.connect(database) as connection:
+        payload = json.loads(
+            connection.execute(
+                "SELECT snapshot_json FROM machine_snapshot"
+            ).fetchone()[0]
+        )
+        payload["active_execution"]["start_committed_at"] = NOW.isoformat()
+        connection.execute(
+            "UPDATE machine_snapshot SET snapshot_json = ?",
+            (json.dumps(payload),),
+        )
+
+    with SQLiteStore(database) as store:
+        with pytest.raises(PersistenceDataError, match="exactly one"):
+            store.resolve_phase_execution(_completed_result())
+        assert store.load_machine_snapshot().active_execution is not None
+
+
+def test_duplicate_start_events_for_active_token_are_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with SQLiteStore() as store:
+        _persist_claim(store)
+        original_load_events = store.load_events
+        start_event = next(
+            event
+            for event in original_load_events("MACHINE", "machine")
+            if isinstance(event, MachineEvent)
+            and event.event_type
+            is MachineEventType.PHASE_EXECUTION_START_COMMITTED
+        )
+
+        def duplicated_events(*args, **kwargs):
+            events = original_load_events(*args, **kwargs)
+            if args == ("MACHINE", "machine"):
+                return (*events, start_event)
+            return events
+
+        monkeypatch.setattr(store, "load_events", duplicated_events)
+        with pytest.raises(PersistenceDataError, match="exactly one"):
+            store.resolve_phase_execution(_completed_result())
+        assert store.load_machine_snapshot().active_execution is not None
+
+
+@pytest.mark.parametrize(
+    ("field_name", "replacement"),
+    [
+        ("run_id", "run-other"),
+        ("execution_phase", RunPhase.P2_TRANSFER_REACTOR_TO_SF),
+        ("execution_claimed_at", NOW + timedelta(seconds=1)),
+        ("occurred_at", NOW + timedelta(seconds=1)),
+    ],
+)
+def test_mismatched_active_start_event_metadata_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+    field_name: str,
+    replacement: object,
+) -> None:
+    with SQLiteStore() as store:
+        _persist_claim(store)
+        original_load_events = store.load_events
+
+        def mismatched_events(*args, **kwargs):
+            events = original_load_events(*args, **kwargs)
+            if args != ("MACHINE", "machine"):
+                return events
+            return tuple(
+                event.model_copy(update={field_name: replacement})
+                if isinstance(event, MachineEvent)
+                and event.event_type
+                is MachineEventType.PHASE_EXECUTION_START_COMMITTED
+                else event
+                for event in events
+            )
+
+        monkeypatch.setattr(store, "load_events", mismatched_events)
+        with pytest.raises(PersistenceDataError, match=field_name):
+            store.resolve_phase_execution(_completed_result())
+        assert store.load_machine_snapshot().active_execution is not None
 
 
 @pytest.mark.parametrize(

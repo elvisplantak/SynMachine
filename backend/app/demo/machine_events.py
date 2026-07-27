@@ -20,6 +20,7 @@ class MachineEventType(StrEnum):
     STOP_DEMO_COMPLETED = "STOP_DEMO_COMPLETED"
     RUNTIME_HARDWARE_FAULT_DETECTED = "RUNTIME_HARDWARE_FAULT_DETECTED"
     PHASE_EXECUTION_CLAIMED = "PHASE_EXECUTION_CLAIMED"
+    PHASE_EXECUTION_START_COMMITTED = "PHASE_EXECUTION_START_COMMITTED"
     PHASE_EXECUTION_RESOLVED = "PHASE_EXECUTION_RESOLVED"
     POWER_LOSS_DETECTED = "POWER_LOSS_DETECTED"
     RECOVERY_STARTED = "RECOVERY_STARTED"
@@ -90,6 +91,38 @@ class MachineEvent(BaseModel):
             ):
                 raise ValueError(
                     "PHASE_EXECUTION_CLAIMED rejects resolution metadata"
+                )
+        elif (
+            self.event_type
+            is MachineEventType.PHASE_EXECUTION_START_COMMITTED
+        ):
+            if (
+                self.machine_state is not MachineState.BUSY
+                or self.run_id is None
+                or self.execution_id is None
+                or self.execution_phase not in HARDWARE_EXECUTION_PHASES
+                or self.execution_claimed_at is None
+            ):
+                raise ValueError(
+                    "PHASE_EXECUTION_START_COMMITTED requires matching "
+                    "BUSY execution metadata"
+                )
+            if self.occurred_at < self.execution_claimed_at:
+                raise ValueError(
+                    "PHASE_EXECUTION_START_COMMITTED precedes claimed_at"
+                )
+            if any(
+                value is not None
+                for value in (
+                    self.execution_outcome,
+                    self.failure_reason,
+                    self.cleanup_failure_reason,
+                    self.primary_failure_reason,
+                    self.runtime_fault_reason,
+                )
+            ):
+                raise ValueError(
+                    "PHASE_EXECUTION_START_COMMITTED rejects result metadata"
                 )
         elif self.event_type is MachineEventType.PHASE_EXECUTION_RESOLVED:
             if self.machine_state is not MachineState.BUSY:

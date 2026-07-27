@@ -9,6 +9,8 @@ from pydantic import ValidationError
 from app.demo.execution_lifecycle import (
     ExecutionIdAlreadyUsedError,
     PhaseExecutionClaimError,
+    PhaseExecutionStartCommitResult,
+    commit_phase_execution_start as commit_phase_execution_start_transition,
     claim_phase_execution as claim_phase_execution_transition,
 )
 from app.demo.events import DomainEvent
@@ -25,6 +27,7 @@ from app.demo.phase_result_resolution import (
     PhaseExecutionResolution,
     resolve_phase_execution as resolve_phase_execution_transition,
 )
+from app.demo.phases import RunPhase
 from app.demo.run_models import DemoRun
 
 SCHEMA_VERSION = 1
@@ -294,6 +297,8 @@ class SQLiteStore:
         run_id: str,
         execution_id: str,
         claimed_at: datetime,
+        expected_run_event_sequence: int,
+        expected_phase: RunPhase,
     ) -> PhaseExecutionIntent:
         self._connection.execute("BEGIN IMMEDIATE")
         try:
@@ -302,6 +307,14 @@ class SQLiteStore:
                 raise PhaseExecutionClaimError(
                     f"Guided Demo run {run_id!r} was not found"
                 )
+            if run.phase != expected_phase:
+                raise PersistenceConflictError(
+                    "run phase precondition failed"
+                )
+            if run.event_sequence != expected_run_event_sequence:
+                raise PersistenceConflictError(
+                    "run event sequence precondition failed"
+                )
             machine = self.load_machine_snapshot()
             if machine is None:
                 raise PhaseExecutionClaimError(
@@ -309,6 +322,9 @@ class SQLiteStore:
                 )
             machine_events = self.load_events(
                 MACHINE_AGGREGATE, MACHINE_AGGREGATE_ID
+            )
+            self._validate_active_execution_start_history(
+                machine, machine_events
             )
             resolved_ids = self._resolved_execution_ids(machine_events)
             if (
@@ -370,6 +386,9 @@ class SQLiteStore:
             machine_events = self.load_events(
                 MACHINE_AGGREGATE, MACHINE_AGGREGATE_ID
             )
+            self._validate_active_execution_start_history(
+                machine, machine_events
+            )
             resolved_ids = self._resolved_execution_ids(machine_events)
             intent = machine.active_execution
             if intent is not None and intent.execution_id in resolved_ids:
@@ -419,6 +438,56 @@ class SQLiteStore:
             raise
         return resolution
 
+    def commit_phase_execution_start(
+        self,
+        intent: PhaseExecutionIntent,
+        *,
+        expected_run_event_sequence: int,
+        expected_phase: RunPhase,
+        start_committed_at: datetime,
+    ) -> PhaseExecutionStartCommitResult:
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            run = self.load_demo_run(intent.run_id)
+            if run is None:
+                raise PersistenceConflictError(
+                    f"Guided Demo run {intent.run_id!r} was not found"
+                )
+            machine = self.load_machine_snapshot()
+            if machine is None:
+                raise PersistenceConflictError(
+                    "machine snapshot was not found"
+                )
+            machine_events = self.load_events(
+                MACHINE_AGGREGATE, MACHINE_AGGREGATE_ID
+            )
+            self._validate_active_execution_start_history(
+                machine, machine_events
+            )
+            result = commit_phase_execution_start_transition(
+                run,
+                machine,
+                intent,
+                expected_run_event_sequence=expected_run_event_sequence,
+                expected_phase=expected_phase,
+                start_committed_at=start_committed_at,
+            )
+            if result.events:
+                self._validate_machine_transition(
+                    result.machine, result.events
+                )
+                self._write_transition(
+                    MACHINE_AGGREGATE,
+                    MACHINE_AGGREGATE_ID,
+                    result.machine,
+                    self._normalize_events(result.events),
+                )
+            self._connection.execute("COMMIT")
+        except Exception:
+            self._connection.execute("ROLLBACK")
+            raise
+        return result
+
     @staticmethod
     def _resolved_execution_ids(
         events: Sequence[DomainEvent | MachineEvent],
@@ -429,6 +498,52 @@ class SQLiteStore:
             if isinstance(event, MachineEvent)
             and event.event_type is MachineEventType.PHASE_EXECUTION_RESOLVED
         }
+
+    @staticmethod
+    def _validate_active_execution_start_history(
+        machine: MachineSnapshot,
+        events: Sequence[DomainEvent | MachineEvent],
+    ) -> None:
+        active = machine.active_execution
+        if active is None:
+            return
+        matching = tuple(
+            event
+            for event in events
+            if isinstance(event, MachineEvent)
+            and event.event_type
+            is MachineEventType.PHASE_EXECUTION_START_COMMITTED
+            and event.execution_id == active.execution_id
+        )
+        if active.start_committed_at is None:
+            if matching:
+                raise PersistenceDataError(
+                    "active execution start is historically committed"
+                )
+            return
+        if len(matching) != 1:
+            raise PersistenceDataError(
+                "start-committed active execution requires exactly one "
+                "matching start event"
+            )
+        event = matching[0]
+        comparisons = (
+            ("execution_id", event.execution_id, active.execution_id),
+            ("run_id", event.run_id, active.run_id),
+            ("execution_phase", event.execution_phase, active.phase),
+            (
+                "execution_claimed_at",
+                event.execution_claimed_at,
+                active.claimed_at,
+            ),
+            ("occurred_at", event.occurred_at, active.start_committed_at),
+        )
+        for field_name, event_value, active_value in comparisons:
+            if event_value != active_value:
+                raise PersistenceDataError(
+                    f"active execution start event {field_name} does not "
+                    f"match active execution {field_name}"
+                )
 
     @staticmethod
     def _validate_phase_execution_resolution(
@@ -595,6 +710,43 @@ class SQLiteStore:
                         "occurred_at",
                         final_event.occurred_at,
                         active_execution.claimed_at,
+                    ),
+                )
+                for field_name, event_value, snapshot_value in execution_comparisons:
+                    if event_value != snapshot_value:
+                        raise PersistenceConflictError(
+                            f"final machine event {field_name} does not match "
+                            f"snapshot active_execution {field_name}"
+                        )
+            elif (
+                final_event.event_type
+                is MachineEventType.PHASE_EXECUTION_START_COMMITTED
+            ):
+                if active_execution is None:
+                    raise PersistenceConflictError(
+                        "start-commit event requires snapshot active_execution"
+                    )
+                execution_comparisons = (
+                    (
+                        "execution_id",
+                        final_event.execution_id,
+                        active_execution.execution_id,
+                    ),
+                    ("run_id", final_event.run_id, active_execution.run_id),
+                    (
+                        "execution_phase",
+                        final_event.execution_phase,
+                        active_execution.phase,
+                    ),
+                    (
+                        "execution_claimed_at",
+                        final_event.execution_claimed_at,
+                        active_execution.claimed_at,
+                    ),
+                    (
+                        "occurred_at",
+                        final_event.occurred_at,
+                        active_execution.start_committed_at,
                     ),
                 )
                 for field_name, event_value, snapshot_value in execution_comparisons:
