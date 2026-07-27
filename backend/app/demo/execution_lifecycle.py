@@ -15,6 +15,10 @@ class PhaseExecutionClaimError(ValueError):
     """Raised when current run and machine state cannot claim execution."""
 
 
+class ExecutionIdAlreadyUsedError(PhaseExecutionClaimError):
+    """Raised when an execution ID already exists in durable history."""
+
+
 def claim_phase_execution(
     run: DemoRun,
     machine: MachineSnapshot,

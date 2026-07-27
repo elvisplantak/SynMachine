@@ -23,6 +23,98 @@ class RuntimeHardwareFaultReason(StrEnum):
     CAROUSEL_MOVEMENT_FAILED = "CAROUSEL_MOVEMENT_FAILED"
 
 
+class PhaseExecutionOutcome(StrEnum):
+    COMPLETED = "COMPLETED"
+    STOPPED_AT_SAFE_BOUNDARY = "STOPPED_AT_SAFE_BOUNDARY"
+    HARDWARE_COMMAND_FAILED = "HARDWARE_COMMAND_FAILED"
+    REQUIRED_CLEANUP_FAILED = "REQUIRED_CLEANUP_FAILED"
+
+
+class PhaseExecutionResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    execution_id: str
+    outcome: PhaseExecutionOutcome
+    reported_at: datetime
+    failure_reason: str | None = None
+    cleanup_failure_reason: str | None = None
+    primary_failure_reason: str | None = None
+    runtime_fault_reason: RuntimeHardwareFaultReason | None = None
+
+    @field_validator("execution_id")
+    @classmethod
+    def validate_result_execution_id(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("execution_id must not be empty")
+        return value
+
+    @field_validator("reported_at")
+    @classmethod
+    def validate_reported_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("reported_at must be timezone-aware")
+        return value
+
+    @field_validator(
+        "failure_reason", "cleanup_failure_reason", "primary_failure_reason"
+    )
+    @classmethod
+    def validate_optional_reason(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("failure reasons must be non-empty when supplied")
+        return value
+
+    @model_validator(mode="after")
+    def validate_failure_metadata(self) -> Self:
+        if self.outcome is PhaseExecutionOutcome.HARDWARE_COMMAND_FAILED:
+            if self.failure_reason is None:
+                raise ValueError(
+                    "HARDWARE_COMMAND_FAILED requires failure_reason"
+                )
+            if (
+                self.cleanup_failure_reason is not None
+                or self.primary_failure_reason is not None
+            ):
+                raise ValueError(
+                    "HARDWARE_COMMAND_FAILED rejects cleanup failure metadata"
+                )
+            if self.runtime_fault_reason not in {
+                RuntimeHardwareFaultReason.HARDWARE_COMMAND_FAILED,
+                RuntimeHardwareFaultReason.CAROUSEL_MOVEMENT_FAILED,
+            }:
+                raise ValueError(
+                    "HARDWARE_COMMAND_FAILED requires a hardware runtime_fault_reason"
+                )
+        elif self.outcome is PhaseExecutionOutcome.REQUIRED_CLEANUP_FAILED:
+            if self.cleanup_failure_reason is None:
+                raise ValueError(
+                    "REQUIRED_CLEANUP_FAILED requires cleanup_failure_reason"
+                )
+            if self.failure_reason is not None:
+                raise ValueError(
+                    "REQUIRED_CLEANUP_FAILED uses primary_failure_reason"
+                )
+            if (
+                self.runtime_fault_reason
+                is not RuntimeHardwareFaultReason.REQUIRED_FOLLOWUP_FAILED
+            ):
+                raise ValueError(
+                    "REQUIRED_CLEANUP_FAILED requires REQUIRED_FOLLOWUP_FAILED"
+                )
+        elif any(
+            reason is not None
+            for reason in (
+                self.failure_reason,
+                self.cleanup_failure_reason,
+                self.primary_failure_reason,
+            )
+        ):
+            raise ValueError("non-failure outcome rejects failure metadata")
+        elif self.runtime_fault_reason is not None:
+            raise ValueError("non-failure outcome rejects runtime_fault_reason")
+        return self
+
+
 class PhaseExecutionIntent(BaseModel):
     model_config = ConfigDict(frozen=True)
 

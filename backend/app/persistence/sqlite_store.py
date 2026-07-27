@@ -7,12 +7,24 @@ from typing import Literal
 from pydantic import ValidationError
 
 from app.demo.execution_lifecycle import (
+    ExecutionIdAlreadyUsedError,
     PhaseExecutionClaimError,
     claim_phase_execution as claim_phase_execution_transition,
 )
 from app.demo.events import DomainEvent
 from app.demo.machine_events import MachineEvent, MachineEventType
-from app.demo.machine_models import MachineSnapshot, PhaseExecutionIntent
+from app.demo.machine_models import (
+    MachineSnapshot,
+    MachineState,
+    PhaseExecutionIntent,
+    PhaseExecutionResult,
+)
+from app.demo.phase_result_resolution import (
+    ExecutionAlreadyResolvedError,
+    NoActiveExecutionError,
+    PhaseExecutionResolution,
+    resolve_phase_execution as resolve_phase_execution_transition,
+)
 from app.demo.run_models import DemoRun
 
 SCHEMA_VERSION = 1
@@ -295,6 +307,31 @@ class SQLiteStore:
                 raise PhaseExecutionClaimError(
                     "machine snapshot was not found"
                 )
+            machine_events = self.load_events(
+                MACHINE_AGGREGATE, MACHINE_AGGREGATE_ID
+            )
+            resolved_ids = self._resolved_execution_ids(machine_events)
+            if (
+                machine.active_execution is not None
+                and machine.active_execution.execution_id in resolved_ids
+            ):
+                raise PersistenceDataError(
+                    "active execution is already historically resolved"
+                )
+            used_ids = {
+                event.execution_id
+                for event in machine_events
+                if isinstance(event, MachineEvent)
+                and event.event_type
+                in {
+                    MachineEventType.PHASE_EXECUTION_CLAIMED,
+                    MachineEventType.PHASE_EXECUTION_RESOLVED,
+                }
+            }
+            if execution_id in used_ids:
+                raise ExecutionIdAlreadyUsedError(
+                    f"execution_id {execution_id!r} was already used"
+                )
             result = claim_phase_execution_transition(
                 run,
                 machine,
@@ -320,6 +357,146 @@ class SQLiteStore:
             raise
 
         return active_execution
+
+    def resolve_phase_execution(
+        self,
+        result: PhaseExecutionResult,
+    ) -> PhaseExecutionResolution:
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            machine = self.load_machine_snapshot()
+            if machine is None:
+                raise PersistenceConflictError("machine snapshot was not found")
+            machine_events = self.load_events(
+                MACHINE_AGGREGATE, MACHINE_AGGREGATE_ID
+            )
+            resolved_ids = self._resolved_execution_ids(machine_events)
+            intent = machine.active_execution
+            if intent is not None and intent.execution_id in resolved_ids:
+                raise PersistenceDataError(
+                    "active execution is already historically resolved"
+                )
+            if result.execution_id in resolved_ids:
+                raise ExecutionAlreadyResolvedError(
+                    "EXECUTION_ALREADY_RESOLVED"
+                )
+            if intent is None:
+                raise NoActiveExecutionError("NO_ACTIVE_EXECUTION")
+            run_id = intent.run_id
+            run = self.load_demo_run(run_id)
+            if run is None:
+                raise PersistenceConflictError(
+                    f"Guided Demo run {run_id!r} was not found"
+                )
+            resolution = resolve_phase_execution_transition(run, machine, result)
+            self._validate_phase_execution_resolution(
+                resolution,
+                active_execution=intent,
+                result=result,
+                previous_machine_sequence=machine.event_sequence,
+            )
+            self._validate_run_transition(
+                resolution.run, resolution.run_events
+            )
+            self._validate_machine_transition(
+                resolution.machine, resolution.machine_events
+            )
+            self._write_transition(
+                RUN_AGGREGATE,
+                resolution.run.run_id,
+                resolution.run,
+                self._normalize_events(resolution.run_events),
+            )
+            self._write_transition(
+                MACHINE_AGGREGATE,
+                MACHINE_AGGREGATE_ID,
+                resolution.machine,
+                self._normalize_events(resolution.machine_events),
+            )
+            self._connection.execute("COMMIT")
+        except Exception:
+            self._connection.execute("ROLLBACK")
+            raise
+        return resolution
+
+    @staticmethod
+    def _resolved_execution_ids(
+        events: Sequence[DomainEvent | MachineEvent],
+    ) -> set[str | None]:
+        return {
+            event.execution_id
+            for event in events
+            if isinstance(event, MachineEvent)
+            and event.event_type is MachineEventType.PHASE_EXECUTION_RESOLVED
+        }
+
+    @staticmethod
+    def _validate_phase_execution_resolution(
+        resolution: PhaseExecutionResolution,
+        *,
+        active_execution: PhaseExecutionIntent,
+        result: PhaseExecutionResult,
+        previous_machine_sequence: int,
+    ) -> None:
+        if not resolution.machine_events:
+            raise PersistenceConflictError(
+                "phase execution resolution requires a machine audit event"
+            )
+        event = resolution.machine_events[0]
+        if event.event_type is not MachineEventType.PHASE_EXECUTION_RESOLVED:
+            raise PersistenceConflictError(
+                "phase execution resolution must begin with PHASE_EXECUTION_RESOLVED"
+            )
+        if (
+            sum(
+                machine_event.event_type
+                is MachineEventType.PHASE_EXECUTION_RESOLVED
+                for machine_event in resolution.machine_events
+            )
+            != 1
+        ):
+            raise PersistenceConflictError(
+                "phase execution resolution requires exactly one resolution audit"
+            )
+        comparisons = (
+            ("sequence_number", event.sequence_number, previous_machine_sequence + 1),
+            ("machine_state", event.machine_state, MachineState.BUSY),
+            ("execution_id", event.execution_id, active_execution.execution_id),
+            ("run_id", event.run_id, active_execution.run_id),
+            ("execution_phase", event.execution_phase, active_execution.phase),
+            (
+                "execution_claimed_at",
+                event.execution_claimed_at,
+                active_execution.claimed_at,
+            ),
+            ("execution_outcome", event.execution_outcome, result.outcome),
+            ("occurred_at", event.occurred_at, result.reported_at),
+            (
+                "runtime_fault_reason",
+                event.runtime_fault_reason,
+                result.runtime_fault_reason,
+            ),
+            ("failure_reason", event.failure_reason, result.failure_reason),
+            (
+                "cleanup_failure_reason",
+                event.cleanup_failure_reason,
+                result.cleanup_failure_reason,
+            ),
+            (
+                "primary_failure_reason",
+                event.primary_failure_reason,
+                result.primary_failure_reason,
+            ),
+        )
+        for field_name, actual, expected in comparisons:
+            if actual != expected:
+                raise PersistenceConflictError(
+                    f"phase resolution audit {field_name} mismatch"
+                )
+        if resolution.machine.active_execution is not None:
+            raise PersistenceConflictError(
+                "phase execution resolution must clear active_execution"
+            )
 
     def persist_run_and_machine_transition(
         self,
@@ -426,6 +603,11 @@ class SQLiteStore:
                             f"final machine event {field_name} does not match "
                             f"snapshot active_execution {field_name}"
                         )
+            elif final_event.event_type is MachineEventType.PHASE_EXECUTION_RESOLVED:
+                if active_execution is not None:
+                    raise PersistenceConflictError(
+                        "resolved machine event requires cleared active_execution"
+                    )
             else:
                 if (
                     final_event.execution_id is not None
