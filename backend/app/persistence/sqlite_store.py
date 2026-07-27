@@ -6,9 +6,13 @@ from typing import Literal
 
 from pydantic import ValidationError
 
+from app.demo.execution_lifecycle import (
+    PhaseExecutionClaimError,
+    claim_phase_execution as claim_phase_execution_transition,
+)
 from app.demo.events import DomainEvent
-from app.demo.machine_events import MachineEvent
-from app.demo.machine_models import MachineSnapshot
+from app.demo.machine_events import MachineEvent, MachineEventType
+from app.demo.machine_models import MachineSnapshot, PhaseExecutionIntent
 from app.demo.run_models import DemoRun
 
 SCHEMA_VERSION = 1
@@ -206,6 +210,31 @@ class SQLiteStore:
             events=events,
         )
 
+    def persist_run_transition_and_load_machine(
+        self,
+        run: DemoRun,
+        events: Sequence[DomainEvent],
+    ) -> MachineSnapshot:
+        self._validate_run_transition(run, events)
+        normalized_events = self._normalize_events(events)
+
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            self._write_transition(
+                RUN_AGGREGATE,
+                run.run_id,
+                run,
+                normalized_events,
+            )
+            machine = self.load_machine_snapshot()
+            if machine is None:
+                raise PersistenceConflictError("machine snapshot was not found")
+            self._connection.execute("COMMIT")
+        except Exception:
+            self._connection.execute("ROLLBACK")
+            raise
+        return machine
+
     def persist_machine_transition(
         self, machine: MachineSnapshot, events: Sequence[MachineEvent]
     ) -> None:
@@ -216,6 +245,81 @@ class SQLiteStore:
             snapshot=machine,
             events=events,
         )
+
+    def persist_run_transition_with_machine_precondition(
+        self,
+        run: DemoRun,
+        events: Sequence[DomainEvent],
+        *,
+        expected_machine_event_sequence: int,
+    ) -> None:
+        self._validate_run_transition(run, events)
+        normalized_events = self._normalize_events(events)
+
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            machine = self.load_machine_snapshot()
+            if machine is None:
+                raise PersistenceConflictError("machine snapshot was not found")
+            if machine.event_sequence != expected_machine_event_sequence:
+                raise PersistenceConflictError(
+                    "machine event sequence precondition failed"
+                )
+            self._write_transition(
+                RUN_AGGREGATE,
+                run.run_id,
+                run,
+                normalized_events,
+            )
+            self._connection.execute("COMMIT")
+        except Exception:
+            self._connection.execute("ROLLBACK")
+            raise
+
+    def claim_phase_execution(
+        self,
+        *,
+        run_id: str,
+        execution_id: str,
+        claimed_at: datetime,
+    ) -> PhaseExecutionIntent:
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            run = self.load_demo_run(run_id)
+            if run is None:
+                raise PhaseExecutionClaimError(
+                    f"Guided Demo run {run_id!r} was not found"
+                )
+            machine = self.load_machine_snapshot()
+            if machine is None:
+                raise PhaseExecutionClaimError(
+                    "machine snapshot was not found"
+                )
+            result = claim_phase_execution_transition(
+                run,
+                machine,
+                execution_id=execution_id,
+                claimed_at=claimed_at,
+            )
+            self._validate_machine_transition(result.machine, result.events)
+            normalized_events = self._normalize_events(result.events)
+            self._write_transition(
+                MACHINE_AGGREGATE,
+                MACHINE_AGGREGATE_ID,
+                result.machine,
+                normalized_events,
+            )
+            active_execution = result.machine.active_execution
+            if active_execution is None:
+                raise PersistenceDataError(
+                    "phase execution claim did not persist an active execution"
+                )
+            self._connection.execute("COMMIT")
+        except Exception:
+            self._connection.execute("ROLLBACK")
+            raise
+
+        return active_execution
 
     def persist_run_and_machine_transition(
         self,
@@ -291,6 +395,49 @@ class SQLiteStore:
                     raise PersistenceConflictError(
                         f"final machine event {field_name} does not match "
                         f"snapshot {field_name}"
+                    )
+            active_execution = machine.active_execution
+            if final_event.event_type is MachineEventType.PHASE_EXECUTION_CLAIMED:
+                if active_execution is None:
+                    raise PersistenceConflictError(
+                        "final machine claim event requires snapshot active_execution"
+                    )
+                execution_comparisons = (
+                    (
+                        "execution_id",
+                        final_event.execution_id,
+                        active_execution.execution_id,
+                    ),
+                    ("run_id", final_event.run_id, active_execution.run_id),
+                    (
+                        "execution_phase",
+                        final_event.execution_phase,
+                        active_execution.phase,
+                    ),
+                    (
+                        "occurred_at",
+                        final_event.occurred_at,
+                        active_execution.claimed_at,
+                    ),
+                )
+                for field_name, event_value, snapshot_value in execution_comparisons:
+                    if event_value != snapshot_value:
+                        raise PersistenceConflictError(
+                            f"final machine event {field_name} does not match "
+                            f"snapshot active_execution {field_name}"
+                        )
+            else:
+                if (
+                    final_event.execution_id is not None
+                    or final_event.execution_phase is not None
+                ):
+                    raise PersistenceConflictError(
+                        "non-claim machine event must not contain execution metadata"
+                    )
+                if active_execution is not None:
+                    raise PersistenceConflictError(
+                        "snapshot active_execution requires final "
+                        "PHASE_EXECUTION_CLAIMED event"
                     )
 
     def _initialize_or_validate_schema(self) -> None:

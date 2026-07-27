@@ -1,7 +1,10 @@
+from datetime import datetime
 from enum import StrEnum
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.demo.phases import HARDWARE_EXECUTION_PHASES, RunPhase
 
 
 class MachineState(StrEnum):
@@ -20,6 +23,43 @@ class RuntimeHardwareFaultReason(StrEnum):
     CAROUSEL_MOVEMENT_FAILED = "CAROUSEL_MOVEMENT_FAILED"
 
 
+class PhaseExecutionIntent(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    execution_id: str
+    run_id: str
+    phase: RunPhase
+    claimed_at: datetime
+
+    @field_validator("execution_id")
+    @classmethod
+    def validate_execution_id(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("execution_id must not be empty")
+        return value
+
+    @field_validator("run_id")
+    @classmethod
+    def validate_run_id(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("run_id must not be empty")
+        return value
+
+    @field_validator("phase")
+    @classmethod
+    def validate_phase(cls, value: RunPhase) -> RunPhase:
+        if value not in HARDWARE_EXECUTION_PHASES:
+            raise ValueError("phase does not support hardware execution")
+        return value
+
+    @field_validator("claimed_at")
+    @classmethod
+    def validate_claimed_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("claimed_at must be timezone-aware")
+        return value
+
+
 class MachineSnapshot(BaseModel):
     """Immutable machine state; sequence zero means no machine event has been emitted yet."""
 
@@ -32,6 +72,7 @@ class MachineSnapshot(BaseModel):
     runtime_fault_reason: RuntimeHardwareFaultReason | None = None
     hardware_outcome_unknown: bool = False
     carousel_position_untrusted: bool = False
+    active_execution: PhaseExecutionIntent | None = None
 
     @field_validator("active_run_id", "interrupted_run_id")
     @classmethod
@@ -49,8 +90,19 @@ class MachineSnapshot(BaseModel):
                 raise ValueError("BUSY requires active_run_id")
             if self.interrupted_run_id is not None:
                 raise ValueError("BUSY requires interrupted_run_id to be empty")
+            if (
+                self.active_execution is not None
+                and self.active_execution.run_id != self.active_run_id
+            ):
+                raise ValueError(
+                    "active_execution run_id must match active_run_id"
+                )
         elif self.active_run_id is not None:
             raise ValueError(f"{self.state.value} requires active_run_id to be empty")
+        elif self.active_execution is not None:
+            raise ValueError(
+                f"{self.state.value} requires active_execution to be empty"
+            )
 
         if self.state in {MachineState.RECOVERY_REQUIRED, MachineState.RECOVERING}:
             if self.interrupted_run_id is None:

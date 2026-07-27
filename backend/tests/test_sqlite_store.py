@@ -5,9 +5,19 @@ from decimal import Decimal
 
 import pytest
 
+from app.demo.execution_lifecycle import (
+    PhaseExecutionClaimError,
+    claim_phase_execution,
+)
 from app.demo.events import DomainEvent
-from app.demo.lifecycle import create_demo_run, fault_run, start_run
-from app.demo.machine_events import MachineEvent
+from app.demo.lifecycle import (
+    complete_current_phase,
+    create_demo_run,
+    fault_run,
+    request_abort,
+    start_run,
+)
+from app.demo.machine_events import MachineEvent, MachineEventType
 from app.demo.machine_lifecycle import (
     complete_startup,
     create_machine,
@@ -817,3 +827,471 @@ def test_atomic_transition_second_snapshot_failure_rolls_back_everything(
         assert store.load_demo_run("run-1") == created.run
         assert store.load_machine_snapshot() == ready.machine
         assert store.load_events() == original_events
+
+
+def _persist_running_run_and_busy_machine(
+    store: SQLiteStore,
+    configuration: DemoConfiguration,
+):
+    created, ready = _persist_created_run_and_ready_machine(store, configuration)
+    started_run = start_run(created.run, NOW)
+    busy_machine = start_machine_run(ready.machine, "run-1", NOW)
+    store.persist_run_and_machine_transition(
+        started_run.run,
+        started_run.events,
+        busy_machine.machine,
+        busy_machine.events,
+    )
+    return started_run, busy_machine
+
+
+def test_atomic_phase_execution_claim_persists_event_and_snapshot(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        started, busy = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
+
+        intent = store.claim_phase_execution(
+            run_id="run-1",
+            execution_id="execution-1",
+            claimed_at=NOW,
+        )
+
+        machine = store.load_machine_snapshot()
+        assert machine.active_execution == intent
+        assert machine.event_sequence == busy.machine.event_sequence + 1
+        assert store.load_demo_run("run-1") == started.run
+        event = store.load_events("MACHINE", "machine")[-1]
+        assert event.event_type is MachineEventType.PHASE_EXECUTION_CLAIMED
+        assert (event.execution_id, event.run_id, event.execution_phase) == (
+            intent.execution_id,
+            intent.run_id,
+            intent.phase,
+        )
+
+
+@pytest.mark.parametrize("missing", ["run", "machine"])
+def test_atomic_claim_rejects_missing_state_without_writes(
+    missing: str, configuration: DemoConfiguration
+) -> None:
+    with SQLiteStore() as store:
+        if missing == "run":
+            created = create_machine(NOW)
+            store.persist_machine_transition(created.machine, created.events)
+        else:
+            created = create_demo_run(
+                "run-1", configuration, EXECUTION_SETTINGS, NOW
+            )
+            store.persist_run_transition(created.run, created.events)
+        original_events = store.load_events()
+
+        with pytest.raises(PhaseExecutionClaimError, match="not found"):
+            store.claim_phase_execution(
+                run_id="run-1",
+                execution_id="execution-1",
+                claimed_at=NOW,
+            )
+
+        assert store.load_events() == original_events
+
+
+def test_duplicate_claim_allows_exactly_one_winner(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        _persist_running_run_and_busy_machine(store, configuration)
+        first = store.claim_phase_execution(
+            run_id="run-1",
+            execution_id="execution-1",
+            claimed_at=NOW,
+        )
+        events_after_first = store.load_events()
+
+        with pytest.raises(PhaseExecutionClaimError, match="already active"):
+            store.claim_phase_execution(
+                run_id="run-1",
+                execution_id="execution-2",
+                claimed_at=NOW,
+            )
+
+        assert store.load_machine_snapshot().active_execution == first
+        assert store.load_events() == events_after_first
+
+
+def test_unresolved_execution_survives_database_reopen(
+    tmp_path, configuration: DemoConfiguration
+) -> None:
+    database = tmp_path / "active-execution.db"
+    with SQLiteStore(database) as store:
+        _persist_running_run_and_busy_machine(store, configuration)
+        intent = store.claim_phase_execution(
+            run_id="run-1",
+            execution_id="execution-1",
+            claimed_at=NOW,
+        )
+
+    with SQLiteStore(database) as reopened:
+        machine = reopened.load_machine_snapshot()
+        assert machine.active_execution == intent
+        assert machine.state is MachineState.BUSY
+
+
+def test_forced_claim_snapshot_failure_rolls_back_event(
+    tmp_path, configuration: DemoConfiguration
+) -> None:
+    database = tmp_path / "claim-rollback.db"
+    with SQLiteStore(database) as store:
+        _, busy = _persist_running_run_and_busy_machine(store, configuration)
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "CREATE TRIGGER reject_execution_claim "
+            "BEFORE UPDATE ON machine_snapshot WHEN NEW.event_sequence = 4 "
+            "BEGIN SELECT RAISE(ABORT, 'forced claim failure'); END"
+        )
+
+    with SQLiteStore(database) as store:
+        original_events = store.load_events()
+        with pytest.raises(sqlite3.IntegrityError, match="forced claim failure"):
+            store.claim_phase_execution(
+                run_id="run-1",
+                execution_id="execution-1",
+                claimed_at=NOW,
+            )
+        assert store.load_machine_snapshot() == busy.machine
+        assert store.load_events() == original_events
+
+
+@pytest.mark.parametrize(
+    ("field_name", "replacement"),
+    [
+        ("execution_id", "execution-other"),
+        ("run_id", "run-other"),
+        ("execution_phase", RunPhase.P2_TRANSFER_REACTOR_TO_SF),
+        ("occurred_at", NOW + timedelta(seconds=1)),
+    ],
+)
+def test_claim_event_metadata_must_match_snapshot(
+    field_name: str,
+    replacement: object,
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        started, busy = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
+        claim = claim_phase_execution(
+            started.run,
+            busy.machine,
+            execution_id="execution-1",
+            claimed_at=NOW,
+        )
+        mismatched = claim.events[0].model_copy(
+            update={field_name: replacement}
+        )
+
+        with pytest.raises(PersistenceConflictError, match=field_name):
+            store.persist_machine_transition(claim.machine, (mismatched,))
+
+
+def test_claim_snapshot_and_final_event_must_agree(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        started, busy = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
+        claim = claim_phase_execution(
+            started.run,
+            busy.machine,
+            execution_id="execution-1",
+            claimed_at=NOW,
+        )
+        non_claim = claim.events[0].model_copy(
+            update={
+                "event_type": MachineEventType.RUN_STARTED,
+                "execution_id": None,
+                "execution_phase": None,
+            }
+        )
+
+        with pytest.raises(
+            PersistenceConflictError, match="active_execution requires"
+        ):
+            store.persist_machine_transition(claim.machine, (non_claim,))
+
+
+def test_claim_event_requires_snapshot_intent(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        started, busy = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
+        claim = claim_phase_execution(
+            started.run,
+            busy.machine,
+            execution_id="execution-1",
+            claimed_at=NOW,
+        )
+        snapshot_without_intent = claim.machine.model_copy(
+            update={"active_execution": None}
+        )
+
+        with pytest.raises(PersistenceConflictError, match="requires snapshot"):
+            store.persist_machine_transition(
+                snapshot_without_intent, claim.events
+            )
+
+
+def test_non_claim_event_rejects_execution_metadata(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        _, busy = _persist_running_run_and_busy_machine(store, configuration)
+        non_claim = busy.events[0].model_copy(
+            update={
+                "sequence_number": busy.machine.event_sequence + 1,
+                "execution_id": "execution-1",
+                "execution_phase": RunPhase.P1_TRANSFER_S_TO_REACTOR,
+            }
+        )
+        next_machine = busy.machine.model_copy(
+            update={"event_sequence": busy.machine.event_sequence + 1}
+        )
+
+        with pytest.raises(PersistenceConflictError, match="non-claim"):
+            store.persist_machine_transition(next_machine, (non_claim,))
+
+
+def test_run_transition_machine_sequence_precondition(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        started, busy = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
+        next_run = started.run.model_copy(
+            update={
+                "event_sequence": started.run.event_sequence + 1,
+                "phase": RunPhase.P1_TRANSFER_FIRST_LIQUID_TO_REACTOR,
+            }
+        )
+        event = DomainEvent(
+            run_id="run-1",
+            sequence_number=next_run.event_sequence,
+            occurred_at=NOW,
+            event_type="PHASE_STARTED",
+            run_status=RunStatus.RUNNING,
+            run_phase=next_run.phase,
+            message="test transition",
+        )
+
+        with pytest.raises(
+            PersistenceConflictError, match="machine event sequence"
+        ):
+            store.persist_run_transition_with_machine_precondition(
+                next_run,
+                (event,),
+                expected_machine_event_sequence=busy.machine.event_sequence - 1,
+            )
+
+        assert store.load_demo_run("run-1") == started.run
+
+
+def test_run_transition_machine_precondition_validates_complete_aggregate(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        started, busy = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
+        advanced = complete_current_phase(started.run, NOW)
+        machine_events = store.load_events("MACHINE", "machine")
+
+        store.persist_run_transition_with_machine_precondition(
+            advanced.run,
+            advanced.events,
+            expected_machine_event_sequence=busy.machine.event_sequence,
+        )
+
+        assert store.load_demo_run("run-1") == advanced.run
+        assert store.load_machine_snapshot() == busy.machine
+        assert store.load_events("MACHINE", "machine") == machine_events
+
+
+def test_machine_snapshot_corruption_rolls_back_preconditioned_run_transition(
+    tmp_path, configuration: DemoConfiguration
+) -> None:
+    database = tmp_path / "precondition-corrupt-machine.db"
+    with SQLiteStore(database) as store:
+        started, busy = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
+        advanced = complete_current_phase(started.run, NOW)
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "UPDATE machine_snapshot SET snapshot_json = '{broken'"
+        )
+
+    with SQLiteStore(database) as store:
+        original_run_events = store.load_events("RUN", "run-1")
+        with pytest.raises(PersistenceDataError, match="invalid machine snapshot JSON"):
+            store.persist_run_transition_with_machine_precondition(
+                advanced.run,
+                advanced.events,
+                expected_machine_event_sequence=busy.machine.event_sequence,
+            )
+        assert store.load_demo_run("run-1") == started.run
+        assert store.load_events("RUN", "run-1") == original_run_events
+
+
+def test_machine_event_history_corruption_rolls_back_preconditioned_transition(
+    tmp_path, configuration: DemoConfiguration
+) -> None:
+    database = tmp_path / "precondition-machine-history.db"
+    with SQLiteStore(database) as store:
+        started, busy = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
+        advanced = complete_current_phase(started.run, NOW)
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "DELETE FROM domain_events WHERE aggregate_type = 'MACHINE' "
+            "AND event_sequence = 2"
+        )
+
+    with SQLiteStore(database) as store:
+        original_run_events = store.load_events("RUN", "run-1")
+        with pytest.raises(PersistenceDataError, match="non-contiguous"):
+            store.persist_run_transition_with_machine_precondition(
+                advanced.run,
+                advanced.events,
+                expected_machine_event_sequence=busy.machine.event_sequence,
+            )
+        assert store.load_demo_run("run-1") == started.run
+        assert store.load_events("RUN", "run-1") == original_run_events
+
+
+def test_run_transition_persists_and_returns_current_machine(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        started, busy = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
+        stopped = request_abort(started.run, NOW)
+        machine_events = store.load_events("MACHINE", "machine")
+
+        returned_machine = store.persist_run_transition_and_load_machine(
+            stopped.run,
+            stopped.events,
+        )
+
+        assert returned_machine == busy.machine
+        assert store.load_demo_run("run-1") == stopped.run
+        assert store.load_machine_snapshot() == busy.machine
+        assert store.load_events("MACHINE", "machine") == machine_events
+
+
+def test_run_transition_returns_existing_active_execution_unchanged(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        started, _ = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
+        intent = store.claim_phase_execution(
+            run_id="run-1",
+            execution_id="execution-1",
+            claimed_at=NOW,
+        )
+        machine_before_stop = store.load_machine_snapshot()
+        machine_events = store.load_events("MACHINE", "machine")
+        stopped = request_abort(started.run, NOW)
+
+        returned_machine = store.persist_run_transition_and_load_machine(
+            stopped.run,
+            stopped.events,
+        )
+
+        assert returned_machine == machine_before_stop
+        assert returned_machine.active_execution == intent
+        assert store.load_events("MACHINE", "machine") == machine_events
+
+
+def test_missing_machine_rolls_back_run_transition(
+    configuration: DemoConfiguration,
+) -> None:
+    created = create_demo_run(
+        "run-1", configuration, EXECUTION_SETTINGS, NOW
+    )
+    started = start_run(created.run, NOW)
+    stopped = request_abort(started.run, NOW)
+    with SQLiteStore() as store:
+        store.persist_run_transition(created.run, created.events)
+        store.persist_run_transition(started.run, started.events)
+        original_events = store.load_events("RUN", "run-1")
+
+        with pytest.raises(PersistenceConflictError, match="machine snapshot"):
+            store.persist_run_transition_and_load_machine(
+                stopped.run,
+                stopped.events,
+            )
+
+        assert store.load_demo_run("run-1") == started.run
+        assert store.load_events("RUN", "run-1") == original_events
+
+
+def test_forced_stop_snapshot_failure_rolls_back_run_event(
+    tmp_path, configuration: DemoConfiguration
+) -> None:
+    database = tmp_path / "stop-machine-read.db"
+    with SQLiteStore(database) as store:
+        started, _ = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "CREATE TRIGGER reject_stop_snapshot "
+            "BEFORE UPDATE ON demo_runs WHEN NEW.status = 'ABORTING' "
+            "BEGIN SELECT RAISE(ABORT, 'forced Stop failure'); END"
+        )
+
+    stopped = request_abort(started.run, NOW)
+    with SQLiteStore(database) as store:
+        original_events = store.load_events()
+        with pytest.raises(sqlite3.IntegrityError, match="forced Stop failure"):
+            store.persist_run_transition_and_load_machine(
+                stopped.run,
+                stopped.events,
+            )
+        assert store.load_demo_run("run-1") == started.run
+        assert store.load_events() == original_events
+
+
+def test_corrupt_machine_aggregate_rolls_back_stop_transition(
+    tmp_path, configuration: DemoConfiguration
+) -> None:
+    database = tmp_path / "stop-corrupt-machine.db"
+    with SQLiteStore(database) as store:
+        started, _ = _persist_running_run_and_busy_machine(
+            store, configuration
+        )
+        stopped = request_abort(started.run, NOW)
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "DELETE FROM domain_events WHERE aggregate_type = 'MACHINE' "
+            "AND event_sequence = 2"
+        )
+
+    with SQLiteStore(database) as store:
+        original_run_events = store.load_events("RUN", "run-1")
+        with pytest.raises(PersistenceDataError, match="non-contiguous"):
+            store.persist_run_transition_and_load_machine(
+                stopped.run,
+                stopped.events,
+            )
+        assert store.load_demo_run("run-1") == started.run
+        assert store.load_events("RUN", "run-1") == original_run_events

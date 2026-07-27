@@ -1,4 +1,6 @@
+from collections.abc import Callable
 from datetime import datetime
+from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict
 
@@ -6,10 +8,20 @@ from app.demo import lifecycle as run_lifecycle
 from app.demo import machine_lifecycle
 from app.demo.events import DomainEvent
 from app.demo.machine_events import MachineEvent
-from app.demo.machine_models import MachineSnapshot, MachineState
+from app.demo.machine_models import (
+    MachineSnapshot,
+    MachineState,
+    PhaseExecutionIntent,
+)
 from app.demo.models import DemoConfiguration, DemoExecutionSettings
 from app.demo.run_models import DemoRun, RunStatus
 from app.persistence.sqlite_store import SQLiteStore
+
+ExecutionIdFactory = Callable[[], str]
+
+
+def _generate_execution_id() -> str:
+    return str(uuid4())
 
 
 class GuidedDemoApplicationError(RuntimeError):
@@ -35,8 +47,13 @@ class GuidedDemoMachineApplicationResult(BaseModel):
 class GuidedDemoApplicationService:
     """Synchronous orchestration for Guided Demo domain transitions."""
 
-    def __init__(self, store: SQLiteStore) -> None:
+    def __init__(
+        self,
+        store: SQLiteStore,
+        execution_id_factory: ExecutionIdFactory = _generate_execution_id,
+    ) -> None:
         self._store = store
+        self._execution_id_factory = execution_id_factory
 
     def initialize_machine(
         self, occurred_at: datetime
@@ -124,9 +141,14 @@ class GuidedDemoApplicationService:
     ) -> GuidedDemoApplicationResult:
         run = self._load_run(run_id)
         machine = self._require_active_machine(run_id)
+        self._require_no_active_execution("complete current phase", machine)
         run_result = run_lifecycle.complete_current_phase(run, occurred_at)
         if run_result.run.status is not RunStatus.COMPLETED:
-            self._store.persist_run_transition(run_result.run, run_result.events)
+            self._store.persist_run_transition_with_machine_precondition(
+                run_result.run,
+                run_result.events,
+                expected_machine_event_sequence=machine.event_sequence,
+            )
             return GuidedDemoApplicationResult(
                 run=run_result.run,
                 machine=machine,
@@ -151,9 +173,12 @@ class GuidedDemoApplicationService:
         self, run_id: str, occurred_at: datetime
     ) -> GuidedDemoApplicationResult:
         run = self._load_run(run_id)
-        machine = self._require_active_machine(run_id)
+        self._require_active_machine(run_id)
         run_result = run_lifecycle.request_abort(run, occurred_at)
-        self._store.persist_run_transition(run_result.run, run_result.events)
+        machine = self._store.persist_run_transition_and_load_machine(
+            run_result.run,
+            run_result.events,
+        )
         return GuidedDemoApplicationResult(
             run=run_result.run,
             machine=machine,
@@ -165,6 +190,7 @@ class GuidedDemoApplicationService:
     ) -> GuidedDemoApplicationResult:
         run = self._load_run(run_id)
         machine = self._require_active_machine(run_id)
+        self._require_no_active_execution("confirm Stop demo", machine)
         run_result = run_lifecycle.confirm_abort(run, occurred_at)
         machine_result = machine_lifecycle.complete_stop_demo(
             machine, run_id, occurred_at
@@ -180,6 +206,19 @@ class GuidedDemoApplicationService:
             machine=machine_result.machine,
             run_events=run_result.events,
             machine_events=machine_result.events,
+        )
+
+    def claim_current_phase_execution(
+        self,
+        run_id: str,
+        *,
+        occurred_at: datetime,
+    ) -> PhaseExecutionIntent:
+        execution_id = self._execution_id_factory()
+        return self._store.claim_phase_execution(
+            run_id=run_id,
+            execution_id=execution_id,
+            claimed_at=occurred_at,
         )
 
     def _load_run(self, run_id: str) -> DemoRun:
@@ -206,3 +245,13 @@ class GuidedDemoApplicationService:
                 f"requested run_id {run_id!r}"
             )
         return machine
+
+    @staticmethod
+    def _require_no_active_execution(
+        operation: str, machine: MachineSnapshot
+    ) -> None:
+        if machine.active_execution is not None:
+            raise GuidedDemoApplicationError(
+                f"cannot {operation} while phase execution "
+                f"{machine.active_execution.execution_id!r} is active"
+            )

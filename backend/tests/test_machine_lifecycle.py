@@ -20,8 +20,10 @@ from app.demo.machine_lifecycle import (
 from app.demo.machine_models import (
     MachineSnapshot,
     MachineState,
+    PhaseExecutionIntent,
     RuntimeHardwareFaultReason,
 )
+from app.demo.phases import RunPhase
 
 NOW = datetime(2026, 7, 18, 12, 0, tzinfo=UTC)
 
@@ -36,6 +38,21 @@ def ready_machine() -> MachineSnapshot:
 
 def busy_machine(run_id: str = "run-1") -> MachineSnapshot:
     return start_run(ready_machine(), run_id, NOW).machine
+
+
+def busy_machine_with_execution() -> MachineSnapshot:
+    machine = busy_machine()
+    return MachineSnapshot.model_validate(
+        {
+            **machine.model_dump(mode="python"),
+            "active_execution": PhaseExecutionIntent(
+                execution_id="execution-1",
+                run_id="run-1",
+                phase=RunPhase.P1_TRANSFER_S_TO_REACTOR,
+                claimed_at=NOW,
+            ),
+        }
+    )
 
 
 def recovering_machine(run_id: str = "run-interrupted") -> MachineSnapshot:
@@ -158,6 +175,14 @@ def test_complete_run_does_not_require_flush() -> None:
     assert complete_run(busy_machine(), "run-1", NOW).machine.state is MachineState.READY
 
 
+def test_complete_run_rejects_active_execution() -> None:
+    machine = busy_machine_with_execution()
+
+    with pytest.raises(MachineTransitionError, match="matching token"):
+        complete_run(machine, "run-1", NOW)
+    assert machine.active_execution is not None
+
+
 def test_complete_run_is_rejected_outside_busy() -> None:
     with pytest.raises(MachineTransitionError, match="complete run.*READY"):
         complete_run(ready_machine(), "run-1", NOW)
@@ -177,6 +202,14 @@ def test_complete_stop_demo_requires_matching_run_and_requires_flush() -> None:
     assert "current atomic operation" in result.events[0].message
     assert "immediate" not in result.events[0].message.lower()
     assert "hardware stop" not in result.events[0].message.lower()
+
+
+def test_complete_stop_demo_rejects_active_execution() -> None:
+    machine = busy_machine_with_execution()
+
+    with pytest.raises(MachineTransitionError, match="matching token"):
+        complete_stop_demo(machine, "run-1", NOW)
+    assert machine.active_execution is not None
 
 
 @pytest.mark.parametrize("state", [state for state in MachineState if state is not MachineState.BUSY])
@@ -230,6 +263,19 @@ def test_runtime_hardware_fault_requires_recovery_with_truthful_metadata(
         "Runtime hardware fault detected; Service recovery is required"
     )
     assert event.reason is None
+
+
+def test_runtime_hardware_fault_rejects_active_execution() -> None:
+    machine = busy_machine_with_execution()
+
+    with pytest.raises(MachineTransitionError, match="matching token"):
+        record_runtime_hardware_fault(
+            machine,
+            run_id="run-1",
+            occurred_at=NOW,
+            reason=RuntimeHardwareFaultReason.HARDWARE_COMMAND_FAILED,
+        )
+    assert machine.active_execution is not None
 
 
 @pytest.mark.parametrize("run_id", ["", "   ", "run-other"])
@@ -355,6 +401,150 @@ def test_ready_snapshot_rejects_active_run_id() -> None:
         MachineSnapshot(
             state=MachineState.READY, event_sequence=4, active_run_id="run-1"
         )
+
+
+def test_active_execution_is_allowed_only_for_matching_busy_run() -> None:
+    intent = PhaseExecutionIntent(
+        execution_id="execution-1",
+        run_id="run-1",
+        phase=RunPhase.P1_TRANSFER_S_TO_REACTOR,
+        claimed_at=NOW,
+    )
+    machine = MachineSnapshot(
+        state=MachineState.BUSY,
+        event_sequence=4,
+        active_run_id="run-1",
+        active_execution=intent,
+    )
+
+    assert machine.active_execution == intent
+    with pytest.raises(ValidationError, match="must match active_run_id"):
+        MachineSnapshot(
+            state=MachineState.BUSY,
+            event_sequence=4,
+            active_run_id="run-other",
+            active_execution=intent,
+        )
+    with pytest.raises(ValidationError, match="active_execution to be empty"):
+        MachineSnapshot(
+            state=MachineState.READY,
+            event_sequence=4,
+            active_execution=intent,
+        )
+
+
+def test_legacy_machine_snapshot_defaults_active_execution_to_none() -> None:
+    machine = MachineSnapshot.model_validate(
+        {
+            "state": "BUSY",
+            "event_sequence": 4,
+            "active_run_id": "run-1",
+        }
+    )
+
+    assert machine.active_execution is None
+
+
+def test_execution_intent_rejects_unsupported_phase() -> None:
+    with pytest.raises(ValidationError, match="does not support"):
+        PhaseExecutionIntent(
+            execution_id="execution-1",
+            run_id="run-1",
+            phase=RunPhase.REACTION_HOLD,
+            claimed_at=NOW,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field_name", "expected_message"),
+    [
+        ("execution_id", "execution_id must not be empty"),
+        ("run_id", "run_id must not be empty"),
+    ],
+)
+def test_execution_intent_rejects_blank_identifier_with_specific_message(
+    field_name: str, expected_message: str
+) -> None:
+    values = {
+        "execution_id": "execution-1",
+        "run_id": "run-1",
+        "phase": RunPhase.P1_TRANSFER_S_TO_REACTOR,
+        "claimed_at": NOW,
+    }
+    values[field_name] = "   "
+
+    with pytest.raises(ValidationError, match=expected_message):
+        PhaseExecutionIntent(**values)
+
+
+def valid_execution_claim_event(**updates: object) -> MachineEvent:
+    values = {
+        "sequence_number": 4,
+        "occurred_at": NOW,
+        "event_type": MachineEventType.PHASE_EXECUTION_CLAIMED,
+        "machine_state": MachineState.BUSY,
+        "run_id": "run-1",
+        "message": "Guided Demo phase execution claimed",
+        "execution_id": "execution-1",
+        "execution_phase": RunPhase.P1_TRANSFER_S_TO_REACTOR,
+    }
+    values.update(updates)
+    return MachineEvent(**values)
+
+
+def test_valid_execution_claim_event_is_accepted() -> None:
+    event = valid_execution_claim_event()
+
+    assert event.event_type is MachineEventType.PHASE_EXECUTION_CLAIMED
+
+
+@pytest.mark.parametrize(
+    ("updates", "expected_message"),
+    [
+        ({"machine_state": MachineState.READY}, "BUSY machine_state"),
+        ({"run_id": None}, "non-empty run_id"),
+        ({"run_id": "   "}, "non-empty run_id"),
+        ({"execution_id": None}, "non-empty execution_id"),
+        ({"execution_id": "   "}, "non-empty execution_id"),
+        ({"execution_phase": None}, "requires execution_phase"),
+        (
+            {"execution_phase": RunPhase.REACTION_HOLD},
+            "execution_phase does not support",
+        ),
+        (
+            {"occurred_at": datetime(2026, 7, 18, 12, 0)},
+            "occurred_at must be timezone-aware",
+        ),
+    ],
+)
+def test_execution_claim_event_rejects_invalid_invariant(
+    updates: dict[str, object], expected_message: str
+) -> None:
+    with pytest.raises(ValidationError, match=expected_message):
+        valid_execution_claim_event(**updates)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("execution_id", "execution-1"),
+        ("execution_phase", RunPhase.P1_TRANSFER_S_TO_REACTOR),
+    ],
+)
+def test_non_claim_event_rejects_execution_metadata(
+    field_name: str, value: object
+) -> None:
+    values = {
+        "sequence_number": 1,
+        "occurred_at": NOW,
+        "event_type": MachineEventType.MACHINE_CREATED,
+        "machine_state": MachineState.STARTING,
+        "message": "Machine lifecycle created",
+        field_name: value,
+    }
+
+    with pytest.raises(ValidationError, match="execution metadata requires"):
+        MachineEvent(**values)
 
 
 @pytest.mark.parametrize(

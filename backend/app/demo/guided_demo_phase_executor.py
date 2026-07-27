@@ -22,7 +22,7 @@ from app.demo.p2_reactor_to_sf_operation_plan import (
 from app.demo.p2_sf_to_column_operation_plan import (
     plan_p2_sf_to_column_operations,
 )
-from app.demo.phases import RunPhase
+from app.demo.phases import HARDWARE_EXECUTION_PHASES, RunPhase
 from app.demo.run_models import DemoRun
 
 
@@ -83,6 +83,8 @@ class GuidedDemoPhaseExecutor:
         *,
         column_readiness: ColumnFractionCollectionReadiness | None,
     ) -> tuple[PlannedOperation, ...]:
+        if run.phase not in HARDWARE_EXECUTION_PHASES:
+            raise UnsupportedGuidedDemoExecutionPhaseError(run.phase)
         if run.phase is RunPhase.P1_TRANSFER_S_TO_REACTOR:
             return plan_p1_solvent_to_reactor_operations(
                 run.fluid_plan,
@@ -122,4 +124,6 @@ class GuidedDemoPhaseExecutor:
             return plan_column_fraction_collection_operations(
                 configuration
             ).operations
-        raise UnsupportedGuidedDemoExecutionPhaseError(run.phase)
+        raise AssertionError(
+            f"missing Guided Demo execution builder for phase {run.phase.value}"
+        )

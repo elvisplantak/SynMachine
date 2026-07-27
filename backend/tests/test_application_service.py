@@ -21,6 +21,7 @@ from app.demo.models import AdditionOrder, DemoConfiguration, DemoExecutionSetti
 from app.demo.phases import RunPhase
 from app.demo.run_models import RunStatus
 from app.persistence.sqlite_store import PersistenceDataError, SQLiteStore
+from app.persistence.sqlite_store import PersistenceConflictError
 
 NOW = datetime(2026, 7, 19, 12, 0, tzinfo=UTC)
 SETTINGS = DemoExecutionSettings(
@@ -353,6 +354,253 @@ def test_request_stop_demo_keeps_machine_busy(
         assert result.machine.state is MachineState.BUSY
         assert result.machine_events == ()
         assert result.run_events[0].event_type is DomainEventType.ABORT_REQUESTED
+
+
+def test_claim_uses_injected_id_and_persists_without_executing_hardware(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        persist_ready_machine(store)
+        service = GuidedDemoApplicationService(
+            store, execution_id_factory=lambda: "execution-1"
+        )
+        create_and_start_run(service, configuration)
+
+        intent = service.claim_current_phase_execution(
+            "run-1", occurred_at=NOW
+        )
+
+        assert intent.execution_id == "execution-1"
+        assert store.load_machine_snapshot().active_execution == intent
+        assert store.load_demo_run("run-1").phase == intent.phase
+
+
+def test_duplicate_claim_preserves_first_token(
+    configuration: DemoConfiguration,
+) -> None:
+    identifiers = iter(("execution-1", "execution-2"))
+    with SQLiteStore() as store:
+        persist_ready_machine(store)
+        service = GuidedDemoApplicationService(
+            store, execution_id_factory=lambda: next(identifiers)
+        )
+        create_and_start_run(service, configuration)
+        first = service.claim_current_phase_execution("run-1", occurred_at=NOW)
+
+        with pytest.raises(ValueError, match="already active"):
+            service.claim_current_phase_execution("run-1", occurred_at=NOW)
+
+        assert store.load_machine_snapshot().active_execution == first
+
+
+def test_stop_before_claim_rejects_without_execution_write(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        persist_ready_machine(store)
+        service = GuidedDemoApplicationService(
+            store, execution_id_factory=lambda: "execution-1"
+        )
+        create_and_start_run(service, configuration)
+        service.request_stop_demo("run-1", NOW)
+        original_events = store.load_events()
+
+        with pytest.raises(ValueError, match="RUNNING"):
+            service.claim_current_phase_execution("run-1", occurred_at=NOW)
+
+        assert store.load_machine_snapshot().active_execution is None
+        assert store.load_events() == original_events
+
+
+def test_stop_after_claim_preserves_active_execution(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        persist_ready_machine(store)
+        service = GuidedDemoApplicationService(
+            store, execution_id_factory=lambda: "execution-1"
+        )
+        create_and_start_run(service, configuration)
+        intent = service.claim_current_phase_execution("run-1", occurred_at=NOW)
+
+        stopped = service.request_stop_demo("run-1", NOW)
+
+        assert stopped.run.status is RunStatus.ABORTING
+        assert stopped.machine.active_execution == intent
+        assert store.load_machine_snapshot().active_execution == intent
+
+
+def test_stop_returns_claim_committed_after_initial_machine_load(
+    configuration: DemoConfiguration,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with SQLiteStore() as store:
+        persist_ready_machine(store)
+        service = GuidedDemoApplicationService(store)
+        create_and_start_run(service, configuration)
+        original_persist = store.persist_run_transition_and_load_machine
+        claimed_intent = None
+        machine_event_count_after_claim = 0
+
+        def claim_then_persist(*args, **kwargs):
+            nonlocal claimed_intent, machine_event_count_after_claim
+            claimed_intent = store.claim_phase_execution(
+                run_id="run-1",
+                execution_id="execution-race",
+                claimed_at=NOW,
+            )
+            machine_event_count_after_claim = len(
+                store.load_events("MACHINE", "machine")
+            )
+            return original_persist(*args, **kwargs)
+
+        monkeypatch.setattr(
+            store,
+            "persist_run_transition_and_load_machine",
+            claim_then_persist,
+        )
+
+        result = service.request_stop_demo("run-1", NOW)
+
+        assert result.run.status is RunStatus.ABORTING
+        assert result.machine.state is MachineState.BUSY
+        assert result.machine.active_execution == claimed_intent
+        assert store.load_machine_snapshot().active_execution == claimed_intent
+        assert (
+            len(store.load_events("MACHINE", "machine"))
+            == machine_event_count_after_claim
+        )
+
+
+def test_active_execution_blocks_phase_completion_and_stop_confirmation(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        persist_ready_machine(store)
+        service = GuidedDemoApplicationService(
+            store, execution_id_factory=lambda: "execution-1"
+        )
+        create_and_start_run(service, configuration)
+        service.claim_current_phase_execution("run-1", occurred_at=NOW)
+        original_run = store.load_demo_run("run-1")
+        original_events = store.load_events()
+
+        with pytest.raises(GuidedDemoApplicationError, match="execution-1"):
+            service.complete_current_phase("run-1", NOW)
+        service.request_stop_demo("run-1", NOW)
+        events_after_stop = store.load_events()
+        with pytest.raises(GuidedDemoApplicationError, match="execution-1"):
+            service.confirm_stop_demo("run-1", NOW)
+
+        assert store.load_demo_run("run-1").status is RunStatus.ABORTING
+        assert store.load_demo_run("run-1").phase == original_run.phase
+        assert store.load_events() == events_after_stop
+        assert len(events_after_stop) == len(original_events) + 1
+
+
+def test_active_execution_blocks_final_phase_completion(
+    configuration: DemoConfiguration,
+) -> None:
+    with SQLiteStore() as store:
+        persist_ready_machine(store)
+        service = GuidedDemoApplicationService(
+            store, execution_id_factory=lambda: "execution-final"
+        )
+        result = create_and_start_run(service, configuration)
+        while result.run.phase is not RunPhase.COLUMN_FRACTION_COLLECTION:
+            result = service.complete_current_phase("run-1", NOW)
+        service.claim_current_phase_execution("run-1", occurred_at=NOW)
+        original_events = store.load_events()
+
+        with pytest.raises(GuidedDemoApplicationError, match="execution-final"):
+            service.complete_current_phase("run-1", NOW)
+
+        assert store.load_demo_run("run-1") == result.run
+        assert store.load_events() == original_events
+
+
+def test_final_phase_completion_rolls_back_after_concurrent_claim(
+    configuration: DemoConfiguration,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with SQLiteStore() as store:
+        persist_ready_machine(store)
+        service = GuidedDemoApplicationService(store)
+        result = create_and_start_run(service, configuration)
+        while result.run.phase is not RunPhase.COLUMN_FRACTION_COLLECTION:
+            result = service.complete_current_phase("run-1", NOW)
+        final_run = result.run
+        original_persist = store.persist_run_and_machine_transition
+
+        def claim_then_persist(*args, **kwargs) -> None:
+            store.claim_phase_execution(
+                run_id="run-1",
+                execution_id="execution-final-race",
+                claimed_at=NOW,
+            )
+            original_persist(*args, **kwargs)
+
+        monkeypatch.setattr(
+            store,
+            "persist_run_and_machine_transition",
+            claim_then_persist,
+        )
+
+        with pytest.raises(PersistenceConflictError, match="sequence"):
+            service.complete_current_phase("run-1", NOW)
+
+        persisted_run = store.load_demo_run("run-1")
+        persisted_machine = store.load_machine_snapshot()
+        assert persisted_run == final_run
+        assert persisted_run.status is RunStatus.RUNNING
+        assert persisted_run.phase is RunPhase.COLUMN_FRACTION_COLLECTION
+        assert persisted_machine.state is MachineState.BUSY
+        assert (
+            persisted_machine.active_execution.execution_id
+            == "execution-final-race"
+        )
+        machine_events = store.load_events("MACHINE", "machine")
+        assert machine_events[-1].event_type is MachineEventType.PHASE_EXECUTION_CLAIMED
+        assert all(
+            event.event_type is not MachineEventType.RUN_COMPLETED
+            for event in machine_events
+        )
+
+
+def test_intermediate_completion_rejects_concurrent_machine_change(
+    configuration: DemoConfiguration,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with SQLiteStore() as store:
+        persist_ready_machine(store)
+        service = GuidedDemoApplicationService(store)
+        started = create_and_start_run(service, configuration)
+        original_persist = (
+            store.persist_run_transition_with_machine_precondition
+        )
+
+        def claim_then_persist(*args, **kwargs) -> None:
+            store.claim_phase_execution(
+                run_id="run-1",
+                execution_id="execution-race",
+                claimed_at=NOW,
+            )
+            original_persist(*args, **kwargs)
+
+        monkeypatch.setattr(
+            store,
+            "persist_run_transition_with_machine_precondition",
+            claim_then_persist,
+        )
+
+        with pytest.raises(PersistenceConflictError, match="machine event sequence"):
+            service.complete_current_phase("run-1", NOW)
+
+        assert store.load_demo_run("run-1") == started.run
+        assert (
+            store.load_machine_snapshot().active_execution.execution_id
+            == "execution-race"
+        )
 
 
 def test_confirm_stop_demo_atomically_aborts_run_and_requires_flush(

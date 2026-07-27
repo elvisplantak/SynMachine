@@ -52,6 +52,17 @@ def _require_active_run(
     return normalized_run_id
 
 
+def _require_no_active_execution(
+    operation: str, machine: MachineSnapshot
+) -> None:
+    if machine.active_execution is not None:
+        raise _reject(
+            operation,
+            machine,
+            "active phase execution must be resolved by its matching token",
+        )
+
+
 def _event(
     machine: MachineSnapshot,
     *,
@@ -163,6 +174,7 @@ def complete_run(
     if machine.state is not MachineState.BUSY:
         raise _reject("complete run", machine, "normal run completion requires BUSY")
     normalized_run_id = _require_active_run("complete run", machine, run_id)
+    _require_no_active_execution("complete run", machine)
 
     event = _event(
         machine,
@@ -182,6 +194,7 @@ def complete_stop_demo(
     if machine.state is not MachineState.BUSY:
         raise _reject("complete Stop demo", machine, "Stop demo completion requires BUSY")
     normalized_run_id = _require_active_run("complete Stop demo", machine, run_id)
+    _require_no_active_execution("complete Stop demo", machine)
 
     event = _event(
         machine,
@@ -211,6 +224,7 @@ def record_runtime_hardware_fault(
     normalized_run_id = _require_active_run(
         "record runtime hardware fault", machine, run_id
     )
+    _require_no_active_execution("record runtime hardware fault", machine)
     carousel_position_untrusted = (
         reason is RuntimeHardwareFaultReason.CAROUSEL_MOVEMENT_FAILED
     )

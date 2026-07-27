@@ -29,7 +29,7 @@ from app.demo.operation_plan_runner import (
     PlanRunOutcome,
     PlanRunResult,
 )
-from app.demo.phases import RunPhase
+from app.demo.phases import HARDWARE_EXECUTION_PHASES, RunPhase
 from app.demo.run_models import DemoRun
 
 NOW = datetime(2026, 7, 26, 12, 0, tzinfo=UTC)
@@ -136,6 +136,12 @@ SUPPORTED_BUILDER_CASES = (
         "plan_column_fraction_collection_operations",
     ),
 )
+
+
+def test_supported_builder_cases_match_hardware_execution_phases() -> None:
+    assert frozenset(phase for phase, _ in SUPPORTED_BUILDER_CASES) == (
+        HARDWARE_EXECUTION_PHASES
+    )
 
 
 @pytest.mark.parametrize(("phase", "builder_name"), SUPPORTED_BUILDER_CASES)
