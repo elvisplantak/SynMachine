@@ -23,6 +23,20 @@ class RuntimeHardwareFaultReason(StrEnum):
     CAROUSEL_MOVEMENT_FAILED = "CAROUSEL_MOVEMENT_FAILED"
 
 
+class StartupRecoveryReason(StrEnum):
+    EXECUTION_OUTCOME_UNKNOWN_AT_STARTUP = (
+        "EXECUTION_OUTCOME_UNKNOWN_AT_STARTUP"
+    )
+    CAROUSEL_POSITION_UNKNOWN_AT_STARTUP = (
+        "CAROUSEL_POSITION_UNKNOWN_AT_STARTUP"
+    )
+
+
+class PhaseExecutionStartupInterruptionKind(StrEnum):
+    CLAIMED_NOT_STARTED = "CLAIMED_NOT_STARTED"
+    START_COMMITTED_OUTCOME_UNKNOWN = "START_COMMITTED_OUTCOME_UNKNOWN"
+
+
 class PhaseExecutionOutcome(StrEnum):
     COMPLETED = "COMPLETED"
     STOPPED_AT_SAFE_BOUNDARY = "STOPPED_AT_SAFE_BOUNDARY"
@@ -183,6 +197,7 @@ class MachineSnapshot(BaseModel):
     active_run_id: str | None = None
     interrupted_run_id: str | None = None
     runtime_fault_reason: RuntimeHardwareFaultReason | None = None
+    startup_recovery_reason: StartupRecoveryReason | None = None
     hardware_outcome_unknown: bool = False
     carousel_position_untrusted: bool = False
     active_execution: PhaseExecutionIntent | None = None
@@ -227,20 +242,32 @@ class MachineSnapshot(BaseModel):
                 )
 
         if self.state is MachineState.RECOVERY_REQUIRED:
-            if self.runtime_fault_reason is None:
-                raise ValueError("RECOVERY_REQUIRED requires runtime_fault_reason")
+            recovery_causes = sum(
+                reason is not None
+                for reason in (
+                    self.runtime_fault_reason,
+                    self.startup_recovery_reason,
+                )
+            )
+            if recovery_causes != 1:
+                raise ValueError(
+                    "RECOVERY_REQUIRED requires exactly one recovery reason"
+                )
             if not self.hardware_outcome_unknown:
                 raise ValueError("RECOVERY_REQUIRED requires hardware_outcome_unknown")
-            carousel_failure = (
+            carousel_untrusted_reason = (
                 self.runtime_fault_reason
                 is RuntimeHardwareFaultReason.CAROUSEL_MOVEMENT_FAILED
+                or self.startup_recovery_reason
+                is StartupRecoveryReason.CAROUSEL_POSITION_UNKNOWN_AT_STARTUP
             )
-            if self.carousel_position_untrusted is not carousel_failure:
+            if self.carousel_position_untrusted is not carousel_untrusted_reason:
                 raise ValueError(
-                    "carousel_position_untrusted must match CAROUSEL_MOVEMENT_FAILED"
+                    "carousel_position_untrusted must match a carousel recovery reason"
                 )
         elif (
             self.runtime_fault_reason is not None
+            or self.startup_recovery_reason is not None
             or self.hardware_outcome_unknown
             or self.carousel_position_untrusted
         ):

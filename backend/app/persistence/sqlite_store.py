@@ -20,6 +20,7 @@ from app.demo.machine_models import (
     MachineState,
     PhaseExecutionIntent,
     PhaseExecutionResult,
+    PhaseExecutionStartupInterruptionKind,
 )
 from app.demo.phase_result_resolution import (
     ExecutionAlreadyResolvedError,
@@ -27,8 +28,13 @@ from app.demo.phase_result_resolution import (
     PhaseExecutionResolution,
     resolve_phase_execution as resolve_phase_execution_transition,
 )
-from app.demo.phases import RunPhase
+from app.demo.phases import HARDWARE_EXECUTION_PHASES, RunPhase
 from app.demo.run_models import DemoRun
+from app.demo.startup_execution_reconciliation import (
+    StartupExecutionReconciliationError,
+    StartupExecutionReconciliationResult,
+    reconcile_interrupted_phase_execution_at_startup as reconcile_startup_transition,
+)
 
 SCHEMA_VERSION = 1
 RUN_AGGREGATE = "RUN"
@@ -112,6 +118,13 @@ class PersistenceDataError(PersistenceError):
 
 class PersistenceConflictError(PersistenceError):
     """Raised for stale, duplicate, skipped, overlapping, or replayed writes."""
+
+
+class StartupExecutionReconciliationConflictError(
+    PersistenceConflictError,
+    StartupExecutionReconciliationError,
+):
+    """Raised when startup execution reconciliation cannot consume a token."""
 
 
 class SQLiteStore:
@@ -323,17 +336,25 @@ class SQLiteStore:
             machine_events = self.load_events(
                 MACHINE_AGGREGATE, MACHINE_AGGREGATE_ID
             )
+            self._validate_startup_interruption_history(machine_events)
             self._validate_active_execution_start_history(
                 machine, machine_events
             )
-            resolved_ids = self._resolved_execution_ids(machine_events)
-            if (
-                machine.active_execution is not None
-                and machine.active_execution.execution_id in resolved_ids
-            ):
-                raise PersistenceDataError(
-                    "active execution is already historically resolved"
-                )
+            active_execution = machine.active_execution
+            if active_execution is not None:
+                if active_execution.execution_id in self._resolved_execution_ids(
+                    machine_events
+                ):
+                    raise PersistenceDataError(
+                        "active execution is already historically resolved"
+                    )
+                if (
+                    active_execution.execution_id
+                    in self._startup_interrupted_execution_ids(machine_events)
+                ):
+                    raise PersistenceDataError(
+                        "active execution is already historically interrupted"
+                    )
             used_ids = {
                 event.execution_id
                 for event in machine_events
@@ -342,6 +363,7 @@ class SQLiteStore:
                 in {
                     MachineEventType.PHASE_EXECUTION_CLAIMED,
                     MachineEventType.PHASE_EXECUTION_RESOLVED,
+                    MachineEventType.PHASE_EXECUTION_INTERRUPTED_AT_STARTUP,
                 }
             }
             if execution_id in used_ids:
@@ -386,18 +408,30 @@ class SQLiteStore:
             machine_events = self.load_events(
                 MACHINE_AGGREGATE, MACHINE_AGGREGATE_ID
             )
+            self._validate_startup_interruption_history(machine_events)
             self._validate_active_execution_start_history(
                 machine, machine_events
             )
             resolved_ids = self._resolved_execution_ids(machine_events)
+            interrupted_ids = self._startup_interrupted_execution_ids(
+                machine_events
+            )
             intent = machine.active_execution
             if intent is not None and intent.execution_id in resolved_ids:
                 raise PersistenceDataError(
                     "active execution is already historically resolved"
                 )
+            if intent is not None and intent.execution_id in interrupted_ids:
+                raise PersistenceDataError(
+                    "active execution is already historically interrupted"
+                )
             if result.execution_id in resolved_ids:
                 raise ExecutionAlreadyResolvedError(
                     "EXECUTION_ALREADY_RESOLVED"
+                )
+            if result.execution_id in interrupted_ids:
+                raise ExecutionAlreadyResolvedError(
+                    "EXECUTION_ALREADY_TERMINALLY_CONSUMED"
                 )
             if intent is None:
                 raise NoActiveExecutionError("NO_ACTIVE_EXECUTION")
@@ -461,6 +495,7 @@ class SQLiteStore:
             machine_events = self.load_events(
                 MACHINE_AGGREGATE, MACHINE_AGGREGATE_ID
             )
+            self._validate_startup_interruption_history(machine_events)
             self._validate_active_execution_start_history(
                 machine, machine_events
             )
@@ -488,6 +523,89 @@ class SQLiteStore:
             raise
         return result
 
+    def reconcile_interrupted_phase_execution_at_startup(
+        self,
+        occurred_at: datetime,
+    ) -> StartupExecutionReconciliationResult:
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            machine = self.load_machine_snapshot()
+            if machine is None:
+                raise StartupExecutionReconciliationConflictError(
+                    "machine snapshot was not found"
+                )
+            if (
+                machine.state is not MachineState.BUSY
+                or machine.active_run_id is None
+                or machine.active_execution is None
+            ):
+                raise StartupExecutionReconciliationConflictError(
+                    "startup execution reconciliation requires BUSY machine "
+                    "with an active run and execution"
+                )
+            machine_events = self.load_events(
+                MACHINE_AGGREGATE, MACHINE_AGGREGATE_ID
+            )
+            self._validate_startup_interruption_history(machine_events)
+            self._validate_active_execution_start_history(
+                machine, machine_events
+            )
+            intent = machine.active_execution
+            if intent.execution_id in self._terminal_execution_ids(machine_events):
+                raise PersistenceDataError(
+                    "active execution is already historically terminal"
+                )
+            run = self.load_demo_run(machine.active_run_id)
+            if run is None:
+                raise StartupExecutionReconciliationConflictError(
+                    f"Guided Demo run {machine.active_run_id!r} was not found"
+                )
+            if (
+                run.run_id != intent.run_id
+                or run.phase != intent.phase
+                or run.phase not in HARDWARE_EXECUTION_PHASES
+            ):
+                raise StartupExecutionReconciliationConflictError(
+                    "startup execution reconciliation requires matching "
+                    "run and execution"
+                )
+            try:
+                reconciliation = reconcile_startup_transition(
+                    run, machine, occurred_at
+                )
+            except StartupExecutionReconciliationError as error:
+                raise StartupExecutionReconciliationConflictError(
+                    str(error)
+                ) from error
+            self._validate_run_transition(
+                reconciliation.run, reconciliation.run_events
+            )
+            self._validate_machine_transition(
+                reconciliation.machine, reconciliation.machine_events
+            )
+            self._validate_startup_reconciliation(
+                reconciliation,
+                active_execution=intent,
+                previous_machine_sequence=machine.event_sequence,
+            )
+            self._write_transition(
+                RUN_AGGREGATE,
+                reconciliation.run.run_id,
+                reconciliation.run,
+                self._normalize_events(reconciliation.run_events),
+            )
+            self._write_transition(
+                MACHINE_AGGREGATE,
+                MACHINE_AGGREGATE_ID,
+                reconciliation.machine,
+                self._normalize_events(reconciliation.machine_events),
+            )
+            self._connection.execute("COMMIT")
+        except Exception:
+            self._connection.execute("ROLLBACK")
+            raise
+        return reconciliation
+
     @staticmethod
     def _resolved_execution_ids(
         events: Sequence[DomainEvent | MachineEvent],
@@ -500,6 +618,132 @@ class SQLiteStore:
         }
 
     @staticmethod
+    def _startup_interrupted_execution_ids(
+        events: Sequence[DomainEvent | MachineEvent],
+    ) -> set[str | None]:
+        return {
+            event.execution_id
+            for event in events
+            if isinstance(event, MachineEvent)
+            and event.event_type
+            is MachineEventType.PHASE_EXECUTION_INTERRUPTED_AT_STARTUP
+        }
+
+    @classmethod
+    def _terminal_execution_ids(
+        cls,
+        events: Sequence[DomainEvent | MachineEvent],
+    ) -> set[str | None]:
+        return cls._resolved_execution_ids(
+            events
+        ) | cls._startup_interrupted_execution_ids(events)
+
+    @staticmethod
+    def _validate_startup_interruption_history(
+        events: Sequence[DomainEvent | MachineEvent],
+    ) -> None:
+        machine_events = tuple(
+            event for event in events if isinstance(event, MachineEvent)
+        )
+        interruptions = tuple(
+            event
+            for event in machine_events
+            if event.event_type
+            is MachineEventType.PHASE_EXECUTION_INTERRUPTED_AT_STARTUP
+        )
+        for interruption in interruptions:
+            claims = tuple(
+                event
+                for event in machine_events
+                if event.event_type is MachineEventType.PHASE_EXECUTION_CLAIMED
+                and event.execution_id == interruption.execution_id
+            )
+            if len(claims) != 1:
+                raise PersistenceDataError(
+                    "startup interruption requires exactly one matching claim"
+                )
+            claim = claims[0]
+            comparisons = (
+                ("run_id", interruption.run_id, claim.run_id),
+                (
+                    "execution_phase",
+                    interruption.execution_phase,
+                    claim.execution_phase,
+                ),
+                (
+                    "execution_claimed_at",
+                    interruption.execution_claimed_at,
+                    claim.occurred_at,
+                ),
+            )
+            for field_name, actual, expected in comparisons:
+                if actual != expected:
+                    raise PersistenceDataError(
+                        f"startup interruption {field_name} does not match claim"
+                    )
+            starts = tuple(
+                event
+                for event in machine_events
+                if event.event_type
+                is MachineEventType.PHASE_EXECUTION_START_COMMITTED
+                and event.execution_id == interruption.execution_id
+            )
+            if (
+                interruption.startup_interruption_kind
+                is PhaseExecutionStartupInterruptionKind.CLAIMED_NOT_STARTED
+            ):
+                if starts:
+                    raise PersistenceDataError(
+                        "claimed-not-started interruption has a start-commit event"
+                    )
+            else:
+                if len(starts) != 1:
+                    raise PersistenceDataError(
+                        "start-committed interruption requires exactly one "
+                        "matching start event"
+                    )
+                start = starts[0]
+                start_comparisons = (
+                    ("run_id", interruption.run_id, start.run_id),
+                    (
+                        "execution_phase",
+                        interruption.execution_phase,
+                        start.execution_phase,
+                    ),
+                    (
+                        "execution_claimed_at",
+                        interruption.execution_claimed_at,
+                        start.execution_claimed_at,
+                    ),
+                    (
+                        "execution_start_committed_at",
+                        interruption.execution_start_committed_at,
+                        start.occurred_at,
+                    ),
+                )
+                for field_name, actual, expected in start_comparisons:
+                    if actual != expected:
+                        raise PersistenceDataError(
+                            f"startup interruption {field_name} does not "
+                            "match start event"
+                        )
+            terminals = tuple(
+                event
+                for event in machine_events
+                if event.execution_id == interruption.execution_id
+                and event.event_type
+                in {
+                    MachineEventType.PHASE_EXECUTION_RESOLVED,
+                    MachineEventType.PHASE_EXECUTION_INTERRUPTED_AT_STARTUP,
+                }
+            )
+            if terminals != (interruption,):
+                raise PersistenceDataError(
+                    "startup-interrupted execution must have exactly one "
+                    "terminal event"
+                )
+
+    @staticmethod
     def _validate_active_execution_start_history(
         machine: MachineSnapshot,
         events: Sequence[DomainEvent | MachineEvent],
@@ -507,6 +751,30 @@ class SQLiteStore:
         active = machine.active_execution
         if active is None:
             return
+        claims = tuple(
+            event
+            for event in events
+            if isinstance(event, MachineEvent)
+            and event.event_type is MachineEventType.PHASE_EXECUTION_CLAIMED
+            and event.execution_id == active.execution_id
+        )
+        if len(claims) != 1:
+            raise PersistenceDataError(
+                "active execution requires exactly one matching claim event"
+            )
+        claim = claims[0]
+        claim_comparisons = (
+            ("execution_id", claim.execution_id, active.execution_id),
+            ("run_id", claim.run_id, active.run_id),
+            ("execution_phase", claim.execution_phase, active.phase),
+            ("occurred_at", claim.occurred_at, active.claimed_at),
+        )
+        for field_name, event_value, active_value in claim_comparisons:
+            if event_value != active_value:
+                raise PersistenceDataError(
+                    f"active execution claim event {field_name} does not "
+                    f"match active execution {field_name}"
+                )
         matching = tuple(
             event
             for event in events
@@ -544,6 +812,59 @@ class SQLiteStore:
                     f"active execution start event {field_name} does not "
                     f"match active execution {field_name}"
                 )
+
+    @staticmethod
+    def _validate_startup_reconciliation(
+        reconciliation: StartupExecutionReconciliationResult,
+        *,
+        active_execution: PhaseExecutionIntent,
+        previous_machine_sequence: int,
+    ) -> None:
+        if len(reconciliation.machine_events) != 1:
+            raise PersistenceConflictError(
+                "startup reconciliation requires exactly one machine event"
+            )
+        event = reconciliation.machine_events[0]
+        comparisons = (
+            (
+                "event_type",
+                event.event_type,
+                MachineEventType.PHASE_EXECUTION_INTERRUPTED_AT_STARTUP,
+            ),
+            (
+                "sequence_number",
+                event.sequence_number,
+                previous_machine_sequence + 1,
+            ),
+            ("execution_id", event.execution_id, active_execution.execution_id),
+            ("run_id", event.run_id, active_execution.run_id),
+            ("execution_phase", event.execution_phase, active_execution.phase),
+            (
+                "execution_claimed_at",
+                event.execution_claimed_at,
+                active_execution.claimed_at,
+            ),
+            (
+                "execution_start_committed_at",
+                event.execution_start_committed_at,
+                active_execution.start_committed_at,
+            ),
+            (
+                "startup_interruption_kind",
+                event.startup_interruption_kind,
+                reconciliation.interruption_kind,
+            ),
+            ("machine_state", event.machine_state, reconciliation.machine.state),
+        )
+        for field_name, actual, expected in comparisons:
+            if actual != expected:
+                raise PersistenceConflictError(
+                    f"startup reconciliation audit {field_name} mismatch"
+                )
+        if reconciliation.machine.active_execution is not None:
+            raise PersistenceConflictError(
+                "startup reconciliation must clear active_execution"
+            )
 
     @staticmethod
     def _validate_phase_execution_resolution(
@@ -672,6 +993,11 @@ class SQLiteStore:
                     machine.runtime_fault_reason,
                 ),
                 (
+                    "startup_recovery_reason",
+                    final_event.startup_recovery_reason,
+                    machine.startup_recovery_reason,
+                ),
+                (
                     "hardware_outcome_unknown",
                     final_event.hardware_outcome_unknown,
                     machine.hardware_outcome_unknown,
@@ -755,10 +1081,13 @@ class SQLiteStore:
                             f"final machine event {field_name} does not match "
                             f"snapshot active_execution {field_name}"
                         )
-            elif final_event.event_type is MachineEventType.PHASE_EXECUTION_RESOLVED:
+            elif final_event.event_type in {
+                MachineEventType.PHASE_EXECUTION_RESOLVED,
+                MachineEventType.PHASE_EXECUTION_INTERRUPTED_AT_STARTUP,
+            }:
                 if active_execution is not None:
                     raise PersistenceConflictError(
-                        "resolved machine event requires cleared active_execution"
+                        "terminal machine event requires cleared active_execution"
                     )
             else:
                 if (

@@ -589,7 +589,7 @@ def test_non_claim_event_rejects_execution_metadata(
                 "event_sequence": 1,
                 "interrupted_run_id": "run-1",
             },
-            "RECOVERY_REQUIRED requires runtime_fault_reason",
+            "RECOVERY_REQUIRED requires exactly one recovery reason",
         ),
         (
             {

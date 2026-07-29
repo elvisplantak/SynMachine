@@ -5,9 +5,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.demo.machine_models import (
     MachineState,
+    PhaseExecutionStartupInterruptionKind,
     PhaseExecutionOutcome,
     PhaseExecutionResult,
     RuntimeHardwareFaultReason,
+    StartupRecoveryReason,
 )
 from app.demo.phases import HARDWARE_EXECUTION_PHASES, RunPhase
 
@@ -22,6 +24,9 @@ class MachineEventType(StrEnum):
     PHASE_EXECUTION_CLAIMED = "PHASE_EXECUTION_CLAIMED"
     PHASE_EXECUTION_START_COMMITTED = "PHASE_EXECUTION_START_COMMITTED"
     PHASE_EXECUTION_RESOLVED = "PHASE_EXECUTION_RESOLVED"
+    PHASE_EXECUTION_INTERRUPTED_AT_STARTUP = (
+        "PHASE_EXECUTION_INTERRUPTED_AT_STARTUP"
+    )
     POWER_LOSS_DETECTED = "POWER_LOSS_DETECTED"
     RECOVERY_STARTED = "RECOVERY_STARTED"
     RECOVERY_COMPLETED = "RECOVERY_COMPLETED"
@@ -40,12 +45,15 @@ class MachineEvent(BaseModel):
     message: str
     reason: str | None = None
     runtime_fault_reason: RuntimeHardwareFaultReason | None = None
+    startup_recovery_reason: StartupRecoveryReason | None = None
     hardware_outcome_unknown: bool = False
     carousel_position_untrusted: bool = False
     execution_id: str | None = None
     execution_phase: RunPhase | None = None
     execution_outcome: PhaseExecutionOutcome | None = None
     execution_claimed_at: datetime | None = None
+    execution_start_committed_at: datetime | None = None
+    startup_interruption_kind: PhaseExecutionStartupInterruptionKind | None = None
     failure_reason: str | None = None
     cleanup_failure_reason: str | None = None
     primary_failure_reason: str | None = None
@@ -165,6 +173,93 @@ class MachineEvent(BaseModel):
                 raise ValueError(
                     "PHASE_EXECUTION_RESOLVED occurred_at precedes claimed_at"
                 )
+        elif (
+            self.event_type
+            is MachineEventType.PHASE_EXECUTION_INTERRUPTED_AT_STARTUP
+        ):
+            if (
+                self.run_id is None
+                or not self.run_id.strip()
+                or self.execution_id is None
+                or not self.execution_id.strip()
+                or self.execution_phase not in HARDWARE_EXECUTION_PHASES
+                or self.execution_claimed_at is None
+                or self.startup_interruption_kind is None
+            ):
+                raise ValueError(
+                    "PHASE_EXECUTION_INTERRUPTED_AT_STARTUP requires matching "
+                    "execution metadata"
+                )
+            if self.execution_claimed_at.tzinfo is None or (
+                self.execution_claimed_at.utcoffset() is None
+            ):
+                raise ValueError("execution_claimed_at must be timezone-aware")
+            if self.occurred_at.tzinfo is None or self.occurred_at.utcoffset() is None:
+                raise ValueError("occurred_at must be timezone-aware")
+            if self.occurred_at < self.execution_claimed_at:
+                raise ValueError("startup interruption precedes claimed_at")
+            if (
+                self.startup_interruption_kind
+                is PhaseExecutionStartupInterruptionKind.CLAIMED_NOT_STARTED
+            ):
+                if self.execution_start_committed_at is not None:
+                    raise ValueError(
+                        "CLAIMED_NOT_STARTED rejects execution_start_committed_at"
+                    )
+                if self.machine_state is not MachineState.RECOVERING:
+                    raise ValueError("CLAIMED_NOT_STARTED requires RECOVERING")
+                if self.startup_recovery_reason is not None:
+                    raise ValueError(
+                        "CLAIMED_NOT_STARTED rejects startup_recovery_reason"
+                    )
+                if self.hardware_outcome_unknown or self.carousel_position_untrusted:
+                    raise ValueError(
+                        "CLAIMED_NOT_STARTED requires trusted default metadata"
+                    )
+            else:
+                if self.execution_start_committed_at is None:
+                    raise ValueError(
+                        "START_COMMITTED_OUTCOME_UNKNOWN requires "
+                        "execution_start_committed_at"
+                    )
+                if (
+                    self.execution_start_committed_at.tzinfo is None
+                    or self.execution_start_committed_at.utcoffset() is None
+                ):
+                    raise ValueError(
+                        "execution_start_committed_at must be timezone-aware"
+                    )
+                if self.occurred_at < self.execution_start_committed_at:
+                    raise ValueError(
+                        "startup interruption precedes start_committed_at"
+                    )
+                if self.machine_state is not MachineState.RECOVERY_REQUIRED:
+                    raise ValueError(
+                        "START_COMMITTED_OUTCOME_UNKNOWN requires RECOVERY_REQUIRED"
+                    )
+                if self.startup_recovery_reason is None:
+                    raise ValueError(
+                        "START_COMMITTED_OUTCOME_UNKNOWN requires "
+                        "startup_recovery_reason"
+                    )
+                if not self.hardware_outcome_unknown:
+                    raise ValueError(
+                        "START_COMMITTED_OUTCOME_UNKNOWN requires "
+                        "hardware_outcome_unknown"
+                    )
+            if any(
+                value is not None
+                for value in (
+                    self.execution_outcome,
+                    self.failure_reason,
+                    self.cleanup_failure_reason,
+                    self.primary_failure_reason,
+                    self.runtime_fault_reason,
+                )
+            ):
+                raise ValueError(
+                    "startup interruption rejects phase-result metadata"
+                )
         elif any(
             value is not None
             for value in (
@@ -172,6 +267,8 @@ class MachineEvent(BaseModel):
                 self.execution_phase,
                 self.execution_outcome,
                 self.execution_claimed_at,
+                self.execution_start_committed_at,
+                self.startup_interruption_kind,
                 self.failure_reason,
                 self.cleanup_failure_reason,
                 self.primary_failure_reason,
@@ -179,5 +276,18 @@ class MachineEvent(BaseModel):
         ):
             raise ValueError(
                 "execution metadata requires a phase execution event"
+            )
+        if (
+            self.event_type
+            is not MachineEventType.PHASE_EXECUTION_INTERRUPTED_AT_STARTUP
+            and (
+                self.execution_start_committed_at is not None
+                or self.startup_interruption_kind is not None
+                or self.startup_recovery_reason is not None
+            )
+        ):
+            raise ValueError(
+                "startup interruption metadata requires "
+                "PHASE_EXECUTION_INTERRUPTED_AT_STARTUP"
             )
         return self
