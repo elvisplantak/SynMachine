@@ -11,6 +11,7 @@ from app.demo.machine_models import (
     MachineState,
 )
 from app.demo.models import DemoConfiguration, DemoExecutionSettings
+from app.demo.phases import HARDWARE_EXECUTION_PHASES
 from app.demo.run_models import DemoRun, RunStatus
 from app.persistence.sqlite_store import SQLiteStore
 
@@ -126,6 +127,10 @@ class GuidedDemoApplicationService:
     ) -> GuidedDemoApplicationResult:
         run = self._load_run(run_id)
         machine = self._require_active_machine(run_id)
+        if run.phase in HARDWARE_EXECUTION_PHASES:
+            raise GuidedDemoApplicationError(
+                "hardware phases must be completed through execution-result resolution"
+            )
         self._require_no_active_execution("complete current phase", machine)
         run_result = run_lifecycle.complete_current_phase(run, occurred_at)
         if run_result.run.status is not RunStatus.COMPLETED:

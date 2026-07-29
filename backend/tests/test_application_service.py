@@ -17,11 +17,11 @@ from app.demo.machine_lifecycle import (
     detect_interrupted_startup,
 )
 from app.demo.machine_models import MachineState
+from app.demo.machine_models import PhaseExecutionOutcome, PhaseExecutionResult
 from app.demo.models import AdditionOrder, DemoConfiguration, DemoExecutionSettings
-from app.demo.phases import RunPhase
+from app.demo.phases import HARDWARE_EXECUTION_PHASES, RunPhase
 from app.demo.run_models import RunStatus
 from app.persistence.sqlite_store import PersistenceDataError, SQLiteStore
-from app.persistence.sqlite_store import PersistenceConflictError
 
 NOW = datetime(2026, 7, 19, 12, 0, tzinfo=UTC)
 SETTINGS = DemoExecutionSettings(
@@ -74,6 +74,47 @@ def persist_current_phase_claim(
         expected_run_event_sequence=run.event_sequence,
         expected_phase=run.phase,
     )
+
+
+def complete_hardware_phase(store: SQLiteStore, execution_id: str) -> None:
+    run = store.load_demo_run("run-1")
+    assert run is not None
+    intent = store.claim_phase_execution(
+        run_id=run.run_id,
+        execution_id=execution_id,
+        claimed_at=NOW,
+        expected_run_event_sequence=run.event_sequence,
+        expected_phase=run.phase,
+    )
+    store.commit_phase_execution_start(
+        intent,
+        expected_run_event_sequence=run.event_sequence,
+        expected_phase=run.phase,
+        start_committed_at=NOW,
+    )
+    store.resolve_phase_execution(
+        PhaseExecutionResult(
+            execution_id=execution_id,
+            outcome=PhaseExecutionOutcome.COMPLETED,
+            reported_at=NOW,
+        )
+    )
+
+
+def advance_to_phase(
+    service: GuidedDemoApplicationService,
+    store: SQLiteStore,
+    target: RunPhase,
+) -> None:
+    execution_number = 1
+    while store.load_demo_run("run-1").phase is not target:  # type: ignore[union-attr]
+        run = store.load_demo_run("run-1")
+        assert run is not None
+        if run.phase in HARDWARE_EXECUTION_PHASES:
+            complete_hardware_phase(store, f"execution-{execution_number}")
+            execution_number += 1
+        else:
+            service.complete_current_phase("run-1", NOW)
 
 
 def persist_flush_required_machine(store: SQLiteStore) -> None:
@@ -305,51 +346,66 @@ def test_start_run_is_rejected_when_machine_is_not_ready(
         assert store.load_machine_snapshot() == created_machine.machine
 
 
-def test_intermediate_phase_completion_changes_only_run(
+@pytest.mark.parametrize("phase", sorted(HARDWARE_EXECUTION_PHASES))
+def test_hardware_phase_completion_is_rejected_without_writes(
+    phase: RunPhase,
+    configuration: DemoConfiguration,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with SQLiteStore() as store:
+        persist_ready_machine(store)
+        service = GuidedDemoApplicationService(store)
+        create_and_start_run(service, configuration)
+        persisted_run = store.load_demo_run("run-1")
+        persisted_machine = store.load_machine_snapshot()
+        persisted_events = store.load_events()
+        assert persisted_run is not None
+        hardware_phase_run = persisted_run.model_copy(update={"phase": phase})
+        monkeypatch.setattr(store, "load_demo_run", lambda run_id: hardware_phase_run)
+
+        with pytest.raises(
+            GuidedDemoApplicationError,
+            match="hardware phases must be completed through execution-result resolution",
+        ):
+            service.complete_current_phase("run-1", NOW + timedelta(seconds=3))
+
+        monkeypatch.undo()
+        assert store.load_demo_run("run-1") == persisted_run
+        assert store.load_machine_snapshot() == persisted_machine
+        assert store.load_events() == persisted_events
+
+
+@pytest.mark.parametrize(
+    ("phase", "next_phase"),
+    [
+        (
+            RunPhase.DELAY_BETWEEN_ADDITIONS,
+            RunPhase.P1_TRANSFER_SECOND_LIQUID_TO_REACTOR,
+        ),
+        (RunPhase.REACTION_HOLD, RunPhase.P2_TRANSFER_REACTOR_TO_SF),
+        (RunPhase.SF_MIXING, RunPhase.SF_SETTLING),
+        (RunPhase.SF_SETTLING, RunPhase.P2_TRANSFER_SF_TO_COLUMN),
+    ],
+)
+def test_non_hardware_phase_completion_still_advances(
+    phase: RunPhase,
+    next_phase: RunPhase,
     configuration: DemoConfiguration,
 ) -> None:
     with SQLiteStore() as store:
         persist_ready_machine(store)
         service = GuidedDemoApplicationService(store)
-        started = create_and_start_run(service, configuration)
-
-        result = service.complete_current_phase("run-1", NOW + timedelta(seconds=3))
-
-        assert (result.run.status, result.run.phase) == (
-            RunStatus.RUNNING,
-            RunPhase.P1_TRANSFER_FIRST_LIQUID_TO_REACTOR,
-        )
-        assert result.machine == started.machine
-        assert result.machine_events == ()
-        assert store.load_machine_snapshot() == started.machine
-        assert result.run_events[-1].sequence_number == 5
-
-
-def test_final_phase_completion_atomically_completes_run_and_releases_machine(
-    configuration: DemoConfiguration,
-) -> None:
-    with SQLiteStore() as store:
-        persist_ready_machine(store)
-        service = GuidedDemoApplicationService(store)
-        result = create_and_start_run(service, configuration)
-        while result.run.phase is not RunPhase.COLUMN_FRACTION_COLLECTION:
-            result = service.complete_current_phase("run-1", NOW)
+        create_and_start_run(service, configuration)
+        advance_to_phase(service, store, phase)
+        machine_before_completion = store.load_machine_snapshot()
 
         result = service.complete_current_phase("run-1", NOW)
 
-        assert (result.run.status, result.run.phase) == (
-            RunStatus.COMPLETED,
-            RunPhase.COMPLETED,
-        )
-        assert result.machine is not None
-        assert (result.machine.state, result.machine.active_run_id) == (
-            MachineState.READY,
-            None,
-        )
-        assert result.run_events[-1].event_type is DomainEventType.RUN_COMPLETED
-        assert result.machine_events[-1].event_type is MachineEventType.RUN_COMPLETED
+        assert (result.run.status, result.run.phase) == (RunStatus.RUNNING, next_phase)
+        assert result.machine == machine_before_completion
+        assert result.machine_events == ()
         assert store.load_demo_run("run-1") == result.run
-        assert store.load_machine_snapshot() == result.machine
+        assert store.load_machine_snapshot() == machine_before_completion
 
 
 def test_request_stop_demo_keeps_machine_busy(
@@ -427,7 +483,10 @@ def test_active_execution_blocks_phase_completion_and_stop_confirmation(
         original_run = store.load_demo_run("run-1")
         original_events = store.load_events()
 
-        with pytest.raises(GuidedDemoApplicationError, match="execution-1"):
+        with pytest.raises(
+            GuidedDemoApplicationError,
+            match="hardware phases must be completed through execution-result resolution",
+        ):
             service.complete_current_phase("run-1", NOW)
         service.request_stop_demo("run-1", NOW)
         events_after_stop = store.load_events()
@@ -438,117 +497,6 @@ def test_active_execution_blocks_phase_completion_and_stop_confirmation(
         assert store.load_demo_run("run-1").phase == original_run.phase
         assert store.load_events() == events_after_stop
         assert len(events_after_stop) == len(original_events) + 1
-
-
-def test_active_execution_blocks_final_phase_completion(
-    configuration: DemoConfiguration,
-) -> None:
-    with SQLiteStore() as store:
-        persist_ready_machine(store)
-        service = GuidedDemoApplicationService(store)
-        result = create_and_start_run(service, configuration)
-        while result.run.phase is not RunPhase.COLUMN_FRACTION_COLLECTION:
-            result = service.complete_current_phase("run-1", NOW)
-        persist_current_phase_claim(store, "execution-final")
-        original_events = store.load_events()
-
-        with pytest.raises(GuidedDemoApplicationError, match="execution-final"):
-            service.complete_current_phase("run-1", NOW)
-
-        assert store.load_demo_run("run-1") == result.run
-        assert store.load_events() == original_events
-
-
-def test_final_phase_completion_rolls_back_after_concurrent_claim(
-    configuration: DemoConfiguration,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    with SQLiteStore() as store:
-        persist_ready_machine(store)
-        service = GuidedDemoApplicationService(store)
-        result = create_and_start_run(service, configuration)
-        while result.run.phase is not RunPhase.COLUMN_FRACTION_COLLECTION:
-            result = service.complete_current_phase("run-1", NOW)
-        final_run = result.run
-        original_persist = store.persist_run_and_machine_transition
-
-        def claim_then_persist(*args, **kwargs) -> None:
-            run = store.load_demo_run("run-1")
-            assert run is not None
-            store.claim_phase_execution(
-                run_id="run-1",
-                execution_id="execution-final-race",
-                claimed_at=NOW,
-                expected_run_event_sequence=run.event_sequence,
-                expected_phase=run.phase,
-            )
-            original_persist(*args, **kwargs)
-
-        monkeypatch.setattr(
-            store,
-            "persist_run_and_machine_transition",
-            claim_then_persist,
-        )
-
-        with pytest.raises(PersistenceConflictError, match="sequence"):
-            service.complete_current_phase("run-1", NOW)
-
-        persisted_run = store.load_demo_run("run-1")
-        persisted_machine = store.load_machine_snapshot()
-        assert persisted_run == final_run
-        assert persisted_run.status is RunStatus.RUNNING
-        assert persisted_run.phase is RunPhase.COLUMN_FRACTION_COLLECTION
-        assert persisted_machine.state is MachineState.BUSY
-        assert (
-            persisted_machine.active_execution.execution_id
-            == "execution-final-race"
-        )
-        machine_events = store.load_events("MACHINE", "machine")
-        assert machine_events[-1].event_type is MachineEventType.PHASE_EXECUTION_CLAIMED
-        assert all(
-            event.event_type is not MachineEventType.RUN_COMPLETED
-            for event in machine_events
-        )
-
-
-def test_intermediate_completion_rejects_concurrent_machine_change(
-    configuration: DemoConfiguration,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    with SQLiteStore() as store:
-        persist_ready_machine(store)
-        service = GuidedDemoApplicationService(store)
-        started = create_and_start_run(service, configuration)
-        original_persist = (
-            store.persist_run_transition_with_machine_precondition
-        )
-
-        def claim_then_persist(*args, **kwargs) -> None:
-            run = store.load_demo_run("run-1")
-            assert run is not None
-            store.claim_phase_execution(
-                run_id="run-1",
-                execution_id="execution-race",
-                claimed_at=NOW,
-                expected_run_event_sequence=run.event_sequence,
-                expected_phase=run.phase,
-            )
-            original_persist(*args, **kwargs)
-
-        monkeypatch.setattr(
-            store,
-            "persist_run_transition_with_machine_precondition",
-            claim_then_persist,
-        )
-
-        with pytest.raises(PersistenceConflictError, match="machine event sequence"):
-            service.complete_current_phase("run-1", NOW)
-
-        assert store.load_demo_run("run-1") == started.run
-        assert (
-            store.load_machine_snapshot().active_execution.execution_id
-            == "execution-race"
-        )
 
 
 def test_confirm_stop_demo_atomically_aborts_run_and_requires_flush(

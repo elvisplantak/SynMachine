@@ -20,7 +20,6 @@ from app.demo.machine_lifecycle import (
     start_run as start_machine_run,
 )
 from app.demo.machine_models import RuntimeHardwareFaultReason
-from app.demo.phases import RunPhase
 from app.main import create_app
 from app.persistence.sqlite_store import SQLiteStore
 
@@ -247,7 +246,7 @@ def test_create_and_read_run_preserve_nested_decimal_json(client: ApiClient) -> 
     assert client.get(f"{API}/runs/missing").status_code == 404
 
 
-def test_start_and_intermediate_phase_completion_keep_machine_busy(
+def test_hardware_phase_completion_returns_409_without_advancing_run(
     client: ApiClient,
 ) -> None:
     initialize_ready_machine(client)
@@ -261,36 +260,14 @@ def test_start_and_intermediate_phase_completion_keep_machine_busy(
     assert started["machine"]["state"] == "BUSY"
     assert started["machine"]["active_run_id"] == "run-1"
 
-    advanced = client.post(
+    original_machine = client.get(f"{API}/machine").json()
+    rejected = client.post(
         f"{API}/runs/run-1/phases/current/complete", json=AWARE_COMMAND
-    ).json()
-    assert advanced["run"]["phase"] == "P1_TRANSFER_FIRST_LIQUID_TO_REACTOR"
-    assert advanced["machine"]["state"] == "BUSY"
-
-
-def test_final_phase_confirmation_completes_run_and_releases_machine(
-    client: ApiClient,
-) -> None:
-    initialize_ready_machine(client)
-    create_and_start_run(client)
-
-    current_phase = "P1_TRANSFER_S_TO_REACTOR"
-    while current_phase != RunPhase.COLUMN_FRACTION_COLLECTION:
-        response = client.post(
-            f"{API}/runs/run-1/phases/current/complete", json=AWARE_COMMAND
-        )
-        assert response.status_code == 200
-        current_phase = response.json()["run"]["phase"]
-
-    completed = client.post(
-        f"{API}/runs/run-1/phases/current/complete", json=AWARE_COMMAND
-    ).json()
-    assert (completed["run"]["status"], completed["run"]["phase"]) == (
-        "COMPLETED",
-        "COMPLETED",
     )
-    assert completed["machine"]["state"] == "READY"
-    assert completed["machine"]["active_run_id"] is None
+
+    assert rejected.status_code == 409
+    assert client.get(f"{API}/runs/run-1").json() == started["run"]
+    assert client.get(f"{API}/machine").json() == original_machine
 
 
 def test_stop_request_and_confirmation_have_separate_persisted_states(

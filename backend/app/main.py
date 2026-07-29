@@ -180,8 +180,11 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
     @application.post(
         f"{API_PREFIX}/runs/{{run_id}}/phases/current/complete",
         response_model=RunMachineResponse,
-        summary="Confirm current phase completion",
-        description="Executor confirmation only; this endpoint does not skip or execute a phase.",
+        summary="Confirm non-hardware phase completion",
+        description=(
+            "Completes only the current non-hardware phase; hardware phases must be "
+            "completed through execution-result resolution."
+        ),
     )
     def complete_current_phase(
         run_id: str, command: CommandRequest, store: Store

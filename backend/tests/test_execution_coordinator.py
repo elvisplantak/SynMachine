@@ -20,12 +20,13 @@ from app.demo.guided_demo_phase_executor import (
 from app.demo.machine_models import (
     MachineState,
     PhaseExecutionOutcome,
+    PhaseExecutionResult,
     RuntimeHardwareFaultReason,
 )
 from app.demo.machine_events import MachineEventType
 from app.demo.models import AdditionOrder, DemoConfiguration, DemoExecutionSettings
 from app.demo.operation_plan_runner import PlanRunOutcome, PlanRunResult
-from app.demo.phases import RunPhase
+from app.demo.phases import HARDWARE_EXECUTION_PHASES, RunPhase
 from app.demo.run_models import DemoRun, RunStatus
 from app.persistence.sqlite_store import PersistenceConflictError, SQLiteStore
 
@@ -198,6 +199,47 @@ def _clock() -> object:
     return lambda: next(times)
 
 
+def _complete_hardware_phase(store: SQLiteStore, execution_id: str) -> None:
+    run = store.load_demo_run("run-1")
+    assert run is not None
+    intent = store.claim_phase_execution(
+        run_id=run.run_id,
+        execution_id=execution_id,
+        claimed_at=NOW,
+        expected_run_event_sequence=run.event_sequence,
+        expected_phase=run.phase,
+    )
+    store.commit_phase_execution_start(
+        intent,
+        expected_run_event_sequence=run.event_sequence,
+        expected_phase=run.phase,
+        start_committed_at=NOW,
+    )
+    store.resolve_phase_execution(
+        PhaseExecutionResult(
+            execution_id=execution_id,
+            outcome=PhaseExecutionOutcome.COMPLETED,
+            reported_at=NOW,
+        )
+    )
+
+
+def _advance_to_phase(
+    service: GuidedDemoApplicationService,
+    store: SQLiteStore,
+    target: RunPhase,
+) -> None:
+    execution_number = 1
+    while store.load_demo_run("run-1").phase is not target:  # type: ignore[union-attr]
+        run = store.load_demo_run("run-1")
+        assert run is not None
+        if run.phase in HARDWARE_EXECUTION_PHASES:
+            _complete_hardware_phase(store, f"setup-execution-{execution_number}")
+            execution_number += 1
+        else:
+            service.complete_current_phase("run-1", NOW)
+
+
 def test_intermediate_success_claims_executes_and_advances_once() -> None:
     with SQLiteStore() as store:
         _started_service(store)
@@ -244,12 +286,11 @@ def test_preparation_failure_occurs_before_claim_or_hardware() -> None:
 def test_missing_column_readiness_does_not_persist_claim() -> None:
     with SQLiteStore() as store:
         service = _started_service(store)
-        while store.load_demo_run("run-1").phase is not (  # type: ignore[union-attr]
-            RunPhase.COLUMN_FRACTION_COLLECTION
-        ):
-            service.complete_current_phase(
-                "run-1", NOW + timedelta(seconds=3)
-            )
+        _advance_to_phase(
+            service,
+            store,
+            RunPhase.COLUMN_FRACTION_COLLECTION,
+        )
         executor = GuidedDemoPhaseExecutor(object())  # type: ignore[arg-type]
 
         with pytest.raises(MissingColumnFractionCollectionReadinessError):
@@ -285,12 +326,11 @@ def test_invalid_calibration_input_does_not_persist_claim() -> None:
 def test_final_success_completes_run_and_releases_machine() -> None:
     with SQLiteStore() as store:
         service = _started_service(store)
-        while store.load_demo_run("run-1").phase is not (  # type: ignore[union-attr]
-            RunPhase.COLUMN_FRACTION_COLLECTION
-        ):
-            service.complete_current_phase(
-                "run-1", NOW + timedelta(seconds=3)
-            )
+        _advance_to_phase(
+            service,
+            store,
+            RunPhase.COLUMN_FRACTION_COLLECTION,
+        )
         executor = RecordingPhaseExecutor()
 
         result = GuidedDemoExecutionCoordinator(
@@ -308,8 +348,8 @@ def test_final_success_completes_run_and_releases_machine() -> None:
 def test_timed_phase_and_active_claim_reject_without_hardware() -> None:
     with SQLiteStore() as store:
         service = _started_service(store)
-        service.complete_current_phase("run-1", NOW + timedelta(seconds=3))
-        service.complete_current_phase("run-1", NOW + timedelta(seconds=3))
+        _complete_hardware_phase(store, "setup-execution-1")
+        _complete_hardware_phase(store, "setup-execution-2")
         executor = RecordingPhaseExecutor()
         coordinator = GuidedDemoExecutionCoordinator(
             store,
@@ -361,9 +401,7 @@ def test_prepared_run_precondition_rejects_stale_state(change: str) -> None:
 
         def change_run() -> None:
             if change == "phase":
-                service.complete_current_phase(
-                    "run-1", NOW + timedelta(seconds=3)
-                )
+                _complete_hardware_phase(store, "concurrent-execution")
             else:
                 service.request_stop_demo(
                     "run-1", NOW + timedelta(seconds=3)
