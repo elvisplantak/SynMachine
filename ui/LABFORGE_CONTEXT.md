@@ -333,19 +333,25 @@ The V3 mapping shown in the UI represents the approved target topology:
     P2 -> V3.k1
     V3.k2 -> V7.k1
 
-## Pending physical verification and commissioning
+## Confirmed physical build and remaining commissioning
 
-The physical tubing rewiring is reported complete and explicitly confirmed by the user. The following remain separate pending checks and must not be inferred from that confirmation:
+The physical tubing matches the approved LabForge v1 topology, including `V3.k2 <-> V7.k1`, one shared solvent source `S`, and `V5` in the downstream P2 branch. Main mechanical assembly, tubing work, and wiring are substantially complete. The valves and pumps have been leak-tested, and no leaks were observed during that testing. Tested actuator motors operated correctly during the performed manual and commissioning checks.
 
-- leak testing
-- individual route testing with liquid
-- verification of every valve angle and physical route
-- verification of `SF_BOTTOM_VALVE` actuation
-- verification of `COLUMN_BOTTOM_VALVE` actuation
-- pump volumetric calibration
+These confirmations establish physical build progress, observed leak-test results, and basic observed motor movement only. They do not prove that every valve reaches the correct angle, every fluidic route is correct, homing is safe, either bottom valve is fully commissioned, or either pump delivers a calibrated volume.
+
+The following remain separate pending checks:
+
+- individual liquid-route testing
+- verification of every valve angle and corresponding physical route
+- safe homing-route verification
+- complete `SF_BOTTOM_VALVE` actuation verification
+- complete `COLUMN_BOTTOM_VALVE` actuation verification
+- pump volumetric calibration, final operational calibration, and working limits
 - safe execution interlocks
-- end-to-end hardware execution
+- end-to-end backend-to-firmware hardware execution
 - automatic phase detection
+- measured delivered-volume confirmation
+- one remaining motor connection / pin-documentation item; the available source of truth does not identify the actuator
 
 The confirmed topology is not hardware execution permission. Symbolic backend operation plans also do not authorize hardware execution.
 
@@ -612,9 +618,11 @@ Phase-dependent controls are:
 
 The preferred UI convention for unavailable controls is a disabled control, a visible lock icon, and a short explanation. A color change is optional. The backend must independently enforce all locks and phase permissions; frontend disabled state is not a safety boundary.
 
-### Topology and pending hardware verification
+### Topology and hardware verification status
 
-Guided Demo displays the complete approved target P1 and P2/SF topology. The user explicitly confirmed on 2026-07-21 that the physical tubing, including `V3.k2 <-> V7.k1`, has been connected according to that topology. Leak testing, liquid route testing, every valve angle and route, bottom-valve actuation, calibration, interlocks, and end-to-end hardware execution remain pending verification.
+Guided Demo displays the complete approved target P1 and P2/SF topology. The physical tubing, including `V3.k2 <-> V7.k1`, is confirmed connected according to that topology. Main mechanical assembly, tubing work, and wiring are substantially complete. The valves and pumps have been leak-tested with no observed leaks, and tested actuator motors moved correctly during the performed manual and commissioning checks.
+
+Individual liquid-route testing, verification of every valve angle and corresponding route, safe homing-route verification, complete bottom-valve actuation verification, pump volumetric and final operational calibration, working limits, interlocks, end-to-end backend-to-firmware hardware execution, automatic phase detection, and measured delivered-volume confirmation remain pending. One motor connection / pin-documentation item also remains pending; the currently available source of truth does not identify which actuator it concerns. Basic observed motor movement is not proof of correct valve angles, correct fluidic routes, safe homing, fully commissioned bottom valves, or calibrated pump delivery.
 
 ### Guided Demo SF-to-Column workflow decisions — 2026-07-22
 
