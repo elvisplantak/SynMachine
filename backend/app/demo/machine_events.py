@@ -27,6 +27,7 @@ class MachineEventType(StrEnum):
     PHASE_EXECUTION_INTERRUPTED_AT_STARTUP = (
         "PHASE_EXECUTION_INTERRUPTED_AT_STARTUP"
     )
+    RUN_INTERRUPTED_AT_STARTUP = "RUN_INTERRUPTED_AT_STARTUP"
     POWER_LOSS_DETECTED = "POWER_LOSS_DETECTED"
     RECOVERY_STARTED = "RECOVERY_STARTED"
     RECOVERY_COMPLETED = "RECOVERY_COMPLETED"
@@ -259,6 +260,44 @@ class MachineEvent(BaseModel):
             ):
                 raise ValueError(
                     "startup interruption rejects phase-result metadata"
+                )
+        elif self.event_type is MachineEventType.RUN_INTERRUPTED_AT_STARTUP:
+            if any(
+                value is not None
+                for value in (
+                    self.execution_id,
+                    self.execution_phase,
+                    self.execution_outcome,
+                    self.execution_claimed_at,
+                    self.execution_start_committed_at,
+                    self.startup_interruption_kind,
+                    self.failure_reason,
+                    self.cleanup_failure_reason,
+                    self.primary_failure_reason,
+                )
+            ):
+                raise ValueError(
+                    "RUN_INTERRUPTED_AT_STARTUP rejects phase-execution metadata"
+                )
+            if self.machine_state is not MachineState.RECOVERING:
+                raise ValueError("RUN_INTERRUPTED_AT_STARTUP requires RECOVERING")
+            if self.run_id is None or not self.run_id.strip():
+                raise ValueError(
+                    "RUN_INTERRUPTED_AT_STARTUP requires non-empty run_id"
+                )
+            if self.occurred_at.tzinfo is None or self.occurred_at.utcoffset() is None:
+                raise ValueError(
+                    "RUN_INTERRUPTED_AT_STARTUP occurred_at must be timezone-aware"
+                )
+            if (
+                self.reason is not None
+                or self.runtime_fault_reason is not None
+                or self.startup_recovery_reason is not None
+                or self.hardware_outcome_unknown
+                or self.carousel_position_untrusted
+            ):
+                raise ValueError(
+                    "RUN_INTERRUPTED_AT_STARTUP requires default recovery metadata"
                 )
         elif any(
             value is not None

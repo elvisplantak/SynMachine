@@ -35,6 +35,11 @@ from app.demo.startup_execution_reconciliation import (
     StartupExecutionReconciliationResult,
     reconcile_interrupted_phase_execution_at_startup as reconcile_startup_transition,
 )
+from app.demo.startup_active_run_reconciliation import (
+    StartupActiveRunReconciliationError,
+    StartupActiveRunReconciliationResult,
+    reconcile_interrupted_active_run_at_startup as reconcile_active_run_transition,
+)
 
 SCHEMA_VERSION = 1
 RUN_AGGREGATE = "RUN"
@@ -125,6 +130,13 @@ class StartupExecutionReconciliationConflictError(
     StartupExecutionReconciliationError,
 ):
     """Raised when startup execution reconciliation cannot consume a token."""
+
+
+class StartupActiveRunReconciliationConflictError(
+    PersistenceConflictError,
+    StartupActiveRunReconciliationError,
+):
+    """Raised when startup active-run reconciliation cannot consume a run."""
 
 
 class SQLiteStore:
@@ -605,6 +617,145 @@ class SQLiteStore:
             self._connection.execute("ROLLBACK")
             raise
         return reconciliation
+
+    def reconcile_interrupted_active_run_at_startup(
+        self,
+        occurred_at: datetime,
+    ) -> StartupActiveRunReconciliationResult:
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            machine = self.load_machine_snapshot()
+            if machine is None:
+                raise StartupActiveRunReconciliationConflictError(
+                    "machine snapshot was not found"
+                )
+            if (
+                machine.state is not MachineState.BUSY
+                or machine.active_run_id is None
+                or machine.active_execution is not None
+            ):
+                raise StartupActiveRunReconciliationConflictError(
+                    "startup active-run reconciliation requires BUSY machine "
+                    "with an active run and no active execution"
+                )
+            self.load_events(MACHINE_AGGREGATE, MACHINE_AGGREGATE_ID)
+            run = self.load_demo_run(machine.active_run_id)
+            if run is None:
+                raise StartupActiveRunReconciliationConflictError(
+                    f"Guided Demo run {machine.active_run_id!r} was not found"
+                )
+            self.load_events(RUN_AGGREGATE, run.run_id)
+            try:
+                reconciliation = reconcile_active_run_transition(
+                    run, machine, occurred_at
+                )
+            except StartupActiveRunReconciliationError as error:
+                raise StartupActiveRunReconciliationConflictError(
+                    str(error)
+                ) from error
+            self._validate_run_transition(
+                reconciliation.run, reconciliation.run_events
+            )
+            self._validate_machine_transition(
+                reconciliation.machine, reconciliation.machine_events
+            )
+            self._validate_active_run_startup_reconciliation(
+                reconciliation,
+                previous_active_run_id=machine.active_run_id,
+                previous_machine_sequence=machine.event_sequence,
+            )
+            self._write_transition(
+                RUN_AGGREGATE,
+                reconciliation.run.run_id,
+                reconciliation.run,
+                self._normalize_events(reconciliation.run_events),
+            )
+            self._write_transition(
+                MACHINE_AGGREGATE,
+                MACHINE_AGGREGATE_ID,
+                reconciliation.machine,
+                self._normalize_events(reconciliation.machine_events),
+            )
+            self._connection.execute("COMMIT")
+        except Exception:
+            self._connection.execute("ROLLBACK")
+            raise
+        return reconciliation
+
+    @staticmethod
+    def _validate_active_run_startup_reconciliation(
+        reconciliation: StartupActiveRunReconciliationResult,
+        *,
+        previous_active_run_id: str,
+        previous_machine_sequence: int,
+    ) -> None:
+        if len(reconciliation.machine_events) != 1:
+            raise PersistenceConflictError(
+                "active-run startup reconciliation requires exactly one "
+                "machine event"
+            )
+        event = reconciliation.machine_events[0]
+        comparisons = (
+            (
+                "event type",
+                event.event_type,
+                MachineEventType.RUN_INTERRUPTED_AT_STARTUP,
+            ),
+            (
+                "event sequence",
+                event.sequence_number,
+                previous_machine_sequence + 1,
+            ),
+            ("event machine state", event.machine_state, reconciliation.machine.state),
+            ("machine state", reconciliation.machine.state, MachineState.RECOVERING),
+            ("event run ID", event.run_id, previous_active_run_id),
+            (
+                "interrupted run ID",
+                reconciliation.machine.interrupted_run_id,
+                previous_active_run_id,
+            ),
+            (
+                "event and interrupted run ID",
+                event.run_id,
+                reconciliation.machine.interrupted_run_id,
+            ),
+            ("run ID", reconciliation.run.run_id, previous_active_run_id),
+            ("active run ID", reconciliation.machine.active_run_id, None),
+            ("active execution", reconciliation.machine.active_execution, None),
+            ("event runtime fault reason", event.runtime_fault_reason, None),
+            (
+                "snapshot runtime fault reason",
+                reconciliation.machine.runtime_fault_reason,
+                None,
+            ),
+            ("event startup recovery reason", event.startup_recovery_reason, None),
+            (
+                "snapshot startup recovery reason",
+                reconciliation.machine.startup_recovery_reason,
+                None,
+            ),
+            ("event hardware outcome unknown", event.hardware_outcome_unknown, False),
+            (
+                "snapshot hardware outcome unknown",
+                reconciliation.machine.hardware_outcome_unknown,
+                False,
+            ),
+            (
+                "event carousel position untrusted",
+                event.carousel_position_untrusted,
+                False,
+            ),
+            (
+                "snapshot carousel position untrusted",
+                reconciliation.machine.carousel_position_untrusted,
+                False,
+            ),
+        )
+        for field_name, actual, expected in comparisons:
+            if actual != expected:
+                raise PersistenceConflictError(
+                    f"active-run startup reconciliation audit {field_name} mismatch"
+                )
 
     @staticmethod
     def _resolved_execution_ids(
