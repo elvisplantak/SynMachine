@@ -2,6 +2,8 @@
 
 - Communicate with the user in Croatian/BHS. Keep code and technical identifiers in English.
 - Before firmware work, read `../labforge-ui/LABFORGE_CONTEXT.md` and local `HARDWARE_CONFIRMATIONS.md`.
+- Before modifying serial communication, parser behavior, controller sessions, command lifecycle, reconnect handling, or actuator protocol, read `docs/LABFORGE_SERIAL_PROTOCOL_V1.md`.
+- `docs/LABFORGE_SERIAL_PROTOCOL_V1.md` is canonical for software communication semantics, while `HARDWARE_CONFIRMATIONS.md` remains canonical for confirmed physical hardware facts; neither document may be used to invent unconfirmed wiring or capabilities.
 - The sibling `LABFORGE_CONTEXT.md` is the canonical system-level LabForge context. Local firmware documentation is the source for confirmed low-level hardware behavior.
 - Before edits, inspect `git status --short`, the current branch, and recent history.
 - Use a separate, clearly named Git branch for each active firmware experiment or functional change.

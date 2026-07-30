@@ -8,6 +8,8 @@ The recovered `Pump` and `Valve` implementations were experimentally useful and 
 
 System-level topology and decisions are documented in `../labforge-ui/LABFORGE_CONTEXT.md`. Confirmed firmware-specific hardware facts are documented in `HARDWARE_CONFIRMATIONS.md`.
 
+The approved, not-yet-implemented serial communication contract is documented in [`docs/LABFORGE_SERIAL_PROTOCOL_V1.md`](docs/LABFORGE_SERIAL_PROTOCOL_V1.md). Production firmware is not implemented yet.
+
 ## Repository layout
 
 - `recovery/` — untouched historical recovery files
