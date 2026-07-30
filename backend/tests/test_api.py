@@ -1,5 +1,6 @@
+import asyncio
 import sqlite3
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from json import dumps, loads
 from pathlib import Path
 from socket import AF_INET, SOCK_STREAM, socket
@@ -13,15 +14,25 @@ from fastapi import FastAPI
 from uvicorn import Config, Server
 
 import app.main as main_module
+from app.demo.application_service import GuidedDemoApplicationService
+from app.demo.machine_events import MachineEventType
 from app.demo.machine_lifecycle import (
+    complete_recovery,
     complete_startup,
     create_machine,
+    detect_interrupted_startup,
     record_runtime_hardware_fault,
+    start_flush,
     start_run as start_machine_run,
 )
-from app.demo.machine_models import RuntimeHardwareFaultReason
+from app.demo.machine_models import MachineState, RuntimeHardwareFaultReason
 from app.main import create_app
-from app.persistence.sqlite_store import SQLiteStore
+from app.persistence.sqlite_store import (
+    PersistenceDataError,
+    SQLiteStore,
+    StartupActiveRunReconciliationConflictError,
+)
+from app.startup_bootstrap import ProcessStartupDisposition
 
 API = "/api/v1"
 AWARE_COMMAND = {"occurred_at": "2026-07-19T14:00:00+02:00"}
@@ -64,13 +75,20 @@ class ApiResponse:
 class ApiClient:
     """HTTP client backed by installed Uvicorn because no HTTP test client extra is installed."""
 
-    def __init__(self, application: FastAPI) -> None:
+    def __init__(
+        self,
+        application: FastAPI,
+        *,
+        lifespan: str = "off",
+    ) -> None:
         self._socket = socket(AF_INET, SOCK_STREAM)
         self._socket.bind(("127.0.0.1", 0))
         self._socket.listen()
         port = self._socket.getsockname()[1]
         self._base_url = f"http://127.0.0.1:{port}"
-        self._server = Server(Config(application, log_level="critical", lifespan="off"))
+        self._server = Server(
+            Config(application, log_level="critical", lifespan=lifespan)
+        )
         self._thread = Thread(
             target=self._server.run,
             kwargs={"sockets": [self._socket]},
@@ -364,3 +382,292 @@ def test_persisted_corruption_remains_server_error(database: Path) -> None:
     assert response.status_code == 500
     assert response.status_code not in {404, 409}
     assert "broken" not in response.text
+
+
+def _run_lifespan(application: FastAPI) -> None:
+    async def run() -> None:
+        async with application.router.lifespan_context(application):
+            pass
+
+    asyncio.run(run())
+
+
+def _persist_api_ready_machine(database: Path) -> None:
+    occurred_at = datetime.fromisoformat(AWARE_COMMAND["occurred_at"])
+    with SQLiteStore(database) as store:
+        service = GuidedDemoApplicationService(store)
+        service.initialize_machine(occurred_at)
+        service.complete_startup(occurred_at)
+
+
+def test_lifespan_runs_before_first_request_for_ready_database(
+    database: Path,
+) -> None:
+    _persist_api_ready_machine(database)
+    occurred_at = datetime.fromisoformat(AWARE_COMMAND["occurred_at"])
+    application = create_app(database, startup_clock=lambda: occurred_at)
+
+    with ApiClient(application, lifespan="on") as client:
+        assert application.state.process_startup.disposition is (
+            ProcessStartupDisposition.READY
+        )
+        assert client.get(f"{API}/machine").json()["state"] == "READY"
+
+
+def test_lifespan_reconciles_busy_machine_before_first_read(
+    database: Path,
+) -> None:
+    occurred_at = datetime.fromisoformat(AWARE_COMMAND["occurred_at"])
+    with SQLiteStore(database) as store:
+        service = GuidedDemoApplicationService(store)
+        service.initialize_machine(occurred_at)
+        service.complete_startup(occurred_at)
+        service.create_run(
+            CREATE_RUN["run_id"],
+            main_module.DemoConfiguration(**CREATE_RUN["configuration"]),
+            main_module.DemoExecutionSettings(
+                **CREATE_RUN["execution_settings"]
+            ),
+            occurred_at,
+        )
+        service.start_run("run-1", occurred_at)
+    application = create_app(
+        database,
+        startup_clock=lambda: occurred_at + timedelta(seconds=1),
+    )
+
+    with ApiClient(application, lifespan="on") as client:
+        result = application.state.process_startup
+        assert result.disposition is (
+            ProcessStartupDisposition.ACTIVE_RUN_RECONCILED
+        )
+        assert client.get(f"{API}/machine").json()["state"] == "RECOVERING"
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        MachineState.RECOVERY_REQUIRED,
+        MachineState.RECOVERING,
+        MachineState.FLUSH_REQUIRED,
+        MachineState.FLUSHING,
+    ],
+)
+def test_lifespan_preserves_blocked_recovery_and_flush_states(
+    database: Path,
+    state: MachineState,
+) -> None:
+    occurred_at = datetime.fromisoformat(AWARE_COMMAND["occurred_at"])
+    created = create_machine(occurred_at)
+    with SQLiteStore(database) as store:
+        store.persist_machine_transition(created.machine, created.events)
+        if state in {MachineState.RECOVERING, MachineState.FLUSH_REQUIRED}:
+            recovering = detect_interrupted_startup(
+                created.machine, "run-1", occurred_at
+            )
+            store.persist_machine_transition(
+                recovering.machine, recovering.events
+            )
+            if state is MachineState.FLUSH_REQUIRED:
+                transition = complete_recovery(
+                    recovering.machine, occurred_at
+                )
+                store.persist_machine_transition(
+                    transition.machine, transition.events
+                )
+        else:
+            ready = complete_startup(created.machine, occurred_at)
+            store.persist_machine_transition(ready.machine, ready.events)
+            if state is MachineState.RECOVERY_REQUIRED:
+                busy = start_machine_run(ready.machine, "run-1", occurred_at)
+                store.persist_machine_transition(busy.machine, busy.events)
+                transition = record_runtime_hardware_fault(
+                    busy.machine,
+                    run_id="run-1",
+                    occurred_at=occurred_at,
+                    reason=RuntimeHardwareFaultReason.HARDWARE_COMMAND_FAILED,
+                )
+            else:
+                transition = start_flush(ready.machine, occurred_at)
+            store.persist_machine_transition(
+                transition.machine, transition.events
+            )
+        before = store.load_events("MACHINE", "machine")
+
+    application = create_app(database, startup_clock=lambda: occurred_at)
+    with ApiClient(application, lifespan="on") as client:
+        assert client.get(f"{API}/machine").json()["state"] == state.value
+
+    with SQLiteStore(database) as store:
+        assert store.load_events("MACHINE", "machine") == before
+
+
+def test_uninitialized_lifespan_preserves_explicit_initialize_endpoint(
+    database: Path,
+) -> None:
+    occurred_at = datetime.fromisoformat(AWARE_COMMAND["occurred_at"])
+    application = create_app(database, startup_clock=lambda: occurred_at)
+
+    with ApiClient(application, lifespan="on") as client:
+        assert application.state.process_startup.disposition is (
+            ProcessStartupDisposition.UNINITIALIZED
+        )
+        assert client.post(
+            f"{API}/machine/initialize", json=AWARE_COMMAND
+        ).status_code == 200
+
+
+def test_naive_startup_clock_prevents_lifespan_startup(database: Path) -> None:
+    application = create_app(
+        database,
+        startup_clock=lambda: datetime(2026, 7, 30, 15),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="process startup occurred_at must be timezone-aware",
+    ):
+        _run_lifespan(application)
+
+
+def test_corrupted_database_prevents_lifespan_startup(database: Path) -> None:
+    occurred_at = datetime(2026, 7, 30, 15, tzinfo=UTC)
+    created = create_machine(occurred_at)
+    with SQLiteStore(database) as store:
+        store.persist_machine_transition(created.machine, created.events)
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "UPDATE machine_snapshot SET state = 'READY'"
+        )
+    application = create_app(database, startup_clock=lambda: occurred_at)
+
+    with pytest.raises(
+        PersistenceDataError,
+        match="machine snapshot metadata does not match JSON",
+    ):
+        _run_lifespan(application)
+
+
+def test_missing_active_run_prevents_lifespan_startup(
+    database: Path,
+) -> None:
+    occurred_at = datetime(2026, 7, 30, 15, tzinfo=UTC)
+    created = create_machine(occurred_at)
+    ready = complete_startup(created.machine, occurred_at)
+    busy = start_machine_run(ready.machine, "missing-run", occurred_at)
+    with SQLiteStore(database) as store:
+        for transition in (created, ready, busy):
+            store.persist_machine_transition(
+                transition.machine, transition.events
+            )
+        machine_before = store.load_machine_snapshot()
+        events_before = store.load_events("MACHINE", "machine")
+    application = create_app(database, startup_clock=lambda: occurred_at)
+
+    with pytest.raises(
+        StartupActiveRunReconciliationConflictError,
+        match="Guided Demo run 'missing-run' was not found",
+    ):
+        _run_lifespan(application)
+
+    assert not hasattr(application.state, "process_startup")
+    with SQLiteStore(database) as store:
+        assert store.load_machine_snapshot() == machine_before
+        assert store.load_events("MACHINE", "machine") == events_before
+        assert all(
+            event.event_type is not MachineEventType.RUN_INTERRUPTED_AT_STARTUP
+            for event in store.load_events("MACHINE", "machine")
+        )
+
+
+@pytest.mark.parametrize("active_execution", [True, False])
+def test_lifespan_reconciliation_failure_rolls_back_all_persistence(
+    database: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    active_execution: bool,
+) -> None:
+    occurred_at = datetime(2026, 7, 30, 15, tzinfo=UTC)
+    with SQLiteStore(database) as store:
+        service = GuidedDemoApplicationService(store)
+        service.initialize_machine(occurred_at)
+        service.complete_startup(occurred_at)
+        service.create_run(
+            CREATE_RUN["run_id"],
+            main_module.DemoConfiguration(**CREATE_RUN["configuration"]),
+            main_module.DemoExecutionSettings(
+                **CREATE_RUN["execution_settings"]
+            ),
+            occurred_at,
+        )
+        service.start_run("run-1", occurred_at)
+        if active_execution:
+            run = store.load_demo_run("run-1")
+            assert run is not None
+            store.claim_phase_execution(
+                run_id=run.run_id,
+                execution_id="execution-1",
+                claimed_at=occurred_at + timedelta(seconds=1),
+                expected_run_event_sequence=run.event_sequence,
+                expected_phase=run.phase,
+            )
+        before = (
+            store.load_demo_run("run-1"),
+            store.load_machine_snapshot(),
+            store.load_events("RUN", "run-1"),
+            store.load_events("MACHINE", "machine"),
+        )
+
+    original_write = SQLiteStore._write_transition
+    run_write_executed = False
+
+    def fail_second_aggregate_write(
+        store,
+        aggregate_type,
+        aggregate_id,
+        snapshot,
+        events,
+    ):
+        nonlocal run_write_executed
+        if aggregate_type == "MACHINE" and run_write_executed:
+            raise RuntimeError("injected machine write failure")
+        result = original_write(
+            store,
+            aggregate_type,
+            aggregate_id,
+            snapshot,
+            events,
+        )
+        if aggregate_type == "RUN":
+            run_write_executed = True
+        return result
+
+    monkeypatch.setattr(SQLiteStore, "_write_transition", fail_second_aggregate_write)
+    application = create_app(
+        database,
+        startup_clock=lambda: occurred_at + timedelta(seconds=2),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="injected machine write failure",
+    ):
+        _run_lifespan(application)
+
+    assert run_write_executed is True
+    assert not hasattr(application.state, "process_startup")
+    with SQLiteStore(database) as store:
+        after = (
+            store.load_demo_run("run-1"),
+            store.load_machine_snapshot(),
+            store.load_events("RUN", "run-1"),
+            store.load_events("MACHINE", "machine"),
+        )
+        assert after == before
+        assert all(
+            event.event_type
+            not in {
+                MachineEventType.PHASE_EXECUTION_INTERRUPTED_AT_STARTUP,
+                MachineEventType.RUN_INTERRUPTED_AT_STARTUP,
+            }
+            for event in store.load_events("MACHINE", "machine")
+        )

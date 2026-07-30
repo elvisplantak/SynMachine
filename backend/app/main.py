@@ -1,6 +1,7 @@
 import os
-from collections.abc import Iterator
-from datetime import datetime
+from collections.abc import AsyncIterator, Callable, Iterator
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -18,6 +19,7 @@ from app.demo.machine_models import MachineSnapshot
 from app.demo.models import DemoConfiguration, DemoExecutionSettings
 from app.demo.run_models import DemoRun
 from app.persistence.sqlite_store import PersistenceConflictError, SQLiteStore
+from app.startup_bootstrap import bootstrap_process_startup
 
 API_PREFIX = "/api/v1"
 DATABASE_PATH_ENVIRONMENT_VARIABLE = "LABFORGE_DATABASE_PATH"
@@ -63,9 +65,25 @@ def _configured_database_path(database_path: str | Path | None) -> Path:
     return Path(os.environ.get(DATABASE_PATH_ENVIRONMENT_VARIABLE, DEFAULT_DATABASE_PATH))
 
 
-def create_app(database_path: str | Path | None = None) -> FastAPI:
-    application = FastAPI(title="LabForge backend")
+def create_app(
+    database_path: str | Path | None = None,
+    *,
+    startup_clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> FastAPI:
     configured_database_path = _configured_database_path(database_path)
+
+    @asynccontextmanager
+    async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+        # LabForge v1 startup reconciliation assumes one FastAPI worker.
+        occurred_at = startup_clock()
+        with SQLiteStore(configured_database_path) as store:
+            application.state.process_startup = bootstrap_process_startup(
+                store,
+                occurred_at,
+            )
+        yield
+
+    application = FastAPI(title="LabForge backend", lifespan=lifespan)
 
     def get_store() -> Iterator[SQLiteStore]:
         with SQLiteStore(configured_database_path) as store:
