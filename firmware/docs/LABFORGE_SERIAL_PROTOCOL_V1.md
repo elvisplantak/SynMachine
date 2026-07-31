@@ -108,8 +108,8 @@ fields MUST be rejected in LABFORGE/1. Missing fields are protocol errors.
 | `error_code` | 1–40 uppercase ASCII bytes; only `A-Z`, `0-9`, `_` |
 | Human-readable `message` | Optional; at most 96 UTF-8 bytes |
 | Capability name | 1–32 uppercase ASCII bytes; at most 8 capabilities |
-| `arguments` object | At most 8 members; keys are 1–24 ASCII bytes; scalar values only: string, integer, boolean, or null; strings at most 64 UTF-8 bytes; no nested object or array |
-| `result` object | Same structural bounds as `arguments` |
+| `arguments` object | At most 8 members; keys are 1–24 ASCII bytes; scalar values only: string, signed 64-bit integer, or boolean; null and floating-point numbers are not allowed; strings at most 64 UTF-8 bytes; no nested object or array |
+| `result` object | Same structural bounds as `arguments`, except future command-specific schemas may explicitly permit selected null values |
 | Any other protocol collection | At most 8 entries unless its schema sets a smaller limit |
 
 Every field and collection MUST pass its bound before actuator behavior, and
@@ -118,7 +118,8 @@ individually valid large arguments MAY therefore be rejected by the total
 limit. Excessive field or collection size returns `INVALID_FIELD`; excessive
 total payload returns `LINE_TOO_LONG`.
 
-Optional fields MUST be omitted rather than set to null. Only
+Optional command arguments MUST be omitted. Optional fields MUST be omitted
+rather than set to null. Only
 `controller_boot_id` in the untrusted-identity diagnostic state,
 `active_operation_command_id` when no command is active, and `result` values
 explicitly permitted as null by a future command schema may be null.
@@ -374,9 +375,9 @@ scoped by the cache), and operation ID (the key).
 
 Comparison MUST occur after JSON parsing and command-schema validation. Argument
 values are compared by validated typed representation, so formatting and object
-key order are irrelevant. Future schemas define integer ranges and permitted
-nulls. Floating-point arguments MUST NOT be used until a command contract
-defines their representation and comparison.
+key order are irrelevant. Generic `arguments` integers use the signed 64-bit
+range; `controller_boot_id` remains a separate unsigned 32-bit field. Argument
+values remain non-null, and floating-point numbers are unsupported.
 
 The same key and identity returns cached status/result without execution. The
 same key with different identity returns `COMMAND_ID_CONFLICT`. Cache loss after
