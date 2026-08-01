@@ -3,7 +3,7 @@ from copy import deepcopy
 import pytest
 from pydantic import ValidationError
 
-from app.protocol.models import UINT32_MAX, parse_message
+from app.protocol.models import INT64_MAX, INT64_MIN, UINT32_MAX, parse_message
 
 NONCE = "123e4567-e89b-12d3-a456-426614174000"
 OPERATION_ID = "323e4567-e89b-12d3-a456-426614174002"
@@ -153,6 +153,33 @@ def test_result_uses_same_structural_bounds() -> None:
         parse_message({**MINIMAL_MESSAGES[6], "result": {"nested": [1]}})
 
 
+@pytest.mark.parametrize(
+    ("message_index", "map_field"),
+    [(2, "arguments"), (6, "result")],
+    ids=["arguments", "result"],
+)
+def test_scalar_maps_enforce_signed_64_bit_integer_bounds(
+    message_index: int, map_field: str
+) -> None:
+    for boundary in (INT64_MIN, INT64_MAX):
+        parsed = parse_message({**MINIMAL_MESSAGES[message_index], map_field: {"value": boundary}})
+        assert getattr(parsed, map_field)["value"] == boundary
+
+    for outside in (INT64_MIN - 1, INT64_MAX + 1):
+        with pytest.raises(ValidationError):
+            parse_message({**MINIMAL_MESSAGES[message_index], map_field: {"value": outside}})
+
+
+@pytest.mark.parametrize(
+    ("message_index", "map_field"),
+    [(2, "arguments"), (6, "result")],
+    ids=["arguments", "result"],
+)
+def test_scalar_maps_preserve_booleans(message_index: int, map_field: str) -> None:
+    parsed = parse_message({**MINIMAL_MESSAGES[message_index], map_field: {"enabled": True}})
+    assert getattr(parsed, map_field)["enabled"] is True
+
+
 @pytest.mark.parametrize("field", ["message", "result"])
 def test_optional_fields_must_be_omitted_instead_of_null(field: str) -> None:
     message = deepcopy(MINIMAL_MESSAGES[7])
@@ -241,11 +268,94 @@ def test_command_status_state_specific_correlations(changes: dict[str, object]) 
         parse_message({**MINIMAL_MESSAGES[11], **changes})
 
 
-def test_protocol_error_correlation_combinations() -> None:
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"command_state": "UNKNOWN"},
+        {"command_state": "REJECTED", "phase_execution_id": "phase-1", "error_code": "FAIL"},
+        {"command_state": "ACCEPTED", "phase_execution_id": "phase-1"},
+        {"command_state": "STARTED", "phase_execution_id": "phase-1"},
+        {"command_state": "COMPLETED", "phase_execution_id": "phase-1", "result": {}},
+        {
+            "command_state": "FAILED",
+            "phase_execution_id": "phase-1",
+            "error_code": "FAIL",
+            "execution_started": True,
+        },
+    ],
+    ids=["UNKNOWN", "REJECTED", "ACCEPTED", "STARTED", "COMPLETED", "FAILED"],
+)
+def test_valid_command_status_state_fields(fields: dict[str, object]) -> None:
+    parsed = parse_message({**MINIMAL_MESSAGES[11], **fields})
+    assert parsed.command_state == fields["command_state"]
+
+
+def test_status_accepts_active_operation_command_id() -> None:
+    parsed = parse_message(
+        {**MINIMAL_MESSAGES[9], "active_operation_command_id": OPERATION_ID}
+    )
+    assert parsed.active_operation_command_id == OPERATION_ID
+
+
+@pytest.mark.parametrize("error_code", ["MALFORMED_MESSAGE", "LINE_TOO_LONG"])
+def test_protocol_error_allows_only_framing_errors_without_correlation(error_code: str) -> None:
+    parsed = parse_message({**MINIMAL_MESSAGES[12], "error_code": error_code})
+    assert parsed.error_code == error_code
+
+
+def test_protocol_error_accepts_complete_query_and_command_correlations() -> None:
     base = MINIMAL_MESSAGES[12]
-    valid_query = {**base, **BASE, "request_id": REQUEST_ID}
+    valid_query = {**base, **BASE, "request_id": REQUEST_ID, "error_code": "INVALID_FIELD"}
     assert parse_message(valid_query).request_id == REQUEST_ID
+
+    valid_command = {**base, **COMMAND, "error_code": "INVALID_FIELD"}
+    assert parse_message(valid_command).operation_command_id == OPERATION_ID
+
+    untrusted_query = {**valid_query, "controller_boot_id": None}
+    assert parse_message(untrusted_query).controller_boot_id is None
+    untrusted_command = {**valid_command, "controller_boot_id": None}
+    assert parse_message(untrusted_command).controller_boot_id is None
+
+
+@pytest.mark.parametrize("error_code", ["INVALID_FIELD", "STALE_SESSION"])
+def test_protocol_error_rejects_semantic_errors_without_correlation(error_code: str) -> None:
+    with pytest.raises(ValidationError):
+        parse_message({**MINIMAL_MESSAGES[12], "error_code": error_code})
+
+
+def test_protocol_error_rejects_incomplete_and_mixed_correlation() -> None:
+    base = MINIMAL_MESSAGES[12]
+    valid_query = {**base, **BASE, "request_id": REQUEST_ID, "error_code": "INVALID_FIELD"}
     with pytest.raises(ValidationError):
         parse_message({**valid_query, "phase_execution_id": "phase-1", "operation_command_id": OPERATION_ID})
     with pytest.raises(ValidationError):
         parse_message({**base, **BASE, "phase_execution_id": "phase-1"})
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["backend_session_nonce", "request_id"],
+)
+def test_protocol_error_rejects_explicit_null_query_correlation(field: str) -> None:
+    valid_query = {
+        **MINIMAL_MESSAGES[12],
+        **BASE,
+        "request_id": REQUEST_ID,
+        "error_code": "INVALID_FIELD",
+    }
+    with pytest.raises(ValidationError):
+        parse_message({**valid_query, field: None})
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["backend_session_nonce", "phase_execution_id", "operation_command_id"],
+)
+def test_protocol_error_rejects_explicit_null_command_correlation(field: str) -> None:
+    valid_command = {
+        **MINIMAL_MESSAGES[12],
+        **COMMAND,
+        "error_code": "INVALID_FIELD",
+    }
+    with pytest.raises(ValidationError):
+        parse_message({**valid_command, field: None})

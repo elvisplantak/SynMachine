@@ -14,6 +14,8 @@ from pydantic import (
 )
 
 PROTOCOL = "LABFORGE/1"
+INT64_MIN = -(2**63)
+INT64_MAX = 2**63 - 1
 UINT32_MAX = 2**32 - 1
 
 UuidText = Annotated[StrictStr, Field(pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")]
@@ -49,6 +51,8 @@ def _validate_map(value: dict[str, Any], field: str) -> dict[str, Scalar]:
             raise ValueError(f"invalid {field} scalar value")
         if isinstance(item, str):
             _utf8_at_most(item, 64, f"{field} string")
+        elif type(item) is int and not INT64_MIN <= item <= INT64_MAX:
+            raise ValueError(f"{field} integer is outside signed 64-bit range")
         validated[key] = item
     return validated
 
@@ -302,6 +306,11 @@ class ProtocolError(StrictMessage, ErrorFields):
         command = self.phase_execution_id is not None or self.operation_command_id is not None
         if query and command:
             raise ValueError("query and command correlations cannot be mixed")
+        if not query and not command and self.error_code not in {
+            "MALFORMED_MESSAGE",
+            "LINE_TOO_LONG",
+        }:
+            raise ValueError("protocol error correlation is required")
         return self
 
 

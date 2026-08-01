@@ -51,6 +51,12 @@ def test_bad_frame_does_not_block_following_valid_frame() -> None:
     assert isinstance(outcomes[1], ParseSuccess)
 
 
+def test_malformed_utf8_does_not_block_following_valid_frame() -> None:
+    outcomes = NdjsonStreamParser().feed(b"\xff\n" + frame(hello()))
+    assert error_code(outcomes[0]) == "MALFORMED_MESSAGE"
+    assert isinstance(outcomes[1], ParseSuccess)
+
+
 def test_oversized_frame_reports_once_and_recovers() -> None:
     parser = NdjsonStreamParser()
     outcomes = parser.feed(b"x" * 513 + b"more ignored\n" + frame(hello()))
@@ -96,6 +102,20 @@ def test_cr_is_excluded_only_directly_before_lf_at_boundary() -> None:
 def test_parse_error_classification(payload: bytes, expected: str) -> None:
     outcomes = NdjsonStreamParser().feed(payload)
     assert error_code(outcomes[0]) == expected
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b'{"protocol":"LABFORGE/1","type":"HELLO","\\u0074ype":"HELLO"}\n',
+        b'{"protocol":"LABFORGE/1","type":"HELLO","a\\u0000":1,"\\u0061\\u0000":2}\n',
+    ],
+    ids=["escaped-equivalent", "escaped-nul"],
+)
+def test_rejects_duplicate_decoded_json_keys(payload: bytes) -> None:
+    outcome = parse_error(payload)
+    assert outcome.error_code == "MALFORMED_MESSAGE"
+    assert outcome.message == "Duplicate JSON field"
 
 
 @pytest.mark.parametrize("constant", [b"NaN", b"Infinity", b"-Infinity"])
