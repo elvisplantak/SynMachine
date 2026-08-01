@@ -127,19 +127,46 @@ explicitly permitted as null by a future command schema may be null.
 ## 6. Controller boot identity and fail-closed behavior
 
 The approved design derives `controller_boot_id` from an EEPROM-backed unsigned
-boot counter advanced once per controller boot. It is not implemented.
+boot counter advanced once per controller boot. The pure, storage-independent
+record codec and selection/update logic are implemented; the Arduino EEPROM
+adapter and startup integration are not implemented.
 `MCUSR` reset cause is diagnostic metadata only and MUST NOT identify a session.
 
 A trusted boot ID exists only after a record passes version and CRC/checksum
 validation, has unambiguous ordering, is initialized or advanced successfully,
-and passes read-back verification. The future storage update MUST tolerate
-power loss, use two slots or a ring with sequence/version and integrity data,
-and MUST NOT write EEPROM per command.
+and passes read-back verification. Storage consists of two fixed 16-byte slots:
 
-If every supported slot is in the defined erased state, firmware MAY initialize
-the first record. Physical commands MUST remain disabled until the record is
-written and read back successfully. Exact layout and initialization algorithm
-remain deferred.
+| Bytes | Value |
+|---|---|
+| `0..3` | ASCII magic `LFBI` |
+| `4` | format version `1` |
+| `5..7` | reserved, all zero |
+| `8..11` | `controller_boot_id`, unsigned 32-bit little-endian |
+| `12..13` | CRC-16/CCITT-FALSE, little-endian |
+| `14` | commit marker A, `0xA5` |
+| `15` | commit marker B, `0x5A` |
+
+CRC-16/CCITT-FALSE uses polynomial `0x1021`, initial value `0xFFFF`, no
+reflection, and no final XOR, covering bytes `0..11`. A slot is valid only when
+both commit markers, magic, supported version, zero reserved bytes, CRC, and a
+nonzero boot ID all validate. Records are encoded byte by byte; C++ structure
+layout is not serialized.
+
+If both slots are fully erased (`0xFF` in every byte), slot 0 is initialized with
+ID 1. With exactly one valid slot, its ID is newest and the next ID is written to
+the other slot. With two valid slots, their IDs MUST be consecutive; the larger
+is newest and the next ID is written into the older slot. Equal, non-consecutive,
+or otherwise ambiguous valid IDs are untrusted. If neither slot is valid and the
+pair is not fully erased, identity is untrusted.
+
+Updating a target slot MUST first invalidate commit marker B, then write bytes
+`0..13`, write commit marker A, and write commit marker B last. The complete slot
+MUST then be read back and validated. The previously valid slot remains untouched
+during this sequence. Any insufficient capacity, read or write failure, failed
+read-back validation, ambiguity, or invalid non-erased pair fails closed without
+guessing an ID. A newest ID of `UINT32_MAX` is untrusted and MUST NOT wrap.
+Physical commands MUST remain disabled until initialization or advancement and
+read-back verification succeed. EEPROM MUST NOT be written per command.
 
 For invalid checksum, ambiguous ordering, an interrupted update without a
 uniquely valid newest record, read failure, unsupported record version, or any
@@ -512,10 +539,7 @@ and stronger physical execution guarantees are outside the initial shell.
 
 The following remain unresolved and MUST NOT be inferred:
 
-- exact EEPROM record layout;
-- exact CRC/checksum algorithm;
-- exact atomic update and initialization algorithms;
-- boot-counter wrap behavior and identity-recovery procedure;
+- identity-recovery procedure after a fail-closed boot;
 - duplicate-cache size within the documented collection bounds;
 - timeout durations and serial reconnect backoff;
 - first Service-mode actuator and actuator-specific schemas;
@@ -527,8 +551,11 @@ The following remain unresolved and MUST NOT be inferred:
 
 ## 22. Current implementation reality
 
-No production firmware, NDJSON parser, EEPROM boot counter, command cache,
-actuator command, physical feedback, real backend serial adapter, mixer
-firmware, carousel firmware, or bottom-valve firmware is implemented by this
-contract. No component is claimed to measure delivered volume or provide
-exactly-once physical execution.
+The current firmware implementation includes bounded serial line reception,
+strict UTF-8/JSON validation, inbound parsing for the currently supported
+backend message types, a pure boot-identity record codec, and storage-independent
+boot-identity selection/update logic. It does not yet include an Arduino EEPROM
+adapter, startup boot-identity integration, outgoing JSON serialization or serial
+responses, `HELLO_OK`, handshake/session state, status-query responses, a command
+cache, actuator commands, or physical execution. No component is claimed to
+measure delivered volume or provide exactly-once physical execution.
