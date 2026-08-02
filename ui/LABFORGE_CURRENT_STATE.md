@@ -44,6 +44,9 @@
 - Completed and pushed P1 absolute-step command contract:
   - branch: `codex/labforge-v1-p1-absolute-command-contract`
   - commit: `d0f295005f77da673cc4c0b8376f6b003cce08e5`
+- Completed and pushed P1 command-boundary hardening:
+  - branch: `codex/labforge-v1-p1-command-boundary-hardening`
+  - commit: `52fa9188f91bc1e08036bb8d1f769e634b156f29`
 
 ## Handshake/session milestone
 
@@ -192,7 +195,7 @@ of this checkpoint before selecting the first actual command contract or any
 Service-layer actuator boundary. Incoming `COMMAND` handling, duplicate-command
 identity comparison, dispatch, and physical behavior remain unimplemented.
 
-## Latest firmware milestone
+## P1 absolute-step contract milestone
 
 The first approved Service-mode contract is now implemented as a no-motion
 foundation:
@@ -224,6 +227,40 @@ bytes of static RAM. The next boundary is independent review, followed by
 confirmation of P1 pins, home-switch electrical semantics, tested pulse timing,
 `ENA` behavior, initial trusted-position policy, and the safe manually prepared
 fluidic route before any production adapter, upload, or physical test.
+
+The user explicitly approved `PUMP_MOVE_ABSOLUTE_STEPS` as the first no-motion
+Service-mode contract before this implementation was created. That approval
+does not authorize production Serial integration, an actuator adapter, upload,
+or physical execution.
+
+## Latest firmware milestone
+
+The no-motion P1 command boundary is now hardened with:
+
+- disjoint request-rejection and execution-failure error categories;
+- detailed cache-store outcomes so only a real non-terminal conflict maps to
+  `CONTROLLER_BUSY`;
+- side-effect-free preflight before `ACCEPTED` and `STARTED`;
+- explicit handling of every declared executor outcome and fail-closed handling
+  of an invalid outcome without inventing a physical cause;
+- `PUMP_HOME_SWITCH_UNEXPECTED` restricted to unexpected activation after the
+  physical execution boundary; and
+- `0..20500` documented as a representable coordinate envelope, not a validated
+  safe physical working range.
+
+Latest verified results:
+
+- focused cache and P1 boundary tests: `20/20 passed`;
+- complete native suite: `72/72 passed`;
+- warning-enabled native suite: `72/72 passed`;
+- Mega 2560 build: successful;
+- flash: `22,358 / 253,952 bytes`;
+- static RAM: `1,675 / 8,192 bytes`; and
+- `git diff --check`: passed.
+
+Flash, SRAM, cache sizes, output capacity, and the production stack path are
+unchanged from the preceding contract checkpoint. Production `main.cpp` and
+`NoMotionDispatcher` remain unchanged and disconnected from the Service.
 
 ## Approved phase and next phase boundary
 
