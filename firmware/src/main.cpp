@@ -1,10 +1,16 @@
 #include <Arduino.h>
 
+#include "identity/ArduinoEepromStorage.h"
+#include "identity/BootIdentityStore.h"
 #include "protocol/LineReceiver.h"
 #include "protocol/MessageParser.h"
 #include "protocol/ProtocolTypes.h"
 
 namespace {
+labforge::ArduinoEepromStorage bootIdentityStorage;
+labforge::BootIdentityStore bootIdentityStore(bootIdentityStorage);
+labforge::BootIdentityResult bootIdentityResult{
+    false, 0, labforge::IdentityFailureReason::NO_VALID_RECORD};
 labforge::LineReceiver lineReceiver;
 labforge::MessageParser messageParser;
 volatile labforge::ParseStatus lastParseStatus = labforge::ParseStatus::NO_FRAME;
@@ -13,6 +19,7 @@ volatile labforge::ParseStatus lastParseStatus = labforge::ParseStatus::NO_FRAME
 void setup() {
   // This protocol-foundation slice intentionally has no actuator side effects.
   Serial.begin(labforge::kSerialBaud);
+  bootIdentityResult = bootIdentityStore.initialize();
 }
 
 void loop() {

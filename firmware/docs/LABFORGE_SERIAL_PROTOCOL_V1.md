@@ -1,7 +1,7 @@
 # LabForge Serial Protocol v1
 
 - Protocol identifier: `LABFORGE/1`
-- Status: approved design contract, not yet implemented
+- Status: approved design contract, partially implemented
 - Date: 2026-07-30
 - Firmware anchor: `f1414ac`
 - Backend anchor: `88d17fb`
@@ -15,11 +15,11 @@ are compact symbolic JSON and do not define actuator command names.
 
 ## 1. Document status and boundaries
 
-This is an approved design contract, not a claim of implementation. The
-firmware repository contains recovery artifacts, not production firmware, and
-does not implement a serial command input, NDJSON parser, EEPROM boot counter,
-command cache, actuator protocol, or physical feedback. The backend does not
-yet implement the real serial adapter in this contract.
+This is an approved design contract with the implementation status documented
+in Section 22. The firmware does not implement outgoing protocol responses,
+handshake/session state, a command cache, actuator protocol, or physical
+feedback. The backend does not yet implement the real serial adapter in this
+contract.
 
 Sections 2–19 define approved requirements and implementation order. Section 20
 lists explicitly deferred functionality, and Section 21 lists unresolved
@@ -128,9 +128,17 @@ explicitly permitted as null by a future command schema may be null.
 
 The approved design derives `controller_boot_id` from an EEPROM-backed unsigned
 boot counter advanced once per controller boot. The pure, storage-independent
-record codec and selection/update logic are implemented; the Arduino EEPROM
-adapter and startup integration are not implemented.
+record codec and selection/update logic, Arduino EEPROM adapter, and startup
+integration are implemented.
 `MCUSR` reset cause is diagnostic metadata only and MUST NOT identify a session.
+
+EEPROM bytes `0..31` are reserved exclusively for boot identity. Slot 0 uses
+bytes `0..15`, and slot 1 uses bytes `16..31`. The Arduino adapter maps each
+logical address directly to the same EEPROM address, reports the actual
+`EEPROM.length()` capacity, and uses `EEPROM.update()` for writes. Because the
+Arduino EEPROM API does not report physical cell-write success, a successful
+adapter write return alone does not establish trust. The complete read-back
+validation performed by the boot-identity store establishes trusted identity.
 
 A trusted boot ID exists only after a record passes version and CRC/checksum
 validation, has unambiguous ordering, is initialized or advanced successfully,
@@ -180,7 +188,14 @@ other identity uncertainty, the controller MUST:
   `CONTROLLER_IDENTITY_UNTRUSTED`; and
 - never invent or guess a trusted boot ID.
 
-Counter wrap and the exact recovery procedure remain unresolved.
+Startup calls boot-identity initialization exactly once after starting Serial
+and retains the complete result internally: either a trusted
+`controller_boot_id`, or an explicit untrusted failure result. No serial
+response currently exposes this state. `HELLO_OK`, handshake/session state, and
+status-query responses remain unimplemented.
+
+Only recovery or provisioning after a fail-closed identity boot remains
+unresolved.
 
 ## 7. Controller software state and trust
 
@@ -553,9 +568,14 @@ The following remain unresolved and MUST NOT be inferred:
 
 The current firmware implementation includes bounded serial line reception,
 strict UTF-8/JSON validation, inbound parsing for the currently supported
-backend message types, a pure boot-identity record codec, and storage-independent
-boot-identity selection/update logic. It does not yet include an Arduino EEPROM
-adapter, startup boot-identity integration, outgoing JSON serialization or serial
-responses, `HELLO_OK`, handshake/session state, status-query responses, a command
-cache, actuator commands, or physical execution. No component is claimed to
-measure delivered volume or provide exactly-once physical execution.
+backend message types, a pure boot-identity record codec, storage-independent
+boot-identity selection/update logic, an Arduino EEPROM adapter, and one
+boot-identity initialization call per firmware startup that retains the complete
+trusted or untrusted result.
+The retained result is internal firmware state and is not exposed over Serial.
+Outgoing JSON serialization and serial responses, `HELLO_OK`, handshake/session
+state, status-query responses, a command cache, actuator commands, and physical
+execution remain unimplemented. Fail-closed recovery and provisioning remain
+unresolved. This firmware has not been uploaded or physically tested. No
+component is claimed to measure delivered volume or provide exactly-once
+physical execution.
