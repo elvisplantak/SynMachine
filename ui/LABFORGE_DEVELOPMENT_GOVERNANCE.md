@@ -44,7 +44,8 @@ Within the approved phase, Codex normally:
 6. reviews the complete local diff and resource impact;
 7. updates implementation-status documentation;
 8. commits and pushes the verified feature branch; and
-9. provides a concise checkpoint report for the user and independent reviewer.
+9. provides a concise checkpoint report for the user, plus an independent-
+   reviewer handoff only when Codex identifies a meaningful review gate.
 
 A dirty tree is not an automatic stop. Existing work must be inspected and
 preserved. Stop only when safe isolation is impossible or changes overlap the
@@ -103,6 +104,12 @@ continues unrelated safe work where possible.
 
 ## Independent review checkpoints
 
+Codex decides when a completed checkpoint should be sent to the independent
+reviewer and tells the user explicitly. Review is not requested after every
+commit, documentation correction, added unit test, mechanical refactor, or
+review-follow-up fix. This keeps Codex as the development lead and avoids
+turning independent review into day-to-day task management.
+
 Meaningful independent review gates include framing/parsing/serialization,
 EEPROM boot identity, handshake/session behavior, status queries, command
 lifecycle and duplicate caching, first dispatch, first Service actuator,
@@ -114,6 +121,23 @@ Reviews use focused evidence: relevant commits or diffs, specific source files,
 test results, and build/resource metadata. Passing tests alone do not prove
 physical readiness. Large review bundles and repeated review of mechanical
 substeps are avoided.
+
+At a meaningful gate, Codex prepares a short structured handoff containing:
+
+- repository, branch, reviewed commit, and base commit;
+- purpose and exact scope;
+- what the user explicitly approved;
+- intentionally unimplemented boundaries;
+- focused verification and resource results; and
+- a small set of concrete review questions.
+
+The reviewer inspects the identified GitHub commit using that handoff. A broad
+request to inspect the repository without a pinned commit and review focus is
+not the normal workflow because it can lose approval context, review stale
+work, or expand scope. Codex evaluates returned findings independently, accepts
+technically sound findings, rejects findings based on missing or incorrect
+context, and records any resulting checkpoint. Independent review never grants
+physical authorization.
 
 ## Protected firmware recovery artifacts
 
