@@ -29,8 +29,11 @@
 - Completed and pushed handshake/session foundation:
   - branch: `codex/labforge-v1-handshake-session-foundation`
   - commit: `1a4f72668045bb63cb8411b6a12249fdd9aa6320`
+- Completed and pushed status-query foundation:
+  - branch: `codex/labforge-v1-status-query-foundation`
+  - commit: `81bc8037c35edbfc6576a32daf93f8a753f62b49`
 
-## Latest firmware milestone
+## Handshake/session milestone
 
 Implemented and pushed:
 
@@ -61,9 +64,30 @@ retains:
 The optimization reduced static RAM from `1,609` to `1,231` bytes (`378` bytes
 recovered) without changing flash usage or byte-exact `HELLO_OK` output.
 
-The next no-motion firmware milestone is harmless `QUERY_STATUS` / `STATUS`
-response behavior, including bounded deterministic serialization, session and
-boot-ID validation, protocol documentation, and native/Mega verification.
+## Latest firmware milestone
+
+The status-query foundation now implements:
+
+- session and boot-ID validation for `QUERY_STATUS`;
+- byte-exact trusted and untrusted `STATUS` serialization;
+- echoed session nonce and request ID;
+- `PROTOCOL_ONLY` or `IDENTITY_UNTRUSTED` software state;
+- `active_operation_command_id:null`; and
+- no command dispatch, pin access, or physical behavior.
+
+Latest verified results:
+
+- focused status-query tests: `3/3 passed`;
+- complete native suite: `44/44 passed`;
+- warning-enabled native suite: `44/44 passed`;
+- Mega 2560 build: successful;
+- flash: `17,984 / 253,952 bytes`;
+- static RAM: `1,295 / 8,192 bytes`; and
+- `git diff --check`: passed.
+
+The next no-motion firmware milestone is bounded correlated `PROTOCOL_ERROR`
+behavior for parser, session, and boot-ID failures. `QUERY_COMMAND` and the
+volatile command-status cache remain subsequent separate milestones.
 
 ## Approved phase and next phase boundary
 
@@ -83,8 +107,8 @@ Expected no-motion progression:
 
 ## Current limitations and unresolved physical decisions
 
-- `PROTOCOL_ERROR`, status/query responses, command cache, and command dispatch
-  are not yet implemented in firmware.
+- `PROTOCOL_ERROR`, `QUERY_COMMAND`, command-status responses, command cache,
+  and command dispatch are not yet implemented in firmware.
 - EEPROM fail-closed recovery/provisioning remains unresolved.
 - No actuator command or physical behavior is authorized by current protocol
   work.
