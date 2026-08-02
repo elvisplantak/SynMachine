@@ -16,6 +16,7 @@ constexpr size_t kJsonDocumentCapacity = 1024;
 
 enum class MessageType : uint8_t { HELLO, COMMAND, QUERY_STATUS, QUERY_COMMAND };
 enum class ArgumentType : uint8_t { STRING, INTEGER, BOOLEAN };
+enum class BootIdPresence : uint8_t { ABSENT, NULL_VALUE, VALUE };
 
 struct Argument {
   char key[kArgumentKeyCapacity];
@@ -30,6 +31,7 @@ struct Argument {
 struct InboundMessage {
   MessageType type;
   char backendSessionNonce[kUuidTextCapacity];
+  BootIdPresence controllerBootIdPresence;
   uint32_t controllerBootId;
   char phaseExecutionId[kPhaseExecutionIdCapacity];
   char operationCommandId[kUuidTextCapacity];

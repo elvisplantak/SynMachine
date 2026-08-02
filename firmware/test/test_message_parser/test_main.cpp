@@ -30,13 +30,44 @@ void assertError(const char* json, ProtocolErrorCode error) {
 void test_all_four_minimal_messages() {
   char json[512];
   snprintf(json, sizeof(json), "{\"protocol\":\"LABFORGE/1\",\"type\":\"HELLO\",\"backend_session_nonce\":\"%s\"}", NONCE);
-  assertValid(json, MessageType::HELLO);
+  ParseResult result = parse(json);
+  TEST_ASSERT_EQUAL(ParseStatus::VALID_MESSAGE, result.status);
+  TEST_ASSERT_EQUAL(BootIdPresence::ABSENT, result.message.controllerBootIdPresence);
   snprintf(json, sizeof(json), "{\"protocol\":\"LABFORGE/1\",\"type\":\"QUERY_STATUS\",\"backend_session_nonce\":\"%s\",\"controller_boot_id\":4294967295,\"request_id\":\"%s\"}", NONCE, REQUEST);
   assertValid(json, MessageType::QUERY_STATUS);
   snprintf(json, sizeof(json), "{\"protocol\":\"LABFORGE/1\",\"type\":\"QUERY_COMMAND\",\"backend_session_nonce\":\"%s\",\"controller_boot_id\":0,\"request_id\":\"%s\",\"operation_command_id\":\"%s\"}", NONCE, REQUEST, OPERATION);
   assertValid(json, MessageType::QUERY_COMMAND);
   snprintf(json, sizeof(json), "{\"protocol\":\"LABFORGE/1\",\"type\":\"COMMAND\",\"backend_session_nonce\":\"%s\",\"controller_boot_id\":1,\"phase_execution_id\":\"phase-1\",\"operation_command_id\":\"%s\",\"command\":\"FUTURE_COMMAND\",\"arguments\":{\"text\":\"ž\",\"count\":2,\"enabled\":true}}", NONCE, OPERATION);
   assertValid(json, MessageType::COMMAND);
+}
+
+void test_nullable_boot_id_representation() {
+  char json[512];
+  snprintf(json, sizeof(json), "{\"protocol\":\"LABFORGE/1\",\"type\":\"QUERY_STATUS\",\"backend_session_nonce\":\"%s\",\"controller_boot_id\":null,\"request_id\":\"%s\"}", NONCE, REQUEST);
+  ParseResult result = parse(json);
+  TEST_ASSERT_EQUAL(ParseStatus::VALID_MESSAGE, result.status);
+  TEST_ASSERT_EQUAL(BootIdPresence::NULL_VALUE, result.message.controllerBootIdPresence);
+
+  snprintf(json, sizeof(json), "{\"protocol\":\"LABFORGE/1\",\"type\":\"QUERY_COMMAND\",\"backend_session_nonce\":\"%s\",\"controller_boot_id\":null,\"request_id\":\"%s\",\"operation_command_id\":\"%s\"}", NONCE, REQUEST, OPERATION);
+  result = parse(json);
+  TEST_ASSERT_EQUAL(ParseStatus::VALID_MESSAGE, result.status);
+  TEST_ASSERT_EQUAL(BootIdPresence::NULL_VALUE, result.message.controllerBootIdPresence);
+
+  snprintf(json, sizeof(json), "{\"protocol\":\"LABFORGE/1\",\"type\":\"COMMAND\",\"backend_session_nonce\":\"%s\",\"controller_boot_id\":null,\"phase_execution_id\":\"phase\",\"operation_command_id\":\"%s\",\"command\":\"GO\",\"arguments\":{}}", NONCE, OPERATION);
+  result = parse(json);
+  TEST_ASSERT_EQUAL(ParseStatus::VALID_MESSAGE, result.status);
+  TEST_ASSERT_EQUAL(BootIdPresence::NULL_VALUE, result.message.controllerBootIdPresence);
+
+  snprintf(json, sizeof(json), "{\"protocol\":\"LABFORGE/1\",\"type\":\"QUERY_STATUS\",\"backend_session_nonce\":\"%s\",\"controller_boot_id\":7,\"request_id\":\"%s\"}", NONCE, REQUEST);
+  result = parse(json);
+  TEST_ASSERT_EQUAL(ParseStatus::VALID_MESSAGE, result.status);
+  TEST_ASSERT_EQUAL(BootIdPresence::VALUE, result.message.controllerBootIdPresence);
+  TEST_ASSERT_EQUAL_UINT32(7, result.message.controllerBootId);
+
+  snprintf(json, sizeof(json), "{\"protocol\":\"LABFORGE/1\",\"type\":\"QUERY_STATUS\",\"backend_session_nonce\":\"%s\",\"request_id\":\"%s\"}", NONCE, REQUEST);
+  assertError(json, ProtocolErrorCode::MISSING_FIELD);
+  snprintf(json, sizeof(json), "{\"protocol\":\"LABFORGE/1\",\"type\":\"QUERY_STATUS\",\"backend_session_nonce\":\"%s\",\"controller_boot_id\":true,\"request_id\":\"%s\"}", NONCE, REQUEST);
+  assertError(json, ProtocolErrorCode::INVALID_FIELD);
 }
 
 void test_envelope_error_classification() {
@@ -84,6 +115,7 @@ void test_argument_key_type_and_boolean_semantics() {
   snprintf(json, sizeof(json), "{\"protocol\":\"LABFORGE/1\",\"type\":\"COMMAND\",\"backend_session_nonce\":\"%s\",\"controller_boot_id\":1,\"phase_execution_id\":\"phase\",\"operation_command_id\":\"%s\",\"command\":\"GO\",\"arguments\":{\"enabled\":true}}", NONCE, OPERATION);
   const ParseResult result = parse(json);
   TEST_ASSERT_EQUAL(ParseStatus::VALID_MESSAGE, result.status);
+  TEST_ASSERT_EQUAL(BootIdPresence::VALUE, result.message.controllerBootIdPresence);
   TEST_ASSERT_EQUAL_UINT8(1, result.message.argumentCount);
   TEST_ASSERT_EQUAL(ArgumentType::BOOLEAN, result.message.arguments[0].type);
   TEST_ASSERT_TRUE(result.message.arguments[0].value.booleanValue);
@@ -158,6 +190,7 @@ void test_escaped_nul_duplicate_rejects_then_parser_recovers() {
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_all_four_minimal_messages);
+  RUN_TEST(test_nullable_boot_id_representation);
   RUN_TEST(test_envelope_error_classification);
   RUN_TEST(test_identifier_and_boot_id_bounds);
   RUN_TEST(test_command_schema_rejections);

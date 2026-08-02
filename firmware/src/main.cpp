@@ -3,8 +3,10 @@
 #include "identity/ArduinoEepromStorage.h"
 #include "identity/BootIdentityStore.h"
 #include "protocol/LineReceiver.h"
+#include "protocol/HelloOkWriter.h"
 #include "protocol/MessageParser.h"
 #include "protocol/ProtocolTypes.h"
+#include "protocol/SessionState.h"
 
 namespace {
 labforge::ArduinoEepromStorage bootIdentityStorage;
@@ -13,6 +15,8 @@ labforge::BootIdentityResult bootIdentityResult{
     false, 0, labforge::IdentityFailureReason::NO_VALID_RECORD};
 labforge::LineReceiver lineReceiver;
 labforge::MessageParser messageParser;
+labforge::SessionState sessionState;
+uint8_t helloOkFrame[labforge::kHelloOkFrameCapacity];
 volatile labforge::ParseStatus lastParseStatus = labforge::ParseStatus::NO_FRAME;
 }  // namespace
 
@@ -31,6 +35,15 @@ void loop() {
     } else if (event == labforge::LineEvent::FRAME_READY) {
       const labforge::ParseResult result = messageParser.parse(frame.data, frame.length);
       lastParseStatus = result.status;
+      if (result.status == labforge::ParseStatus::VALID_MESSAGE &&
+          result.message.type == labforge::MessageType::HELLO) {
+        size_t outputLength = 0;
+        if (labforge::writeHelloOk(result.message.backendSessionNonce, bootIdentityResult,
+                                   helloOkFrame, sizeof(helloOkFrame), outputLength)) {
+          sessionState.establish(result.message.backendSessionNonce);
+          Serial.write(helloOkFrame, outputLength);
+        }
+      }
     }
   }
 }

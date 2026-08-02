@@ -68,11 +68,17 @@ bool extractUuid(JsonObjectConst object, const char* name, char* output) {
   return validUuid(value) && copyChecked(value, output, kUuidTextCapacity);
 }
 
-bool extractBootId(JsonObjectConst object, uint32_t& output) {
+bool extractBootId(JsonObjectConst object, BootIdPresence& presence, uint32_t& output) {
   JsonVariantConst value = object["controller_boot_id"];
+  if (value.isNull()) {
+    presence = BootIdPresence::NULL_VALUE;
+    output = 0;
+    return true;
+  }
   if (value.is<bool>() || !value.is<uint64_t>()) return false;
   const uint64_t number = value.as<uint64_t>();
   if (number > UINT32_MAX) return false;
+  presence = BootIdPresence::VALUE;
   output = static_cast<uint32_t>(number);
   return true;
 }
@@ -173,11 +179,15 @@ ParseResult MessageParser::parse(const uint8_t* payload, size_t length) const {
   result.status = ParseStatus::VALID_MESSAGE;
   result.error = ProtocolErrorCode::NONE;
   result.message.type = type;
+  result.message.controllerBootIdPresence = BootIdPresence::ABSENT;
   if (!extractUuid(object, "backend_session_nonce", result.message.backendSessionNonce)) {
     return failure(ProtocolErrorCode::INVALID_FIELD);
   }
   if (type == MessageType::HELLO) return result;
-  if (!extractBootId(object, result.message.controllerBootId)) return failure(ProtocolErrorCode::INVALID_FIELD);
+  if (!extractBootId(object, result.message.controllerBootIdPresence,
+                     result.message.controllerBootId)) {
+    return failure(ProtocolErrorCode::INVALID_FIELD);
+  }
 
   if (type == MessageType::COMMAND) {
     if (!object["phase_execution_id"].is<const char*>() ||

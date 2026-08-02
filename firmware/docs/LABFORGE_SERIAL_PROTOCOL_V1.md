@@ -16,10 +16,9 @@ are compact symbolic JSON and do not define actuator command names.
 ## 1. Document status and boundaries
 
 This is an approved design contract with the implementation status documented
-in Section 22. The firmware does not implement outgoing protocol responses,
-handshake/session state, a command cache, actuator protocol, or physical
-feedback. The backend does not yet implement the real serial adapter in this
-contract.
+in Section 22. The firmware does not implement status or command responses,
+protocol-error output, a command cache, actuator protocol, or physical feedback.
+The backend does not yet implement the real serial adapter in this contract.
 
 Sections 2–19 define approved requirements and implementation order. Section 20
 lists explicitly deferred functionality, and Section 21 lists unresolved
@@ -88,6 +87,12 @@ Every successfully parsed session-bound message and response MUST contain
   `controller_boot_id:null`; and
 - `PROTOCOL_ERROR` MAY omit correlation fields that framing, oversize, or
   malformed JSON prevents the receiver from recovering safely.
+
+Inbound session-bound `controller_boot_id` parsing distinguishes an absent
+field, explicit JSON null, and an unsigned 32-bit value. Null is syntactically
+supported for an untrusted diagnostic session, but semantic acceptance still
+depends on current session and boot-identity validation and never authorizes a
+physical command by itself.
 
 Query responses MUST echo `request_id`. Command lifecycle messages MUST contain
 `phase_execution_id` and `operation_command_id`. Unknown and duplicate JSON
@@ -234,6 +239,14 @@ Required: `protocol`, `type`, `backend_session_nonce`, `controller_boot_id`,
 `controller_state`, `software_state_trust`, `capabilities`. Optional:
 `reset_cause`.
 
+The current implementation emits one compact LF-terminated `HELLO_OK` for each
+valid parsed `HELLO`, with deterministic field order, empty `capabilities`, and
+no `reset_cause`. A trusted identity emits its numeric boot ID with
+`controller_state:"PROTOCOL_ONLY"` and `software_state_trust:"TRUSTED"`. An
+untrusted identity emits `controller_boot_id:null`,
+`controller_state:"IDENTITY_UNTRUSTED"`, and
+`software_state_trust:"UNTRUSTED"` for diagnostic-only correlation.
+
 ```json
 {"protocol":"LABFORGE/1","type":"HELLO_OK","backend_session_nonce":"123e4567-e89b-12d3-a456-426614174000","controller_boot_id":4294967295,"controller_state":"PROTOCOL_ONLY","software_state_trust":"TRUSTED","capabilities":[]}
 ```
@@ -354,11 +367,22 @@ extraction. Semantic refusal of a valid `COMMAND` uses `REJECTED`.
 
 ## 9. Handshake and session replacement
 
-The backend MUST generate a new `backend_session_nonce` for every handshake.
+`backend_session_nonce` is the sole LABFORGE/1 session identifier. The backend
+generates the canonical lowercase UUID, and firmware copies it unchanged into
+fixed-capacity volatile storage. Firmware does not generate a separate
+`session_id`. The backend MUST generate a new `backend_session_nonce` for every
+handshake.
 The controller MUST NOT accept physical commands before a successful handshake.
 Every successful `HELLO` establishes one current nonce. A later successful
 `HELLO` in the same controller boot replaces it; messages and queued lifecycle
 messages carrying the old nonce are stale and MUST be rejected or ignored.
+
+Retrying the same valid nonce is idempotent and emits the same semantic
+`HELLO_OK`. A different valid nonce immediately replaces the previous session.
+Invalid, malformed, oversized, unsupported, or otherwise rejected input does
+not alter session state and currently produces no protocol-error output. There
+is no firmware-side session timeout or inactivity expiry in LABFORGE/1;
+controller reboot naturally clears the volatile session.
 
 Session replacement MUST NOT resume, repeat, stop, cancel, complete, or
 otherwise alter an active physical command. Command identity and cached state
@@ -367,6 +391,8 @@ the submitting nonce. A new session in the same boot MAY query an existing
 command by ID. If it is non-terminal, new physical `COMMAND` messages MUST be
 rejected with `CONTROLLER_BUSY`. The backend MUST use `QUERY_COMMAND` after
 replacement rather than rely on lifecycle messages queued for the old session.
+Session establishment and replacement provide correlation only and have no
+command or physical side effect.
 
 A changed boot ID means volatile state was lost and unresolved prior physical
 commands become outcome unknown. A handshake never automatically resumes,
@@ -572,10 +598,12 @@ backend message types, a pure boot-identity record codec, storage-independent
 boot-identity selection/update logic, an Arduino EEPROM adapter, and one
 boot-identity initialization call per firmware startup that retains the complete
 trusted or untrusted result.
-The retained result is internal firmware state and is not exposed over Serial.
-Outgoing JSON serialization and serial responses, `HELLO_OK`, handshake/session
-state, status-query responses, a command cache, actuator commands, and physical
-execution remain unimplemented. Fail-closed recovery and provisioning remain
-unresolved. This firmware has not been uploaded or physically tested. No
-component is claimed to measure delivered volume or provide exactly-once
+It also includes nullable inbound boot-ID parsing, fixed-capacity volatile
+session state, bounded deterministic `HELLO_OK` serialization, and actual
+`HELLO` to `HELLO_OK` Serial integration for trusted and untrusted identity.
+`PROTOCOL_ERROR` output, invalid-message responses, `QUERY_STATUS`,
+`QUERY_COMMAND`, command responses, a command cache, actuator commands, and
+physical execution remain unimplemented. Fail-closed recovery and provisioning
+remain unresolved. This firmware has not been uploaded or physically tested.
+No component is claimed to measure delivered volume or provide exactly-once
 physical execution.
