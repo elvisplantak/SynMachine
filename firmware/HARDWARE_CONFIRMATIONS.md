@@ -26,12 +26,38 @@ The user explicitly confirmed that the physical tubing was connected according t
 - The current Guided Demo sends all nominal SF contents to the Column. This rule does not imply automatic phase detection or verified phase separation.
 - These are approved operating rules, not confirmation of actuator wiring, actuation, or execution.
 
+### Confirmed `COLUMN_BOTTOM_VALVE` signal pins and driver type — 2026-08-02
+
+The user explicitly confirmed these physical Arduino signal-pin assignments:
+
+- `COLUMN_BOTTOM_VALVE HOME = D10`
+- `COLUMN_BOTTOM_VALVE STEP = D12`
+- `COLUMN_BOTTOM_VALVE DIR = D13`
+
+The user also explicitly confirmed that the motor driver is a `DM542T`.
+
+This wiring update does not confirm:
+
+- home-switch contact selection such as `NC` versus `NO`
+- input polarity or the electrical meaning of `HIGH` and `LOW`
+- motor rotation direction
+- valve open and closed directions
+- valve angles or step counts
+- homing behavior
+- early-switch handling
+- driver current or microstep settings
+- `ENA` wiring or behavior
+- motor power wiring
+- successful actuation
+- leak-tightness
+- fluidic routing through the valve
+- safe physical execution
+
 ### Pending verification and commissioning
 
 - Leak testing and liquid route testing remain pending.
 - Verification of every valve angle, every physical valve route, and V1-V8 actuation remains pending.
 - Verification of `SF_BOTTOM_VALVE` and `COLUMN_BOTTOM_VALVE` actuation remains pending.
-- `COLUMN_BOTTOM_VALVE` driver wiring and Arduino pin assignment remain unconfirmed.
 - Pump volumetric calibration remains pending.
 - Safe execution interlocks and end-to-end hardware execution remain pending.
 - Automatic phase detection and automatic or actual liquid-phase separation are not confirmed.
