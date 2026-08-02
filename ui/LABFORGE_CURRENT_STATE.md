@@ -41,6 +41,9 @@
 - Completed and pushed command-lifecycle integrity foundation:
   - branch: `codex/labforge-v1-command-lifecycle-integrity-foundation`
   - commit: `99101b93f2d44c4e2e5722398653d665c9b031c1`
+- Completed and pushed P1 absolute-step command contract:
+  - branch: `codex/labforge-v1-p1-absolute-command-contract`
+  - commit: `d0f295005f77da673cc4c0b8376f6b003cce08e5`
 
 ## Handshake/session milestone
 
@@ -156,7 +159,7 @@ AVR memory details:
 - nominal SRAM remaining after static use plus the conservative deepest stack
   estimate: approximately `2.9 KB` before interrupt/runtime margin.
 
-## Latest firmware milestone
+## Command-lifecycle integrity milestone
 
 The command-lifecycle integrity foundation now adds:
 
@@ -189,6 +192,39 @@ of this checkpoint before selecting the first actual command contract or any
 Service-layer actuator boundary. Incoming `COMMAND` handling, duplicate-command
 identity comparison, dispatch, and physical behavior remain unimplemented.
 
+## Latest firmware milestone
+
+The first approved Service-mode contract is now implemented as a no-motion
+foundation:
+
+- exact `PUMP_MOVE_ABSOLUTE_STEPS` schema, restricted to `P1`;
+- exactly `pump:"P1"` and integer `target_steps` in `0..20500`;
+- compact exact semantic duplicate identity without hash-only comparison;
+- testable `ACCEPTED -> STARTED -> COMPLETED/FAILED` Service lifecycle using a
+  fake executor; and
+- precise `PUMP_MOTION_TIMEOUT` and `PUMP_HOME_SWITCH_UNEXPECTED` execution
+  failure codes.
+
+Production `main.cpp` and `NoMotionDispatcher` remain unchanged. The Service
+is not connected to Serial, pins, a motor driver, or physical behavior, and the
+real `QUERY_COMMAND` path can still return only `UNKNOWN`.
+
+Latest verified results:
+
+- focused P1 contract tests: `5/5 passed`;
+- complete native suite: `68/68 passed`;
+- warning-enabled native suite: `68/68 passed`;
+- Mega 2560 build: successful;
+- flash: `22,358 / 253,952 bytes`;
+- static RAM: `1,675 / 8,192 bytes`; and
+- `git diff --check`: passed.
+
+Compared with the preceding checkpoint, this adds 72 bytes of flash and 10
+bytes of static RAM. The next boundary is independent review, followed by
+confirmation of P1 pins, home-switch electrical semantics, tested pulse timing,
+`ENA` behavior, initial trusted-position policy, and the safe manually prepared
+fluidic route before any production adapter, upload, or physical test.
+
 ## Approved phase and next phase boundary
 
 Codex may autonomously complete the current no-motion LABFORGE/1 software
@@ -207,9 +243,10 @@ Expected no-motion progression:
 
 ## Current limitations and unresolved physical decisions
 
-- Incoming `COMMAND` handling, duplicate-command identity comparison, lifecycle
-  dispatch, cache population from the runtime, and command execution are not yet
-  implemented in firmware.
+- Incoming production `COMMAND` handling, Serial lifecycle dispatch, runtime
+  cache population, actuator adapters, and command execution are not yet
+  implemented in firmware. Exact identity exists only for the approved P1
+  absolute-step contract.
 - EEPROM fail-closed recovery/provisioning remains unresolved.
 - No actuator command or physical behavior is authorized by current protocol
   work.
