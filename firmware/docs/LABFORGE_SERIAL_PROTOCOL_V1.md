@@ -457,12 +457,21 @@ Queries MUST NOT initiate or repeat motion.
 
 The current no-motion implementation answers a valid session-bound
 `QUERY_COMMAND` from a two-entry volatile cache. Cache absence emits `UNKNOWN`
-without creating an entry. Known entries emit only mandatory state fields,
+without creating an entry. The production runtime does not currently call the
+cache storage API, so real Serial queries can currently return only `UNKNOWN`.
+Tests can seed structurally prepared entries, which emit only mandatory fields,
 including `result:{}` for `COMPLETED` and `error_code` plus
 `execution_started` for `FAILED`; optional messages and result payloads are not
 implemented. Querying never mutates the cache, and handshake replacement in the
 same controller boot does not clear it. The maximum implemented mandatory frame
 is 443 bytes including LF, and the shared output capacity is 464 bytes.
+
+Cache mutation enforces the normative `ACCEPTED` to `STARTED` to terminal
+ordering, exact idempotent replay, immutable terminal results, and immutable
+phase identity for one operation ID. The structural transition model recognizes
+the two valid `FAILED` boundaries, but the cache rejects actual `FAILED` storage
+until a reviewed command contract defines execution-failure error codes. Current
+rejection codes MUST NOT be misrepresented as execution failures.
 
 ## 12. Duplicate-command semantics
 
@@ -639,9 +648,12 @@ deterministic trusted or untrusted `STATUS` responses, and uses a testable
 no-motion dispatcher for bounded parser, session, and boot-ID protocol errors.
 It also includes a two-entry volatile command-status cache shell and bounded
 `QUERY_COMMAND` / `COMMAND_STATUS` responses without accepting or executing
-`COMMAND`. Duplicate-command identity comparison, command lifecycle dispatch,
-actuator commands, and physical execution remain unimplemented. Fail-closed
-recovery and provisioning remain unresolved. This firmware has not been
-uploaded or physically tested. No component is claimed to measure delivered
-volume or provide exactly-once
+`COMMAND`. Production does not populate the cache, so only `UNKNOWN` is
+currently reachable over real Serial. Cache lifecycle-integrity and identifier
+validation are implemented for future internal use, while actual `FAILED`
+storage awaits approved execution-failure codes. Duplicate-command identity
+comparison, command lifecycle dispatch, actuator commands, and physical
+execution remain unimplemented. Fail-closed recovery and provisioning remain
+unresolved. This firmware has not been uploaded or physically tested. No
+component is claimed to measure delivered volume or provide exactly-once
 physical execution.

@@ -40,6 +40,9 @@ struct CommandStatusEntry {
   uint32_t insertionSequence;
 };
 
+bool commandLifecycleTransitionAllowed(CommandState from, CommandState to,
+                                       bool executionStarted);
+
 class CommandStatusCache {
  public:
   const CommandStatusEntry* find(const char* operationCommandId) const;
@@ -49,6 +52,10 @@ class CommandStatusCache {
  private:
   static bool terminal(CommandState state);
   static bool valid(const CommandStatusRecord& record);
+  static bool sameIdentity(const CommandStatusRecord& left,
+                           const CommandStatusRecord& right);
+  static bool semanticallyEqual(const CommandStatusRecord& left,
+                                const CommandStatusRecord& right);
   CommandStatusEntry entries_[kCommandStatusCacheCapacity]{};
   uint32_t nextInsertionSequence_ = 0;
 };

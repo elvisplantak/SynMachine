@@ -46,10 +46,10 @@ void test_memory_bounds_and_empty_lookup() {
 
 void test_two_entries_and_deterministic_terminal_eviction() {
   CommandStatusCache cache;
-  TEST_ASSERT_TRUE(cache.store(record(OPERATION_1, CommandState::COMPLETED)));
+  TEST_ASSERT_TRUE(cache.store(record(OPERATION_1, CommandState::REJECTED)));
   TEST_ASSERT_TRUE(cache.store(record(OPERATION_2, CommandState::REJECTED)));
   TEST_ASSERT_EQUAL_UINT32(2, cache.occupiedCount());
-  TEST_ASSERT_TRUE(cache.store(record(OPERATION_3, CommandState::COMPLETED)));
+  TEST_ASSERT_TRUE(cache.store(record(OPERATION_3, CommandState::REJECTED)));
   TEST_ASSERT_NULL(cache.find(OPERATION_1));
   TEST_ASSERT_NOT_NULL(cache.find(OPERATION_2));
   TEST_ASSERT_NOT_NULL(cache.find(OPERATION_3));
@@ -57,17 +57,16 @@ void test_two_entries_and_deterministic_terminal_eviction() {
 
 void test_nonterminal_is_preserved_and_only_one_is_allowed() {
   CommandStatusCache cache;
-  TEST_ASSERT_TRUE(cache.store(record(OPERATION_1, CommandState::STARTED)));
+  TEST_ASSERT_TRUE(cache.store(record(OPERATION_1, CommandState::ACCEPTED)));
   TEST_ASSERT_FALSE(cache.store(record(OPERATION_2, CommandState::ACCEPTED)));
-  TEST_ASSERT_TRUE(cache.store(record(OPERATION_2, CommandState::COMPLETED)));
-  TEST_ASSERT_FALSE(cache.store(record(OPERATION_2, CommandState::ACCEPTED)));
+  TEST_ASSERT_TRUE(cache.store(record(OPERATION_2, CommandState::REJECTED)));
   TEST_ASSERT_TRUE(cache.store(record(OPERATION_3, CommandState::REJECTED)));
   TEST_ASSERT_NOT_NULL(cache.find(OPERATION_1));
   TEST_ASSERT_NULL(cache.find(OPERATION_2));
   TEST_ASSERT_NOT_NULL(cache.find(OPERATION_3));
 
-  CommandStatusRecord updated = record(OPERATION_1, CommandState::COMPLETED);
-  TEST_ASSERT_TRUE(cache.store(updated));
+  TEST_ASSERT_TRUE(cache.store(record(OPERATION_1, CommandState::STARTED)));
+  TEST_ASSERT_TRUE(cache.store(record(OPERATION_1, CommandState::COMPLETED)));
   TEST_ASSERT_EQUAL(CommandState::COMPLETED,
                     cache.find(OPERATION_1)->record.state);
 }
@@ -81,7 +80,6 @@ void test_invalid_record_combinations_are_rejected() {
   invalid.executionStarted = true;
   TEST_ASSERT_FALSE(cache.store(invalid));
   invalid = record(OPERATION_1, CommandState::FAILED);
-  invalid.errorCode = CommandErrorCode::NONE;
   TEST_ASSERT_FALSE(cache.store(invalid));
   TEST_ASSERT_EQUAL_UINT32(0, cache.occupiedCount());
 }
@@ -96,6 +94,8 @@ void test_exact_unknown_and_completed_frames() {
       reinterpret_cast<char*>(output));
 
   CommandStatusCache cache;
+  TEST_ASSERT_TRUE(cache.store(record(OPERATION_1, CommandState::ACCEPTED)));
+  TEST_ASSERT_TRUE(cache.store(record(OPERATION_1, CommandState::STARTED)));
   TEST_ASSERT_TRUE(cache.store(record(OPERATION_1, CommandState::COMPLETED)));
   memset(output, 0, sizeof(output));
   TEST_ASSERT_TRUE(writeCommandStatus(
@@ -108,7 +108,6 @@ void test_exact_unknown_and_completed_frames() {
 }
 
 void test_all_states_maximum_frame_and_transactional_failure() {
-  CommandStatusCache cache;
   char maximumPhase[kPhaseExecutionIdCapacity];
   memset(maximumPhase, 'p', sizeof(maximumPhase) - 1);
   maximumPhase[sizeof(maximumPhase) - 1] = '\0';
@@ -121,10 +120,12 @@ void test_all_states_maximum_frame_and_transactional_failure() {
   for (CommandState state : states) {
     CommandStatusRecord value = record(OPERATION_1, state, maximumPhase);
     value.executionStarted = state == CommandState::FAILED;
-    TEST_ASSERT_TRUE(cache.store(value));
+    CommandStatusEntry entry{};
+    entry.occupied = true;
+    entry.record = value;
     size_t length = 0;
     TEST_ASSERT_TRUE(writeCommandStatus(
-        NONCE, REQUEST_ID, OPERATION_1, TRUSTED, cache.find(OPERATION_1),
+        NONCE, REQUEST_ID, OPERATION_1, TRUSTED, &entry,
         output, sizeof(output), length));
     TEST_ASSERT_EQUAL_UINT8('\n', output[length - 1]);
     if (length > maximumLength) maximumLength = length;
@@ -132,10 +133,12 @@ void test_all_states_maximum_frame_and_transactional_failure() {
   CommandStatusRecord failedBeforeStart =
       record(OPERATION_1, CommandState::FAILED, maximumPhase);
   failedBeforeStart.executionStarted = false;
-  TEST_ASSERT_TRUE(cache.store(failedBeforeStart));
+  CommandStatusEntry failedEntry{};
+  failedEntry.occupied = true;
+  failedEntry.record = failedBeforeStart;
   size_t failedLength = 0;
   TEST_ASSERT_TRUE(writeCommandStatus(
-      NONCE, REQUEST_ID, OPERATION_1, TRUSTED, cache.find(OPERATION_1),
+      NONCE, REQUEST_ID, OPERATION_1, TRUSTED, &failedEntry,
       output, sizeof(output), failedLength));
   if (failedLength > maximumLength) maximumLength = failedLength;
   printf("MAX_COMMAND_STATUS_FRAME_BYTES=%u\n",
@@ -145,7 +148,7 @@ void test_all_states_maximum_frame_and_transactional_failure() {
   memset(output, 0xA7, sizeof(output));
   size_t length = 123;
   TEST_ASSERT_FALSE(writeCommandStatus(
-      NONCE, REQUEST_ID, OPERATION_1, TRUSTED, cache.find(OPERATION_1),
+      NONCE, REQUEST_ID, OPERATION_1, TRUSTED, &failedEntry,
       output, maximumLength - 1, length));
   TEST_ASSERT_EQUAL_UINT32(0, length);
   for (size_t i = 0; i < sizeof(output); ++i) {
@@ -153,10 +156,136 @@ void test_all_states_maximum_frame_and_transactional_failure() {
   }
 }
 
+void test_normative_transition_model_and_idempotent_replay() {
+  TEST_ASSERT_TRUE(commandLifecycleTransitionAllowed(
+      CommandState::ACCEPTED, CommandState::STARTED, false));
+  TEST_ASSERT_TRUE(commandLifecycleTransitionAllowed(
+      CommandState::ACCEPTED, CommandState::FAILED, false));
+  TEST_ASSERT_TRUE(commandLifecycleTransitionAllowed(
+      CommandState::STARTED, CommandState::COMPLETED, false));
+  TEST_ASSERT_TRUE(commandLifecycleTransitionAllowed(
+      CommandState::STARTED, CommandState::FAILED, true));
+  TEST_ASSERT_FALSE(commandLifecycleTransitionAllowed(
+      CommandState::STARTED, CommandState::ACCEPTED, false));
+  TEST_ASSERT_FALSE(commandLifecycleTransitionAllowed(
+      CommandState::ACCEPTED, CommandState::COMPLETED, false));
+
+  CommandStatusCache failedBeforeStartCache;
+  TEST_ASSERT_TRUE(failedBeforeStartCache.store(
+      record(OPERATION_2, CommandState::ACCEPTED)));
+  CommandStatusEntry failedBeforeStartOriginal =
+      *failedBeforeStartCache.find(OPERATION_2);
+  CommandStatusRecord failedBeforeStart =
+      record(OPERATION_2, CommandState::FAILED);
+  failedBeforeStart.executionStarted = false;
+  TEST_ASSERT_FALSE(failedBeforeStartCache.store(failedBeforeStart));
+  TEST_ASSERT_EQUAL_MEMORY(&failedBeforeStartOriginal,
+                           failedBeforeStartCache.find(OPERATION_2),
+                           sizeof(failedBeforeStartOriginal));
+
+  CommandStatusCache failedAfterStartCache;
+  TEST_ASSERT_TRUE(failedAfterStartCache.store(
+      record(OPERATION_3, CommandState::ACCEPTED)));
+  TEST_ASSERT_TRUE(failedAfterStartCache.store(
+      record(OPERATION_3, CommandState::STARTED)));
+  CommandStatusEntry failedAfterStartOriginal =
+      *failedAfterStartCache.find(OPERATION_3);
+  CommandStatusRecord failedAfterStart =
+      record(OPERATION_3, CommandState::FAILED);
+  failedAfterStart.executionStarted = true;
+  TEST_ASSERT_FALSE(failedAfterStartCache.store(failedAfterStart));
+  TEST_ASSERT_EQUAL_MEMORY(&failedAfterStartOriginal,
+                           failedAfterStartCache.find(OPERATION_3),
+                           sizeof(failedAfterStartOriginal));
+
+  CommandStatusCache cache;
+  CommandStatusRecord accepted = record(OPERATION_1, CommandState::ACCEPTED);
+  TEST_ASSERT_TRUE(cache.store(accepted));
+  const uint32_t sequence = cache.find(OPERATION_1)->insertionSequence;
+  TEST_ASSERT_TRUE(cache.store(accepted));
+  TEST_ASSERT_EQUAL_UINT32(sequence,
+                           cache.find(OPERATION_1)->insertionSequence);
+  TEST_ASSERT_TRUE(cache.store(record(OPERATION_1, CommandState::STARTED)));
+  CommandStatusRecord started = record(OPERATION_1, CommandState::STARTED);
+  TEST_ASSERT_TRUE(cache.store(started));
+  TEST_ASSERT_EQUAL_UINT32(sequence,
+                           cache.find(OPERATION_1)->insertionSequence);
+  TEST_ASSERT_TRUE(cache.store(record(OPERATION_1, CommandState::COMPLETED)));
+  CommandStatusRecord completed =
+      record(OPERATION_1, CommandState::COMPLETED);
+  TEST_ASSERT_TRUE(cache.store(completed));
+  TEST_ASSERT_EQUAL_UINT32(sequence,
+                           cache.find(OPERATION_1)->insertionSequence);
+}
+
+void test_regressions_terminal_changes_and_phase_mutation_are_rejected() {
+  CommandStatusCache cache;
+  TEST_ASSERT_TRUE(cache.store(record(OPERATION_1, CommandState::ACCEPTED)));
+  TEST_ASSERT_TRUE(cache.store(record(OPERATION_1, CommandState::STARTED)));
+  CommandStatusEntry before = *cache.find(OPERATION_1);
+  TEST_ASSERT_FALSE(cache.store(record(OPERATION_1, CommandState::ACCEPTED)));
+  TEST_ASSERT_EQUAL_MEMORY(&before, cache.find(OPERATION_1), sizeof(before));
+  CommandStatusRecord changedPhase =
+      record(OPERATION_1, CommandState::COMPLETED, "different-phase");
+  TEST_ASSERT_FALSE(cache.store(changedPhase));
+  TEST_ASSERT_EQUAL_MEMORY(&before, cache.find(OPERATION_1), sizeof(before));
+  TEST_ASSERT_TRUE(cache.store(record(OPERATION_1, CommandState::COMPLETED)));
+  before = *cache.find(OPERATION_1);
+  TEST_ASSERT_FALSE(cache.store(record(OPERATION_1, CommandState::STARTED)));
+  TEST_ASSERT_FALSE(cache.store(record(OPERATION_1, CommandState::FAILED)));
+  TEST_ASSERT_EQUAL_MEMORY(&before, cache.find(OPERATION_1), sizeof(before));
+
+  CommandStatusCache rejectedCache;
+  TEST_ASSERT_TRUE(
+      rejectedCache.store(record(OPERATION_2, CommandState::REJECTED)));
+  before = *rejectedCache.find(OPERATION_2);
+  TEST_ASSERT_FALSE(
+      rejectedCache.store(record(OPERATION_2, CommandState::ACCEPTED)));
+  TEST_ASSERT_EQUAL_MEMORY(&before, rejectedCache.find(OPERATION_2),
+                           sizeof(before));
+
+  CommandStatusCache directCompletion;
+  TEST_ASSERT_TRUE(directCompletion.store(
+      record(OPERATION_3, CommandState::ACCEPTED)));
+  before = *directCompletion.find(OPERATION_3);
+  TEST_ASSERT_FALSE(directCompletion.store(
+      record(OPERATION_3, CommandState::COMPLETED)));
+  TEST_ASSERT_EQUAL_MEMORY(&before, directCompletion.find(OPERATION_3),
+                           sizeof(before));
+}
+
+void test_invalid_identifiers_and_enum_values_do_not_mutate_cache() {
+  CommandStatusCache cache;
+  CommandStatusRecord invalid = record(OPERATION_1, CommandState::ACCEPTED);
+  strcpy(invalid.operationCommandId, "gggggggg-gggg-gggg-gggg-gggggggggggg");
+  TEST_ASSERT_FALSE(cache.store(invalid));
+  invalid = record(OPERATION_1, CommandState::ACCEPTED);
+  invalid.operationCommandId[0] = 'A';
+  TEST_ASSERT_FALSE(cache.store(invalid));
+  invalid = record(OPERATION_1, CommandState::ACCEPTED, "bad\"phase");
+  TEST_ASSERT_FALSE(cache.store(invalid));
+  invalid = record(OPERATION_1, CommandState::ACCEPTED, "bad phase");
+  TEST_ASSERT_FALSE(cache.store(invalid));
+  invalid = record(OPERATION_1, CommandState::ACCEPTED);
+  memset(invalid.operationCommandId, 'a', sizeof(invalid.operationCommandId));
+  TEST_ASSERT_FALSE(cache.store(invalid));
+  invalid = record(OPERATION_1, CommandState::ACCEPTED);
+  memset(invalid.phaseExecutionId, 'p', sizeof(invalid.phaseExecutionId));
+  TEST_ASSERT_FALSE(cache.store(invalid));
+  invalid = record(OPERATION_1, CommandState::ACCEPTED);
+  invalid.state = static_cast<CommandState>(255);
+  TEST_ASSERT_FALSE(cache.store(invalid));
+  invalid = record(OPERATION_1, CommandState::ACCEPTED);
+  invalid.errorCode = static_cast<CommandErrorCode>(255);
+  TEST_ASSERT_FALSE(cache.store(invalid));
+  TEST_ASSERT_EQUAL_UINT32(0, cache.occupiedCount());
+}
+
 void test_dispatch_query_is_read_only_and_survives_session_replacement() {
   NoMotionDispatcher dispatcher;
   SessionState session;
   CommandStatusCache cache;
+  TEST_ASSERT_TRUE(cache.store(record(OPERATION_1, CommandState::ACCEPTED)));
   TEST_ASSERT_TRUE(cache.store(record(OPERATION_1, CommandState::STARTED)));
   session.establish(NONCE);
   char query[300];
@@ -213,6 +342,9 @@ int main(int, char**) {
   RUN_TEST(test_invalid_record_combinations_are_rejected);
   RUN_TEST(test_exact_unknown_and_completed_frames);
   RUN_TEST(test_all_states_maximum_frame_and_transactional_failure);
+  RUN_TEST(test_normative_transition_model_and_idempotent_replay);
+  RUN_TEST(test_regressions_terminal_changes_and_phase_mutation_are_rejected);
+  RUN_TEST(test_invalid_identifiers_and_enum_values_do_not_mutate_cache);
   RUN_TEST(test_dispatch_query_is_read_only_and_survives_session_replacement);
   RUN_TEST(test_untrusted_session_can_query_unknown_without_cache_mutation);
   return UNITY_END();
