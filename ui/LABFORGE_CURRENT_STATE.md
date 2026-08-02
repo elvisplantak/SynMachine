@@ -35,6 +35,9 @@
 - Completed and pushed protocol-error/dispatch foundation:
   - branch: `codex/labforge-v1-protocol-error-dispatch-foundation`
   - commit: `2d793369ba4a91bb9fbbbcaf48de963fbc650af2`
+- Completed and pushed command-status cache foundation:
+  - branch: `codex/labforge-v1-command-status-cache-foundation`
+  - commit: `ab6c1747f70ed99885fa2bcb38f4ee425cc7ac82`
 
 ## Handshake/session milestone
 
@@ -88,7 +91,7 @@ Latest verified results:
 - static RAM: `1,295 / 8,192 bytes`; and
 - `git diff --check`: passed.
 
-## Latest firmware milestone
+## Protocol-error/dispatch milestone
 
 The protocol-error/dispatch foundation now implements:
 
@@ -116,8 +119,43 @@ parser/dispatch path at approximately `3.3–3.6 KB`, including parser, JSON
 document, and validator calls. This is acceptable for the current no-motion
 shell but must be reassessed before command-cache growth and actuator work.
 
-The next no-motion firmware milestone is `QUERY_COMMAND` / `COMMAND_STATUS`
-with a bounded volatile command-status cache shell and no command dispatch.
+## Latest firmware milestone
+
+The command-status cache foundation now implements:
+
+- valid session-bound `QUERY_COMMAND` / `COMMAND_STATUS` responses;
+- a two-entry volatile per-boot cache with at most one non-terminal entry;
+- deterministic oldest-terminal eviction;
+- read-only query behavior and `UNKNOWN` for absent or evicted IDs;
+- mandatory serialization for all six command states, without optional message
+  or result payloads; and
+- no incoming `COMMAND` acceptance, lifecycle progression, duplicate-command
+  identity comparison, dispatch, or physical behavior.
+
+Latest verified results:
+
+- focused command-status and protocol-error/dispatch tests: `16/16 passed`;
+- complete native suite: `60/60 passed`;
+- warning-enabled native suite: `60/60 passed`;
+- Mega 2560 build: successful;
+- flash: `22,286 / 253,952 bytes`;
+- static RAM: `1,665 / 8,192 bytes`; and
+- `git diff --check`: passed.
+
+AVR memory details:
+
+- `CommandStatusEntry`: `111` bytes;
+- `CommandStatusCache`: `226` bytes;
+- shared output buffer: `464` bytes;
+- maximum implemented mandatory `COMMAND_STATUS`: `443` bytes including LF;
+- deepest estimated parser/dispatch stack path: approximately `3.3–3.6 KB`;
+- command-status writer path: approximately `1.7 KB`; and
+- nominal SRAM remaining after static use plus the conservative deepest stack
+  estimate: approximately `2.9 KB` before interrupt/runtime margin.
+
+The next milestone should independently review this checkpoint and then define
+the remaining no-motion command-lifecycle boundary. Duplicate-command identity
+and any incoming `COMMAND` handling remain explicitly unimplemented.
 
 ## Approved phase and next phase boundary
 
@@ -137,8 +175,8 @@ Expected no-motion progression:
 
 ## Current limitations and unresolved physical decisions
 
-- `QUERY_COMMAND`, command-status responses, command cache, and command dispatch
-  are not yet implemented in firmware.
+- Incoming `COMMAND` handling, duplicate-command identity comparison, lifecycle
+  dispatch, and command execution are not yet implemented in firmware.
 - EEPROM fail-closed recovery/provisioning remains unresolved.
 - No actuator command or physical behavior is authorized by current protocol
   work.
