@@ -45,10 +45,29 @@ bool validError(CommandErrorCode error) {
          error == CommandErrorCode::UNSUPPORTED_COMMAND ||
          error == CommandErrorCode::COMMAND_ID_CONFLICT ||
          error == CommandErrorCode::CONTROLLER_BUSY ||
-         error == CommandErrorCode::CONTROLLER_IDENTITY_UNTRUSTED;
+         error == CommandErrorCode::CONTROLLER_IDENTITY_UNTRUSTED ||
+         error == CommandErrorCode::PUMP_MOTION_TIMEOUT ||
+         error == CommandErrorCode::PUMP_HOME_SWITCH_UNEXPECTED;
+}
+
+bool executionError(CommandErrorCode error) {
+  return error == CommandErrorCode::PUMP_MOTION_TIMEOUT ||
+         error == CommandErrorCode::PUMP_HOME_SWITCH_UNEXPECTED;
+}
+
+bool validSemanticIdentity(const CommandSemanticIdentity& identity) {
+  return identity.command == CommandKind::PUMP_MOVE_ABSOLUTE_STEPS &&
+         identity.pump == PumpId::P1 &&
+         identity.targetSteps <= kP1MaximumAbsoluteSteps;
 }
 
 }  // namespace
+
+bool commandSemanticIdentityEqual(const CommandSemanticIdentity& left,
+                                  const CommandSemanticIdentity& right) {
+  return left.command == right.command && left.pump == right.pump &&
+         left.targetSteps == right.targetSteps;
+}
 
 bool commandLifecycleTransitionAllowed(CommandState from, CommandState to,
                                        bool executionStarted) {
@@ -75,7 +94,12 @@ bool CommandStatusCache::valid(const CommandStatusRecord& record) {
   }
   if (record.phaseExecutionIdKnown && !validPhaseId(record.phaseExecutionId))
     return false;
-  if (record.state == CommandState::FAILED) return false;
+  if (record.semanticIdentityKnown &&
+      !validSemanticIdentity(record.semanticIdentity))
+    return false;
+  if (record.state == CommandState::FAILED)
+    return executionError(record.errorCode) &&
+           record.semanticIdentityKnown && record.executionStarted;
   if (record.state == CommandState::REJECTED)
     return record.errorCode != CommandErrorCode::NONE &&
            !record.executionStarted;
@@ -86,8 +110,13 @@ bool CommandStatusCache::valid(const CommandStatusRecord& record) {
 bool CommandStatusCache::sameIdentity(const CommandStatusRecord& left,
                                       const CommandStatusRecord& right) {
   if (left.phaseExecutionIdKnown != right.phaseExecutionIdKnown) return false;
-  return !left.phaseExecutionIdKnown ||
-         strcmp(left.phaseExecutionId, right.phaseExecutionId) == 0;
+  if (left.phaseExecutionIdKnown &&
+      strcmp(left.phaseExecutionId, right.phaseExecutionId) != 0)
+    return false;
+  if (left.semanticIdentityKnown != right.semanticIdentityKnown) return false;
+  return !left.semanticIdentityKnown ||
+         commandSemanticIdentityEqual(left.semanticIdentity,
+                                      right.semanticIdentity);
 }
 
 bool CommandStatusCache::semanticallyEqual(const CommandStatusRecord& left,

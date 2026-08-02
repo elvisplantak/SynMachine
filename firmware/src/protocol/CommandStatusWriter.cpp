@@ -58,6 +58,10 @@ const char* errorText(CommandErrorCode error) {
     return LABFORGE_TEXT("CONTROLLER_BUSY");
   if (error == CommandErrorCode::CONTROLLER_IDENTITY_UNTRUSTED)
     return LABFORGE_TEXT("CONTROLLER_IDENTITY_UNTRUSTED");
+  if (error == CommandErrorCode::PUMP_MOTION_TIMEOUT)
+    return LABFORGE_TEXT("PUMP_MOTION_TIMEOUT");
+  if (error == CommandErrorCode::PUMP_HOME_SWITCH_UNEXPECTED)
+    return LABFORGE_TEXT("PUMP_HOME_SWITCH_UNEXPECTED");
   return nullptr;
 }
 

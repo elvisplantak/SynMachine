@@ -8,6 +8,7 @@
 namespace labforge {
 
 constexpr size_t kCommandStatusCacheCapacity = 2;
+constexpr uint16_t kP1MaximumAbsoluteSteps = 20500;
 
 enum class CommandState : uint8_t {
   REJECTED,
@@ -23,12 +24,25 @@ enum class CommandErrorCode : uint8_t {
   COMMAND_ID_CONFLICT,
   CONTROLLER_BUSY,
   CONTROLLER_IDENTITY_UNTRUSTED,
+  PUMP_MOTION_TIMEOUT,
+  PUMP_HOME_SWITCH_UNEXPECTED,
+};
+
+enum class CommandKind : uint8_t { NONE, PUMP_MOVE_ABSOLUTE_STEPS };
+enum class PumpId : uint8_t { NONE, P1 };
+
+struct CommandSemanticIdentity {
+  CommandKind command;
+  PumpId pump;
+  uint16_t targetSteps;
 };
 
 struct CommandStatusRecord {
   char operationCommandId[kUuidTextCapacity];
   char phaseExecutionId[kPhaseExecutionIdCapacity];
   bool phaseExecutionIdKnown;
+  bool semanticIdentityKnown;
+  CommandSemanticIdentity semanticIdentity;
   CommandState state;
   CommandErrorCode errorCode;
   bool executionStarted;
@@ -42,6 +56,8 @@ struct CommandStatusEntry {
 
 bool commandLifecycleTransitionAllowed(CommandState from, CommandState to,
                                        bool executionStarted);
+bool commandSemanticIdentityEqual(const CommandSemanticIdentity& left,
+                                  const CommandSemanticIdentity& right);
 
 class CommandStatusCache {
  public:

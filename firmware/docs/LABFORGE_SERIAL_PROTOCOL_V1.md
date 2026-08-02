@@ -262,6 +262,23 @@ Required: `protocol`, `type`, `backend_session_nonce`, `controller_boot_id`,
 {"protocol":"LABFORGE/1","type":"COMMAND","backend_session_nonce":"123e4567-e89b-12d3-a456-426614174000","controller_boot_id":4294967295,"phase_execution_id":"phase-execution-1","operation_command_id":"323e4567-e89b-12d3-a456-426614174002","command":"FUTURE_COMMAND","arguments":{}}
 ```
 
+The first approved Service-mode command contract is
+`PUMP_MOVE_ABSOLUTE_STEPS`, initially restricted to `P1`. Its `arguments`
+object contains exactly `pump:"P1"` and integer `target_steps` in `0..20500`.
+Argument order is irrelevant; missing, additional, incorrectly typed, or
+out-of-range arguments are invalid. The command expresses an absolute software
+step target, not a calibrated volume. It has no caller-supplied direction,
+speed, homing, or route argument.
+
+```json
+{"protocol":"LABFORGE/1","type":"COMMAND","backend_session_nonce":"123e4567-e89b-12d3-a456-426614174000","controller_boot_id":4294967295,"phase_execution_id":"phase-execution-1","operation_command_id":"323e4567-e89b-12d3-a456-426614174002","command":"PUMP_MOVE_ABSOLUTE_STEPS","arguments":{"pump":"P1","target_steps":10000}}
+```
+
+The current implementation provides only the pure schema and a testable
+Service lifecycle boundary with a fake executor. It is not connected to the
+production dispatcher, Serial command acceptance, Arduino pins, or a motor
+driver. Therefore this approved contract cannot currently cause movement.
+
 ### `REJECTED`
 
 Required: common command correlation fields and `error_code`. Optional:
@@ -530,6 +547,12 @@ Error codes include:
 Future actuator-specific errors MUST be added only after actuator contracts
 exist.
 
+The approved P1 absolute-step contract reserves the precise execution-failure
+codes `PUMP_MOTION_TIMEOUT` and `PUMP_HOME_SWITCH_UNEXPECTED`. They apply only
+after an accepted command reaches its execution boundary and MUST NOT be used
+for request rejection. Their presence does not claim that production motion or
+home-switch handling is implemented.
+
 ## 15. Retry-safety policy
 
 Only `HELLO`, `QUERY_STATUS`, and `QUERY_COMMAND` are automatically retryable.
@@ -650,10 +673,12 @@ It also includes a two-entry volatile command-status cache shell and bounded
 `QUERY_COMMAND` / `COMMAND_STATUS` responses without accepting or executing
 `COMMAND`. Production does not populate the cache, so only `UNKNOWN` is
 currently reachable over real Serial. Cache lifecycle-integrity and identifier
-validation are implemented for future internal use, while actual `FAILED`
-storage awaits approved execution-failure codes. Duplicate-command identity
-comparison, command lifecycle dispatch, actuator commands, and physical
-execution remain unimplemented. Fail-closed recovery and provisioning remain
-unresolved. This firmware has not been uploaded or physically tested. No
-component is claimed to measure delivered volume or provide exactly-once
-physical execution.
+validation are implemented for future internal use. The approved
+`PUMP_MOVE_ABSOLUTE_STEPS` P1 contract adds exact bounded schema validation,
+compact exact semantic identity, test-only lifecycle execution, and precise
+failure codes using a fake executor. It remains disconnected from the
+production dispatcher and all hardware. Generic duplicate-command identity,
+Serial command lifecycle dispatch, actuator adapters, and physical execution
+remain unimplemented. Fail-closed recovery and provisioning remain unresolved.
+This firmware has not been uploaded or physically tested. No component is
+claimed to measure delivered volume or provide exactly-once physical execution.
