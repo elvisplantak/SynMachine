@@ -7,6 +7,7 @@
 #include "protocol/MessageParser.h"
 #include "protocol/ProtocolTypes.h"
 #include "protocol/SessionState.h"
+#include "protocol/StatusWriter.h"
 
 namespace {
 labforge::ArduinoEepromStorage bootIdentityStorage;
@@ -16,7 +17,7 @@ labforge::BootIdentityResult bootIdentityResult{
 labforge::LineReceiver lineReceiver;
 labforge::MessageParser messageParser;
 labforge::SessionState sessionState;
-uint8_t helloOkFrame[labforge::kHelloOkFrameCapacity];
+uint8_t protocolOutputFrame[labforge::kStatusFrameCapacity];
 volatile labforge::ParseStatus lastParseStatus = labforge::ParseStatus::NO_FRAME;
 }  // namespace
 
@@ -39,9 +40,23 @@ void loop() {
           result.message.type == labforge::MessageType::HELLO) {
         size_t outputLength = 0;
         if (labforge::writeHelloOk(result.message.backendSessionNonce, bootIdentityResult,
-                                   helloOkFrame, sizeof(helloOkFrame), outputLength)) {
+                                   protocolOutputFrame, sizeof(protocolOutputFrame), outputLength)) {
           sessionState.establish(result.message.backendSessionNonce);
-          Serial.write(helloOkFrame, outputLength);
+          Serial.write(protocolOutputFrame, outputLength);
+        }
+      } else if (result.status == labforge::ParseStatus::VALID_MESSAGE &&
+                 result.message.type == labforge::MessageType::QUERY_STATUS &&
+                 sessionState.validate(result.message.backendSessionNonce,
+                                       result.message.controllerBootIdPresence,
+                                       result.message.controllerBootId,
+                                       bootIdentityResult) ==
+                     labforge::SessionValidationResult::VALID) {
+        size_t outputLength = 0;
+        if (labforge::writeStatus(result.message.backendSessionNonce,
+                                  result.message.requestId, bootIdentityResult,
+                                  protocolOutputFrame, sizeof(protocolOutputFrame),
+                                  outputLength)) {
+          Serial.write(protocolOutputFrame, outputLength);
         }
       }
     }

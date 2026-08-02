@@ -193,11 +193,12 @@ other identity uncertainty, the controller MUST:
   `CONTROLLER_IDENTITY_UNTRUSTED`; and
 - never invent or guess a trusted boot ID.
 
-Startup calls boot-identity initialization exactly once after starting Serial
-and retains the complete result internally: either a trusted
-`controller_boot_id`, or an explicit untrusted failure result. No serial
-response currently exposes this state. `HELLO_OK`, handshake/session state, and
-status-query responses remain unimplemented.
+Firmware makes one boot-identity initialization call per startup after starting
+Serial and retains the complete result internally: either a trusted
+`controller_boot_id`, or an explicit untrusted failure result. `HELLO_OK` and
+valid session-bound `STATUS` responses expose the trusted or explicitly
+untrusted identity state without converting an untrusted result into a guessed
+boot ID.
 
 Only recovery or provisioning after a fail-closed identity boot remains
 unresolved.
@@ -325,6 +326,14 @@ Required: `protocol`, `type`, `backend_session_nonce`, `controller_boot_id`,
 `request_id`, `controller_state`, `software_state_trust`, and
 `active_operation_command_id`. The active ID is null when no command is active.
 `STATUS` MUST NOT repeat capabilities or claim physical truth.
+
+The current protocol-only implementation emits one compact LF-terminated
+`STATUS` after a valid session-bound `QUERY_STATUS`. It echoes the nonce and
+request ID, reports the trusted numeric or untrusted null boot ID, uses
+`PROTOCOL_ONLY` or `IDENTITY_UNTRUSTED` as applicable, and reports
+`active_operation_command_id:null`. Queries that fail session or boot-ID
+validation cannot produce `STATUS`; correlated `PROTOCOL_ERROR` output remains
+unimplemented.
 
 ```json
 {"protocol":"LABFORGE/1","type":"STATUS","backend_session_nonce":"123e4567-e89b-12d3-a456-426614174000","controller_boot_id":4294967295,"request_id":"423e4567-e89b-12d3-a456-426614174003","controller_state":"IDLE","software_state_trust":"TRUSTED","active_operation_command_id":null}
@@ -601,9 +610,10 @@ trusted or untrusted result.
 It also includes nullable inbound boot-ID parsing, fixed-capacity volatile
 session state, bounded deterministic `HELLO_OK` serialization, and actual
 `HELLO` to `HELLO_OK` Serial integration for trusted and untrusted identity.
-`PROTOCOL_ERROR` output, invalid-message responses, `QUERY_STATUS`,
-`QUERY_COMMAND`, command responses, a command cache, actuator commands, and
-physical execution remain unimplemented. Fail-closed recovery and provisioning
-remain unresolved. This firmware has not been uploaded or physically tested.
-No component is claimed to measure delivered volume or provide exactly-once
-physical execution.
+It now also validates session-bound `QUERY_STATUS` messages and emits bounded,
+deterministic trusted or untrusted `STATUS` responses.
+`PROTOCOL_ERROR` output, invalid-message responses, `QUERY_COMMAND`, command
+responses, a command cache, actuator commands, and physical execution remain
+unimplemented. Fail-closed recovery and provisioning remain unresolved. This
+firmware has not been uploaded or physically tested. No component is claimed to
+measure delivered volume or provide exactly-once physical execution.
