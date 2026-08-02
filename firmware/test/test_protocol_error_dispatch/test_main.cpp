@@ -20,8 +20,10 @@ DispatchResult dispatch(NoMotionDispatcher& dispatcher, SessionState& session,
                         const BootIdentityResult& identity, const char* frame,
                         uint8_t* output, size_t capacity) {
   memset(output, 0, capacity);
+  CommandStatusCache commandStatusCache;
   return dispatcher.dispatch(reinterpret_cast<const uint8_t*>(frame),
-                             strlen(frame), identity, session, output, capacity);
+                             strlen(frame), identity, session,
+                             commandStatusCache, output, capacity);
 }
 
 void assertSingleFrame(const uint8_t* output, size_t length) {
@@ -246,7 +248,33 @@ void test_exact_correlated_error_frames_and_all_codes() {
   }
 }
 
-void test_valid_deferred_messages_intentionally_emit_nothing() {
+void test_incomplete_correlation_tuples_are_fully_omitted() {
+  NoMotionDispatcher dispatcher;
+  SessionState session;
+  session.establish(NONCE);
+  const char* frames[] = {
+      "{\"protocol\":\"LABFORGE/1\",\"type\":\"QUERY_STATUS\",\"backend_session_nonce\":\"123e4567-e89b-12d3-a456-426614174000\",\"controller_boot_id\":7}",
+      "{\"protocol\":\"LABFORGE/1\",\"type\":\"QUERY_STATUS\",\"backend_session_nonce\":\"123E4567-E89B-12D3-A456-426614174000\",\"controller_boot_id\":7,\"request_id\":\"423e4567-e89b-12d3-a456-426614174003\"}",
+      "{\"protocol\":\"LABFORGE/1\",\"type\":\"COMMAND\",\"backend_session_nonce\":\"123e4567-e89b-12d3-a456-426614174000\",\"controller_boot_id\":7,\"operation_command_id\":\"323e4567-e89b-12d3-a456-426614174002\",\"command\":\"GO\",\"arguments\":{}}",
+      "{\"protocol\":\"LABFORGE/1\",\"type\":\"COMMAND\",\"backend_session_nonce\":\"123e4567-e89b-12d3-a456-426614174000\",\"controller_boot_id\":7,\"phase_execution_id\":\"phase-1\",\"operation_command_id\":\"invalid\",\"command\":\"GO\",\"arguments\":{}}",
+  };
+  uint8_t output[kProtocolErrorFrameCapacity];
+  for (const char* frame : frames) {
+    const DispatchResult result = dispatch(dispatcher, session, TRUSTED, frame,
+                                           output, sizeof(output));
+    assertSingleFrame(output, result.outputLength);
+    TEST_ASSERT_NULL(strstr(reinterpret_cast<char*>(output),
+                            "backend_session_nonce"));
+    TEST_ASSERT_NULL(strstr(reinterpret_cast<char*>(output), "request_id"));
+    TEST_ASSERT_NULL(strstr(reinterpret_cast<char*>(output),
+                            "phase_execution_id"));
+    TEST_ASSERT_NULL(strstr(reinterpret_cast<char*>(output),
+                            "operation_command_id"));
+    TEST_ASSERT_EQUAL_STRING(NONCE, session.nonce());
+  }
+}
+
+void test_valid_query_command_returns_unknown_without_cache_mutation() {
   NoMotionDispatcher dispatcher;
   SessionState session;
   session.establish(NONCE);
@@ -260,7 +288,10 @@ void test_valid_deferred_messages_intentionally_emit_nothing() {
   DispatchResult result = dispatch(dispatcher, session, TRUSTED, frame, output,
                                    sizeof(output));
   TEST_ASSERT_EQUAL(ParseStatus::VALID_MESSAGE, result.parseStatus);
-  TEST_ASSERT_EQUAL_UINT32(0, result.outputLength);
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "\"type\":\"COMMAND_STATUS\""));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "\"command_state\":\"UNKNOWN\""));
   TEST_ASSERT_EQUAL_STRING(NONCE, session.nonce());
 }
 
@@ -274,6 +305,7 @@ int main(int, char**) {
   RUN_TEST(test_parser_errors_correlate_only_safe_identifiers);
   RUN_TEST(test_oversize_and_writer_failure_are_transactional);
   RUN_TEST(test_exact_correlated_error_frames_and_all_codes);
-  RUN_TEST(test_valid_deferred_messages_intentionally_emit_nothing);
+  RUN_TEST(test_incomplete_correlation_tuples_are_fully_omitted);
+  RUN_TEST(test_valid_query_command_returns_unknown_without_cache_mutation);
   return UNITY_END();
 }

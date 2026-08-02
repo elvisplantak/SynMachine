@@ -368,8 +368,10 @@ Required: `protocol`, `type`, `error_code`. Optional: `message`. When safely
 recoverable it MUST also contain `backend_session_nonce`, `controller_boot_id`,
 and either `request_id` for a query error or both command IDs for a command
 error. Query and command correlation fields MUST NOT be mixed. Correlation MAY
-be omitted only when framing, oversize, or malformed JSON prevents safe
-extraction. Semantic refusal of a valid `COMMAND` uses `REJECTED`.
+be omitted whenever the complete required correlation tuple cannot be safely
+recovered, including framing failure, oversized input, malformed JSON, or
+missing or invalid correlation fields. Partial correlation MUST NOT be emitted.
+Semantic refusal of a valid `COMMAND` uses `REJECTED`.
 
 The current no-motion dispatcher emits bounded deterministic errors with no
 optional `message`. Oversized and malformed input produces an uncorrelated
@@ -453,10 +455,22 @@ prove a physical command never executed and never authorizes automatic
 re-execution. `ACCEPTED` and `STARTED` contain no invented terminal result.
 Queries MUST NOT initiate or repeat motion.
 
+The current no-motion implementation answers a valid session-bound
+`QUERY_COMMAND` from a two-entry volatile cache. Cache absence emits `UNKNOWN`
+without creating an entry. Known entries emit only mandatory state fields,
+including `result:{}` for `COMPLETED` and `error_code` plus
+`execution_started` for `FAILED`; optional messages and result payloads are not
+implemented. Querying never mutates the cache, and handshake replacement in the
+same controller boot does not clear it. The maximum implemented mandatory frame
+is 443 bytes including LF, and the shared output capacity is 464 bytes.
+
 ## 12. Duplicate-command semantics
 
-The controller MUST maintain a bounded volatile per-boot cache; exact size
-remains unresolved. Its key is `operation_command_id`. Command identity is the
+The controller MUST maintain a bounded volatile per-boot cache. The current
+foundation capacity is two entries: at most one non-terminal entry plus one
+recent terminal entry. When both entries are terminal, the oldest is replaced
+deterministically. An absent or evicted ID returns `UNKNOWN`. Its key is
+`operation_command_id`. Command identity is the
 parsed, validated semantic tuple (`phase_execution_id`, `command`, `arguments`).
 It excludes the nonce, JSON whitespace, JSON object key order, boot ID (already
 scoped by the cache), and operation ID (the key).
@@ -601,7 +615,6 @@ and stronger physical execution guarantees are outside the initial shell.
 The following remain unresolved and MUST NOT be inferred:
 
 - identity-recovery procedure after a fail-closed boot;
-- duplicate-cache size within the documented collection bounds;
 - timeout durations and serial reconnect backoff;
 - first Service-mode actuator and actuator-specific schemas;
 - pump semantic direction API and early-limit-switch policy;
@@ -624,8 +637,11 @@ session state, bounded deterministic `HELLO_OK` serialization, and actual
 It now also validates session-bound `QUERY_STATUS` messages, emits bounded
 deterministic trusted or untrusted `STATUS` responses, and uses a testable
 no-motion dispatcher for bounded parser, session, and boot-ID protocol errors.
-`QUERY_COMMAND`, command responses, a command cache, actuator commands, and
-physical execution remain unimplemented. Fail-closed recovery and provisioning
-remain unresolved. This firmware has not been uploaded or physically tested.
-No component is claimed to measure delivered volume or provide exactly-once
+It also includes a two-entry volatile command-status cache shell and bounded
+`QUERY_COMMAND` / `COMMAND_STATUS` responses without accepting or executing
+`COMMAND`. Duplicate-command identity comparison, command lifecycle dispatch,
+actuator commands, and physical execution remain unimplemented. Fail-closed
+recovery and provisioning remain unresolved. This firmware has not been
+uploaded or physically tested. No component is claimed to measure delivered
+volume or provide exactly-once
 physical execution.

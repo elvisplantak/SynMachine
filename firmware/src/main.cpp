@@ -2,6 +2,8 @@
 
 #include "identity/ArduinoEepromStorage.h"
 #include "identity/BootIdentityStore.h"
+#include "protocol/CommandStatusCache.h"
+#include "protocol/CommandStatusWriter.h"
 #include "protocol/LineReceiver.h"
 #include "protocol/NoMotionDispatcher.h"
 #include "protocol/ProtocolErrorWriter.h"
@@ -16,7 +18,8 @@ labforge::BootIdentityResult bootIdentityResult{
 labforge::LineReceiver lineReceiver;
 labforge::NoMotionDispatcher dispatcher;
 labforge::SessionState sessionState;
-uint8_t protocolOutputFrame[labforge::kProtocolErrorFrameCapacity];
+labforge::CommandStatusCache commandStatusCache;
+uint8_t protocolOutputFrame[labforge::kCommandStatusFrameCapacity];
 volatile labforge::ParseStatus lastParseStatus = labforge::ParseStatus::NO_FRAME;
 }  // namespace
 
@@ -40,7 +43,7 @@ void loop() {
     } else if (event == labforge::LineEvent::FRAME_READY) {
       const labforge::DispatchResult result = dispatcher.dispatch(
           frame.data, frame.length, bootIdentityResult, sessionState,
-          protocolOutputFrame, sizeof(protocolOutputFrame));
+          commandStatusCache, protocolOutputFrame, sizeof(protocolOutputFrame));
       lastParseStatus = result.parseStatus;
       if (result.outputLength > 0) {
         Serial.write(protocolOutputFrame, result.outputLength);

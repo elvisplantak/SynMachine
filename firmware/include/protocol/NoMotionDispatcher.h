@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "identity/BootIdentityStore.h"
+#include "protocol/CommandStatusCache.h"
 #include "protocol/MessageParser.h"
 #include "protocol/ProtocolTypes.h"
 #include "protocol/SessionState.h"
@@ -19,7 +20,9 @@ class NoMotionDispatcher {
  public:
   DispatchResult dispatch(const uint8_t* payload, size_t length,
                           const BootIdentityResult& identity,
-                          SessionState& session, uint8_t* output,
+                          SessionState& session,
+                          const CommandStatusCache& commandStatusCache,
+                          uint8_t* output,
                           size_t capacity) const;
   DispatchResult lineTooLong(const BootIdentityResult& identity,
                              uint8_t* output, size_t capacity) const;

@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "protocol/CommandStatusWriter.h"
 #include "protocol/HelloOkWriter.h"
 #include "protocol/ProtocolErrorWriter.h"
 #include "protocol/StatusWriter.h"
@@ -37,7 +38,8 @@ ErrorCorrelation queryCorrelation(const InboundMessage& message) {
 
 DispatchResult NoMotionDispatcher::dispatch(
     const uint8_t* payload, size_t length, const BootIdentityResult& identity,
-    SessionState& session, uint8_t* output, size_t capacity) const {
+    SessionState& session, const CommandStatusCache& commandStatusCache,
+    uint8_t* output, size_t capacity) const {
   const ParseResult parsed = parser_.parse(payload, length);
   size_t outputLength = 0;
   if (parsed.status != ParseStatus::VALID_MESSAGE) {
@@ -56,7 +58,8 @@ DispatchResult NoMotionDispatcher::dispatch(
     return {parsed.status, outputLength};
   }
 
-  if (parsed.message.type != MessageType::QUERY_STATUS) {
+  if (parsed.message.type != MessageType::QUERY_STATUS &&
+      parsed.message.type != MessageType::QUERY_COMMAND) {
     return {parsed.status, 0};
   }
 
@@ -71,8 +74,16 @@ DispatchResult NoMotionDispatcher::dispatch(
     return {parsed.status, outputLength};
   }
 
-  writeStatus(parsed.message.backendSessionNonce, parsed.message.requestId,
-              identity, output, capacity, outputLength);
+  if (parsed.message.type == MessageType::QUERY_STATUS) {
+    writeStatus(parsed.message.backendSessionNonce, parsed.message.requestId,
+                identity, output, capacity, outputLength);
+  } else {
+    writeCommandStatus(
+        parsed.message.backendSessionNonce, parsed.message.requestId,
+        parsed.message.operationCommandId, identity,
+        commandStatusCache.find(parsed.message.operationCommandId), output,
+        capacity, outputLength);
+  }
   return {parsed.status, outputLength};
 }
 
