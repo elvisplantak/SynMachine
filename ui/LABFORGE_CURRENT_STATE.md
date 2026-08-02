@@ -38,6 +38,9 @@
 - Completed and pushed command-status cache foundation:
   - branch: `codex/labforge-v1-command-status-cache-foundation`
   - commit: `ab6c1747f70ed99885fa2bcb38f4ee425cc7ac82`
+- Completed and pushed command-lifecycle integrity foundation:
+  - branch: `codex/labforge-v1-command-lifecycle-integrity-foundation`
+  - commit: `99101b93f2d44c4e2e5722398653d665c9b031c1`
 
 ## Handshake/session milestone
 
@@ -119,7 +122,7 @@ parser/dispatch path at approximately `3.3–3.6 KB`, including parser, JSON
 document, and validator calls. This is acceptable for the current no-motion
 shell but must be reassessed before command-cache growth and actuator work.
 
-## Latest firmware milestone
+## Command-status cache milestone
 
 The command-status cache foundation now implements:
 
@@ -153,9 +156,38 @@ AVR memory details:
 - nominal SRAM remaining after static use plus the conservative deepest stack
   estimate: approximately `2.9 KB` before interrupt/runtime margin.
 
-The next milestone should independently review this checkpoint and then define
-the remaining no-motion command-lifecycle boundary. Duplicate-command identity
-and any incoming `COMMAND` handling remain explicitly unimplemented.
+## Latest firmware milestone
+
+The command-lifecycle integrity foundation now adds:
+
+- strict `ACCEPTED -> STARTED -> COMPLETED` lifecycle ordering;
+- idempotent exact replay without insertion-sequence changes;
+- immutable terminal states and phase identity;
+- canonical lowercase UUID and safe phase-ID validation;
+- rejection of invalid enum values and invalid cached identifiers; and
+- structural recognition of both valid `FAILED` boundaries, while actual
+  `FAILED` storage remains blocked until execution-failure error codes are
+  explicitly defined and reviewed.
+
+The production runtime still never calls `CommandStatusCache::store()`, so the
+real Serial path can currently return only `UNKNOWN`. Existing protocol
+rejection codes are not represented as execution failures.
+
+Latest verified results:
+
+- focused command-lifecycle tests: `11/11 passed`;
+- complete native suite: `63/63 passed`;
+- warning-enabled native suite: `63/63 passed`;
+- Mega 2560 build: successful;
+- flash: `22,286 / 253,952 bytes`;
+- static RAM: `1,665 / 8,192 bytes`; and
+- `git diff --check`: passed.
+
+The memory measurements and conservative stack estimate from the preceding
+command-status checkpoint are unchanged. The next step is independent review
+of this checkpoint before selecting the first actual command contract or any
+Service-layer actuator boundary. Incoming `COMMAND` handling, duplicate-command
+identity comparison, dispatch, and physical behavior remain unimplemented.
 
 ## Approved phase and next phase boundary
 
@@ -176,7 +208,8 @@ Expected no-motion progression:
 ## Current limitations and unresolved physical decisions
 
 - Incoming `COMMAND` handling, duplicate-command identity comparison, lifecycle
-  dispatch, and command execution are not yet implemented in firmware.
+  dispatch, cache population from the runtime, and command execution are not yet
+  implemented in firmware.
 - EEPROM fail-closed recovery/provisioning remains unresolved.
 - No actuator command or physical behavior is authorized by current protocol
   work.
