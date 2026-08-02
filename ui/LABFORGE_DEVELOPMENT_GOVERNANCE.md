@@ -155,3 +155,18 @@ limitations, and real decisions requiring user input.
 session can determine what is complete, what is in progress, what comes next,
 and which physical decisions remain unresolved. Detailed history remains in Git
 and technical documents rather than being duplicated there.
+
+Codex decides when the active conversation should move to a new session. Before
+recommending that transition, Codex checks whether all information needed for
+safe continuation is already preserved in the canonical documents, current
+code, Git history, and pushed branch state. It updates
+`LABFORGE_CURRENT_STATE.md` or another canonical technical document only where
+relevant information is missing.
+
+If a separate handoff is useful, it is a concise delta only: current repository,
+branch and HEAD; worktree state; newly completed work; the immediate next step;
+remaining limitations; and unresolved user or physical decisions. It must not
+repeat history, decisions, test evidence, or technical facts already recorded
+in canonical documents or Git. If the existing sources are sufficient, Codex
+creates no redundant handoff and instead identifies the documents and commits
+the new session must read.
