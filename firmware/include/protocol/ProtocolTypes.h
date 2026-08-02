@@ -17,6 +17,7 @@ constexpr size_t kJsonDocumentCapacity = 1024;
 enum class MessageType : uint8_t { HELLO, COMMAND, QUERY_STATUS, QUERY_COMMAND };
 enum class ArgumentType : uint8_t { STRING, INTEGER, BOOLEAN };
 enum class BootIdPresence : uint8_t { ABSENT, NULL_VALUE, VALUE };
+enum class ErrorCorrelationKind : uint8_t { NONE, QUERY, COMMAND };
 
 struct Argument {
   char key[kArgumentKeyCapacity];
@@ -47,9 +48,21 @@ enum class ProtocolErrorCode : uint8_t {
   MALFORMED_MESSAGE,
   LINE_TOO_LONG,
   UNSUPPORTED_PROTOCOL_VERSION,
+  HANDSHAKE_REQUIRED,
+  STALE_SESSION,
+  CONTROLLER_BOOT_MISMATCH,
+  CONTROLLER_IDENTITY_UNTRUSTED,
   MISSING_FIELD,
   INVALID_FIELD,
   UNSUPPORTED_MESSAGE_TYPE
+};
+
+struct ErrorCorrelation {
+  ErrorCorrelationKind kind;
+  char backendSessionNonce[kUuidTextCapacity];
+  char requestId[kUuidTextCapacity];
+  char phaseExecutionId[kPhaseExecutionIdCapacity];
+  char operationCommandId[kUuidTextCapacity];
 };
 
 struct ParseResult {

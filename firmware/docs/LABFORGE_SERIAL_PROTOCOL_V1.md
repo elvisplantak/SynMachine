@@ -16,9 +16,10 @@ are compact symbolic JSON and do not define actuator command names.
 ## 1. Document status and boundaries
 
 This is an approved design contract with the implementation status documented
-in Section 22. The firmware does not implement status or command responses,
-protocol-error output, a command cache, actuator protocol, or physical feedback.
-The backend does not yet implement the real serial adapter in this contract.
+in Section 22. The firmware implements handshake, status, and bounded
+protocol-error responses, but not command responses, a command cache, actuator
+protocol, or physical feedback. The backend does not yet implement the real
+serial adapter in this contract.
 
 Sections 2–19 define approved requirements and implementation order. Section 20
 lists explicitly deferred functionality, and Section 21 lists unresolved
@@ -332,11 +333,11 @@ The current protocol-only implementation emits one compact LF-terminated
 request ID, reports the trusted numeric or untrusted null boot ID, uses
 `PROTOCOL_ONLY` or `IDENTITY_UNTRUSTED` as applicable, and reports
 `active_operation_command_id:null`. Queries that fail session or boot-ID
-validation cannot produce `STATUS`; correlated `PROTOCOL_ERROR` output remains
-unimplemented.
+validation cannot produce `STATUS` and instead receive a correlated
+`PROTOCOL_ERROR`.
 
 ```json
-{"protocol":"LABFORGE/1","type":"STATUS","backend_session_nonce":"123e4567-e89b-12d3-a456-426614174000","controller_boot_id":4294967295,"request_id":"423e4567-e89b-12d3-a456-426614174003","controller_state":"IDLE","software_state_trust":"TRUSTED","active_operation_command_id":null}
+{"protocol":"LABFORGE/1","type":"STATUS","backend_session_nonce":"123e4567-e89b-12d3-a456-426614174000","controller_boot_id":4294967295,"request_id":"423e4567-e89b-12d3-a456-426614174003","controller_state":"PROTOCOL_ONLY","software_state_trust":"TRUSTED","active_operation_command_id":null}
 ```
 
 ### `QUERY_COMMAND`
@@ -370,6 +371,15 @@ error. Query and command correlation fields MUST NOT be mixed. Correlation MAY
 be omitted only when framing, oversize, or malformed JSON prevents safe
 extraction. Semantic refusal of a valid `COMMAND` uses `REJECTED`.
 
+The current no-motion dispatcher emits bounded deterministic errors with no
+optional `message`. Oversized and malformed input produces an uncorrelated
+error. Schema errors are correlated only when a valid LABFORGE/1 message type
+and the complete relevant query or command identifiers can be recovered
+safely. A parsed `QUERY_STATUS` receives correlated `HANDSHAKE_REQUIRED`,
+`STALE_SESSION`, `CONTROLLER_BOOT_MISMATCH`, or
+`CONTROLLER_IDENTITY_UNTRUSTED` as applicable. Writer failure emits no partial
+frame, and dispatch selects at most one response per received frame.
+
 ```json
 {"protocol":"LABFORGE/1","type":"PROTOCOL_ERROR","backend_session_nonce":"123e4567-e89b-12d3-a456-426614174000","controller_boot_id":4294967295,"request_id":"423e4567-e89b-12d3-a456-426614174003","error_code":"INVALID_FIELD","message":"Invalid query field"}
 ```
@@ -389,9 +399,10 @@ messages carrying the old nonce are stale and MUST be rejected or ignored.
 Retrying the same valid nonce is idempotent and emits the same semantic
 `HELLO_OK`. A different valid nonce immediately replaces the previous session.
 Invalid, malformed, oversized, unsupported, or otherwise rejected input does
-not alter session state and currently produces no protocol-error output. There
-is no firmware-side session timeout or inactivity expiry in LABFORGE/1;
-controller reboot naturally clears the volatile session.
+not alter session state. It produces the bounded protocol error defined above
+when serialization succeeds. There is no firmware-side session timeout or
+inactivity expiry in LABFORGE/1; controller reboot naturally clears the
+volatile session.
 
 Session replacement MUST NOT resume, repeat, stop, cancel, complete, or
 otherwise alter an active physical command. Command identity and cached state
@@ -610,10 +621,11 @@ trusted or untrusted result.
 It also includes nullable inbound boot-ID parsing, fixed-capacity volatile
 session state, bounded deterministic `HELLO_OK` serialization, and actual
 `HELLO` to `HELLO_OK` Serial integration for trusted and untrusted identity.
-It now also validates session-bound `QUERY_STATUS` messages and emits bounded,
-deterministic trusted or untrusted `STATUS` responses.
-`PROTOCOL_ERROR` output, invalid-message responses, `QUERY_COMMAND`, command
-responses, a command cache, actuator commands, and physical execution remain
-unimplemented. Fail-closed recovery and provisioning remain unresolved. This
-firmware has not been uploaded or physically tested. No component is claimed to
-measure delivered volume or provide exactly-once physical execution.
+It now also validates session-bound `QUERY_STATUS` messages, emits bounded
+deterministic trusted or untrusted `STATUS` responses, and uses a testable
+no-motion dispatcher for bounded parser, session, and boot-ID protocol errors.
+`QUERY_COMMAND`, command responses, a command cache, actuator commands, and
+physical execution remain unimplemented. Fail-closed recovery and provisioning
+remain unresolved. This firmware has not been uploaded or physically tested.
+No component is claimed to measure delivered volume or provide exactly-once
+physical execution.

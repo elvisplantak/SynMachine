@@ -3,11 +3,10 @@
 #include "identity/ArduinoEepromStorage.h"
 #include "identity/BootIdentityStore.h"
 #include "protocol/LineReceiver.h"
-#include "protocol/HelloOkWriter.h"
-#include "protocol/MessageParser.h"
+#include "protocol/NoMotionDispatcher.h"
+#include "protocol/ProtocolErrorWriter.h"
 #include "protocol/ProtocolTypes.h"
 #include "protocol/SessionState.h"
-#include "protocol/StatusWriter.h"
 
 namespace {
 labforge::ArduinoEepromStorage bootIdentityStorage;
@@ -15,9 +14,9 @@ labforge::BootIdentityStore bootIdentityStore(bootIdentityStorage);
 labforge::BootIdentityResult bootIdentityResult{
     false, 0, labforge::IdentityFailureReason::NO_VALID_RECORD};
 labforge::LineReceiver lineReceiver;
-labforge::MessageParser messageParser;
+labforge::NoMotionDispatcher dispatcher;
 labforge::SessionState sessionState;
-uint8_t protocolOutputFrame[labforge::kStatusFrameCapacity];
+uint8_t protocolOutputFrame[labforge::kProtocolErrorFrameCapacity];
 volatile labforge::ParseStatus lastParseStatus = labforge::ParseStatus::NO_FRAME;
 }  // namespace
 
@@ -32,32 +31,19 @@ void loop() {
     labforge::FrameView frame{};
     const labforge::LineEvent event = lineReceiver.feed(static_cast<uint8_t>(Serial.read()), frame);
     if (event == labforge::LineEvent::LINE_TOO_LONG) {
-      lastParseStatus = labforge::ParseStatus::OVERSIZED_FRAME;
+      const labforge::DispatchResult result = dispatcher.lineTooLong(
+          bootIdentityResult, protocolOutputFrame, sizeof(protocolOutputFrame));
+      lastParseStatus = result.parseStatus;
+      if (result.outputLength > 0) {
+        Serial.write(protocolOutputFrame, result.outputLength);
+      }
     } else if (event == labforge::LineEvent::FRAME_READY) {
-      const labforge::ParseResult result = messageParser.parse(frame.data, frame.length);
-      lastParseStatus = result.status;
-      if (result.status == labforge::ParseStatus::VALID_MESSAGE &&
-          result.message.type == labforge::MessageType::HELLO) {
-        size_t outputLength = 0;
-        if (labforge::writeHelloOk(result.message.backendSessionNonce, bootIdentityResult,
-                                   protocolOutputFrame, sizeof(protocolOutputFrame), outputLength)) {
-          sessionState.establish(result.message.backendSessionNonce);
-          Serial.write(protocolOutputFrame, outputLength);
-        }
-      } else if (result.status == labforge::ParseStatus::VALID_MESSAGE &&
-                 result.message.type == labforge::MessageType::QUERY_STATUS &&
-                 sessionState.validate(result.message.backendSessionNonce,
-                                       result.message.controllerBootIdPresence,
-                                       result.message.controllerBootId,
-                                       bootIdentityResult) ==
-                     labforge::SessionValidationResult::VALID) {
-        size_t outputLength = 0;
-        if (labforge::writeStatus(result.message.backendSessionNonce,
-                                  result.message.requestId, bootIdentityResult,
-                                  protocolOutputFrame, sizeof(protocolOutputFrame),
-                                  outputLength)) {
-          Serial.write(protocolOutputFrame, outputLength);
-        }
+      const labforge::DispatchResult result = dispatcher.dispatch(
+          frame.data, frame.length, bootIdentityResult, sessionState,
+          protocolOutputFrame, sizeof(protocolOutputFrame));
+      lastParseStatus = result.parseStatus;
+      if (result.outputLength > 0) {
+        Serial.write(protocolOutputFrame, result.outputLength);
       }
     }
   }

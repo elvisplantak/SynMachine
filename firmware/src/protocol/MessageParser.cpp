@@ -212,4 +212,45 @@ ParseResult MessageParser::parse(const uint8_t* payload, size_t length) const {
   return result;
 }
 
+ErrorCorrelation MessageParser::recoverErrorCorrelation(const uint8_t* payload,
+                                                        size_t length) const {
+  ErrorCorrelation correlation{};
+  correlation.kind = ErrorCorrelationKind::NONE;
+  if (length > kMaxPayloadBytes) {
+    return correlation;
+  }
+  const LexicalError lexical = StrictJsonValidator().validate(payload, length);
+  if (lexical != LexicalError::NONE && lexical != LexicalError::NON_INTEGER_NUMBER) {
+    return correlation;
+  }
+
+  StaticJsonDocument<kJsonDocumentCapacity> document;
+  if (deserializeJson(document, payload, length) || !document.is<JsonObject>()) {
+    return correlation;
+  }
+  JsonObjectConst object = document.as<JsonObjectConst>();
+  if (!object["protocol"].is<const char*>() ||
+      strcmp(object["protocol"].as<const char*>(), "LABFORGE/1") != 0 ||
+      !object["type"].is<const char*>() ||
+      !extractUuid(object, "backend_session_nonce", correlation.backendSessionNonce)) {
+    return correlation;
+  }
+
+  const char* type = object["type"].as<const char*>();
+  if ((strcmp(type, "QUERY_STATUS") == 0 || strcmp(type, "QUERY_COMMAND") == 0) &&
+      extractUuid(object, "request_id", correlation.requestId)) {
+    correlation.kind = ErrorCorrelationKind::QUERY;
+  } else if (strcmp(type, "COMMAND") == 0 &&
+             object["phase_execution_id"].is<const char*>() &&
+             validPhaseId(object["phase_execution_id"].as<const char*>()) &&
+             copyChecked(object["phase_execution_id"].as<const char*>(),
+                         correlation.phaseExecutionId,
+                         sizeof(correlation.phaseExecutionId)) &&
+             extractUuid(object, "operation_command_id",
+                         correlation.operationCommandId)) {
+    correlation.kind = ErrorCorrelationKind::COMMAND;
+  }
+  return correlation;
+}
+
 }  // namespace labforge
