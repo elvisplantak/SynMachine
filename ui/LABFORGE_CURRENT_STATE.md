@@ -32,6 +32,9 @@
 - Completed and pushed status-query foundation:
   - branch: `codex/labforge-v1-status-query-foundation`
   - commit: `81bc8037c35edbfc6576a32daf93f8a753f62b49`
+- Completed and pushed protocol-error/dispatch foundation:
+  - branch: `codex/labforge-v1-protocol-error-dispatch-foundation`
+  - commit: `2d793369ba4a91bb9fbbbcaf48de963fbc650af2`
 
 ## Handshake/session milestone
 
@@ -64,7 +67,7 @@ retains:
 The optimization reduced static RAM from `1,609` to `1,231` bytes (`378` bytes
 recovered) without changing flash usage or byte-exact `HELLO_OK` output.
 
-## Latest firmware milestone
+## Status-query milestone
 
 The status-query foundation now implements:
 
@@ -85,9 +88,36 @@ Latest verified results:
 - static RAM: `1,295 / 8,192 bytes`; and
 - `git diff --check`: passed.
 
-The next no-motion firmware milestone is bounded correlated `PROTOCOL_ERROR`
-behavior for parser, session, and boot-ID failures. `QUERY_COMMAND` and the
-volatile command-status cache remain subsequent separate milestones.
+## Latest firmware milestone
+
+The protocol-error/dispatch foundation now implements:
+
+- a small testable no-motion dispatch path from parsed frame to one response or
+  intentional no response;
+- bounded deterministic `PROTOCOL_ERROR` serialization;
+- safe query or command correlation for recoverable schema errors;
+- uncorrelated malformed and oversized errors;
+- correlated `QUERY_STATUS` session and boot-identity errors;
+- transactional writer failure with no partial Serial output; and
+- at most one selected response per received frame.
+
+Latest verified results:
+
+- focused protocol-error/dispatch tests: `7/7 passed`;
+- complete native suite: `51/51 passed`;
+- warning-enabled native suite: `51/51 passed`;
+- Mega 2560 build: successful;
+- flash: `20,682 / 253,952 bytes`;
+- static RAM: `1,359 / 8,192 bytes`; and
+- `git diff --check`: passed.
+
+An AVR `-fstack-usage` analysis without LTO estimated the deepest current
+parser/dispatch path at approximately `3.3–3.6 KB`, including parser, JSON
+document, and validator calls. This is acceptable for the current no-motion
+shell but must be reassessed before command-cache growth and actuator work.
+
+The next no-motion firmware milestone is `QUERY_COMMAND` / `COMMAND_STATUS`
+with a bounded volatile command-status cache shell and no command dispatch.
 
 ## Approved phase and next phase boundary
 
@@ -107,8 +137,8 @@ Expected no-motion progression:
 
 ## Current limitations and unresolved physical decisions
 
-- `PROTOCOL_ERROR`, `QUERY_COMMAND`, command-status responses, command cache,
-  and command dispatch are not yet implemented in firmware.
+- `QUERY_COMMAND`, command-status responses, command cache, and command dispatch
+  are not yet implemented in firmware.
 - EEPROM fail-closed recovery/provisioning remains unresolved.
 - No actuator command or physical behavior is authorized by current protocol
   work.
