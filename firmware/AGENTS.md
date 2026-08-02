@@ -1,21 +1,37 @@
 # LabForge firmware working rules
 
-- Communicate with the user in Croatian/BHS. Keep code and technical identifiers in English.
-- Before firmware work, read `../labforge-ui/LABFORGE_CONTEXT.md` and local `HARDWARE_CONFIRMATIONS.md`.
-- Before modifying serial communication, parser behavior, controller sessions, command lifecycle, reconnect handling, or actuator protocol, read `docs/LABFORGE_SERIAL_PROTOCOL_V1.md`.
-- `docs/LABFORGE_SERIAL_PROTOCOL_V1.md` is canonical for software communication semantics, while `HARDWARE_CONFIRMATIONS.md` remains canonical for confirmed physical hardware facts; neither document may be used to invent unconfirmed wiring or capabilities.
-- The sibling `LABFORGE_CONTEXT.md` is the canonical system-level LabForge context. Local firmware documentation is the source for confirmed low-level hardware behavior.
-- Before edits, inspect `git status --short`, the current branch, and recent history.
-- Use a separate, clearly named Git branch for each active firmware experiment or functional change.
-- Keep changes small, targeted, and limited to the requested problem. Do not perform unrelated refactoring or redesign.
-- Do not modify recovery artifacts unless the user explicitly approves it.
-- Do not commit, push, merge, delete branches, or modify `main` without explicit user approval.
-- Quote terminal errors exactly.
-- Run available compilation/tests, the complete relevant diff, `git diff --check`, and final Git status.
-- Firmware owns pin assignments, motor direction, stepping, homing, debounce, low-level timeout behavior, and device execution.
-- Backend owns the chemical run lifecycle, high-level phase policy, route decisions, and system orchestration.
-- Frontend disabled controls are not a hardware safety boundary.
-- P1 and P2 are syringe pumps with separate aspiration and dispense operations, never inline pumps.
-- Do not invent pins, valve ports, sensors, calibration values, or hardware capabilities.
-- P1 and P2 have the same confirmed physical orientation documented in `HARDWARE_CONFIRMATIONS.md`.
-- Pump homing may move fluid and therefore requires a verified safe fluidic route.
+- Communicate with the user in Croatian/BHS. Keep code, identifiers, paths,
+  commands, commit messages, and terminal errors in English.
+- Before work, read `../labforge-ui/LABFORGE_DEVELOPMENT_GOVERNANCE.md`,
+  `../labforge-ui/LABFORGE_CURRENT_STATE.md`,
+  `../labforge-ui/LABFORGE_CONTEXT.md`, and local
+  `HARDWARE_CONFIRMATIONS.md`.
+- Before changing serial communication, parsing, sessions, command lifecycle,
+  reconnect behavior, or actuator protocol, read
+  `docs/LABFORGE_SERIAL_PROTOCOL_V1.md`.
+- Governance overrides older workflow instructions. The serial-protocol document
+  remains canonical for communication semantics; hardware confirmations remain
+  canonical for confirmed physical facts. Neither may invent facts owned by the
+  other.
+- Follow the milestone-scoped autonomous workflow and approval boundaries in
+  the governance document.
+- Never access, search, list, diff, summarize, modify, or use anything under
+  `recovery/` without explicit authorization for that exact action.
+- Firmware owns pins, motor direction, stepping, homing, debounce, low-level
+  timeout behavior, and device execution. Backend owns lifecycle, high-level
+  policy, routes, and orchestration.
+- Never invent pins, valve ports, sensors, polarity, directions, steps,
+  calibration, or hardware capability. `P1` and `P2` are syringe pumps with
+  separate aspiration and dispense operations and the confirmed common physical
+  orientation documented in `HARDWARE_CONFIRMATIONS.md`.
+- Pump homing can move fluid and requires a physically verified safe route.
+- Inspect and preserve existing work. Isolate changes in another branch or
+  worktree when appropriate; stop only if safe isolation is impossible.
+- Keep changes cohesive and avoid unrelated refactoring.
+- For firmware code, run focused and complete native tests, warning-enabled
+  native compilation, the Mega 2560 build, memory/resource reporting,
+  `git diff --check`, and final Git status. Documentation-only work requires
+  diff/whitespace/status verification, not builds.
+- Self-review the complete relevant diff, but report concise changed-file,
+  diff-stat, verification, risk, and final-status information unless focused
+  content is requested.
