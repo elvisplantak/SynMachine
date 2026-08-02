@@ -26,13 +26,13 @@
 - Completed and pushed EEPROM bootstrap:
   - branch: `codex/labforge-v1-arduino-eeprom-identity-bootstrap`
   - commit: `cde95cae8860f8ef0b417d95b0b1ee3d1848031e`
-- Active branch: `codex/labforge-v1-handshake-session-foundation`
-- Active branch base HEAD: `cde95cae8860f8ef0b417d95b0b1ee3d1848031e`
-- Handshake/session changes are implemented but not yet committed or pushed.
+- Completed and pushed handshake/session foundation:
+  - branch: `codex/labforge-v1-handshake-session-foundation`
+  - commit: `1a4f72668045bb63cb8411b6a12249fdd9aa6320`
 
-## Active firmware milestone
+## Latest firmware milestone
 
-Implemented in the working tree:
+Implemented and pushed:
 
 - trusted and untrusted deterministic `HELLO_OK` serialization;
 - fixed-capacity volatile session state;
@@ -48,18 +48,22 @@ Latest verified results:
 - warning-enabled native suite: `41/41 passed`;
 - Mega 2560 build: successful;
 - flash: `17,302 / 253,952 bytes`;
-- static RAM: `1,609 / 8,192 bytes`; and
+- static RAM: `1,231 / 8,192 bytes`; and
 - `git diff --check`: passed.
 
-Independent review identified `678` additional bytes of static RAM:
+Independent review identified unnecessary AVR SRAM use in the writer format
+strings. The final implementation stores those constant strings in flash and
+retains:
 
 - global `helloOkFrame`: `256` bytes;
-- `SessionState`: `38` bytes; and
-- two writer format strings in AVR `.data`: approximately `384` bytes.
+- `SessionState`: `38` bytes.
 
-The next action inside the current milestone is to optimize `HelloOkWriter`
-SRAM use without changing wire output, rerun verification, complete independent
-review, then commit and push the handshake/session feature branch.
+The optimization reduced static RAM from `1,609` to `1,231` bytes (`378` bytes
+recovered) without changing flash usage or byte-exact `HELLO_OK` output.
+
+The next no-motion firmware milestone is harmless `QUERY_STATUS` / `STATUS`
+response behavior, including bounded deterministic serialization, session and
+boot-ID validation, protocol documentation, and native/Mega verification.
 
 ## Approved phase and next phase boundary
 
@@ -92,7 +96,5 @@ Expected no-motion progression:
 
 ## Governance alignment work
 
-Governance alignment is being prepared on isolated
-`codex/align-development-governance` documentation branches/worktrees so the
-active firmware handshake working tree remains untouched. No PR or merge has
-been performed.
+Governance alignment is pushed on `codex/align-development-governance` in the
+UI, backend, and firmware repositories. No PR or merge has been performed.
