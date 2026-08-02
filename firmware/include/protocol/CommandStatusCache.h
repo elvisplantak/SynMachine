@@ -28,6 +28,23 @@ enum class CommandErrorCode : uint8_t {
   PUMP_HOME_SWITCH_UNEXPECTED,
 };
 
+enum class CommandErrorCategory : uint8_t {
+  NONE,
+  REQUEST_REJECTION,
+  EXECUTION_FAILURE,
+  INVALID,
+};
+
+enum class CommandStatusStoreResult : uint8_t {
+  STORED,
+  REPLAYED,
+  BUSY,
+  SEQUENCE_EXHAUSTED,
+  INVALID_RECORD,
+  IDENTITY_CONFLICT,
+  INVALID_TRANSITION,
+};
+
 enum class CommandKind : uint8_t { NONE, PUMP_MOVE_ABSOLUTE_STEPS };
 enum class PumpId : uint8_t { NONE, P1 };
 
@@ -58,11 +75,13 @@ bool commandLifecycleTransitionAllowed(CommandState from, CommandState to,
                                        bool executionStarted);
 bool commandSemanticIdentityEqual(const CommandSemanticIdentity& left,
                                   const CommandSemanticIdentity& right);
+CommandErrorCategory commandErrorCategory(CommandErrorCode error);
 
 class CommandStatusCache {
  public:
   const CommandStatusEntry* find(const char* operationCommandId) const;
   bool store(const CommandStatusRecord& record);
+  CommandStatusStoreResult storeDetailed(const CommandStatusRecord& record);
   size_t occupiedCount() const;
 
  private:

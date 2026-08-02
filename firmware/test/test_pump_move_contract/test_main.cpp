@@ -33,9 +33,18 @@ InboundMessage parseCommand(const char* arguments,
 
 class FakeExecutor : public PumpMoveAbsoluteStepsExecutor {
  public:
+  PumpMovePreflightOutcome preflightOutcome = PumpMovePreflightOutcome::READY;
   PumpMoveExecutionOutcome outcome = PumpMoveExecutionOutcome::COMPLETED;
+  unsigned preflightCalls = 0;
   unsigned calls = 0;
   PumpMoveAbsoluteStepsCommand last{};
+
+  PumpMovePreflightOutcome preflight(
+      const PumpMoveAbsoluteStepsCommand& command) override {
+    ++preflightCalls;
+    last = command;
+    return preflightOutcome;
+  }
 
   PumpMoveExecutionOutcome execute(
       const PumpMoveAbsoluteStepsCommand& command) override {
@@ -135,6 +144,58 @@ void test_fake_execution_failure_is_terminal_and_replayed() {
   TEST_ASSERT_EQUAL_UINT32(1, executor.calls);
 }
 
+void test_failed_preflight_never_starts_or_invokes_executor() {
+  CommandStatusCache cache;
+  FakeExecutor executor;
+  executor.preflightOutcome = PumpMovePreflightOutcome::NOT_READY;
+  PumpMoveAbsoluteStepsService service;
+  const InboundMessage message =
+      parseCommand("{\"pump\":\"P1\",\"target_steps\":5000}");
+  TEST_ASSERT_EQUAL(PumpMoveServiceStatus::PREFLIGHT_REJECTED,
+                    service.execute(message, cache, executor));
+  TEST_ASSERT_EQUAL_UINT32(1, executor.preflightCalls);
+  TEST_ASSERT_EQUAL_UINT32(0, executor.calls);
+  TEST_ASSERT_NULL(cache.find(OPERATION));
+}
+
+void test_unknown_executor_outcome_fails_closed_without_invented_reason() {
+  CommandStatusCache cache;
+  FakeExecutor executor;
+  executor.outcome = static_cast<PumpMoveExecutionOutcome>(255);
+  PumpMoveAbsoluteStepsService service;
+  const InboundMessage message =
+      parseCommand("{\"pump\":\"P1\",\"target_steps\":5000}");
+  TEST_ASSERT_EQUAL(PumpMoveServiceStatus::CACHE_ERROR,
+                    service.execute(message, cache, executor));
+  TEST_ASSERT_EQUAL_UINT32(1, executor.calls);
+  const CommandStatusRecord& record = cache.find(OPERATION)->record;
+  TEST_ASSERT_EQUAL(CommandState::STARTED, record.state);
+  TEST_ASSERT_EQUAL(CommandErrorCode::NONE, record.errorCode);
+}
+
+void test_busy_cache_is_distinct_from_internal_cache_error() {
+  CommandStatusCache cache;
+  CommandStatusRecord active{};
+  strcpy(active.operationCommandId,
+         "423e4567-e89b-12d3-a456-426614174003");
+  strcpy(active.phaseExecutionId, "other-phase");
+  active.phaseExecutionIdKnown = true;
+  active.semanticIdentityKnown = true;
+  active.semanticIdentity = {CommandKind::PUMP_MOVE_ABSOLUTE_STEPS, PumpId::P1,
+                             100};
+  active.state = CommandState::ACCEPTED;
+  active.errorCode = CommandErrorCode::NONE;
+  TEST_ASSERT_TRUE(cache.store(active));
+
+  FakeExecutor executor;
+  PumpMoveAbsoluteStepsService service;
+  const InboundMessage message =
+      parseCommand("{\"pump\":\"P1\",\"target_steps\":5000}");
+  TEST_ASSERT_EQUAL(PumpMoveServiceStatus::CONTROLLER_BUSY,
+                    service.execute(message, cache, executor));
+  TEST_ASSERT_EQUAL_UINT32(0, executor.calls);
+}
+
 }  // namespace
 
 int main(int, char**) {
@@ -144,5 +205,8 @@ int main(int, char**) {
   RUN_TEST(test_service_completes_once_and_exact_replay_never_executes_again);
   RUN_TEST(test_same_operation_with_changed_target_or_phase_conflicts);
   RUN_TEST(test_fake_execution_failure_is_terminal_and_replayed);
+  RUN_TEST(test_failed_preflight_never_starts_or_invokes_executor);
+  RUN_TEST(test_unknown_executor_outcome_fails_closed_without_invented_reason);
+  RUN_TEST(test_busy_cache_is_distinct_from_internal_cache_error);
   return UNITY_END();
 }

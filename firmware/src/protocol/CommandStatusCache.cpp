@@ -50,11 +50,6 @@ bool validError(CommandErrorCode error) {
          error == CommandErrorCode::PUMP_HOME_SWITCH_UNEXPECTED;
 }
 
-bool executionError(CommandErrorCode error) {
-  return error == CommandErrorCode::PUMP_MOTION_TIMEOUT ||
-         error == CommandErrorCode::PUMP_HOME_SWITCH_UNEXPECTED;
-}
-
 bool validSemanticIdentity(const CommandSemanticIdentity& identity) {
   return identity.command == CommandKind::PUMP_MOVE_ABSOLUTE_STEPS &&
          identity.pump == PumpId::P1 &&
@@ -62,6 +57,21 @@ bool validSemanticIdentity(const CommandSemanticIdentity& identity) {
 }
 
 }  // namespace
+
+CommandErrorCategory commandErrorCategory(CommandErrorCode error) {
+  if (error == CommandErrorCode::NONE) return CommandErrorCategory::NONE;
+  if (error == CommandErrorCode::UNSUPPORTED_COMMAND ||
+      error == CommandErrorCode::COMMAND_ID_CONFLICT ||
+      error == CommandErrorCode::CONTROLLER_BUSY ||
+      error == CommandErrorCode::CONTROLLER_IDENTITY_UNTRUSTED) {
+    return CommandErrorCategory::REQUEST_REJECTION;
+  }
+  if (error == CommandErrorCode::PUMP_MOTION_TIMEOUT ||
+      error == CommandErrorCode::PUMP_HOME_SWITCH_UNEXPECTED) {
+    return CommandErrorCategory::EXECUTION_FAILURE;
+  }
+  return CommandErrorCategory::INVALID;
+}
 
 bool commandSemanticIdentityEqual(const CommandSemanticIdentity& left,
                                   const CommandSemanticIdentity& right) {
@@ -98,10 +108,12 @@ bool CommandStatusCache::valid(const CommandStatusRecord& record) {
       !validSemanticIdentity(record.semanticIdentity))
     return false;
   if (record.state == CommandState::FAILED)
-    return executionError(record.errorCode) &&
+    return commandErrorCategory(record.errorCode) ==
+               CommandErrorCategory::EXECUTION_FAILURE &&
            record.semanticIdentityKnown && record.executionStarted;
   if (record.state == CommandState::REJECTED)
-    return record.errorCode != CommandErrorCode::NONE &&
+    return commandErrorCategory(record.errorCode) ==
+               CommandErrorCategory::REQUEST_REJECTION &&
            !record.executionStarted;
   return record.errorCode == CommandErrorCode::NONE &&
          !record.executionStarted;
@@ -138,30 +150,41 @@ const CommandStatusEntry* CommandStatusCache::find(
 }
 
 bool CommandStatusCache::store(const CommandStatusRecord& record) {
-  if (!valid(record)) return false;
+  const CommandStatusStoreResult result = storeDetailed(record);
+  return result == CommandStatusStoreResult::STORED ||
+         result == CommandStatusStoreResult::REPLAYED;
+}
+
+CommandStatusStoreResult CommandStatusCache::storeDetailed(
+    const CommandStatusRecord& record) {
+  if (!valid(record)) return CommandStatusStoreResult::INVALID_RECORD;
   for (CommandStatusEntry& entry : entries_) {
     if (entry.occupied &&
         strcmp(entry.record.operationCommandId, record.operationCommandId) == 0) {
-      if (!sameIdentity(entry.record, record)) return false;
-      if (semanticallyEqual(entry.record, record)) return true;
+      if (!sameIdentity(entry.record, record))
+        return CommandStatusStoreResult::IDENTITY_CONFLICT;
+      if (semanticallyEqual(entry.record, record))
+        return CommandStatusStoreResult::REPLAYED;
       if (terminal(entry.record.state) ||
           !commandLifecycleTransitionAllowed(entry.record.state, record.state,
                                              record.executionStarted))
-        return false;
+        return CommandStatusStoreResult::INVALID_TRANSITION;
       entry.record = record;
-      return true;
+      return CommandStatusStoreResult::STORED;
     }
   }
 
   if (record.state != CommandState::REJECTED &&
       record.state != CommandState::ACCEPTED)
-    return false;
+    return CommandStatusStoreResult::INVALID_TRANSITION;
   if (!terminal(record.state)) {
     for (const CommandStatusEntry& entry : entries_) {
-      if (entry.occupied && !terminal(entry.record.state)) return false;
+      if (entry.occupied && !terminal(entry.record.state))
+        return CommandStatusStoreResult::BUSY;
     }
   }
-  if (nextInsertionSequence_ == UINT32_MAX) return false;
+  if (nextInsertionSequence_ == UINT32_MAX)
+    return CommandStatusStoreResult::SEQUENCE_EXHAUSTED;
 
   CommandStatusEntry* target = nullptr;
   for (CommandStatusEntry& entry : entries_) {
@@ -179,12 +202,12 @@ bool CommandStatusCache::store(const CommandStatusRecord& record) {
       }
     }
   }
-  if (target == nullptr) return false;
+  if (target == nullptr) return CommandStatusStoreResult::BUSY;
 
   target->occupied = true;
   target->record = record;
   target->insertionSequence = ++nextInsertionSequence_;
-  return true;
+  return CommandStatusStoreResult::STORED;
 }
 
 size_t CommandStatusCache::occupiedCount() const {

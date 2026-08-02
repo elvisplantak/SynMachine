@@ -267,15 +267,21 @@ The first approved Service-mode command contract is
 object contains exactly `pump:"P1"` and integer `target_steps` in `0..20500`.
 Argument order is irrelevant; missing, additional, incorrectly typed, or
 out-of-range arguments are invalid. The command expresses an absolute software
-step target, not a calibrated volume. It has no caller-supplied direction,
-speed, homing, or route argument.
+step target, not a calibrated volume. `0..20500` is only the representable
+software coordinate envelope; the validated safe physical working range and
+endpoint margins remain unresolved and may be narrower. It has no
+caller-supplied direction, speed, homing, or route argument.
 
 ```json
 {"protocol":"LABFORGE/1","type":"COMMAND","backend_session_nonce":"123e4567-e89b-12d3-a456-426614174000","controller_boot_id":4294967295,"phase_execution_id":"phase-execution-1","operation_command_id":"323e4567-e89b-12d3-a456-426614174002","command":"PUMP_MOVE_ABSOLUTE_STEPS","arguments":{"pump":"P1","target_steps":10000}}
 ```
 
 The current implementation provides only the pure schema and a testable
-Service lifecycle boundary with a fake executor. It is not connected to the
+Service lifecycle boundary with a fake executor. A side-effect-free `preflight`
+step occurs before `ACCEPTED`; only a ready preflight may reach `STARTED` and
+the injected execution call. The exact future hardware boundary is not final:
+it must count the first driver-affecting `DIR`, `ENA`, or `STEP` change as the
+first possible physical side effect. The Service is not connected to the
 production dispatcher, Serial command acceptance, Arduino pins, or a motor
 driver. Therefore this approved contract cannot currently cause movement.
 
@@ -486,9 +492,10 @@ is 443 bytes including LF, and the shared output capacity is 464 bytes.
 Cache mutation enforces the normative `ACCEPTED` to `STARTED` to terminal
 ordering, exact idempotent replay, immutable terminal results, and immutable
 phase identity for one operation ID. The structural transition model recognizes
-the two valid `FAILED` boundaries, but the cache rejects actual `FAILED` storage
-until a reviewed command contract defines execution-failure error codes. Current
-rejection codes MUST NOT be misrepresented as execution failures.
+the two valid `FAILED` boundaries. Request-rejection codes are valid only with
+`REJECTED`; the reviewed P1 execution-failure codes are valid only with
+`FAILED(execution_started:true)` and a known exact semantic identity. The cache
+rejects every cross-category error/state combination.
 
 ## 12. Duplicate-command semantics
 
@@ -552,6 +559,12 @@ codes `PUMP_MOTION_TIMEOUT` and `PUMP_HOME_SWITCH_UNEXPECTED`. They apply only
 after an accepted command reaches its execution boundary and MUST NOT be used
 for request rejection. Their presence does not claim that production motion or
 home-switch handling is implemented.
+
+For future physical handling, `PUMP_HOME_SWITCH_UNEXPECTED` means that the
+switch becomes unexpectedly active after the physical execution boundary. A
+switch already active during side-effect-free preflight is a pre-start refusal
+and MUST NOT use this code or claim `execution_started:true`. Expected home
+arrival remains outside this non-homing command contract.
 
 ## 15. Retry-safety policy
 
@@ -648,7 +661,7 @@ The following remain unresolved and MUST NOT be inferred:
 
 - identity-recovery procedure after a fail-closed boot;
 - timeout durations and serial reconnect backoff;
-- first Service-mode actuator and actuator-specific schemas;
+- production integration boundary for the approved first Service-mode command;
 - pump semantic direction API and early-limit-switch policy;
 - carousel position model and mixer command semantics;
 - bottom-valve wiring and feedback;

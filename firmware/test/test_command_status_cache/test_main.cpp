@@ -84,6 +84,39 @@ void test_invalid_record_combinations_are_rejected() {
   TEST_ASSERT_EQUAL_UINT32(0, cache.occupiedCount());
 }
 
+void test_rejection_and_execution_error_categories_do_not_cross() {
+  CommandStatusCache cache;
+  CommandStatusRecord value = record(OPERATION_1, CommandState::REJECTED);
+  value.errorCode = CommandErrorCode::PUMP_MOTION_TIMEOUT;
+  TEST_ASSERT_EQUAL(CommandStatusStoreResult::INVALID_RECORD,
+                    cache.storeDetailed(value));
+  value.errorCode = CommandErrorCode::PUMP_HOME_SWITCH_UNEXPECTED;
+  TEST_ASSERT_EQUAL(CommandStatusStoreResult::INVALID_RECORD,
+                    cache.storeDetailed(value));
+
+  value = record(OPERATION_1, CommandState::REJECTED);
+  value.errorCode = CommandErrorCode::CONTROLLER_BUSY;
+  TEST_ASSERT_EQUAL(CommandStatusStoreResult::STORED,
+                    cache.storeDetailed(value));
+
+  CommandStatusCache failedCache;
+  value = record(OPERATION_2, CommandState::ACCEPTED);
+  value.semanticIdentityKnown = true;
+  value.semanticIdentity = {CommandKind::PUMP_MOVE_ABSOLUTE_STEPS, PumpId::P1,
+                            5000};
+  TEST_ASSERT_TRUE(failedCache.store(value));
+  value.state = CommandState::STARTED;
+  TEST_ASSERT_TRUE(failedCache.store(value));
+  value.state = CommandState::FAILED;
+  value.executionStarted = true;
+  value.errorCode = CommandErrorCode::CONTROLLER_BUSY;
+  TEST_ASSERT_EQUAL(CommandStatusStoreResult::INVALID_RECORD,
+                    failedCache.storeDetailed(value));
+  value.errorCode = CommandErrorCode::PUMP_MOTION_TIMEOUT;
+  TEST_ASSERT_EQUAL(CommandStatusStoreResult::STORED,
+                    failedCache.storeDetailed(value));
+}
+
 void test_exact_unknown_and_completed_frames() {
   uint8_t output[kCommandStatusFrameCapacity]{};
   size_t length = 0;
@@ -340,6 +373,7 @@ int main(int, char**) {
   RUN_TEST(test_two_entries_and_deterministic_terminal_eviction);
   RUN_TEST(test_nonterminal_is_preserved_and_only_one_is_allowed);
   RUN_TEST(test_invalid_record_combinations_are_rejected);
+  RUN_TEST(test_rejection_and_execution_error_categories_do_not_cross);
   RUN_TEST(test_exact_unknown_and_completed_frames);
   RUN_TEST(test_all_states_maximum_frame_and_transactional_failure);
   RUN_TEST(test_normative_transition_model_and_idempotent_replay);

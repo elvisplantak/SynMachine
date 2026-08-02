@@ -49,21 +49,32 @@ PumpMoveServiceStatus PumpMoveAbsoluteStepsService::execute(
     return PumpMoveServiceStatus::REPLAYED;
   }
 
+  if (executor.preflight(command) != PumpMovePreflightOutcome::READY)
+    return PumpMoveServiceStatus::PREFLIGHT_REJECTED;
+
   CommandStatusRecord record =
       makeRecord(message, command, CommandState::ACCEPTED);
-  if (!cache.store(record)) return PumpMoveServiceStatus::CONTROLLER_BUSY;
+  const CommandStatusStoreResult accepted = cache.storeDetailed(record);
+  if (accepted == CommandStatusStoreResult::BUSY)
+    return PumpMoveServiceStatus::CONTROLLER_BUSY;
+  if (accepted != CommandStatusStoreResult::STORED)
+    return PumpMoveServiceStatus::CACHE_ERROR;
   record.state = CommandState::STARTED;
   if (!cache.store(record)) return PumpMoveServiceStatus::CACHE_ERROR;
 
   const PumpMoveExecutionOutcome outcome = executor.execute(command);
   if (outcome == PumpMoveExecutionOutcome::COMPLETED) {
     record.state = CommandState::COMPLETED;
-  } else {
+  } else if (outcome == PumpMoveExecutionOutcome::MOTION_TIMEOUT) {
     record.state = CommandState::FAILED;
     record.executionStarted = true;
-    record.errorCode = outcome == PumpMoveExecutionOutcome::MOTION_TIMEOUT
-                           ? CommandErrorCode::PUMP_MOTION_TIMEOUT
-                           : CommandErrorCode::PUMP_HOME_SWITCH_UNEXPECTED;
+    record.errorCode = CommandErrorCode::PUMP_MOTION_TIMEOUT;
+  } else if (outcome == PumpMoveExecutionOutcome::HOME_SWITCH_UNEXPECTED) {
+    record.state = CommandState::FAILED;
+    record.executionStarted = true;
+    record.errorCode = CommandErrorCode::PUMP_HOME_SWITCH_UNEXPECTED;
+  } else {
+    return PumpMoveServiceStatus::CACHE_ERROR;
   }
   if (!cache.store(record)) return PumpMoveServiceStatus::CACHE_ERROR;
   return outcome == PumpMoveExecutionOutcome::COMPLETED
