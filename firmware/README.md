@@ -1,18 +1,29 @@
 # LabForge firmware
 
-This repository contains LabForge Arduino firmware work and historical recovery artifacts. Its current state is a recovery baseline, not production firmware.
+This repository contains the active LabForge Arduino firmware foundations and
+historical recovery artifacts. The active firmware remains a no-motion
+LABFORGE/1 protocol foundation, not production actuator firmware.
 
-The recovered sketch represents a legacy/test topology and must not be treated as the current approved complete machine topology. No active production sketch or serial command protocol exists yet, and no PlatformIO or Arduino build configuration has been selected. The repository therefore does not claim to compile or control the approved Guided Demo workflow.
+Historical sketches represent legacy/test topology and must not be treated as
+the current approved complete machine topology. PlatformIO native and Arduino
+Mega 2560 builds exist for the active bounded protocol foundation. The
+repository does not claim to control the approved Guided Demo workflow.
 
-The recovered `Pump` and `Valve` implementations were experimentally useful and should be reviewed conservatively rather than rewritten automatically. Files under `recovery/` are intentionally preserved unchanged. `LabForge_recovered.ino` and `LabForge_recovered_clean.ino` contain the same logical text after line-ending normalization, but both remain as historical recovery artifacts.
+Protected historical artifacts remain outside active production behavior and
+must not be accessed without the explicit authorization required by
+`AGENTS.md`.
 
 System-level topology and decisions are documented in `../labforge-ui/LABFORGE_CONTEXT.md`. Confirmed firmware-specific hardware facts are documented in `HARDWARE_CONFIRMATIONS.md`.
 
-The approved, not-yet-implemented serial communication contract is documented in [`docs/LABFORGE_SERIAL_PROTOCOL_V1.md`](docs/LABFORGE_SERIAL_PROTOCOL_V1.md). Production firmware is not implemented yet.
+The approved, partially implemented serial communication contract is
+documented in
+[`docs/LABFORGE_SERIAL_PROTOCOL_V1.md`](docs/LABFORGE_SERIAL_PROTOCOL_V1.md).
+The current production entry point provides no actuator side effects.
 
 ## Repository layout
 
-- `recovery/` — untouched historical recovery files
 - `HARDWARE_CONFIRMATIONS.md` — confirmed low-level hardware behavior, implications, and pending decisions
 - `AGENTS.md` — firmware repository working rules
 - `README.md` — repository scope and baseline status
+- `docs/PIN_DISCOVERY_COMMISSIONING.md` — isolated V7/V8 commissioning preparation; no upload or execution authorization
+- `docs/HARDWARE_COMMISSIONING_PLAN.md` — staged electrical, motion, homing, route, liquid, and fault commissioning gates

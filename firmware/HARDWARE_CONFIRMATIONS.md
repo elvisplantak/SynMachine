@@ -53,6 +53,60 @@ This wiring update does not confirm:
 - fluidic routing through the valve
 - safe physical execution
 
+### Confirmed `SF_BOTTOM_VALVE` actuator and connection — 2026-08-04
+
+The user explicitly confirmed that `SF_BOTTOM_VALVE` is actuated by a
+`DYNAMIXEL XL430-W250-T`. It is connected to a `U2D2`, and the `U2D2` is
+connected directly to the host computer over USB. It is therefore not assigned
+Arduino Mega `STEP`, `DIR`, or `HOME` pins.
+
+This connection update does not yet confirm:
+
+- the DYNAMIXEL device ID or USB device identity
+- baud rate or protocol configuration
+- operating mode
+- torque-enable policy
+- position limits or raw position values
+- which commanded position means physically open or closed
+- motion speed, profile acceleration, or timeout behavior
+- actuator fault handling or loss-of-communication behavior
+- successful actuation, leak-tightness, or safe physical execution
+
+### Confirmed V1-V8 valve position semantics — 2026-08-04
+
+The user reconfirmed the previously documented intended position semantics for
+the motorized three-port valves V1-V8:
+
+- `0 degrees = closed`
+- `90 degrees = k1 <-> k3`
+- `180 degrees = k1 <-> k2`
+
+This confirms the intended logical position mapping. It does not yet confirm
+that any individual valve physically reaches the commanded position, uses the
+expected direction or step count, or provides the expected fluidic route.
+
+### Unverified Arduino pin candidates for commissioning — 2026-08-04
+
+The available partially outdated wiring notes suggest the following map. The
+user considers this map likely correct, but it remains an input to
+commissioning rather than a confirmed physical fact until tested:
+
+| Actuator | STEP candidate | DIR candidate | HOME candidate |
+|---|---:|---:|---:|
+| V1 | D22 | D23 | D39 |
+| V2 | D24 | D25 | D38 |
+| V3 | D26 | D27 | D43 |
+| V4 | D28 | D29 | D40 |
+| V5 | D30 | D31 | D41 |
+| V6 | D32 | D33 | D42 |
+| P1 | D46 | D47 | D45 |
+| P2 | D48 | D49 | D44 |
+
+V7 and V8 are not present in those notes. Sequential allocation makes
+`D34/D35` and `D36/D37` useful first commissioning candidates for their
+`STEP/DIR` pairs, but this is an inference only and MUST NOT be treated as a
+confirmed assignment. Their HOME pins are unknown.
+
 ### Pending verification and commissioning
 
 - Leak testing and liquid route testing remain pending.
