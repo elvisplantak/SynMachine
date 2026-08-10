@@ -10,8 +10,9 @@
 ### UI
 
 - Branch: `codex/harden-env-ignore-rules-2026-07-30`
-- HEAD: `54e6f0ff4747d13b5312c07f8e1e044ef4c571ee`
-- Working tree was clean when governance alignment started.
+- HEAD before this checkpoint documentation update:
+  `2715b92035277626ebb86e8a38906d1c683896bf`
+- Working tree was clean before this checkpoint documentation update.
 
 ### Backend
 
@@ -23,24 +24,31 @@
 
 ### Firmware
 
-- Current reviewed P1 runtime checkpoint:
+- Current P1 runtime checkpoint:
   - branch: `codex/p1-motion-safety-hardening`
-  - commit: `10a2567a93f620d7a43dfc2634460f91ddaaf49e`
-    (`Harden P1 runtime integration`)
+  - commit: `430f7534b4d554c81af39338280f5aa95835727a`
+    (`Bound P1 step pulses and serial output`)
   - production Mega build connects the confirmed P1 STEP/DIR/HOME pins, the
     nonblocking controller, bounded Serial servicing, lifecycle output, and
     volatile command-status recovery;
+  - each STEP pulse uses the confirmed bounded 20 us HIGH primitive and returns
+    LOW before controller update returns;
+  - Serial output is cooperatively handed to the AVR transport in fixed chunks,
+    with motion servicing between chunks;
   - a complete `STARTED` frame must be handed to Serial before motion starts or
     the cache advances to `STARTED`;
   - reconnect preserves active motion, suppresses lifecycle frames tied to the
     replaced nonce, reports `BUSY`, and permits recovery through
     `QUERY_COMMAND`;
   - identity-untrusted physical commands fail closed;
-  - focused P1 runtime tests: `13/13 passed`;
-  - complete warning-clean native suite: `114/114 passed`;
+  - focused P1 motion/runtime/transport tests: `36/36 passed`;
+  - complete warning-clean native suite: `118/118 passed`;
   - warning-clean Mega 2560 build: successful;
-  - flash: `30,564 / 253,952 bytes` (`12%`);
-  - static RAM: `2,234 / 8,192 bytes` (`27%`); and
+  - flash: `30,816 / 253,952 bytes` (`12%`);
+  - static RAM: `2,241 / 8,192 bytes` (`27%`);
+  - refreshed no-LTO AVR stack analysis places the worst credible integrated
+    parser/dispatch path at approximately `5.0 KB`, leaving approximately
+    `0.9 KB` before interrupt/runtime margin; and
   - physical upload and execution were not performed.
 
 - Completed and pushed EEPROM bootstrap:
