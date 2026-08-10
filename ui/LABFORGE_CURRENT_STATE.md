@@ -1,7 +1,7 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-08-02
-- Development phase: no-motion LABFORGE/1 software foundations
+- Checkpoint date: 2026-08-10
+- Development phase: P1 production Serial/runtime software integration; physical upload deferred
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
@@ -22,6 +22,26 @@
   checkpoint.
 
 ### Firmware
+
+- Current reviewed P1 runtime checkpoint:
+  - branch: `codex/p1-motion-safety-hardening`
+  - commit: `10a2567a93f620d7a43dfc2634460f91ddaaf49e`
+    (`Harden P1 runtime integration`)
+  - production Mega build connects the confirmed P1 STEP/DIR/HOME pins, the
+    nonblocking controller, bounded Serial servicing, lifecycle output, and
+    volatile command-status recovery;
+  - a complete `STARTED` frame must be handed to Serial before motion starts or
+    the cache advances to `STARTED`;
+  - reconnect preserves active motion, suppresses lifecycle frames tied to the
+    replaced nonce, reports `BUSY`, and permits recovery through
+    `QUERY_COMMAND`;
+  - identity-untrusted physical commands fail closed;
+  - focused P1 runtime tests: `13/13 passed`;
+  - complete warning-clean native suite: `114/114 passed`;
+  - warning-clean Mega 2560 build: successful;
+  - flash: `30,564 / 253,952 bytes` (`12%`);
+  - static RAM: `2,234 / 8,192 bytes` (`27%`); and
+  - physical upload and execution were not performed.
 
 - Completed and pushed EEPROM bootstrap:
   - branch: `codex/labforge-v1-arduino-eeprom-identity-bootstrap`
@@ -47,6 +67,10 @@
 - Completed and pushed P1 command-boundary hardening:
   - branch: `codex/labforge-v1-p1-command-boundary-hardening`
   - commit: `52fa9188f91bc1e08036bb8d1f769e634b156f29`
+
+The milestone sections below preserve the state recorded when each checkpoint
+was completed. They are historical; the current firmware state is the P1
+runtime checkpoint above.
 
 ## Handshake/session milestone
 
@@ -175,9 +199,10 @@ The command-lifecycle integrity foundation now adds:
   `FAILED` storage remains blocked until execution-failure error codes are
   explicitly defined and reviewed.
 
-The production runtime still never calls `CommandStatusCache::store()`, so the
-real Serial path can currently return only `UNKNOWN`. Existing protocol
-rejection codes are not represented as execution failures.
+At this historical checkpoint the production runtime did not yet call
+`CommandStatusCache::store()`. The current P1 runtime now stores lifecycle
+states, and deliberate post-`STARTED` abort uses the distinct
+`COMMAND_ABORTED` execution-failure code.
 
 Latest verified results:
 
@@ -201,7 +226,7 @@ The first approved Service-mode contract is now implemented as a no-motion
 foundation:
 
 - exact `PUMP_MOVE_ABSOLUTE_STEPS` schema, restricted to `P1`;
-- exactly `pump:"P1"` and integer `target_steps` in `0..20500`;
+- exactly `pump:"P1"` and integer `target_steps` in `1..20500`;
 - compact exact semantic duplicate identity without hash-only comparison;
 - testable `ACCEPTED -> STARTED -> COMPLETED/FAILED` Service lifecycle using a
   fake executor; and
@@ -264,29 +289,22 @@ unchanged from the preceding contract checkpoint. Production `main.cpp` and
 
 ## Approved phase and next phase boundary
 
-Codex may autonomously complete the current no-motion LABFORGE/1 software
-foundation phase, including handshake/session corrections and subsequent
-harmless protocol-shell milestones. Codex must obtain concise user approval
-before entering actuator implementation, firmware upload, or physical testing.
-
-Expected no-motion progression:
-
-1. finish handshake/session foundation;
-2. implement harmless status-query responses;
-3. implement remaining bounded protocol-error/session shell behavior;
-4. implement bounded command-status cache and lifecycle foundations without
-   actuator dispatch; and
-5. review the complete no-motion boundary before actuator work.
+The user approved the focused P1 Arduino GPIO and production Serial/lifecycle
+software integration. That checkpoint is implemented and reviewed in software.
+No firmware upload, Serial Monitor use, physical P1 execution, PR, or merge to
+`main` is authorized by that approval. The next boundary is an explicit
+physical integration/test authorization or a separately scoped software
+checkpoint for another actuator.
 
 ## Current limitations and unresolved physical decisions
 
-- Incoming production `COMMAND` handling, Serial lifecycle dispatch, runtime
-  cache population, actuator adapters, and command execution are not yet
-  implemented in firmware. Exact identity exists only for the approved P1
-  absolute-step contract.
+- Incoming production P1 `PUMP_HOME` and `PUMP_MOVE_ABSOLUTE_STEPS` handling,
+  Serial lifecycle dispatch, runtime cache population, and the Arduino P1
+  adapter are implemented in the Mega build. Other actuator runtimes remain
+  unintegrated.
 - EEPROM fail-closed recovery/provisioning remains unresolved.
-- No actuator command or physical behavior is authorized by current protocol
-  work.
+- No firmware upload or physical execution is authorized by the current P1
+  software checkpoint.
 - Unconfirmed pin, polarity, direction, angle, step, calibration, homing, and
   safe-route decisions must be obtained from the user and canonical hardware
   documentation.
