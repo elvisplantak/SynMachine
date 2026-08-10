@@ -93,6 +93,9 @@ void test_rejection_and_execution_error_categories_do_not_cross() {
   value.errorCode = CommandErrorCode::PUMP_HOME_SWITCH_UNEXPECTED;
   TEST_ASSERT_EQUAL(CommandStatusStoreResult::INVALID_RECORD,
                     cache.storeDetailed(value));
+  value.errorCode = CommandErrorCode::PUMP_HOME_SWITCH_STUCK;
+  TEST_ASSERT_EQUAL(CommandStatusStoreResult::INVALID_RECORD,
+                    cache.storeDetailed(value));
 
   value = record(OPERATION_1, CommandState::REJECTED);
   value.errorCode = CommandErrorCode::CONTROLLER_BUSY;
@@ -115,6 +118,27 @@ void test_rejection_and_execution_error_categories_do_not_cross() {
   value.errorCode = CommandErrorCode::PUMP_MOTION_TIMEOUT;
   TEST_ASSERT_EQUAL(CommandStatusStoreResult::STORED,
                     failedCache.storeDetailed(value));
+
+  CommandStatusCache homeFailedCache;
+  value = record(OPERATION_3, CommandState::ACCEPTED);
+  value.semanticIdentityKnown = true;
+  value.semanticIdentity = {CommandKind::PUMP_HOME, PumpId::P1, 0};
+  TEST_ASSERT_TRUE(homeFailedCache.store(value));
+  value.state = CommandState::STARTED;
+  TEST_ASSERT_TRUE(homeFailedCache.store(value));
+  value.state = CommandState::FAILED;
+  value.executionStarted = true;
+  value.errorCode = CommandErrorCode::PUMP_HOME_SWITCH_STUCK;
+  TEST_ASSERT_EQUAL(CommandStatusStoreResult::STORED,
+                    homeFailedCache.storeDetailed(value));
+
+  uint8_t output[kCommandStatusFrameCapacity]{};
+  size_t length = 0;
+  TEST_ASSERT_TRUE(writeCommandStatus(
+      NONCE, REQUEST_ID, OPERATION_3, TRUSTED,
+      homeFailedCache.find(OPERATION_3), output, sizeof(output), length));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "\"error_code\":\"PUMP_HOME_SWITCH_STUCK\""));
 }
 
 void test_exact_unknown_and_completed_frames() {

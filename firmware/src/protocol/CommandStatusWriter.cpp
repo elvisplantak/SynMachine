@@ -62,6 +62,8 @@ const char* errorText(CommandErrorCode error) {
     return LABFORGE_TEXT("PUMP_MOTION_TIMEOUT");
   if (error == CommandErrorCode::PUMP_HOME_SWITCH_UNEXPECTED)
     return LABFORGE_TEXT("PUMP_HOME_SWITCH_UNEXPECTED");
+  if (error == CommandErrorCode::PUMP_HOME_SWITCH_STUCK)
+    return LABFORGE_TEXT("PUMP_HOME_SWITCH_STUCK");
   return nullptr;
 }
 

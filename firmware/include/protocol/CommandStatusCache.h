@@ -26,6 +26,7 @@ enum class CommandErrorCode : uint8_t {
   CONTROLLER_IDENTITY_UNTRUSTED,
   PUMP_MOTION_TIMEOUT,
   PUMP_HOME_SWITCH_UNEXPECTED,
+  PUMP_HOME_SWITCH_STUCK,
 };
 
 enum class CommandErrorCategory : uint8_t {
@@ -45,7 +46,11 @@ enum class CommandStatusStoreResult : uint8_t {
   INVALID_TRANSITION,
 };
 
-enum class CommandKind : uint8_t { NONE, PUMP_MOVE_ABSOLUTE_STEPS };
+enum class CommandKind : uint8_t {
+  NONE,
+  PUMP_HOME,
+  PUMP_MOVE_ABSOLUTE_STEPS,
+};
 enum class PumpId : uint8_t { NONE, P1 };
 
 struct CommandSemanticIdentity {

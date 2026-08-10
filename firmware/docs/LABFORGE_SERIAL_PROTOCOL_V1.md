@@ -285,6 +285,34 @@ first possible physical side effect. The Service is not connected to the
 production dispatcher, Serial command acceptance, Arduino pins, or a motor
 driver. Therefore this approved contract cannot currently cause movement.
 
+The second approved P1 command schema is `PUMP_HOME`. Its `arguments` object
+contains exactly `pump:"P1"`; missing, additional, incorrectly typed, or other
+pump values are invalid. It has no caller-supplied direction, speed, route, or
+limit. Issuing this command is a backend assertion that a previously verified
+safe fluid route is already configured, because P1 homing can move fluid and
+firmware does not own or infer route policy.
+
+```json
+{"protocol":"LABFORGE/1","type":"COMMAND","backend_session_nonce":"123e4567-e89b-12d3-a456-426614174000","controller_boot_id":4294967295,"phase_execution_id":"phase-execution-1","operation_command_id":"323e4567-e89b-12d3-a456-426614174002","command":"PUMP_HOME","arguments":{"pump":"P1"}}
+```
+
+The implemented P1 motion-controller foundation is nonblocking and remains
+disconnected from the production dispatcher and Arduino pin adapter. Position
+trust begins `UNTRUSTED` after every boot. Only successful `PUMP_HOME`
+execution may establish coordinate zero and `TRUSTED` position. An absolute
+move is refused while position is untrusted; target zero requires `PUMP_HOME`
+rather than ordinary absolute motion. Preparation is side-effect-free. A
+separate start call performs the first driver-affecting `DIR` write so the
+runtime can serialize `STARTED` immediately before crossing that boundary.
+
+Homing uses the confirmed P1 polarity and direction, bounds HOME search to the
+confirmed 20,500-step mechanical envelope, and permits at most 200 away pulses
+to release an initially active HOME switch. Absolute movement from confirmed
+zero permits the same bounded initial release. A stuck switch, missing HOME, or
+unexpected activation terminates motion and leaves position untrusted. These
+rules are implemented and natively tested, but no Serial command can invoke
+them yet.
+
 ### `REJECTED`
 
 Required: common command correlation fields and `error_code`. Optional:
@@ -554,17 +582,20 @@ Error codes include:
 Future actuator-specific errors MUST be added only after actuator contracts
 exist.
 
-The approved P1 absolute-step contract reserves the precise execution-failure
-codes `PUMP_MOTION_TIMEOUT` and `PUMP_HOME_SWITCH_UNEXPECTED`. They apply only
+The approved P1 motion contracts reserve the precise execution-failure codes
+`PUMP_MOTION_TIMEOUT`, `PUMP_HOME_SWITCH_UNEXPECTED`, and
+`PUMP_HOME_SWITCH_STUCK`. They apply only
 after an accepted command reaches its execution boundary and MUST NOT be used
 for request rejection. Their presence does not claim that production motion or
-home-switch handling is implemented.
+Serial command dispatch is implemented.
 
-For future physical handling, `PUMP_HOME_SWITCH_UNEXPECTED` means that the
+`PUMP_HOME_SWITCH_UNEXPECTED` means that the
 switch becomes unexpectedly active after the physical execution boundary. A
 switch already active during side-effect-free preflight is a pre-start refusal
-and MUST NOT use this code or claim `execution_started:true`. Expected home
-arrival remains outside this non-homing command contract.
+unless the controller is at trusted zero and moving away, or a `PUMP_HOME`
+operation is performing its bounded release stage. `PUMP_HOME_SWITCH_STUCK`
+means that an allowed release stage did not clear HOME within 200 pulses.
+Expected home arrival remains outside the non-homing command contract.
 
 ## 15. Retry-safety policy
 
@@ -661,8 +692,8 @@ The following remain unresolved and MUST NOT be inferred:
 
 - identity-recovery procedure after a fail-closed boot;
 - timeout durations and serial reconnect backoff;
-- production integration boundary for the approved first Service-mode command;
-- pump semantic direction API and early-limit-switch policy;
+- production Serial integration boundary for the approved P1 commands;
+- backend safe-route orchestration before pump homing;
 - carousel position model and mixer command semantics;
 - bottom-valve wiring and feedback;
 - emergency-stop hardware contract; and
@@ -687,11 +718,15 @@ It also includes a two-entry volatile command-status cache shell and bounded
 `COMMAND`. Production does not populate the cache, so only `UNKNOWN` is
 currently reachable over real Serial. Cache lifecycle-integrity and identifier
 validation are implemented for future internal use. The approved
-`PUMP_MOVE_ABSOLUTE_STEPS` P1 contract adds exact bounded schema validation,
-compact exact semantic identity, test-only lifecycle execution, and precise
-failure codes using a fake executor. It remains disconnected from the
-production dispatcher and all hardware. Generic duplicate-command identity,
-Serial command lifecycle dispatch, actuator adapters, and physical execution
-remain unimplemented. Fail-closed recovery and provisioning remain unresolved.
+`PUMP_MOVE_ABSOLUTE_STEPS` and `PUMP_HOME` P1 contracts add exact bounded schema
+validation and compact semantic identity. A nonblocking P1 motion-controller
+foundation now implements boot-time untrusted position, explicit homing,
+bounded active-switch release and HOME search, absolute step tracking, pulse
+timing, and fail-closed trust invalidation. Native tests use a fake pin adapter.
+The older absolute-move Service still uses a synchronous fake executor for
+lifecycle tests. Neither command is connected to the production dispatcher,
+lifecycle output, Arduino pins, or a motor driver. Serial command lifecycle
+dispatch, the Arduino actuator adapter, and physical execution remain
+unimplemented. Fail-closed recovery and provisioning remain unresolved.
 This firmware has not been uploaded or physically tested. No component is
 claimed to measure delivered volume or provide exactly-once physical execution.

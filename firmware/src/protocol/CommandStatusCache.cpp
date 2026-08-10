@@ -47,12 +47,15 @@ bool validError(CommandErrorCode error) {
          error == CommandErrorCode::CONTROLLER_BUSY ||
          error == CommandErrorCode::CONTROLLER_IDENTITY_UNTRUSTED ||
          error == CommandErrorCode::PUMP_MOTION_TIMEOUT ||
-         error == CommandErrorCode::PUMP_HOME_SWITCH_UNEXPECTED;
+         error == CommandErrorCode::PUMP_HOME_SWITCH_UNEXPECTED ||
+         error == CommandErrorCode::PUMP_HOME_SWITCH_STUCK;
 }
 
 bool validSemanticIdentity(const CommandSemanticIdentity& identity) {
+  if (identity.pump != PumpId::P1) return false;
+  if (identity.command == CommandKind::PUMP_HOME)
+    return identity.targetSteps == 0;
   return identity.command == CommandKind::PUMP_MOVE_ABSOLUTE_STEPS &&
-         identity.pump == PumpId::P1 &&
          identity.targetSteps <= kP1MaximumAbsoluteSteps;
 }
 
@@ -67,7 +70,8 @@ CommandErrorCategory commandErrorCategory(CommandErrorCode error) {
     return CommandErrorCategory::REQUEST_REJECTION;
   }
   if (error == CommandErrorCode::PUMP_MOTION_TIMEOUT ||
-      error == CommandErrorCode::PUMP_HOME_SWITCH_UNEXPECTED) {
+      error == CommandErrorCode::PUMP_HOME_SWITCH_UNEXPECTED ||
+      error == CommandErrorCode::PUMP_HOME_SWITCH_STUCK) {
     return CommandErrorCategory::EXECUTION_FAILURE;
   }
   return CommandErrorCategory::INVALID;
