@@ -5,6 +5,7 @@
 
 #include "actuator/P1MotionController.h"
 #include "protocol/CommandLifecycleWriter.h"
+#include "protocol/CooperativeFrameTransport.h"
 #include "service/P1CommandRuntime.h"
 
 using namespace labforge;
@@ -26,6 +27,7 @@ class FakeIo : public P1MotionIo {
   bool step = false;
   unsigned directionWrites = 0;
   unsigned risingEdges = 0;
+  uint16_t lastPulseHighUs = 0;
 
   bool homeActive() const override { return home; }
   void writeDirection(bool high) override {
@@ -35,6 +37,12 @@ class FakeIo : public P1MotionIo {
   void writeStep(bool high) override {
     if (high && !step) ++risingEdges;
     step = high;
+  }
+  void pulseStep(uint16_t highUs) override {
+    step = true;
+    ++risingEdges;
+    lastPulseHighUs = highUs;
+    step = false;
   }
 };
 
@@ -96,6 +104,46 @@ void test_started_is_serialized_before_any_motion_side_effect() {
   runtime.update(100 + kP1DirectionSetupUs, cache);
   TEST_ASSERT_EQUAL_UINT32(1, io.risingEdges);
   TEST_ASSERT_GREATER_THAN_UINT32(0, result.outputLength);
+}
+
+void test_started_transport_must_complete_before_first_gpio_side_effect() {
+  FakeIo io;
+  P1MotionController controller(io);
+  P1CommandRuntime runtime(controller);
+  SessionState session;
+  establishSession(session);
+  CommandStatusCache cache;
+  char command[384];
+  makeCommand(command, sizeof(command), "PUMP_HOME", "{\"pump\":\"P1\"}");
+  uint8_t output[kCommandLifecycleFrameCapacity]{};
+  dispatch(runtime, session, cache, command, output, sizeof(output));
+
+  size_t length = 0;
+  bool startsMotion = false;
+  TEST_ASSERT_TRUE(runtime.nextLifecycleFrame(
+      IDENTITY, cache, output, sizeof(output), length, startsMotion));
+  TEST_ASSERT_TRUE(startsMotion);
+  CooperativeFrameTransport transport;
+  TEST_ASSERT_TRUE(transport.begin(length, startsMotion));
+
+  while (transport.pending()) {
+    const FrameTxSlice slice = transport.nextSlice(7);
+    const FrameTxCompletion completion =
+        transport.commit(slice.length, slice.length);
+    if (completion == FrameTxCompletion::STARTED_FRAME_COMPLETE) {
+      TEST_ASSERT_TRUE(runtime.confirmStartedFrameWritten(100, cache));
+    } else {
+      TEST_ASSERT_EQUAL_UINT32(0, io.directionWrites);
+      TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+      TEST_ASSERT_EQUAL(CommandState::ACCEPTED,
+                        cache.find(OPERATION)->record.state);
+    }
+  }
+
+  TEST_ASSERT_EQUAL_UINT32(1, io.directionWrites);
+  TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+  TEST_ASSERT_EQUAL(CommandState::STARTED,
+                    cache.find(OPERATION)->record.state);
 }
 
 void test_small_started_buffer_cannot_start_or_advance_cache() {
@@ -484,6 +532,7 @@ void test_home_completion_is_cached_and_duplicate_only_replays() {
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_started_is_serialized_before_any_motion_side_effect);
+  RUN_TEST(test_started_transport_must_complete_before_first_gpio_side_effect);
   RUN_TEST(test_small_started_buffer_cannot_start_or_advance_cache);
   RUN_TEST(test_short_started_transport_is_retryable_without_false_started_state);
   RUN_TEST(test_command_session_failure_is_protocol_error_not_rejection);

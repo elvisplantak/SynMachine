@@ -124,19 +124,6 @@ P1MotionResult P1MotionController::update(uint32_t nowUs) {
     return P1MotionResult::NONE;
   }
 
-  bool pulseFinished = false;
-  if (pulsePhase_ == PulsePhase::STEP_HIGH) {
-    if (!pulseDue(nowUs)) return P1MotionResult::NONE;
-    pulseFinished = finishPulse(nowUs);
-    if (pulseFinished && state_ == P1MotionState::MOVING) {
-      if (directionHigh_) {
-        ++positionSteps_;
-      } else {
-        --positionSteps_;
-      }
-    }
-  }
-
   if (state_ == P1MotionState::SEARCHING_HOME && io_.homeActive()) {
     pauseForHomeStability(P1MotionState::CONFIRMING_HOME_ACTIVE, nowUs);
     return P1MotionResult::NONE;
@@ -148,9 +135,6 @@ P1MotionResult P1MotionController::update(uint32_t nowUs) {
     } else if (stageSteps_ >= kP1HomeReleaseMaximumSteps) {
       return finish(P1MotionResult::HOME_SWITCH_STUCK);
     }
-  } else if (state_ == P1MotionState::SEARCHING_HOME) {
-    if (stageSteps_ >= kP1MaximumAbsoluteSteps)
-      return finish(P1MotionResult::MOTION_TIMEOUT);
   } else if (state_ == P1MotionState::MOVING) {
     if (releasingHomeDuringMove_) {
       if (!io_.homeActive()) {
@@ -165,15 +149,35 @@ P1MotionResult P1MotionController::update(uint32_t nowUs) {
     } else if (io_.homeActive()) {
       trust_ = P1PositionTrust::UNTRUSTED;
       return finish(P1MotionResult::HOME_SWITCH_UNEXPECTED);
-    } else if (pulseFinished && positionSteps_ == targetSteps_) {
-      return finish(P1MotionResult::COMPLETED);
     }
   }
 
-  if (pulsePhase_ == PulsePhase::WAITING_TO_RISE && pulseDue(nowUs)) {
-    io_.writeStep(true);
-    pulsePhase_ = PulsePhase::STEP_HIGH;
-    nextPulseUs_ = nowUs + kP1StepHighUs;
+  if (!pulseDue(nowUs)) return P1MotionResult::NONE;
+
+  emitPulse(nowUs);
+  if (state_ == P1MotionState::MOVING) {
+    if (directionHigh_) {
+      ++positionSteps_;
+    } else {
+      --positionSteps_;
+    }
+  }
+
+  if (state_ == P1MotionState::RELEASING_HOME &&
+      stageSteps_ >= kP1HomeReleaseMaximumSteps)
+    return finish(P1MotionResult::HOME_SWITCH_STUCK);
+  if (state_ == P1MotionState::SEARCHING_HOME &&
+      stageSteps_ >= kP1MaximumAbsoluteSteps)
+    return finish(P1MotionResult::MOTION_TIMEOUT);
+  if (state_ == P1MotionState::MOVING) {
+    if (releasingHomeDuringMove_ &&
+        (positionSteps_ == targetSteps_ ||
+         stageSteps_ >= kP1HomeReleaseMaximumSteps)) {
+      trust_ = P1PositionTrust::UNTRUSTED;
+      return finish(P1MotionResult::HOME_SWITCH_STUCK);
+    }
+    if (!releasingHomeDuringMove_ && positionSteps_ == targetSteps_)
+      return finish(P1MotionResult::COMPLETED);
   }
   return P1MotionResult::NONE;
 }
@@ -191,7 +195,6 @@ bool P1MotionController::abort() {
   }
   io_.writeStep(false);
   state_ = P1MotionState::IDLE;
-  pulsePhase_ = PulsePhase::WAITING_TO_RISE;
   releasingHomeDuringMove_ = false;
   trust_ = P1PositionTrust::UNTRUSTED;
   return true;
@@ -212,7 +215,6 @@ void P1MotionController::beginStage(P1MotionState state, bool directionHigh,
   state_ = state;
   directionHigh_ = directionHigh;
   stageSteps_ = 0;
-  pulsePhase_ = PulsePhase::WAITING_TO_RISE;
   nextPulseUs_ = nowUs + kP1DirectionSetupUs;
   io_.writeDirection(directionHigh);
 }
@@ -221,31 +223,26 @@ bool P1MotionController::pulseDue(uint32_t nowUs) const {
   return timeReached(nowUs, nextPulseUs_);
 }
 
-bool P1MotionController::finishPulse(uint32_t nowUs) {
-  io_.writeStep(false);
-  pulsePhase_ = PulsePhase::WAITING_TO_RISE;
+void P1MotionController::emitPulse(uint32_t nowUs) {
+  io_.pulseStep(kP1StepHighUs);
   ++stageSteps_;
-  nextPulseUs_ = nowUs + (kP1StepIntervalUs - kP1StepHighUs);
-  return true;
+  nextPulseUs_ = nowUs + kP1StepIntervalUs;
 }
 
 void P1MotionController::pauseForHomeStability(P1MotionState state,
                                                uint32_t nowUs) {
   io_.writeStep(false);
-  pulsePhase_ = PulsePhase::WAITING_TO_RISE;
   state_ = state;
   homeStableSinceUs_ = nowUs;
 }
 
 void P1MotionController::resumePulses(uint32_t nowUs) {
-  pulsePhase_ = PulsePhase::WAITING_TO_RISE;
   nextPulseUs_ = nowUs + kP1StepIntervalUs;
 }
 
 P1MotionResult P1MotionController::finish(P1MotionResult result) {
   io_.writeStep(false);
   state_ = P1MotionState::IDLE;
-  pulsePhase_ = PulsePhase::WAITING_TO_RISE;
   releasingHomeDuringMove_ = false;
   return result;
 }

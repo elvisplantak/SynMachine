@@ -68,10 +68,10 @@ validation, session validation, and command validation. Malformed JSON and
 oversized or invalid fields MUST NOT trigger actuator behavior.
 
 Realistic mandatory messages exceeded the former 256-byte proposal. The
-512-byte limit preserves readable field names and bounded headroom. Firmware
-SRAM consumption MUST still be measured before actuator implementation; this
-contract does not claim that a parser exists or that the future firmware SRAM
-budget has been validated. No specific Arduino JSON library is prescribed.
+512-byte limit preserves readable field names and bounded headroom. The current
+firmware implements the bounded parser and its integrated Mega SRAM usage is
+measured in the active development checkpoint. No specific Arduino JSON
+library is prescribed by this contract.
 
 ## 5. Versioning, envelope, and field bounds
 
@@ -396,13 +396,12 @@ Required: `protocol`, `type`, `backend_session_nonce`, `controller_boot_id`,
 `active_operation_command_id`. The active ID is null when no command is active.
 `STATUS` MUST NOT repeat capabilities or claim physical truth.
 
-The current protocol-only implementation emits one compact LF-terminated
-`STATUS` after a valid session-bound `QUERY_STATUS`. It echoes the nonce and
-request ID, reports the trusted numeric or untrusted null boot ID, uses
-`PROTOCOL_ONLY` or `IDENTITY_UNTRUSTED` as applicable, and reports
-`active_operation_command_id:null`. Queries that fail session or boot-ID
-validation cannot produce `STATUS` and instead receive a correlated
-`PROTOCOL_ERROR`.
+The current integrated implementation emits one compact LF-terminated `STATUS`
+after a valid session-bound `QUERY_STATUS`. It echoes the nonce and request ID,
+reports the trusted numeric or untrusted null boot ID, reports `IDLE`, `BUSY`,
+or `IDENTITY_UNTRUSTED` as applicable, and includes the active operation ID or
+null. Queries that fail session or boot-ID validation cannot produce `STATUS`
+and instead receive a correlated `PROTOCOL_ERROR`.
 
 ```json
 {"protocol":"LABFORGE/1","type":"STATUS","backend_session_nonce":"123e4567-e89b-12d3-a456-426614174000","controller_boot_id":4294967295,"request_id":"423e4567-e89b-12d3-a456-426614174003","controller_state":"PROTOCOL_ONLY","software_state_trust":"TRUSTED","active_operation_command_id":null}
@@ -441,12 +440,12 @@ recovered, including framing failure, oversized input, malformed JSON, or
 missing or invalid correlation fields. Partial correlation MUST NOT be emitted.
 Semantic refusal of a valid `COMMAND` uses `REJECTED`.
 
-The current no-motion dispatcher emits bounded deterministic errors with no
-optional `message`. Oversized and malformed input produces an uncorrelated
-error. Schema errors are correlated only when a valid LABFORGE/1 message type
-and the complete relevant query or command identifiers can be recovered
-safely. A parsed `QUERY_STATUS` receives correlated `HANDSHAKE_REQUIRED`,
-`STALE_SESSION`, `CONTROLLER_BOOT_MISMATCH`, or
+The current dispatcher and integrated P1 runtime emit bounded deterministic
+errors with no optional `message`. Oversized and malformed input produces an
+uncorrelated error. Schema errors are correlated only when a valid LABFORGE/1
+message type and the complete relevant query or command identifiers can be
+recovered safely. A parsed `QUERY_STATUS` receives correlated
+`HANDSHAKE_REQUIRED`, `STALE_SESSION`, `CONTROLLER_BOOT_MISMATCH`, or
 `CONTROLLER_IDENTITY_UNTRUSTED` as applicable. Writer failure emits no partial
 frame, and dispatch selects at most one response per received frame.
 
@@ -735,7 +734,7 @@ session state, bounded deterministic `HELLO_OK` serialization, and actual
 `HELLO` to `HELLO_OK` Serial integration for trusted and untrusted identity.
 It now also validates session-bound `QUERY_STATUS` messages, emits bounded
 deterministic trusted or untrusted `STATUS` responses, and uses a testable
-no-motion dispatcher for bounded parser, session, and boot-ID protocol errors.
+dispatcher for bounded parser, session, and boot-ID protocol errors.
 It also includes a two-entry volatile command-status cache and bounded
 `QUERY_COMMAND` / `COMMAND_STATUS` responses. The integrated P1 runtime
 populates the cache, and cache lifecycle-integrity and identifier validation
@@ -751,13 +750,18 @@ and its unresolved missing-switch overtravel risk are recorded in the hardware
 confirmations and P1 design; this is not an unattended-production safety claim.
 Native tests use a fake pin adapter. The production dispatcher, lifecycle
 output, Arduino P1 adapter, and confirmed P1 STEP/DIR/HOME pins are connected in
-the Mega build. STARTED uses a two-phase transport boundary: cache mutation and
-motion start occur only after the complete frame is handed to Serial. Session
+the Mega build. Each STEP pulse is lowered by a bounded 20 us pulse primitive,
+independently of parser or Serial latency, and consecutive rising edges are
+never scheduled closer than 1500 us. Serial output is handed to the AVR
+transport cooperatively in fixed chunks, with motion servicing between chunks.
+STARTED uses a two-phase transport boundary: cache mutation and motion start
+occur only after the complete frame is handed to Serial. Session
 replacement leaves active motion unchanged, suppresses lifecycle output tied
 to the replaced nonce, reports BUSY from the cache, and relies on
-`QUERY_COMMAND` for recovery. Serial input work is bounded per loop so the P1
-update cadence remains materially shorter than the 30 ms HOME stability
-interval. Physical upload/execution and backend orchestration remain deferred.
+`QUERY_COMMAND` for recovery. Serial input and output work are bounded per loop
+so the P1 update cadence remains materially shorter than the 30 ms HOME
+stability interval. Physical upload/execution and backend orchestration remain
+deferred.
 Fail-closed recovery and provisioning remain unresolved.
 This firmware has not been uploaded or physically tested. No component is
 claimed to measure delivered volume or provide exactly-once physical execution.

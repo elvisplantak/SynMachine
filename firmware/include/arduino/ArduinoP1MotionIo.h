@@ -10,6 +10,7 @@ class ArduinoP1MotionIo final : public P1MotionIo {
   bool homeActive() const override;
   void writeDirection(bool high) override;
   void writeStep(bool high) override;
+  void pulseStep(uint16_t highUs) override;
 };
 
 }  // namespace labforge

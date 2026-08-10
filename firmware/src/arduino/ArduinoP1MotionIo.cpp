@@ -29,4 +29,10 @@ void ArduinoP1MotionIo::writeStep(bool high) {
   digitalWrite(kP1StepPin, high ? HIGH : LOW);
 }
 
+void ArduinoP1MotionIo::pulseStep(uint16_t highUs) {
+  digitalWrite(kP1StepPin, HIGH);
+  delayMicroseconds(highUs);
+  digitalWrite(kP1StepPin, LOW);
+}
+
 }  // namespace labforge

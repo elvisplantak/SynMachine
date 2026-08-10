@@ -4,6 +4,9 @@
 
 using namespace labforge;
 
+void setUp() {}
+void tearDown() {}
+
 namespace {
 
 class FakeIo : public P1MotionIo {
@@ -14,6 +17,7 @@ class FakeIo : public P1MotionIo {
   unsigned directionWrites = 0;
   unsigned stepWrites = 0;
   unsigned risingEdges = 0;
+  uint16_t lastPulseHighUs = 0;
 
   bool homeActive() const override { return home; }
   void writeDirection(bool high) override {
@@ -25,6 +29,14 @@ class FakeIo : public P1MotionIo {
     step = high;
     ++stepWrites;
   }
+  void pulseStep(uint16_t highUs) override {
+    step = true;
+    ++risingEdges;
+    ++stepWrites;
+    lastPulseHighUs = highUs;
+    step = false;
+    ++stepWrites;
+  }
 };
 
 void reachFirstRise(uint32_t& nowUs) { nowUs += kP1DirectionSetupUs; }
@@ -34,11 +46,9 @@ P1MotionResult runOnePulse(P1MotionController& controller, FakeIo& io,
   const unsigned before = io.risingEdges;
   P1MotionResult result = controller.update(nowUs);
   TEST_ASSERT_EQUAL_UINT32(before + 1, io.risingEdges);
-  TEST_ASSERT_TRUE(io.step);
-  nowUs += kP1StepHighUs;
-  result = controller.update(nowUs);
   TEST_ASSERT_FALSE(io.step);
-  nowUs += kP1StepIntervalUs - kP1StepHighUs;
+  TEST_ASSERT_EQUAL_UINT16(kP1StepHighUs, io.lastPulseHighUs);
+  nowUs += kP1StepIntervalUs;
   return result;
 }
 
@@ -394,7 +404,7 @@ void test_abort_during_home_release_search_and_absolute_motion() {
   }
 }
 
-void test_abort_while_step_high_forces_step_low() {
+void test_abort_after_atomic_pulse_keeps_step_low() {
   FakeIo io;
   P1MotionController controller(io);
   uint32_t nowUs = 0;
@@ -405,7 +415,8 @@ void test_abort_while_step_high_forces_step_low() {
   TEST_ASSERT_TRUE(controller.start(nowUs));
   reachFirstRise(nowUs);
   TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
-  TEST_ASSERT_TRUE(io.step);
+  TEST_ASSERT_FALSE(io.step);
+  TEST_ASSERT_EQUAL_UINT16(kP1StepHighUs, io.lastPulseHighUs);
   TEST_ASSERT_TRUE(controller.abort());
   TEST_ASSERT_FALSE(io.step);
   TEST_ASSERT_EQUAL(P1MotionState::IDLE, controller.state());
@@ -436,13 +447,10 @@ void test_full_pulse_sequence_crosses_micros_wraparound() {
   TEST_ASSERT_TRUE(controller.start(nowUs));
   reachFirstRise(nowUs);
   TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
-  TEST_ASSERT_TRUE(io.step);
-  nowUs += kP1StepHighUs;
+  TEST_ASSERT_FALSE(io.step);
+  nowUs += kP1StepIntervalUs;
   TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
   TEST_ASSERT_FALSE(io.step);
-  nowUs += kP1StepIntervalUs - kP1StepHighUs;
-  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
-  TEST_ASSERT_TRUE(io.step);
   TEST_ASSERT_EQUAL_UINT32(2, io.risingEdges);
 }
 
@@ -460,9 +468,9 @@ void test_delayed_updates_do_not_emit_catch_up_pulses() {
   nowUs += 100000;
   TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
   TEST_ASSERT_FALSE(io.step);
-  TEST_ASSERT_EQUAL_UINT32(1, io.risingEdges);
+  TEST_ASSERT_EQUAL_UINT32(2, io.risingEdges);
   TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
-  TEST_ASSERT_EQUAL_UINT32(1, io.risingEdges);
+  TEST_ASSERT_EQUAL_UINT32(2, io.risingEdges);
 }
 
 }  // namespace
@@ -484,7 +492,7 @@ int main(int, char**) {
   RUN_TEST(test_move_requires_stable_home_release_and_ignores_one_sample_bounce);
   RUN_TEST(test_unexpected_home_during_absolute_move_invalidates_position);
   RUN_TEST(test_abort_during_home_release_search_and_absolute_motion);
-  RUN_TEST(test_abort_while_step_high_forces_step_low);
+  RUN_TEST(test_abort_after_atomic_pulse_keeps_step_low);
   RUN_TEST(test_abort_after_completion_does_not_corrupt_trusted_position);
   RUN_TEST(test_full_pulse_sequence_crosses_micros_wraparound);
   RUN_TEST(test_delayed_updates_do_not_emit_catch_up_pulses);

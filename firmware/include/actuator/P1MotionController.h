@@ -21,6 +21,7 @@ class P1MotionIo {
   virtual bool homeActive() const = 0;
   virtual void writeDirection(bool high) = 0;
   virtual void writeStep(bool high) = 0;
+  virtual void pulseStep(uint16_t highUs) = 0;
 };
 
 enum class P1PositionTrust : uint8_t { UNTRUSTED, TRUSTED };
@@ -69,11 +70,9 @@ class P1MotionController {
   bool busy() const;
 
  private:
-  enum class PulsePhase : uint8_t { WAITING_TO_RISE, STEP_HIGH };
-
   void beginStage(P1MotionState state, bool directionHigh, uint32_t nowUs);
   bool pulseDue(uint32_t nowUs) const;
-  bool finishPulse(uint32_t nowUs);
+  void emitPulse(uint32_t nowUs);
   void pauseForHomeStability(P1MotionState state, uint32_t nowUs);
   void resumePulses(uint32_t nowUs);
   P1MotionResult finish(P1MotionResult result);
@@ -81,7 +80,6 @@ class P1MotionController {
   P1MotionIo& io_;
   P1MotionState state_ = P1MotionState::IDLE;
   P1PositionTrust trust_ = P1PositionTrust::UNTRUSTED;
-  PulsePhase pulsePhase_ = PulsePhase::WAITING_TO_RISE;
   uint16_t positionSteps_ = 0;
   uint16_t targetSteps_ = 0;
   uint16_t stageSteps_ = 0;

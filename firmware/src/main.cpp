@@ -7,6 +7,7 @@
 #include "protocol/CommandLifecycleWriter.h"
 #include "protocol/CommandStatusCache.h"
 #include "protocol/CommandStatusWriter.h"
+#include "protocol/CooperativeFrameTransport.h"
 #include "protocol/LineReceiver.h"
 #include "protocol/NoMotionDispatcher.h"
 #include "protocol/ProtocolErrorWriter.h"
@@ -27,25 +28,37 @@ labforge::ArduinoP1MotionIo p1MotionIo;
 labforge::P1MotionController p1MotionController(p1MotionIo);
 labforge::P1CommandRuntime p1CommandRuntime(p1MotionController);
 uint8_t protocolOutputFrame[labforge::kCommandStatusFrameCapacity];
+labforge::CooperativeFrameTransport frameTransport;
 volatile labforge::ParseStatus lastParseStatus = labforge::ParseStatus::NO_FRAME;
 
-void emitPendingLifecycleFrames() {
+bool queueFrame(size_t outputLength, bool startsMotion = false) {
+  if (outputLength == 0) return true;
+  return frameTransport.begin(outputLength, startsMotion);
+}
+
+void queuePendingLifecycleFrame() {
+  if (frameTransport.pending()) return;
   size_t outputLength = 0;
   bool startsMotion = false;
-  while (p1CommandRuntime.nextLifecycleFrame(
-      bootIdentityResult, commandStatusCache, protocolOutputFrame,
-      sizeof(protocolOutputFrame), outputLength, startsMotion)) {
-    const size_t written = Serial.write(protocolOutputFrame, outputLength);
-    if (startsMotion) {
-      if (written == outputLength) {
-        p1CommandRuntime.confirmStartedFrameWritten(micros(),
-                                                    commandStatusCache);
-      } else {
-        p1CommandRuntime.startedFrameTransportFailed();
-      }
-      break;
-    }
+  if (p1CommandRuntime.nextLifecycleFrame(
+          bootIdentityResult, commandStatusCache, protocolOutputFrame,
+          sizeof(protocolOutputFrame), outputLength, startsMotion) &&
+      !queueFrame(outputLength, startsMotion) && startsMotion) {
+    p1CommandRuntime.startedFrameTransportFailed();
   }
+}
+
+void serviceFrameTransport() {
+  if (!frameTransport.pending()) return;
+  const size_t available = static_cast<size_t>(Serial.availableForWrite());
+  const labforge::FrameTxSlice slice = frameTransport.nextSlice(available);
+  if (slice.length == 0) return;
+  const size_t written =
+      Serial.write(protocolOutputFrame + slice.offset, slice.length);
+  const labforge::FrameTxCompletion completion =
+      frameTransport.commit(slice.length, written);
+  if (completion == labforge::FrameTxCompletion::STARTED_FRAME_COMPLETE)
+    p1CommandRuntime.confirmStartedFrameWritten(micros(), commandStatusCache);
 }
 }  // namespace
 
@@ -58,11 +71,13 @@ void setup() {
 
 void loop() {
   p1CommandRuntime.update(micros(), commandStatusCache);
-  emitPendingLifecycleFrames();
+  queuePendingLifecycleFrame();
+  serviceFrameTransport();
 
   constexpr uint8_t kMaxSerialBytesPerLoop = 32;
   for (uint8_t processed = 0;
-       processed < kMaxSerialBytesPerLoop && Serial.available() > 0;
+       !frameTransport.pending() && processed < kMaxSerialBytesPerLoop &&
+       Serial.available() > 0;
        ++processed) {
     labforge::FrameView frame{};
     const labforge::LineEvent event = lineReceiver.feed(static_cast<uint8_t>(Serial.read()), frame);
@@ -70,21 +85,17 @@ void loop() {
       const labforge::DispatchResult result = framingErrorDispatcher.lineTooLong(
           bootIdentityResult, protocolOutputFrame, sizeof(protocolOutputFrame));
       lastParseStatus = result.parseStatus;
-      if (result.outputLength > 0) {
-        Serial.write(protocolOutputFrame, result.outputLength);
-      }
+      queueFrame(result.outputLength);
     } else if (event == labforge::LineEvent::FRAME_READY) {
       const labforge::DispatchResult result = p1CommandRuntime.dispatch(
           frame.data, frame.length, bootIdentityResult, sessionState,
           commandStatusCache, protocolOutputFrame, sizeof(protocolOutputFrame));
       lastParseStatus = result.parseStatus;
-      if (result.outputLength > 0) {
-        Serial.write(protocolOutputFrame, result.outputLength);
-      }
-      emitPendingLifecycleFrames();
+      queueFrame(result.outputLength);
     }
   }
 
   p1CommandRuntime.update(micros(), commandStatusCache);
-  emitPendingLifecycleFrames();
+  queuePendingLifecycleFrame();
+  serviceFrameTransport();
 }
