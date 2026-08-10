@@ -52,7 +52,7 @@ DispatchResult NoMotionDispatcher::dispatch(
 
   if (parsed.message.type == MessageType::HELLO) {
     if (writeHelloOk(parsed.message.backendSessionNonce, identity, output,
-                     capacity, outputLength)) {
+                     capacity, outputLength, p1MotionEnabled_)) {
       session.establish(parsed.message.backendSessionNonce);
     }
     return {parsed.status, outputLength};
@@ -76,7 +76,8 @@ DispatchResult NoMotionDispatcher::dispatch(
 
   if (parsed.message.type == MessageType::QUERY_STATUS) {
     writeStatus(parsed.message.backendSessionNonce, parsed.message.requestId,
-                identity, output, capacity, outputLength);
+                identity, output, capacity, outputLength,
+                &commandStatusCache, p1MotionEnabled_);
   } else {
     writeCommandStatus(
         parsed.message.backendSessionNonce, parsed.message.requestId,

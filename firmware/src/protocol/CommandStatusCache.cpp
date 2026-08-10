@@ -42,6 +42,7 @@ bool validState(CommandState state) {
 
 bool validError(CommandErrorCode error) {
   return error == CommandErrorCode::NONE ||
+         error == CommandErrorCode::INVALID_FIELD ||
          error == CommandErrorCode::UNSUPPORTED_COMMAND ||
          error == CommandErrorCode::COMMAND_ID_CONFLICT ||
          error == CommandErrorCode::CONTROLLER_BUSY ||
@@ -65,7 +66,8 @@ bool validSemanticIdentity(const CommandSemanticIdentity& identity) {
 
 CommandErrorCategory commandErrorCategory(CommandErrorCode error) {
   if (error == CommandErrorCode::NONE) return CommandErrorCategory::NONE;
-  if (error == CommandErrorCode::UNSUPPORTED_COMMAND ||
+  if (error == CommandErrorCode::INVALID_FIELD ||
+      error == CommandErrorCode::UNSUPPORTED_COMMAND ||
       error == CommandErrorCode::COMMAND_ID_CONFLICT ||
       error == CommandErrorCode::CONTROLLER_BUSY ||
       error == CommandErrorCode::CONTROLLER_IDENTITY_UNTRUSTED) {
@@ -152,6 +154,13 @@ const CommandStatusEntry* CommandStatusCache::find(
         strcmp(entry.record.operationCommandId, operationCommandId) == 0) {
       return &entry;
     }
+  }
+  return nullptr;
+}
+
+const CommandStatusEntry* CommandStatusCache::active() const {
+  for (const CommandStatusEntry& entry : entries_) {
+    if (entry.occupied && !terminal(entry.record.state)) return &entry;
   }
   return nullptr;
 }

@@ -18,6 +18,8 @@ struct DispatchResult {
 
 class NoMotionDispatcher {
  public:
+  explicit NoMotionDispatcher(bool p1MotionEnabled = false)
+      : p1MotionEnabled_(p1MotionEnabled) {}
   DispatchResult dispatch(const uint8_t* payload, size_t length,
                           const BootIdentityResult& identity,
                           SessionState& session,
@@ -29,6 +31,7 @@ class NoMotionDispatcher {
 
  private:
   MessageParser parser_;
+  bool p1MotionEnabled_;
 };
 
 }  // namespace labforge

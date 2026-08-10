@@ -20,6 +20,7 @@ enum class CommandState : uint8_t {
 
 enum class CommandErrorCode : uint8_t {
   NONE,
+  INVALID_FIELD,
   UNSUPPORTED_COMMAND,
   COMMAND_ID_CONFLICT,
   CONTROLLER_BUSY,
@@ -86,6 +87,7 @@ CommandErrorCategory commandErrorCategory(CommandErrorCode error);
 class CommandStatusCache {
  public:
   const CommandStatusEntry* find(const char* operationCommandId) const;
+  const CommandStatusEntry* active() const;
   bool store(const CommandStatusRecord& record);
   CommandStatusStoreResult storeDetailed(const CommandStatusRecord& record);
   size_t occupiedCount() const;

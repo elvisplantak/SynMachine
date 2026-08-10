@@ -125,7 +125,7 @@ P1MotionResult P1MotionController::update(uint32_t nowUs) {
   }
 
   bool pulseFinished = false;
-  if (pulsePhase_ == PulsePhase::HIGH) {
+  if (pulsePhase_ == PulsePhase::STEP_HIGH) {
     if (!pulseDue(nowUs)) return P1MotionResult::NONE;
     pulseFinished = finishPulse(nowUs);
     if (pulseFinished && state_ == P1MotionState::MOVING) {
@@ -172,7 +172,7 @@ P1MotionResult P1MotionController::update(uint32_t nowUs) {
 
   if (pulsePhase_ == PulsePhase::WAITING_TO_RISE && pulseDue(nowUs)) {
     io_.writeStep(true);
-    pulsePhase_ = PulsePhase::HIGH;
+    pulsePhase_ = PulsePhase::STEP_HIGH;
     nextPulseUs_ = nowUs + kP1StepHighUs;
   }
   return P1MotionResult::NONE;

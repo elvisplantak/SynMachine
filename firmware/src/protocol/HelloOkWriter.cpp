@@ -15,9 +15,21 @@
 namespace labforge {
 
 bool writeHelloOk(const char* nonce, const BootIdentityResult& identity,
-                  uint8_t* output, size_t capacity, size_t& outputLength) {
+                  uint8_t* output, size_t capacity, size_t& outputLength,
+                  bool p1MotionEnabled) {
   char frame[kHelloOkFrameCapacity];
-  const int written = identity.trusted
+  const int written = identity.trusted && p1MotionEnabled
+      ? LABFORGE_SNPRINTF(
+            frame, sizeof(frame),
+            LABFORGE_FORMAT(
+                "{\"protocol\":\"LABFORGE/1\",\"type\":\"HELLO_OK\","
+                "\"backend_session_nonce\":\"%s\",\"controller_boot_id\":%lu,"
+                "\"controller_state\":\"IDLE\","
+                "\"software_state_trust\":\"TRUSTED\","
+                "\"capabilities\":[\"PUMP_HOME\","
+                "\"PUMP_MOVE_ABSOLUTE_STEPS\"]}\n"),
+            nonce, static_cast<unsigned long>(identity.controllerBootId))
+      : identity.trusted
       ? LABFORGE_SNPRINTF(
             frame, sizeof(frame),
             LABFORGE_FORMAT(

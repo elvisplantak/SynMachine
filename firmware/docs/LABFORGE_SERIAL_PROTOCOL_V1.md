@@ -242,10 +242,12 @@ Required: `protocol`, `type`, `backend_session_nonce`, `controller_boot_id`,
 `reset_cause`.
 
 The current implementation emits one compact LF-terminated `HELLO_OK` for each
-valid parsed `HELLO`, with deterministic field order, empty `capabilities`, and
-no `reset_cause`. A trusted identity emits its numeric boot ID with
-`controller_state:"PROTOCOL_ONLY"` and `software_state_trust:"TRUSTED"`. An
-untrusted identity emits `controller_boot_id:null`,
+valid parsed `HELLO`, with deterministic field order and no `reset_cause`. A
+trusted production runtime emits its numeric boot ID,
+`controller_state:"IDLE"`, `software_state_trust:"TRUSTED"`, and capabilities
+`PUMP_HOME` and `PUMP_MOVE_ABSOLUTE_STEPS`. The protocol-only writer mode keeps
+the empty capability list used by its focused tests. An untrusted identity emits
+`controller_boot_id:null`,
 `controller_state:"IDENTITY_UNTRUSTED"`, and
 `software_state_trust:"UNTRUSTED"` for diagnostic-only correlation.
 
@@ -276,14 +278,12 @@ caller-supplied direction, speed, homing, or route argument.
 {"protocol":"LABFORGE/1","type":"COMMAND","backend_session_nonce":"123e4567-e89b-12d3-a456-426614174000","controller_boot_id":4294967295,"phase_execution_id":"phase-execution-1","operation_command_id":"323e4567-e89b-12d3-a456-426614174002","command":"PUMP_MOVE_ABSOLUTE_STEPS","arguments":{"pump":"P1","target_steps":10000}}
 ```
 
-The current implementation provides only the pure schema and a testable
-Service lifecycle boundary with a fake executor. A side-effect-free `preflight`
-step occurs before `ACCEPTED`; only a ready preflight may reach `STARTED` and
-the injected execution call. The exact future hardware boundary is not final:
-it must count the first driver-affecting `DIR`, `ENA`, or `STEP` change as the
-first possible physical side effect. The Service is not connected to the
-production dispatcher, Serial command acceptance, Arduino pins, or a motor
-driver. Therefore this approved contract cannot currently cause movement.
+The production P1 runtime performs side-effect-free validation and preparation
+before `ACCEPTED`. It serializes `STARTED` before invoking the controller start
+boundary; the first possible driver-affecting action after that frame is the
+confirmed P1 DIR write, followed by the configured DIR-to-STEP setup interval.
+The command is connected to the Arduino P1 adapter, but this checkpoint has not
+been uploaded or physically executed.
 
 The second approved P1 command schema is `PUMP_HOME`. Its `arguments` object
 contains exactly `pump:"P1"`; missing, additional, incorrectly typed, or other
@@ -296,8 +296,9 @@ firmware does not own or infer route policy.
 {"protocol":"LABFORGE/1","type":"COMMAND","backend_session_nonce":"123e4567-e89b-12d3-a456-426614174000","controller_boot_id":4294967295,"phase_execution_id":"phase-execution-1","operation_command_id":"323e4567-e89b-12d3-a456-426614174002","command":"PUMP_HOME","arguments":{"pump":"P1"}}
 ```
 
-The implemented P1 motion-controller foundation is nonblocking and remains
-disconnected from the production dispatcher and Arduino pin adapter. Position
+The implemented P1 motion-controller and Serial lifecycle runtime are
+nonblocking and connected to the production dispatcher and Arduino pin
+adapter. Position
 trust begins `UNTRUSTED` after every boot. Only successful `PUMP_HOME`
 execution may establish coordinate zero and `TRUSTED` position. An absolute
 move is refused while position is untrusted; target zero requires `PUMP_HOME`
@@ -316,7 +317,7 @@ stable active signal may then use at most 200 away pulses to release HOME before
 searching again; a stable inactive signal is inconsistent with trusted zero and
 fails closed without movement toward HOME. HOME activation and release must
 remain stable for 30 ms while motion is paused before they affect state or
-establish trusted zero. The future runtime must call the nonblocking `update()`
+establish trusted zero. The integrated P1 runtime must call the nonblocking `update()`
 method regularly at a cadence materially shorter than this interval so the
 sampling-based stability policy is meaningful; blocking delays are prohibited.
 Absolute
@@ -326,8 +327,8 @@ unexpected activation terminates motion and leaves position untrusted. A local
 abort primitive forces STEP inactive, stops future pulses, and invalidates
 position trust after execution starts. DIR is established at least 5 us before
 the first STEP rising edge, per the installed DM542T timing contract. These
-rules are implemented and natively tested, but no Serial command can invoke
-them yet.
+rules are implemented and natively tested. Upload and physical invocation
+remain separate explicit approval gates.
 
 ### `REJECTED`
 
@@ -602,8 +603,8 @@ The approved P1 motion contracts reserve the precise execution-failure codes
 `PUMP_MOTION_TIMEOUT`, `PUMP_HOME_SWITCH_UNEXPECTED`,
 `PUMP_HOME_SWITCH_STUCK`, and `COMMAND_ABORTED`. They apply only
 after an accepted command reaches its execution boundary and MUST NOT be used
-for request rejection. Their presence does not claim that production motion or
-Serial command dispatch is implemented.
+for request rejection. Their presence does not authorize firmware upload,
+physical execution, or unattended operation.
 
 `PUMP_HOME_SWITCH_UNEXPECTED` means that HOME becomes active outside an
 allowed homing arrival. An initially active HOME input during an untrusted

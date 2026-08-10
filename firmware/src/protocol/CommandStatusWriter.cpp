@@ -50,6 +50,8 @@ const char* stateText(const CommandStatusEntry* entry) {
 }
 
 const char* errorText(CommandErrorCode error) {
+  if (error == CommandErrorCode::INVALID_FIELD)
+    return LABFORGE_TEXT("INVALID_FIELD");
   if (error == CommandErrorCode::UNSUPPORTED_COMMAND)
     return LABFORGE_TEXT("UNSUPPORTED_COMMAND");
   if (error == CommandErrorCode::COMMAND_ID_CONFLICT)

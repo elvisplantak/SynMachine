@@ -1,6 +1,7 @@
 # P1 production motion checkpoint
 
-This document records the implemented, still-disconnected P1 motion foundation.
+This document records the implemented P1 motion foundation and its focused
+Arduino/Serial integration.
 Confirmed physical facts remain canonical in `HARDWARE_CONFIRMATIONS.md`, and
 wire semantics remain canonical in `LABFORGE_SERIAL_PROTOCOL_V1.md`.
 
@@ -29,7 +30,7 @@ wire semantics remain canonical in `LABFORGE_SERIAL_PROTOCOL_V1.md`.
   HOME stability. Stable active HOME permits release by no more than 200 pulses
   before searching again; stable inactive HOME contradicts trusted zero and
   fails closed without a STEP rising edge toward HOME.
-- The future production runtime must call nonblocking `update()` regularly at a
+- The production runtime calls nonblocking `update()` regularly at a
   cadence materially shorter than 30 ms. The sampling-based stability policy
   is not meaningful if runtime scheduling leaves gaps comparable to its full
   interval; blocking delays must not be introduced.
@@ -41,8 +42,8 @@ wire semantics remain canonical in `LABFORGE_SERIAL_PROTOCOL_V1.md`.
 - Local abort forces STEP LOW, stops future pulses, returns the controller to
   idle, and invalidates position trust whenever execution had started. Abort
   after completion is a no-op and preserves the completed trusted position. A
-  future lifecycle adapter must store a deliberate post-`STARTED` abort as
-  `FAILED` with `COMMAND_ABORTED` and `execution_started:true`.
+  lifecycle adapter stores a deliberate post-`STARTED` abort as `FAILED` with
+  `COMMAND_ABORTED` and `execution_started:true`.
 - No ENA behavior is implemented or inferred.
 
 The DM542T timing value is taken from the manufacturer's `DM542T(V4.0) Digital
@@ -57,9 +58,9 @@ The user accepted continued automatic startup homing for this supervised demo
 because all HOME switches were manually tested and the operator remains at the
 power switch. Consequently the implementation retains a 20,500-pulse search
 bound from an untrusted start. That bound limits software activity but cannot
-guarantee prevention of mechanical overtravel. GPIO integration, upload, and
-physical execution remain separate approval gates, and unattended or
-production use is not approved by this design.
+guarantee prevention of mechanical overtravel. Firmware upload and physical
+execution remain separate approval gates, and unattended or production use is
+not approved by this design.
 
 ## Fluidic ownership
 
@@ -68,13 +69,22 @@ handling, bounds, and low-level failure. Backend owns route selection and must
 configure a physically safe route before sending `PUMP_HOME`. The Arduino must
 not infer or autonomously move valves as part of pump homing.
 
-## Deliberately not connected yet
+## Integrated production boundary
 
-The controller is not instantiated by `src/main.cpp`; no Arduino pin adapter or
-Serial command dispatcher invokes it. This preserves the repository's current
-no-motion production entry point while the first actuator checkpoint is
-reviewed. The next integration slice must add lifecycle serialization, cache
-ownership, session-validated command dispatch, an Arduino P1 pin adapter, and
-tests proving `STARTED` precedes the first driver-affecting write.
+`src/main.cpp` instantiates the P1 controller through an Arduino adapter for
+confirmed pins STEP D46, DIR D47, and HOME D45. Boot configuration holds STEP
+and DIR inactive and does not move the actuator. Only session-validated
+`PUMP_HOME` and `PUMP_MOVE_ABSOLUTE_STEPS` commands can cross the motion
+boundary.
 
-No firmware from this checkpoint has been uploaded or physically executed.
+The runtime emits and caches `ACCEPTED`, serializes `STARTED`, and only after
+the caller writes that frame invokes `start()`, whose first physical side
+effect is DIR setup. It continues polling Serial while calling `update()` and
+emits the cached terminal `COMPLETED` or `FAILED` frame. Exact duplicate command
+identity replays cached state without motion. `QUERY_STATUS` reports `BUSY`
+with the active operation ID while a command is nonterminal, otherwise `IDLE`.
+
+Automated native coverage verifies lifecycle ordering, no-motion writer
+failure, session rejection, BUSY status, abort semantics, successful HOME
+completion, and duplicate replay. No firmware from this checkpoint has been
+uploaded or physically executed.

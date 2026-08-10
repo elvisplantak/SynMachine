@@ -16,9 +16,36 @@ namespace labforge {
 
 bool writeStatus(const char* nonce, const char* requestId,
                  const BootIdentityResult& identity, uint8_t* output,
-                 size_t capacity, size_t& outputLength) {
+                 size_t capacity, size_t& outputLength,
+                 const CommandStatusCache* commandStatusCache,
+                 bool p1MotionEnabled) {
   char frame[kStatusFrameCapacity];
-  const int written = identity.trusted
+  const CommandStatusEntry* active =
+      commandStatusCache == nullptr ? nullptr : commandStatusCache->active();
+  int written = -1;
+  if (identity.trusted && p1MotionEnabled && active != nullptr) {
+    written = LABFORGE_SNPRINTF(
+        frame, sizeof(frame),
+        LABFORGE_FORMAT(
+            "{\"protocol\":\"LABFORGE/1\",\"type\":\"STATUS\","
+            "\"backend_session_nonce\":\"%s\",\"controller_boot_id\":%lu,"
+            "\"request_id\":\"%s\",\"controller_state\":\"BUSY\","
+            "\"software_state_trust\":\"TRUSTED\","
+            "\"active_operation_command_id\":\"%s\"}\n"),
+        nonce, static_cast<unsigned long>(identity.controllerBootId), requestId,
+        active->record.operationCommandId);
+  } else if (identity.trusted && p1MotionEnabled) {
+    written = LABFORGE_SNPRINTF(
+        frame, sizeof(frame),
+        LABFORGE_FORMAT(
+            "{\"protocol\":\"LABFORGE/1\",\"type\":\"STATUS\","
+            "\"backend_session_nonce\":\"%s\",\"controller_boot_id\":%lu,"
+            "\"request_id\":\"%s\",\"controller_state\":\"IDLE\","
+            "\"software_state_trust\":\"TRUSTED\","
+            "\"active_operation_command_id\":null}\n"),
+        nonce, static_cast<unsigned long>(identity.controllerBootId), requestId);
+  } else {
+    written = identity.trusted
       ? LABFORGE_SNPRINTF(
             frame, sizeof(frame),
             LABFORGE_FORMAT(
@@ -38,6 +65,7 @@ bool writeStatus(const char* nonce, const char* requestId,
                 "\"software_state_trust\":\"UNTRUSTED\","
                 "\"active_operation_command_id\":null}\n"),
             nonce, requestId);
+  }
   outputLength = 0;
   if (written < 0 || static_cast<size_t>(written) >= sizeof(frame) ||
       static_cast<size_t>(written) > capacity) {

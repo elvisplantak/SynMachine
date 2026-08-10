@@ -69,7 +69,7 @@ class P1MotionController {
   bool busy() const;
 
  private:
-  enum class PulsePhase : uint8_t { WAITING_TO_RISE, HIGH };
+  enum class PulsePhase : uint8_t { WAITING_TO_RISE, STEP_HIGH };
 
   void beginStage(P1MotionState state, bool directionHigh, uint32_t nowUs);
   bool pulseDue(uint32_t nowUs) const;
