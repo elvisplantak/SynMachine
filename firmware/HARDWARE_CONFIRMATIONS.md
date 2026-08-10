@@ -383,7 +383,7 @@ does not by itself verify liquid routing through the physical valve ports.
 
 ### Confirmed facts: P1 and P2 syringe orientation
 
-- P1 and P2 use 10 mL syringes.
+- P1 and P2 use 20 mL syringes.
 - P1 and P2 have the same confirmed mechanical syringe orientation.
 - For both P1 and P2, position `0` is the home-switch end and corresponds to the maximum syringe chamber volume.
 - For both P1 and P2, position `20500` is the recovered approximate minimum-volume, practically empty position.
@@ -528,6 +528,65 @@ signal is missing. A stuck-LOW switch, broken signal path that appears LOW, or
 mechanical failure to actuate the switch can still cause damage before the
 software pulse bound is reached. Production or unattended use remains blocked
 until an independent protection or a different safe recovery design exists.
+
+### Confirmed carousel control path and position model — 2026-08-10
+
+The user physically identified the lowest installed driver as the carousel
+driver and confirmed it is a StepperOnline `CL57T` closed-loop driver. Its ENA
+input is not connected. A controlled 400-pulse out-and-back test identified
+the Arduino Mega signal pins:
+
+- `CAROUSEL STEP = D8`
+- `CAROUSEL DIR = D9`
+
+The same test produced visible carousel movement and return. A subsequent
+controlled test at `DIR=HIGH` experimentally produced one full 360-degree
+carousel revolution from 10,000 STEP pulses. With 40 equally spaced tube
+positions, this establishes the nominal conversion:
+
+- `10,000 pulses / revolution`
+- `250 pulses / tube position`
+- `25 pulses / degree`
+
+The user then confirmed that a one-tube movement using 250 pulses aligned as
+intended and that the following S-curve profile produced acceptably smooth
+motion for the current demo:
+
+- tested logical direction: `DIR=HIGH`
+- starting/stopping STEP interval: `6,000 us`
+- fastest STEP interval: `1,200 us`
+- acceleration: 125 pulses using cubic smoothstep
+- deceleration: 125 pulses using cubic smoothstep
+
+These values are the accepted initial carousel operating profile. A subsequent
+40-position test advanced the carousel by one nominal tube position at a time,
+held each position for two seconds, and completed the full revolution using
+this profile. The user confirmed that the complete test passed. Physical
+CW/CCW naming for `DIR=HIGH` remains intentionally unspecified because the
+logical direction and position progression are sufficient for the current
+machine behavior.
+
+The future Service interface should expose bounded carousel commissioning
+settings for:
+
+- pulses per revolution and derived pulses/degrees per tube position
+- movement direction
+- starting/stopping STEP interval
+- fastest STEP interval
+- acceleration/deceleration pulse count and motion-profile selection
+- dwell time and a bounded number of test positions
+
+These are calibration and service parameters, not unrestricted direct GPIO
+controls. The backend owns authorization and persistence policy, while firmware
+must validate every received value against explicit safe numeric bounds before
+using it for motion.
+
+The carousel has 40 tube positions, so adjacent nominal positions are separated
+by 9 degrees. There is no carousel HOME sensor. The operator will therefore
+align and declare the initial tube position manually. Software must treat the
+position as unknown after controller startup or any event that can lose step
+accounting until that explicit manual initialization occurs; it must not invent
+an absolute carousel position.
 
 ### Common DM542T driver DIP layout — 2026-08-08
 

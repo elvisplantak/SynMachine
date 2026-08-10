@@ -22,6 +22,7 @@ facts until the relevant level passes:
 | P1/P2 | Arduino Mega | P1 D46/D47; P2 D48/D49 | P1 D45; P2 D44; `INPUT_PULLUP`; released LOW, active HIGH | HOME LOW; away HIGH for both | 20,000-pulse dry round trip passed; 20,500 approved mechanical maximum; volume calibration pending | separate Waste routes confirmed | pending |
 | COLUMN_BOTTOM_VALVE | Arduino Mega / DM542T | STEP D12; DIR D13 | D10; released LOW, active HIGH | HOME LOW | CLOSED 4 degrees; OPEN 94 degrees; 80,000 pulses/rev; 1,000-us interval | mechanical dry actuation confirmed; fluid route pending | pending |
 | SF_BOTTOM_VALVE | host USB / U2D2 / XL430-W250-T | stable FTDI by-id path; ID 2; model 1060; 57,600 baud; Protocol 2.0 | internal position/error/voltage/temperature telemetry confirmed | positive raw direction from CLOSED to OPEN | CLOSED 2559; OPEN 3697; profile velocity 20; acceleration 1 | repeated mechanical dry actuation confirmed | pending |
+| CAROUSEL | Arduino Mega / CL57T | STEP D8; DIR D9; ENA not connected | no HOME sensor; manual initial alignment required | `DIR=HIGH` tested; physical CW/CCW naming not required | 40 positions; 250 pulses/tube; 10,000 pulses/rev; S-curve 6,000->1,200->6,000 us over 125+125 pulses | basic motion, smooth single-position move, and 40-position full-revolution test confirmed | pending |
 
 The detailed evidence, measured values, limitations, and precedence rules for
 these promoted confirmations are canonical in `HARDWARE_CONFIRMATIONS.md`.
@@ -40,10 +41,12 @@ Completed with explicit physical authorization and user observation:
   and functional CLOSED/OPEN offsets
 - `SF_BOTTOM_VALVE` U2D2 identity, DYNAMIXEL identity/status, bounded motion in
   both directions, test profile, and visually calibrated CLOSED/OPEN values
+- carousel STEP/DIR identity, basic bounded out-and-back actuation, smooth
+  one-position movement, and 40-position full-revolution progression with a
+  two-second dwell at every position
 
 Explicitly deferred or still pending:
 
-- carousel driver, pins, positions, and motion
 - leak testing and liquid verification of physical routes
 - pump `steps/ml`, volumetric repeatability, and validated wet speed range
 - production actuator adapters, safety interlocks, disconnect/recovery and
