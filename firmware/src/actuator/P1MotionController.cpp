@@ -141,8 +141,7 @@ P1MotionResult P1MotionController::update(uint32_t nowUs) {
         pauseForHomeStability(P1MotionState::CONFIRMING_MOVE_RELEASE, nowUs);
         return P1MotionResult::NONE;
       }
-      if (positionSteps_ == targetSteps_ ||
-          stageSteps_ >= kP1HomeReleaseMaximumSteps) {
+      if (positionSteps_ == targetSteps_) {
         trust_ = P1PositionTrust::UNTRUSTED;
         return finish(P1MotionResult::HOME_SWITCH_STUCK);
       }
@@ -170,9 +169,7 @@ P1MotionResult P1MotionController::update(uint32_t nowUs) {
       stageSteps_ >= kP1MaximumAbsoluteSteps)
     return finish(P1MotionResult::MOTION_TIMEOUT);
   if (state_ == P1MotionState::MOVING) {
-    if (releasingHomeDuringMove_ &&
-        (positionSteps_ == targetSteps_ ||
-         stageSteps_ >= kP1HomeReleaseMaximumSteps)) {
+    if (releasingHomeDuringMove_ && positionSteps_ == targetSteps_) {
       trust_ = P1PositionTrust::UNTRUSTED;
       return finish(P1MotionResult::HOME_SWITCH_STUCK);
     }

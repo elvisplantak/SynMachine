@@ -38,9 +38,11 @@ wire semantics remain canonical in `LABFORGE_SERIAL_PROTOCOL_V1.md`.
   interval. Serial output is therefore queued and handed to `HardwareSerial`
   in fixed chunks no larger than the space reported by `availableForWrite()`,
   with controller servicing between chunks.
-- A move away from trusted zero tolerates HOME only while performing a bounded,
-  stability-confirmed release. It cannot complete while HOME remains active,
-  including when the requested target is inside the physical release zone.
+- A move away from trusted zero tolerates HOME while performing a
+  stability-confirmed release, bounded by the validated absolute target rather
+  than the repeated-homing release allowance. It cannot complete while HOME
+  remains active, including when the requested target is inside the physical
+  release zone.
 - Missing HOME, stuck HOME, or unexpected HOME activation stops STEP LOW and
   invalidates position trust.
 - Local abort forces STEP LOW, stops future pulses, returns the controller to

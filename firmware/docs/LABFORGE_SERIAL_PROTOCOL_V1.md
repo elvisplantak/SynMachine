@@ -609,9 +609,11 @@ physical execution, or unattended operation.
 allowed homing arrival. An initially active HOME input during an untrusted
 `PUMP_HOME` operation is held motionless and accepted as zero only after the
 configured stability interval. A repeated `PUMP_HOME` from trusted zero may
-first perform the bounded release stage. `PUMP_HOME_SWITCH_STUCK` means that an
-allowed release did not clear HOME within 400 pulses, or that an absolute move
-away from zero reached its requested target while HOME was still active.
+first perform the bounded release stage. `PUMP_HOME_SWITCH_STUCK` means that a
+repeated-homing release did not clear HOME within 400 pulses, or that an
+absolute move away from zero reached its requested target while HOME was still
+active. The latter release is bounded by the validated absolute target, not by
+the repeated-homing release allowance.
 Expected stable HOME arrival is part of the `PUMP_HOME` contract, not the
 non-homing command contract.
 

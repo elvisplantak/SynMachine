@@ -345,21 +345,21 @@ void test_move_requires_stable_home_release_and_ignores_one_sample_bounce() {
   TEST_ASSERT_EQUAL_UINT16(3, controller.positionSteps());
 }
 
-void test_move_allows_confirmed_home_release_after_more_than_200_steps() {
+void test_move_allows_confirmed_home_release_after_home_release_limit() {
   FakeIo io;
   P1MotionController controller(io);
   uint32_t nowUs = 0;
   establishHome(controller, io, nowUs);
   TEST_ASSERT_EQUAL(P1PrepareResult::READY,
-                    controller.prepareMoveAbsolute(500));
+                    controller.prepareMoveAbsolute(600));
   TEST_ASSERT_TRUE(controller.start(nowUs));
   reachFirstRise(nowUs);
 
   P1MotionResult result = P1MotionResult::NONE;
-  for (uint16_t i = 0; i < 300; ++i)
+  for (uint16_t i = 0; i < 450; ++i)
     result = runOnePulse(controller, io, nowUs);
   TEST_ASSERT_EQUAL(P1MotionResult::NONE, result);
-  TEST_ASSERT_EQUAL_UINT16(300, controller.positionSteps());
+  TEST_ASSERT_EQUAL_UINT16(450, controller.positionSteps());
 
   io.home = false;
   TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
@@ -369,10 +369,10 @@ void test_move_allows_confirmed_home_release_after_more_than_200_steps() {
   TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
 
   nowUs += kP1StepIntervalUs;
-  for (uint16_t i = 300; i < 500; ++i)
+  for (uint16_t i = 450; i < 600; ++i)
     result = runOnePulse(controller, io, nowUs);
   TEST_ASSERT_EQUAL(P1MotionResult::COMPLETED, result);
-  TEST_ASSERT_EQUAL_UINT16(500, controller.positionSteps());
+  TEST_ASSERT_EQUAL_UINT16(600, controller.positionSteps());
   TEST_ASSERT_EQUAL(P1PositionTrust::TRUSTED, controller.positionTrust());
 }
 
@@ -521,7 +521,7 @@ int main(int, char**) {
   RUN_TEST(test_absolute_move_rejects_zero_and_tracks_position);
   RUN_TEST(test_move_cannot_complete_inside_active_home_release_zone);
   RUN_TEST(test_move_requires_stable_home_release_and_ignores_one_sample_bounce);
-  RUN_TEST(test_move_allows_confirmed_home_release_after_more_than_200_steps);
+  RUN_TEST(test_move_allows_confirmed_home_release_after_home_release_limit);
   RUN_TEST(test_unexpected_home_during_absolute_move_invalidates_position);
   RUN_TEST(test_abort_during_home_release_search_and_absolute_motion);
   RUN_TEST(test_abort_after_atomic_pulse_keeps_step_low);
