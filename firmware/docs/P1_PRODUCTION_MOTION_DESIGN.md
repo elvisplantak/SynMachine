@@ -25,8 +25,14 @@ wire semantics remain canonical in `LABFORGE_SERIAL_PROTOCOL_V1.md`.
   machine accepts the transition. Motion pauses during this stability window,
   so a one-sample glitch cannot establish trusted zero.
 - An initially active HOME at untrusted boot is confirmed without first moving
-  away. A repeated home from trusted zero may release by no more than 200
-  pulses before searching toward HOME again.
+  away. A repeated home from trusted zero first holds STEP inactive and checks
+  HOME stability. Stable active HOME permits release by no more than 200 pulses
+  before searching again; stable inactive HOME contradicts trusted zero and
+  fails closed without a STEP rising edge toward HOME.
+- The future production runtime must call nonblocking `update()` regularly at a
+  cadence materially shorter than 30 ms. The sampling-based stability policy
+  is not meaningful if runtime scheduling leaves gaps comparable to its full
+  interval; blocking delays must not be introduced.
 - A move away from trusted zero tolerates HOME only while performing a bounded,
   stability-confirmed release. It cannot complete while HOME remains active,
   including when the requested target is inside the physical release zone.
@@ -34,7 +40,9 @@ wire semantics remain canonical in `LABFORGE_SERIAL_PROTOCOL_V1.md`.
   invalidates position trust.
 - Local abort forces STEP LOW, stops future pulses, returns the controller to
   idle, and invalidates position trust whenever execution had started. Abort
-  after completion is a no-op and preserves the completed trusted position.
+  after completion is a no-op and preserves the completed trusted position. A
+  future lifecycle adapter must store a deliberate post-`STARTED` abort as
+  `FAILED` with `COMMAND_ABORTED` and `execution_started:true`.
 - No ENA behavior is implemented or inferred.
 
 The DM542T timing value is taken from the manufacturer's `DM542T(V4.0) Digital

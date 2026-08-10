@@ -28,6 +28,7 @@ enum class P1MotionState : uint8_t {
   IDLE,
   PREPARED_HOME,
   PREPARED_MOVE,
+  CONFIRMING_TRUSTED_HOME,
   RELEASING_HOME,
   CONFIRMING_HOME_RELEASE,
   SEARCHING_HOME,
@@ -86,6 +87,7 @@ class P1MotionController {
   uint16_t stageSteps_ = 0;
   uint32_t nextPulseUs_ = 0;
   uint32_t homeStableSinceUs_ = 0;
+  bool homeStableLevel_ = false;
   bool directionHigh_ = false;
   bool releasingHomeDuringMove_ = false;
 };

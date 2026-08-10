@@ -27,6 +27,7 @@ enum class CommandErrorCode : uint8_t {
   PUMP_MOTION_TIMEOUT,
   PUMP_HOME_SWITCH_UNEXPECTED,
   PUMP_HOME_SWITCH_STUCK,
+  COMMAND_ABORTED,
 };
 
 enum class CommandErrorCategory : uint8_t {

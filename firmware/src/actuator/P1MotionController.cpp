@@ -41,15 +41,15 @@ bool P1MotionController::start(uint32_t nowUs) {
     const bool trustedAtHome =
         trust_ == P1PositionTrust::TRUSTED && positionSteps_ == 0;
     trust_ = P1PositionTrust::UNTRUSTED;
-    if (io_.homeActive()) {
-      if (trustedAtHome) {
-        beginStage(P1MotionState::RELEASING_HOME,
-                   kDirectionAwayFromHomeHigh, nowUs);
-      } else {
-        beginStage(P1MotionState::SEARCHING_HOME,
-                   kDirectionTowardHomeHigh, nowUs);
-        pauseForHomeStability(P1MotionState::CONFIRMING_HOME_ACTIVE, nowUs);
-      }
+    if (trustedAtHome) {
+      beginStage(P1MotionState::RELEASING_HOME,
+                 kDirectionAwayFromHomeHigh, nowUs);
+      homeStableLevel_ = io_.homeActive();
+      pauseForHomeStability(P1MotionState::CONFIRMING_TRUSTED_HOME, nowUs);
+    } else if (io_.homeActive()) {
+      beginStage(P1MotionState::SEARCHING_HOME,
+                 kDirectionTowardHomeHigh, nowUs);
+      pauseForHomeStability(P1MotionState::CONFIRMING_HOME_ACTIVE, nowUs);
     } else {
       beginStage(P1MotionState::SEARCHING_HOME,
                  kDirectionTowardHomeHigh, nowUs);
@@ -70,6 +70,20 @@ P1MotionResult P1MotionController::update(uint32_t nowUs) {
   if (state_ == P1MotionState::IDLE ||
       state_ == P1MotionState::PREPARED_HOME ||
       state_ == P1MotionState::PREPARED_MOVE) {
+    return P1MotionResult::NONE;
+  }
+
+  if (state_ == P1MotionState::CONFIRMING_TRUSTED_HOME) {
+    const bool homeActive = io_.homeActive();
+    if (homeActive != homeStableLevel_) {
+      homeStableLevel_ = homeActive;
+      homeStableSinceUs_ = nowUs;
+    } else if (timeReached(nowUs, homeStableSinceUs_ + kP1HomeStableUs)) {
+      if (!homeActive)
+        return finish(P1MotionResult::HOME_SWITCH_UNEXPECTED);
+      resumePulses(nowUs);
+      state_ = P1MotionState::RELEASING_HOME;
+    }
     return P1MotionResult::NONE;
   }
 

@@ -310,10 +310,16 @@ supervised-demo assumption, startup HOME search may begin from an untrusted
 position and is bounded to 20,500 pulses. Because P1/P2 have no independent end
 protection, that pulse bound is not fail-safe against a missing HOME signal and
 does not approve unattended or production operation. An initially active HOME
-at untrusted boot is stability-confirmed without away motion; repeated homing
-from trusted zero may use at most 200 away pulses to release HOME before
-searching again. HOME activation and release must remain stable for 30 ms while
-motion is paused before they affect state or establish trusted zero. Absolute
+at untrusted boot is stability-confirmed without away motion. Repeated homing
+from trusted zero first holds STEP inactive while checking HOME stability. A
+stable active signal may then use at most 200 away pulses to release HOME before
+searching again; a stable inactive signal is inconsistent with trusted zero and
+fails closed without movement toward HOME. HOME activation and release must
+remain stable for 30 ms while motion is paused before they affect state or
+establish trusted zero. The future runtime must call the nonblocking `update()`
+method regularly at a cadence materially shorter than this interval so the
+sampling-based stability policy is meaningful; blocking delays are prohibited.
+Absolute
 movement from confirmed zero uses the same bounded stable-release policy and
 cannot complete while HOME remains active. A stuck switch, missing HOME, or
 unexpected activation terminates motion and leaves position untrusted. A local
@@ -593,8 +599,8 @@ Future actuator-specific errors MUST be added only after actuator contracts
 exist.
 
 The approved P1 motion contracts reserve the precise execution-failure codes
-`PUMP_MOTION_TIMEOUT`, `PUMP_HOME_SWITCH_UNEXPECTED`, and
-`PUMP_HOME_SWITCH_STUCK`. They apply only
+`PUMP_MOTION_TIMEOUT`, `PUMP_HOME_SWITCH_UNEXPECTED`,
+`PUMP_HOME_SWITCH_STUCK`, and `COMMAND_ABORTED`. They apply only
 after an accepted command reaches its execution boundary and MUST NOT be used
 for request rejection. Their presence does not claim that production motion or
 Serial command dispatch is implemented.
@@ -608,6 +614,11 @@ allowed release did not clear HOME within 200 pulses, or that an absolute move
 away from zero reached its requested target while HOME was still active.
 Expected stable HOME arrival is part of the `PUMP_HOME` contract, not the
 non-homing command contract.
+
+`COMMAND_ABORTED` means a command that had already crossed `STARTED` was
+deliberately stopped by the local abort path. It is a cached
+`FAILED(execution_started:true)` outcome. It is not a request rejection,
+timeout, HOME fault, or proof of a particular partial physical result.
 
 ## 15. Retry-safety policy
 
@@ -733,7 +744,8 @@ validation are implemented for future internal use. The approved
 `PUMP_MOVE_ABSOLUTE_STEPS` and `PUMP_HOME` P1 contracts add exact bounded schema
 validation and compact semantic identity. A nonblocking P1 motion-controller
 foundation now implements boot-time untrusted position, explicit homing,
-stable HOME confirmation, bounded active-switch release and HOME search,
+stable HOME confirmation including trusted-zero pre-motion validation, bounded
+active-switch release and HOME search,
 absolute step tracking, direction-setup and pulse timing, local abort, and
 fail-closed trust invalidation. The accepted supervised-demo homing assumption
 and its unresolved missing-switch overtravel risk are recorded in the hardware

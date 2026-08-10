@@ -96,6 +96,9 @@ void test_rejection_and_execution_error_categories_do_not_cross() {
   value.errorCode = CommandErrorCode::PUMP_HOME_SWITCH_STUCK;
   TEST_ASSERT_EQUAL(CommandStatusStoreResult::INVALID_RECORD,
                     cache.storeDetailed(value));
+  value.errorCode = CommandErrorCode::COMMAND_ABORTED;
+  TEST_ASSERT_EQUAL(CommandStatusStoreResult::INVALID_RECORD,
+                    cache.storeDetailed(value));
 
   value = record(OPERATION_1, CommandState::REJECTED);
   value.errorCode = CommandErrorCode::CONTROLLER_BUSY;
@@ -139,6 +142,56 @@ void test_rejection_and_execution_error_categories_do_not_cross() {
       homeFailedCache.find(OPERATION_3), output, sizeof(output), length));
   TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
                               "\"error_code\":\"PUMP_HOME_SWITCH_STUCK\""));
+}
+
+void test_semantic_identity_rejects_absolute_zero_but_accepts_home_zero() {
+  CommandStatusCache moveCache;
+  CommandStatusRecord value = record(OPERATION_1, CommandState::ACCEPTED);
+  value.semanticIdentityKnown = true;
+  value.semanticIdentity = {CommandKind::PUMP_MOVE_ABSOLUTE_STEPS, PumpId::P1,
+                            0};
+  TEST_ASSERT_EQUAL(CommandStatusStoreResult::INVALID_RECORD,
+                    moveCache.storeDetailed(value));
+  TEST_ASSERT_EQUAL_UINT32(0, moveCache.occupiedCount());
+
+  CommandStatusCache homeCache;
+  value.semanticIdentity = {CommandKind::PUMP_HOME, PumpId::P1, 0};
+  TEST_ASSERT_EQUAL(CommandStatusStoreResult::STORED,
+                    homeCache.storeDetailed(value));
+
+  CommandStatusCache positiveMoveCache;
+  value.semanticIdentity = {CommandKind::PUMP_MOVE_ABSOLUTE_STEPS, PumpId::P1,
+                            1};
+  TEST_ASSERT_EQUAL(CommandStatusStoreResult::STORED,
+                    positiveMoveCache.storeDetailed(value));
+}
+
+void test_started_abort_is_precise_cached_execution_failure() {
+  CommandStatusCache cache;
+  CommandStatusRecord value = record(OPERATION_1, CommandState::ACCEPTED);
+  value.semanticIdentityKnown = true;
+  value.semanticIdentity = {CommandKind::PUMP_HOME, PumpId::P1, 0};
+  TEST_ASSERT_TRUE(cache.store(value));
+  value.state = CommandState::STARTED;
+  TEST_ASSERT_TRUE(cache.store(value));
+  value.state = CommandState::FAILED;
+  value.errorCode = CommandErrorCode::COMMAND_ABORTED;
+  value.executionStarted = true;
+  TEST_ASSERT_TRUE(cache.store(value));
+  TEST_ASSERT_EQUAL(CommandErrorCategory::EXECUTION_FAILURE,
+                    commandErrorCategory(value.errorCode));
+
+  uint8_t output[kCommandStatusFrameCapacity]{};
+  size_t length = 0;
+  TEST_ASSERT_TRUE(writeCommandStatus(
+      NONCE, REQUEST_ID, OPERATION_1, TRUSTED, cache.find(OPERATION_1), output,
+      sizeof(output), length));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "\"command_state\":\"FAILED\""));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "\"error_code\":\"COMMAND_ABORTED\""));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "\"execution_started\":true"));
 }
 
 void test_exact_unknown_and_completed_frames() {
@@ -398,6 +451,8 @@ int main(int, char**) {
   RUN_TEST(test_nonterminal_is_preserved_and_only_one_is_allowed);
   RUN_TEST(test_invalid_record_combinations_are_rejected);
   RUN_TEST(test_rejection_and_execution_error_categories_do_not_cross);
+  RUN_TEST(test_semantic_identity_rejects_absolute_zero_but_accepts_home_zero);
+  RUN_TEST(test_started_abort_is_precise_cached_execution_failure);
   RUN_TEST(test_exact_unknown_and_completed_frames);
   RUN_TEST(test_all_states_maximum_frame_and_transactional_failure);
   RUN_TEST(test_normative_transition_model_and_idempotent_replay);
