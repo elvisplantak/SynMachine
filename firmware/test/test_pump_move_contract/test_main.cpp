@@ -72,6 +72,7 @@ void test_contract_accepts_only_exact_p1_schema_in_any_key_order() {
 void test_contract_rejects_wrong_types_ranges_and_extra_arguments() {
   const char* invalid[] = {
       "{\"pump\":\"P2\",\"target_steps\":1}",
+      "{\"pump\":\"P1\",\"target_steps\":0}",
       "{\"pump\":\"P1\",\"target_steps\":-1}",
       "{\"pump\":\"P1\",\"target_steps\":20501}",
       "{\"pump\":\"P1\",\"target_steps\":true}",

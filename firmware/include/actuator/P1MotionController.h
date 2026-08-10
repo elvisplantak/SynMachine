@@ -8,7 +8,12 @@ namespace labforge {
 
 constexpr uint32_t kP1StepIntervalUs = 1500;
 constexpr uint16_t kP1StepHighUs = 20;
+constexpr uint16_t kP1DirectionSetupUs = 5;
+constexpr uint32_t kP1HomeStableUs = 30000;
 constexpr uint16_t kP1HomeReleaseMaximumSteps = 200;
+
+static_assert(kP1StepHighUs < kP1StepIntervalUs,
+              "P1 STEP high time must be shorter than its pulse interval");
 
 class P1MotionIo {
  public:
@@ -24,8 +29,11 @@ enum class P1MotionState : uint8_t {
   PREPARED_HOME,
   PREPARED_MOVE,
   RELEASING_HOME,
+  CONFIRMING_HOME_RELEASE,
   SEARCHING_HOME,
+  CONFIRMING_HOME_ACTIVE,
   MOVING,
+  CONFIRMING_MOVE_RELEASE,
 };
 enum class P1PrepareResult : uint8_t {
   READY,
@@ -52,6 +60,7 @@ class P1MotionController {
   P1PrepareResult prepareMoveAbsolute(uint16_t targetSteps);
   bool start(uint32_t nowUs);
   P1MotionResult update(uint32_t nowUs);
+  bool abort();
 
   P1MotionState state() const;
   P1PositionTrust positionTrust() const;
@@ -64,6 +73,8 @@ class P1MotionController {
   void beginStage(P1MotionState state, bool directionHigh, uint32_t nowUs);
   bool pulseDue(uint32_t nowUs) const;
   bool finishPulse(uint32_t nowUs);
+  void pauseForHomeStability(P1MotionState state, uint32_t nowUs);
+  void resumePulses(uint32_t nowUs);
   P1MotionResult finish(P1MotionResult result);
 
   P1MotionIo& io_;
@@ -74,6 +85,7 @@ class P1MotionController {
   uint16_t targetSteps_ = 0;
   uint16_t stageSteps_ = 0;
   uint32_t nextPulseUs_ = 0;
+  uint32_t homeStableSinceUs_ = 0;
   bool directionHigh_ = false;
   bool releasingHomeDuringMove_ = false;
 };

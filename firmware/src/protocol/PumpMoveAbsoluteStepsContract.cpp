@@ -27,7 +27,7 @@ PumpMoveContractStatus parsePumpMoveAbsoluteSteps(
       pumpFound = true;
     } else if (strcmp(argument.key, "target_steps") == 0) {
       if (targetFound || argument.type != ArgumentType::INTEGER ||
-          argument.value.integerValue < 0 ||
+          argument.value.integerValue < 1 ||
           argument.value.integerValue > kP1MaximumAbsoluteSteps) {
         return PumpMoveContractStatus::INVALID_ARGUMENTS;
       }

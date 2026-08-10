@@ -38,10 +38,18 @@ P1PrepareResult P1MotionController::prepareMoveAbsolute(uint16_t targetSteps) {
 
 bool P1MotionController::start(uint32_t nowUs) {
   if (state_ == P1MotionState::PREPARED_HOME) {
+    const bool trustedAtHome =
+        trust_ == P1PositionTrust::TRUSTED && positionSteps_ == 0;
     trust_ = P1PositionTrust::UNTRUSTED;
     if (io_.homeActive()) {
-      beginStage(P1MotionState::RELEASING_HOME,
-                 kDirectionAwayFromHomeHigh, nowUs);
+      if (trustedAtHome) {
+        beginStage(P1MotionState::RELEASING_HOME,
+                   kDirectionAwayFromHomeHigh, nowUs);
+      } else {
+        beginStage(P1MotionState::SEARCHING_HOME,
+                   kDirectionTowardHomeHigh, nowUs);
+        pauseForHomeStability(P1MotionState::CONFIRMING_HOME_ACTIVE, nowUs);
+      }
     } else {
       beginStage(P1MotionState::SEARCHING_HOME,
                  kDirectionTowardHomeHigh, nowUs);
@@ -65,70 +73,114 @@ P1MotionResult P1MotionController::update(uint32_t nowUs) {
     return P1MotionResult::NONE;
   }
 
-  if (state_ == P1MotionState::SEARCHING_HOME && io_.homeActive()) {
-    positionSteps_ = 0;
-    trust_ = P1PositionTrust::TRUSTED;
-    return finish(P1MotionResult::COMPLETED);
+  if (state_ == P1MotionState::CONFIRMING_HOME_ACTIVE) {
+    if (!io_.homeActive()) {
+      resumePulses(nowUs);
+      state_ = P1MotionState::SEARCHING_HOME;
+    } else if (timeReached(nowUs, homeStableSinceUs_ + kP1HomeStableUs)) {
+      positionSteps_ = 0;
+      trust_ = P1PositionTrust::TRUSTED;
+      return finish(P1MotionResult::COMPLETED);
+    }
+    return P1MotionResult::NONE;
   }
-  if (state_ == P1MotionState::MOVING) {
+
+  if (state_ == P1MotionState::CONFIRMING_HOME_RELEASE) {
+    if (io_.homeActive()) {
+      resumePulses(nowUs);
+      state_ = P1MotionState::RELEASING_HOME;
+    } else if (timeReached(nowUs, homeStableSinceUs_ + kP1HomeStableUs)) {
+      beginStage(P1MotionState::SEARCHING_HOME,
+                 kDirectionTowardHomeHigh, nowUs);
+    }
+    return P1MotionResult::NONE;
+  }
+
+  if (state_ == P1MotionState::CONFIRMING_MOVE_RELEASE) {
+    if (io_.homeActive()) {
+      resumePulses(nowUs);
+      state_ = P1MotionState::MOVING;
+    } else if (timeReached(nowUs, homeStableSinceUs_ + kP1HomeStableUs)) {
+      releasingHomeDuringMove_ = false;
+      if (positionSteps_ == targetSteps_)
+        return finish(P1MotionResult::COMPLETED);
+      resumePulses(nowUs);
+      state_ = P1MotionState::MOVING;
+    }
+    return P1MotionResult::NONE;
+  }
+
+  bool pulseFinished = false;
+  if (pulsePhase_ == PulsePhase::HIGH) {
+    if (!pulseDue(nowUs)) return P1MotionResult::NONE;
+    pulseFinished = finishPulse(nowUs);
+    if (pulseFinished && state_ == P1MotionState::MOVING) {
+      if (directionHigh_) {
+        ++positionSteps_;
+      } else {
+        --positionSteps_;
+      }
+    }
+  }
+
+  if (state_ == P1MotionState::SEARCHING_HOME && io_.homeActive()) {
+    pauseForHomeStability(P1MotionState::CONFIRMING_HOME_ACTIVE, nowUs);
+    return P1MotionResult::NONE;
+  }
+
+  if (state_ == P1MotionState::RELEASING_HOME) {
+    if (!io_.homeActive()) {
+      pauseForHomeStability(P1MotionState::CONFIRMING_HOME_RELEASE, nowUs);
+    } else if (stageSteps_ >= kP1HomeReleaseMaximumSteps) {
+      return finish(P1MotionResult::HOME_SWITCH_STUCK);
+    }
+  } else if (state_ == P1MotionState::SEARCHING_HOME) {
+    if (stageSteps_ >= kP1MaximumAbsoluteSteps)
+      return finish(P1MotionResult::MOTION_TIMEOUT);
+  } else if (state_ == P1MotionState::MOVING) {
     if (releasingHomeDuringMove_) {
       if (!io_.homeActive()) {
-        releasingHomeDuringMove_ = false;
-      } else if (stageSteps_ >= kP1HomeReleaseMaximumSteps) {
+        pauseForHomeStability(P1MotionState::CONFIRMING_MOVE_RELEASE, nowUs);
+        return P1MotionResult::NONE;
+      }
+      if (positionSteps_ == targetSteps_ ||
+          stageSteps_ >= kP1HomeReleaseMaximumSteps) {
         trust_ = P1PositionTrust::UNTRUSTED;
         return finish(P1MotionResult::HOME_SWITCH_STUCK);
       }
     } else if (io_.homeActive()) {
       trust_ = P1PositionTrust::UNTRUSTED;
       return finish(P1MotionResult::HOME_SWITCH_UNEXPECTED);
+    } else if (pulseFinished && positionSteps_ == targetSteps_) {
+      return finish(P1MotionResult::COMPLETED);
     }
   }
-  if (!pulseDue(nowUs)) return P1MotionResult::NONE;
 
-  if (pulsePhase_ == PulsePhase::WAITING_TO_RISE) {
+  if (pulsePhase_ == PulsePhase::WAITING_TO_RISE && pulseDue(nowUs)) {
     io_.writeStep(true);
     pulsePhase_ = PulsePhase::HIGH;
     nextPulseUs_ = nowUs + kP1StepHighUs;
-    return P1MotionResult::NONE;
   }
-
-  if (!finishPulse(nowUs)) return P1MotionResult::NONE;
-
-  if (state_ == P1MotionState::RELEASING_HOME) {
-    if (!io_.homeActive()) {
-      beginStage(P1MotionState::SEARCHING_HOME,
-                 kDirectionTowardHomeHigh, nowUs);
-    } else if (stageSteps_ >= kP1HomeReleaseMaximumSteps) {
-      return finish(P1MotionResult::HOME_SWITCH_STUCK);
-    }
-    return P1MotionResult::NONE;
-  }
-
-  if (state_ == P1MotionState::SEARCHING_HOME) {
-    if (io_.homeActive()) {
-      positionSteps_ = 0;
-      trust_ = P1PositionTrust::TRUSTED;
-      return finish(P1MotionResult::COMPLETED);
-    }
-    if (stageSteps_ >= kP1MaximumAbsoluteSteps)
-      return finish(P1MotionResult::MOTION_TIMEOUT);
-    return P1MotionResult::NONE;
-  }
-
-  if (releasingHomeDuringMove_ && io_.homeActive() &&
-      stageSteps_ >= kP1HomeReleaseMaximumSteps) {
-    trust_ = P1PositionTrust::UNTRUSTED;
-    return finish(P1MotionResult::HOME_SWITCH_STUCK);
-  }
-
-  if (directionHigh_) {
-    ++positionSteps_;
-  } else {
-    --positionSteps_;
-  }
-  if (positionSteps_ == targetSteps_)
-    return finish(P1MotionResult::COMPLETED);
   return P1MotionResult::NONE;
+}
+
+bool P1MotionController::abort() {
+  if (state_ == P1MotionState::IDLE) return false;
+
+  const bool executionStarted =
+      state_ != P1MotionState::PREPARED_HOME &&
+      state_ != P1MotionState::PREPARED_MOVE;
+  if (!executionStarted) {
+    state_ = P1MotionState::IDLE;
+    releasingHomeDuringMove_ = false;
+    return true;
+  }
+  io_.writeStep(false);
+  state_ = P1MotionState::IDLE;
+  pulsePhase_ = PulsePhase::WAITING_TO_RISE;
+  releasingHomeDuringMove_ = false;
+  trust_ = P1PositionTrust::UNTRUSTED;
+  return true;
 }
 
 P1MotionState P1MotionController::state() const { return state_; }
@@ -147,7 +199,7 @@ void P1MotionController::beginStage(P1MotionState state, bool directionHigh,
   directionHigh_ = directionHigh;
   stageSteps_ = 0;
   pulsePhase_ = PulsePhase::WAITING_TO_RISE;
-  nextPulseUs_ = nowUs;
+  nextPulseUs_ = nowUs + kP1DirectionSetupUs;
   io_.writeDirection(directionHigh);
 }
 
@@ -161,6 +213,19 @@ bool P1MotionController::finishPulse(uint32_t nowUs) {
   ++stageSteps_;
   nextPulseUs_ = nowUs + (kP1StepIntervalUs - kP1StepHighUs);
   return true;
+}
+
+void P1MotionController::pauseForHomeStability(P1MotionState state,
+                                               uint32_t nowUs) {
+  io_.writeStep(false);
+  pulsePhase_ = PulsePhase::WAITING_TO_RISE;
+  state_ = state;
+  homeStableSinceUs_ = nowUs;
+}
+
+void P1MotionController::resumePulses(uint32_t nowUs) {
+  pulsePhase_ = PulsePhase::WAITING_TO_RISE;
+  nextPulseUs_ = nowUs + kP1StepIntervalUs;
 }
 
 P1MotionResult P1MotionController::finish(P1MotionResult result) {

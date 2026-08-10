@@ -510,6 +510,25 @@ setting may request pump speed, but firmware must own and validate the allowed
 range and reject unsupported values. No final UI control, protocol field, or
 validated speed range is established by this confirmation.
 
+### Accepted demo-only P1/P2 homing assumption — 2026-08-10
+
+The user confirmed that P1/P2 have no independent end sensor, second limit,
+stall feedback, or other protection capable of preventing mechanical damage if
+HOME fails to activate. The HOME switches have been manually tested and the
+user explicitly chose, for the supervised demo machine, to assume that they
+remain functional. At startup, homing is therefore expected to move toward
+HOME from any initial pump position until HOME activates, bounded to 20,500
+STEP pulses. The operator remains physically present at the power switch during
+physical demo operation.
+
+This is an explicitly accepted demo risk, not a fail-safe hardware property.
+The 20,500-pulse bound is the confirmed coordinate span and cannot prevent
+overtravel when the unknown starting position is closer to HOME and the HOME
+signal is missing. A stuck-LOW switch, broken signal path that appears LOW, or
+mechanical failure to actuate the switch can still cause damage before the
+software pulse bound is reached. Production or unattended use remains blocked
+until an independent protection or a different safe recovery design exists.
+
 ### Common DM542T driver DIP layout — 2026-08-08
 
 The user confirmed that all currently discussed stepper drivers are `DM542T`

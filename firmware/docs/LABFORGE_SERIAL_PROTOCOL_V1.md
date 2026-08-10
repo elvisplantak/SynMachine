@@ -264,8 +264,8 @@ Required: `protocol`, `type`, `backend_session_nonce`, `controller_boot_id`,
 
 The first approved Service-mode command contract is
 `PUMP_MOVE_ABSOLUTE_STEPS`, initially restricted to `P1`. Its `arguments`
-object contains exactly `pump:"P1"` and integer `target_steps` in `0..20500`.
-Argument order is irrelevant; missing, additional, incorrectly typed, or
+object contains exactly `pump:"P1"` and integer `target_steps` in `1..20500`.
+Argument order is irrelevant; missing, additional, incorrectly typed, zero, or
 out-of-range arguments are invalid. The command expresses an absolute software
 step target, not a calibrated volume. `0..20500` is only the representable
 software coordinate envelope; the validated safe physical working range and
@@ -305,11 +305,21 @@ rather than ordinary absolute motion. Preparation is side-effect-free. A
 separate start call performs the first driver-affecting `DIR` write so the
 runtime can serialize `STARTED` immediately before crossing that boundary.
 
-Homing uses the confirmed P1 polarity and direction, bounds HOME search to the
-confirmed 20,500-step mechanical envelope, and permits at most 200 away pulses
-to release an initially active HOME switch. Absolute movement from confirmed
-zero permits the same bounded initial release. A stuck switch, missing HOME, or
-unexpected activation terminates motion and leaves position untrusted. These
+Homing uses the confirmed P1 polarity and direction. Under the user's accepted
+supervised-demo assumption, startup HOME search may begin from an untrusted
+position and is bounded to 20,500 pulses. Because P1/P2 have no independent end
+protection, that pulse bound is not fail-safe against a missing HOME signal and
+does not approve unattended or production operation. An initially active HOME
+at untrusted boot is stability-confirmed without away motion; repeated homing
+from trusted zero may use at most 200 away pulses to release HOME before
+searching again. HOME activation and release must remain stable for 30 ms while
+motion is paused before they affect state or establish trusted zero. Absolute
+movement from confirmed zero uses the same bounded stable-release policy and
+cannot complete while HOME remains active. A stuck switch, missing HOME, or
+unexpected activation terminates motion and leaves position untrusted. A local
+abort primitive forces STEP inactive, stops future pulses, and invalidates
+position trust after execution starts. DIR is established at least 5 us before
+the first STEP rising edge, per the installed DM542T timing contract. These
 rules are implemented and natively tested, but no Serial command can invoke
 them yet.
 
@@ -589,13 +599,15 @@ after an accepted command reaches its execution boundary and MUST NOT be used
 for request rejection. Their presence does not claim that production motion or
 Serial command dispatch is implemented.
 
-`PUMP_HOME_SWITCH_UNEXPECTED` means that the
-switch becomes unexpectedly active after the physical execution boundary. A
-switch already active during side-effect-free preflight is a pre-start refusal
-unless the controller is at trusted zero and moving away, or a `PUMP_HOME`
-operation is performing its bounded release stage. `PUMP_HOME_SWITCH_STUCK`
-means that an allowed release stage did not clear HOME within 200 pulses.
-Expected home arrival remains outside the non-homing command contract.
+`PUMP_HOME_SWITCH_UNEXPECTED` means that HOME becomes active outside an
+allowed homing arrival. An initially active HOME input during an untrusted
+`PUMP_HOME` operation is held motionless and accepted as zero only after the
+configured stability interval. A repeated `PUMP_HOME` from trusted zero may
+first perform the bounded release stage. `PUMP_HOME_SWITCH_STUCK` means that an
+allowed release did not clear HOME within 200 pulses, or that an absolute move
+away from zero reached its requested target while HOME was still active.
+Expected stable HOME arrival is part of the `PUMP_HOME` contract, not the
+non-homing command contract.
 
 ## 15. Retry-safety policy
 
@@ -721,8 +733,12 @@ validation are implemented for future internal use. The approved
 `PUMP_MOVE_ABSOLUTE_STEPS` and `PUMP_HOME` P1 contracts add exact bounded schema
 validation and compact semantic identity. A nonblocking P1 motion-controller
 foundation now implements boot-time untrusted position, explicit homing,
-bounded active-switch release and HOME search, absolute step tracking, pulse
-timing, and fail-closed trust invalidation. Native tests use a fake pin adapter.
+stable HOME confirmation, bounded active-switch release and HOME search,
+absolute step tracking, direction-setup and pulse timing, local abort, and
+fail-closed trust invalidation. The accepted supervised-demo homing assumption
+and its unresolved missing-switch overtravel risk are recorded in the hardware
+confirmations and P1 design; this is not an unattended-production safety claim.
+Native tests use a fake pin adapter.
 The older absolute-move Service still uses a synchronous fake executor for
 lifecycle tests. Neither command is connected to the production dispatcher,
 lifecycle output, Arduino pins, or a motor driver. Serial command lifecycle
