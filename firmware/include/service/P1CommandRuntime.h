@@ -25,7 +25,9 @@ class P1CommandRuntime {
                           CommandStatusCache& cache, uint8_t* output,
                           size_t capacity, size_t& outputLength,
                           bool& startsMotion);
-  bool confirmStartedFrameWritten(uint32_t nowUs);
+  bool confirmStartedFrameWritten(uint32_t nowUs,
+                                  CommandStatusCache& cache);
+  bool startedFrameTransportFailed();
   void update(uint32_t nowUs, CommandStatusCache& cache);
   bool abort(CommandStatusCache& cache);
   bool hasPendingLifecycleFrame() const;
@@ -54,6 +56,7 @@ class P1CommandRuntime {
               const BootIdentityResult& identity, CommandStatusCache& cache,
               uint8_t* output, size_t capacity, size_t& outputLength);
   void finish(P1MotionResult result, CommandStatusCache& cache);
+  void handleSessionReplacement(const char* newNonce);
 
   P1MotionController& controller_;
   MessageParser parser_;
@@ -61,6 +64,7 @@ class P1CommandRuntime {
   RuntimeState runtimeState_ = RuntimeState::IDLE;
   CommandStatusRecord activeRecord_{};
   char lifecycleNonce_[kUuidTextCapacity]{};
+  bool suppressUnsolicitedLifecycle_ = false;
 };
 
 }  // namespace labforge

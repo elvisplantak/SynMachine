@@ -15,6 +15,7 @@ void tearDown() {}
 namespace {
 
 constexpr char NONCE[] = "123e4567-e89b-12d3-a456-426614174000";
+constexpr char NONCE_B[] = "223e4567-e89b-12d3-a456-426614174001";
 constexpr char OPERATION[] = "323e4567-e89b-12d3-a456-426614174002";
 constexpr BootIdentityResult IDENTITY{true, 7, IdentityFailureReason::NONE};
 
@@ -87,7 +88,7 @@ void test_started_is_serialized_before_any_motion_side_effect() {
                               "\"type\":\"STARTED\""));
   TEST_ASSERT_EQUAL_UINT32(0, io.directionWrites);
   TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
-  TEST_ASSERT_TRUE(runtime.confirmStartedFrameWritten(100));
+  TEST_ASSERT_TRUE(runtime.confirmStartedFrameWritten(100, cache));
   TEST_ASSERT_EQUAL_UINT32(1, io.directionWrites);
   TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
   runtime.update(100 + kP1DirectionSetupUs - 1, cache);
@@ -119,6 +120,38 @@ void test_small_started_buffer_cannot_start_or_advance_cache() {
                     cache.find(OPERATION)->record.state);
   TEST_ASSERT_EQUAL_UINT32(0, io.directionWrites);
   TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+
+}
+
+void test_short_started_transport_is_retryable_without_false_started_state() {
+  FakeIo io;
+  P1MotionController controller(io);
+  P1CommandRuntime runtime(controller);
+  SessionState session;
+  establishSession(session);
+  CommandStatusCache cache;
+  char command[384];
+  makeCommand(command, sizeof(command), "PUMP_HOME", "{\"pump\":\"P1\"}");
+  uint8_t output[kCommandLifecycleFrameCapacity]{};
+  dispatch(runtime, session, cache, command, output, sizeof(output));
+
+  size_t length = 0;
+  bool startsMotion = false;
+  TEST_ASSERT_TRUE(runtime.nextLifecycleFrame(
+      IDENTITY, cache, output, sizeof(output), length, startsMotion));
+  TEST_ASSERT_TRUE(startsMotion);
+  TEST_ASSERT_EQUAL(CommandState::ACCEPTED,
+                    cache.find(OPERATION)->record.state);
+  TEST_ASSERT_TRUE(runtime.startedFrameTransportFailed());
+  TEST_ASSERT_EQUAL_UINT32(0, io.directionWrites);
+  TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+
+  TEST_ASSERT_TRUE(runtime.nextLifecycleFrame(
+      IDENTITY, cache, output, sizeof(output), length, startsMotion));
+  TEST_ASSERT_TRUE(runtime.confirmStartedFrameWritten(100, cache));
+  TEST_ASSERT_EQUAL(CommandState::STARTED,
+                    cache.find(OPERATION)->record.state);
+  TEST_ASSERT_EQUAL_UINT32(1, io.directionWrites);
 }
 
 void test_command_session_failure_is_protocol_error_not_rejection() {
@@ -138,6 +171,144 @@ void test_command_session_failure_is_protocol_error_not_rejection() {
   TEST_ASSERT_NULL(cache.find(OPERATION));
 }
 
+void test_stale_session_and_boot_mismatch_do_not_touch_motion_or_cache() {
+  FakeIo io;
+  P1MotionController controller(io);
+  P1CommandRuntime runtime(controller);
+  SessionState session;
+  establishSession(session);
+  CommandStatusCache cache;
+  uint8_t output[kCommandLifecycleFrameCapacity]{};
+  const char stale[] =
+      "{\"protocol\":\"LABFORGE/1\",\"type\":\"COMMAND\","
+      "\"backend_session_nonce\":\"223e4567-e89b-12d3-a456-426614174001\","
+      "\"controller_boot_id\":7,\"phase_execution_id\":\"phase-1\","
+      "\"operation_command_id\":\"323e4567-e89b-12d3-a456-426614174002\","
+      "\"command\":\"PUMP_HOME\",\"arguments\":{\"pump\":\"P1\"}}";
+  dispatch(runtime, session, cache, stale, output, sizeof(output));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output), "STALE_SESSION"));
+  TEST_ASSERT_NULL(cache.find(OPERATION));
+
+  const char wrongBoot[] =
+      "{\"protocol\":\"LABFORGE/1\",\"type\":\"COMMAND\","
+      "\"backend_session_nonce\":\"123e4567-e89b-12d3-a456-426614174000\","
+      "\"controller_boot_id\":8,\"phase_execution_id\":\"phase-1\","
+      "\"operation_command_id\":\"323e4567-e89b-12d3-a456-426614174002\","
+      "\"command\":\"PUMP_HOME\",\"arguments\":{\"pump\":\"P1\"}}";
+  dispatch(runtime, session, cache, wrongBoot, output, sizeof(output));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "CONTROLLER_BOOT_MISMATCH"));
+  TEST_ASSERT_NULL(cache.find(OPERATION));
+  TEST_ASSERT_EQUAL_UINT32(0, io.directionWrites);
+  TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+
+}
+
+void test_untrusted_identity_rejects_physical_command_before_preflight() {
+  FakeIo io;
+  P1MotionController controller(io);
+  P1CommandRuntime runtime(controller);
+  SessionState session;
+  session.establish(NONCE);
+  CommandStatusCache cache;
+  const BootIdentityResult untrusted{
+      false, 0, IdentityFailureReason::NO_VALID_RECORD};
+  const char command[] =
+      "{\"protocol\":\"LABFORGE/1\",\"type\":\"COMMAND\","
+      "\"backend_session_nonce\":\"123e4567-e89b-12d3-a456-426614174000\","
+      "\"controller_boot_id\":null,\"phase_execution_id\":\"phase-1\","
+      "\"operation_command_id\":\"323e4567-e89b-12d3-a456-426614174002\","
+      "\"command\":\"PUMP_HOME\",\"arguments\":{\"pump\":\"P1\"}}";
+  uint8_t output[kCommandLifecycleFrameCapacity]{};
+  runtime.dispatch(reinterpret_cast<const uint8_t*>(command), strlen(command),
+                   untrusted, session, cache, output, sizeof(output));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "CONTROLLER_IDENTITY_UNTRUSTED"));
+  TEST_ASSERT_NULL(cache.find(OPERATION));
+  TEST_ASSERT_EQUAL(P1MotionState::IDLE, controller.state());
+  TEST_ASSERT_EQUAL_UINT32(0, io.directionWrites);
+  TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+}
+
+void test_session_replacement_keeps_running_and_suppresses_old_lifecycle() {
+  FakeIo io;
+  P1MotionController controller(io);
+  P1CommandRuntime runtime(controller);
+  SessionState session;
+  establishSession(session);
+  CommandStatusCache cache;
+  char command[384];
+  makeCommand(command, sizeof(command), "PUMP_HOME", "{\"pump\":\"P1\"}");
+  uint8_t output[kCommandLifecycleFrameCapacity]{};
+  dispatch(runtime, session, cache, command, output, sizeof(output));
+  size_t length = 0;
+  bool startsMotion = false;
+  TEST_ASSERT_TRUE(runtime.nextLifecycleFrame(
+      IDENTITY, cache, output, sizeof(output), length, startsMotion));
+  TEST_ASSERT_TRUE(runtime.confirmStartedFrameWritten(0, cache));
+
+  const char helloB[] =
+      "{\"protocol\":\"LABFORGE/1\",\"type\":\"HELLO\","
+      "\"backend_session_nonce\":\"223e4567-e89b-12d3-a456-426614174001\"}";
+  dispatch(runtime, session, cache, helloB, output, sizeof(output));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "\"controller_state\":\"BUSY\""));
+  TEST_ASSERT_EQUAL_STRING(NONCE_B, session.nonce());
+  TEST_ASSERT_FALSE(runtime.hasPendingLifecycleFrame());
+
+  io.home = true;
+  runtime.update(100, cache);
+  runtime.update(100 + kP1HomeStableUs, cache);
+  TEST_ASSERT_EQUAL(CommandState::COMPLETED,
+                    cache.find(OPERATION)->record.state);
+  TEST_ASSERT_FALSE(runtime.hasPendingLifecycleFrame());
+
+  const char query[] =
+      "{\"protocol\":\"LABFORGE/1\",\"type\":\"QUERY_COMMAND\","
+      "\"backend_session_nonce\":\"223e4567-e89b-12d3-a456-426614174001\","
+      "\"controller_boot_id\":7,"
+      "\"request_id\":\"423e4567-e89b-12d3-a456-426614174003\","
+      "\"operation_command_id\":\"323e4567-e89b-12d3-a456-426614174002\"}";
+  dispatch(runtime, session, cache, query, output, sizeof(output));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "\"command_state\":\"COMPLETED\""));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output), NONCE_B));
+}
+
+void test_session_replacement_after_short_started_write_uses_new_nonce() {
+  FakeIo io;
+  P1MotionController controller(io);
+  P1CommandRuntime runtime(controller);
+  SessionState session;
+  establishSession(session);
+  CommandStatusCache cache;
+  char command[384];
+  makeCommand(command, sizeof(command), "PUMP_HOME", "{\"pump\":\"P1\"}");
+  uint8_t output[kCommandLifecycleFrameCapacity]{};
+  dispatch(runtime, session, cache, command, output, sizeof(output));
+
+  size_t length = 0;
+  bool startsMotion = false;
+  TEST_ASSERT_TRUE(runtime.nextLifecycleFrame(
+      IDENTITY, cache, output, sizeof(output), length, startsMotion));
+  TEST_ASSERT_TRUE(runtime.startedFrameTransportFailed());
+
+  const char helloB[] =
+      "{\"protocol\":\"LABFORGE/1\",\"type\":\"HELLO\","
+      "\"backend_session_nonce\":\"223e4567-e89b-12d3-a456-426614174001\"}";
+  dispatch(runtime, session, cache, helloB, output, sizeof(output));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "\"controller_state\":\"BUSY\""));
+
+  memset(output, 0, sizeof(output));
+  TEST_ASSERT_TRUE(runtime.nextLifecycleFrame(
+      IDENTITY, cache, output, sizeof(output), length, startsMotion));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output), NONCE_B));
+  TEST_ASSERT_NULL(strstr(reinterpret_cast<char*>(output), NONCE));
+  TEST_ASSERT_TRUE(runtime.confirmStartedFrameWritten(100, cache));
+  TEST_ASSERT_EQUAL_UINT32(1, io.directionWrites);
+}
+
 void test_running_command_reports_busy_and_abort_is_truthful() {
   FakeIo io;
   P1MotionController controller(io);
@@ -153,7 +324,7 @@ void test_running_command_reports_busy_and_abort_is_truthful() {
   bool startsMotion = false;
   TEST_ASSERT_TRUE(runtime.nextLifecycleFrame(
       IDENTITY, cache, output, sizeof(output), length, startsMotion));
-  TEST_ASSERT_TRUE(runtime.confirmStartedFrameWritten(0));
+  TEST_ASSERT_TRUE(runtime.confirmStartedFrameWritten(0, cache));
 
   const char query[] =
       "{\"protocol\":\"LABFORGE/1\",\"type\":\"QUERY_STATUS\","
@@ -182,6 +353,51 @@ void test_running_command_reports_busy_and_abort_is_truthful() {
                               "\"controller_state\":\"IDLE\""));
   TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
                               "\"active_operation_command_id\":null"));
+}
+
+void test_duplicate_identity_conflict_and_new_command_busy_are_rejected() {
+  FakeIo io;
+  P1MotionController controller(io);
+  P1CommandRuntime runtime(controller);
+  SessionState session;
+  establishSession(session);
+  CommandStatusCache cache;
+  uint8_t output[kCommandLifecycleFrameCapacity]{};
+  char command[384];
+  makeCommand(command, sizeof(command), "PUMP_HOME", "{\"pump\":\"P1\"}");
+  dispatch(runtime, session, cache, command, output, sizeof(output));
+
+  makeCommand(command, sizeof(command), "PUMP_MOVE_ABSOLUTE_STEPS",
+              "{\"pump\":\"P1\",\"target_steps\":100}");
+  dispatch(runtime, session, cache, command, output, sizeof(output));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "COMMAND_ID_CONFLICT"));
+
+  makeCommand(command, sizeof(command), "PUMP_HOME", "{\"pump\":\"P1\"}",
+              "523e4567-e89b-12d3-a456-426614174004");
+  dispatch(runtime, session, cache, command, output, sizeof(output));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "CONTROLLER_BUSY"));
+  TEST_ASSERT_EQUAL(CommandState::ACCEPTED,
+                    cache.find(OPERATION)->record.state);
+  TEST_ASSERT_EQUAL_UINT32(0, io.directionWrites);
+  TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+
+  size_t length = 0;
+  bool startsMotion = false;
+  TEST_ASSERT_TRUE(runtime.nextLifecycleFrame(
+      IDENTITY, cache, output, sizeof(output), length, startsMotion));
+  TEST_ASSERT_TRUE(runtime.confirmStartedFrameWritten(100, cache));
+
+  makeCommand(command, sizeof(command), "PUMP_HOME", "{\"pump\":\"P1\"}",
+              "623e4567-e89b-12d3-a456-426614174005");
+  dispatch(runtime, session, cache, command, output, sizeof(output));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "CONTROLLER_BUSY"));
+  TEST_ASSERT_EQUAL(CommandState::STARTED,
+                    cache.find(OPERATION)->record.state);
+  TEST_ASSERT_EQUAL_UINT32(1, io.directionWrites);
+  TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
 }
 
 void test_hello_advertises_only_integrated_p1_capabilities() {
@@ -243,7 +459,7 @@ void test_home_completion_is_cached_and_duplicate_only_replays() {
   bool startsMotion = false;
   TEST_ASSERT_TRUE(runtime.nextLifecycleFrame(
       IDENTITY, cache, output, sizeof(output), length, startsMotion));
-  TEST_ASSERT_TRUE(runtime.confirmStartedFrameWritten(0));
+  TEST_ASSERT_TRUE(runtime.confirmStartedFrameWritten(0, cache));
   runtime.update(kP1HomeStableUs, cache);
   TEST_ASSERT_TRUE(runtime.hasPendingLifecycleFrame());
   memset(output, 0, sizeof(output));
@@ -269,8 +485,14 @@ int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_started_is_serialized_before_any_motion_side_effect);
   RUN_TEST(test_small_started_buffer_cannot_start_or_advance_cache);
+  RUN_TEST(test_short_started_transport_is_retryable_without_false_started_state);
   RUN_TEST(test_command_session_failure_is_protocol_error_not_rejection);
+  RUN_TEST(test_stale_session_and_boot_mismatch_do_not_touch_motion_or_cache);
+  RUN_TEST(test_untrusted_identity_rejects_physical_command_before_preflight);
+  RUN_TEST(test_session_replacement_keeps_running_and_suppresses_old_lifecycle);
+  RUN_TEST(test_session_replacement_after_short_started_write_uses_new_nonce);
   RUN_TEST(test_running_command_reports_busy_and_abort_is_truthful);
+  RUN_TEST(test_duplicate_identity_conflict_and_new_command_busy_are_rejected);
   RUN_TEST(test_hello_advertises_only_integrated_p1_capabilities);
   RUN_TEST(test_invalid_move_is_rejected_without_gpio_writes);
   RUN_TEST(test_home_completion_is_cached_and_duplicate_only_replays);

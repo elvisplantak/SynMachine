@@ -16,10 +16,9 @@ are compact symbolic JSON and do not define actuator command names.
 ## 1. Document status and boundaries
 
 This is an approved design contract with the implementation status documented
-in Section 22. The firmware implements handshake, status, and bounded
-protocol-error responses, but not command responses, a command cache, actuator
-protocol, or physical feedback. The backend does not yet implement the real
-serial adapter in this contract.
+in Section 22. The firmware implements the protocol shell and the first
+production-wired P1 command runtime described there. The backend does not yet
+implement the real serial adapter in this contract.
 
 Sections 2–19 define approved requirements and implementation order. Section 20
 lists explicitly deferred functionality, and Section 21 lists unresolved
@@ -243,8 +242,9 @@ Required: `protocol`, `type`, `backend_session_nonce`, `controller_boot_id`,
 
 The current implementation emits one compact LF-terminated `HELLO_OK` for each
 valid parsed `HELLO`, with deterministic field order and no `reset_cause`. A
-trusted production runtime emits its numeric boot ID,
-`controller_state:"IDLE"`, `software_state_trust:"TRUSTED"`, and capabilities
+trusted production runtime emits its numeric boot ID, `controller_state`
+`"IDLE"` or `"BUSY"` according to the command cache,
+`software_state_trust:"TRUSTED"`, and capabilities
 `PUMP_HOME` and `PUMP_MOVE_ABSOLUTE_STEPS`. The protocol-only writer mode keeps
 the empty capability list used by its focused tests. An untrusted identity emits
 `controller_boot_id:null`,
@@ -523,11 +523,11 @@ prove a physical command never executed and never authorizes automatic
 re-execution. `ACCEPTED` and `STARTED` contain no invented terminal result.
 Queries MUST NOT initiate or repeat motion.
 
-The current no-motion implementation answers a valid session-bound
-`QUERY_COMMAND` from a two-entry volatile cache. Cache absence emits `UNKNOWN`
-without creating an entry. The production runtime does not currently call the
-cache storage API, so real Serial queries can currently return only `UNKNOWN`.
-Tests can seed structurally prepared entries, which emit only mandatory fields,
+The current implementation answers a valid session-bound `QUERY_COMMAND` from
+a two-entry volatile cache. Cache absence emits `UNKNOWN` without creating an
+entry. The integrated P1 runtime stores accepted, started, and terminal states,
+so real Serial queries can recover them after reconnect. Tests can also seed
+structurally prepared entries, which emit only mandatory fields,
 including `result:{}` for `COMPLETED` and `error_code` plus
 `execution_started` for `FAILED`; optional messages and result payloads are not
 implemented. Querying never mutates the cache, and handshake replacement in the
@@ -705,8 +705,8 @@ Approval of one stage MUST NOT imply approval of a later stage.
 
 ## 20. Explicitly deferred functionality
 
-Actuator command names/contracts and actuator-specific schemas are deferred.
-Production movement, homing, route selection, fluid handling, automatic
+Additional actuator command names/contracts and actuator-specific schemas are
+deferred. Physical upload/execution, route selection, fluid handling, automatic
 recovery/flush, Guided Demo execution, durable per-command EEPROM journaling,
 and stronger physical execution guarantees are outside the initial shell.
 
@@ -716,7 +716,6 @@ The following remain unresolved and MUST NOT be inferred:
 
 - identity-recovery procedure after a fail-closed boot;
 - timeout durations and serial reconnect backoff;
-- production Serial integration boundary for the approved P1 commands;
 - backend safe-route orchestration before pump homing;
 - carousel position model and mixer command semantics;
 - bottom-valve wiring and feedback;
@@ -737,11 +736,10 @@ session state, bounded deterministic `HELLO_OK` serialization, and actual
 It now also validates session-bound `QUERY_STATUS` messages, emits bounded
 deterministic trusted or untrusted `STATUS` responses, and uses a testable
 no-motion dispatcher for bounded parser, session, and boot-ID protocol errors.
-It also includes a two-entry volatile command-status cache shell and bounded
-`QUERY_COMMAND` / `COMMAND_STATUS` responses without accepting or executing
-`COMMAND`. Production does not populate the cache, so only `UNKNOWN` is
-currently reachable over real Serial. Cache lifecycle-integrity and identifier
-validation are implemented for future internal use. The approved
+It also includes a two-entry volatile command-status cache and bounded
+`QUERY_COMMAND` / `COMMAND_STATUS` responses. The integrated P1 runtime
+populates the cache, and cache lifecycle-integrity and identifier validation
+are enforced. The approved
 `PUMP_MOVE_ABSOLUTE_STEPS` and `PUMP_HOME` P1 contracts add exact bounded schema
 validation and compact semantic identity. A nonblocking P1 motion-controller
 foundation now implements boot-time untrusted position, explicit homing,
@@ -751,11 +749,15 @@ absolute step tracking, direction-setup and pulse timing, local abort, and
 fail-closed trust invalidation. The accepted supervised-demo homing assumption
 and its unresolved missing-switch overtravel risk are recorded in the hardware
 confirmations and P1 design; this is not an unattended-production safety claim.
-Native tests use a fake pin adapter.
-The older absolute-move Service still uses a synchronous fake executor for
-lifecycle tests. Neither command is connected to the production dispatcher,
-lifecycle output, Arduino pins, or a motor driver. Serial command lifecycle
-dispatch, the Arduino actuator adapter, and physical execution remain
-unimplemented. Fail-closed recovery and provisioning remain unresolved.
+Native tests use a fake pin adapter. The production dispatcher, lifecycle
+output, Arduino P1 adapter, and confirmed P1 STEP/DIR/HOME pins are connected in
+the Mega build. STARTED uses a two-phase transport boundary: cache mutation and
+motion start occur only after the complete frame is handed to Serial. Session
+replacement leaves active motion unchanged, suppresses lifecycle output tied
+to the replaced nonce, reports BUSY from the cache, and relies on
+`QUERY_COMMAND` for recovery. Serial input work is bounded per loop so the P1
+update cadence remains materially shorter than the 30 ms HOME stability
+interval. Physical upload/execution and backend orchestration remain deferred.
+Fail-closed recovery and provisioning remain unresolved.
 This firmware has not been uploaded or physically tested. No component is
 claimed to measure delivered volume or provide exactly-once physical execution.

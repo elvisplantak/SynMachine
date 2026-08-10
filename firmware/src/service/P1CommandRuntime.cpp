@@ -61,8 +61,15 @@ DispatchResult P1CommandRuntime::dispatch(
   const ParseResult parsed = parser_.parse(payload, length);
   if (parsed.status != ParseStatus::VALID_MESSAGE ||
       parsed.message.type != MessageType::COMMAND) {
-    return protocolDispatcher_.dispatch(payload, length, identity, session,
-                                        cache, output, capacity);
+    const bool replacesSession =
+        parsed.status == ParseStatus::VALID_MESSAGE &&
+        parsed.message.type == MessageType::HELLO && session.active() &&
+        strcmp(session.nonce(), parsed.message.backendSessionNonce) != 0;
+    const DispatchResult result = protocolDispatcher_.dispatch(
+        payload, length, identity, session, cache, output, capacity);
+    if (replacesSession && result.outputLength > 0)
+      handleSessionReplacement(parsed.message.backendSessionNonce);
+    return result;
   }
   return dispatchCommand(parsed.message, identity, session, cache, output,
                          capacity);
@@ -79,6 +86,13 @@ DispatchResult P1CommandRuntime::dispatchCommand(
   if (validation != SessionValidationResult::VALID) {
     writeProtocolError(sessionError(validation), commandCorrelation(message),
                        identity, output, capacity, outputLength);
+    return {ParseStatus::VALID_MESSAGE, outputLength};
+  }
+
+  if (!identity.trusted) {
+    writeProtocolError(ProtocolErrorCode::CONTROLLER_IDENTITY_UNTRUSTED,
+                       commandCorrelation(message), identity, output,
+                       capacity, outputLength);
     return {ParseStatus::VALID_MESSAGE, outputLength};
   }
 
@@ -177,6 +191,7 @@ bool P1CommandRuntime::accept(
     return false;
   activeRecord_ = accepted;
   strcpy(lifecycleNonce_, message.backendSessionNonce);
+  suppressUnsolicitedLifecycle_ = false;
   runtimeState_ = RuntimeState::EMIT_STARTED;
   return true;
 }
@@ -187,14 +202,13 @@ bool P1CommandRuntime::nextLifecycleFrame(
     bool& startsMotion) {
   outputLength = 0;
   startsMotion = false;
+  (void)cache;
   if (runtimeState_ == RuntimeState::EMIT_STARTED) {
     CommandStatusRecord started = activeRecord_;
     started.state = CommandState::STARTED;
     if (!writeCommandLifecycle(lifecycleNonce_, identity, started, output,
-                               capacity, outputLength) ||
-        !cache.store(started))
+                               capacity, outputLength))
       return false;
-    activeRecord_ = started;
     runtimeState_ = RuntimeState::WAIT_STARTED_WRITE;
     startsMotion = true;
     return true;
@@ -209,10 +223,21 @@ bool P1CommandRuntime::nextLifecycleFrame(
   return false;
 }
 
-bool P1CommandRuntime::confirmStartedFrameWritten(uint32_t nowUs) {
+bool P1CommandRuntime::confirmStartedFrameWritten(uint32_t nowUs,
+                                                  CommandStatusCache& cache) {
   if (runtimeState_ != RuntimeState::WAIT_STARTED_WRITE) return false;
+  CommandStatusRecord started = activeRecord_;
+  started.state = CommandState::STARTED;
+  if (!cache.store(started)) return false;
+  activeRecord_ = started;
   if (!controller_.start(nowUs)) return false;
   runtimeState_ = RuntimeState::RUNNING;
+  return true;
+}
+
+bool P1CommandRuntime::startedFrameTransportFailed() {
+  if (runtimeState_ != RuntimeState::WAIT_STARTED_WRITE) return false;
+  runtimeState_ = RuntimeState::EMIT_STARTED;
   return true;
 }
 
@@ -237,7 +262,11 @@ void P1CommandRuntime::finish(P1MotionResult result,
       activeRecord_.errorCode =
           CommandErrorCode::PUMP_HOME_SWITCH_UNEXPECTED;
   }
-  if (cache.store(activeRecord_)) runtimeState_ = RuntimeState::EMIT_TERMINAL;
+  if (cache.store(activeRecord_)) {
+    runtimeState_ = suppressUnsolicitedLifecycle_
+                        ? RuntimeState::IDLE
+                        : RuntimeState::EMIT_TERMINAL;
+  }
 }
 
 bool P1CommandRuntime::abort(CommandStatusCache& cache) {
@@ -247,8 +276,25 @@ bool P1CommandRuntime::abort(CommandStatusCache& cache) {
   activeRecord_.executionStarted = true;
   activeRecord_.errorCode = CommandErrorCode::COMMAND_ABORTED;
   if (!cache.store(activeRecord_)) return false;
-  runtimeState_ = RuntimeState::EMIT_TERMINAL;
+  runtimeState_ = suppressUnsolicitedLifecycle_
+                      ? RuntimeState::IDLE
+                      : RuntimeState::EMIT_TERMINAL;
   return true;
+}
+
+void P1CommandRuntime::handleSessionReplacement(const char* newNonce) {
+  if (runtimeState_ == RuntimeState::IDLE ||
+      strcmp(lifecycleNonce_, newNonce) == 0)
+    return;
+  if (runtimeState_ == RuntimeState::EMIT_STARTED ||
+      runtimeState_ == RuntimeState::WAIT_STARTED_WRITE) {
+    strcpy(lifecycleNonce_, newNonce);
+    suppressUnsolicitedLifecycle_ = false;
+    return;
+  }
+  suppressUnsolicitedLifecycle_ = true;
+  if (runtimeState_ == RuntimeState::EMIT_TERMINAL)
+    runtimeState_ = RuntimeState::IDLE;
 }
 
 bool P1CommandRuntime::hasPendingLifecycleFrame() const {

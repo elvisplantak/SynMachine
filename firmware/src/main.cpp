@@ -38,7 +38,10 @@ void emitPendingLifecycleFrames() {
     const size_t written = Serial.write(protocolOutputFrame, outputLength);
     if (startsMotion) {
       if (written == outputLength) {
-        p1CommandRuntime.confirmStartedFrameWritten(micros());
+        p1CommandRuntime.confirmStartedFrameWritten(micros(),
+                                                    commandStatusCache);
+      } else {
+        p1CommandRuntime.startedFrameTransportFailed();
       }
       break;
     }
@@ -48,16 +51,19 @@ void emitPendingLifecycleFrames() {
 
 void setup() {
   // Pin setup is motion-inactive. Commands remain gated by HELLO/session checks.
+  p1MotionIo.begin();
   Serial.begin(labforge::kSerialBaud);
   bootIdentityResult = bootIdentityStore.initialize();
-  p1MotionIo.begin();
 }
 
 void loop() {
   p1CommandRuntime.update(micros(), commandStatusCache);
   emitPendingLifecycleFrames();
 
-  while (Serial.available() > 0) {
+  constexpr uint8_t kMaxSerialBytesPerLoop = 32;
+  for (uint8_t processed = 0;
+       processed < kMaxSerialBytesPerLoop && Serial.available() > 0;
+       ++processed) {
     labforge::FrameView frame{};
     const labforge::LineEvent event = lineReceiver.feed(static_cast<uint8_t>(Serial.read()), frame);
     if (event == labforge::LineEvent::LINE_TOO_LONG) {

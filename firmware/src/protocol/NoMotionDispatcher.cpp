@@ -52,7 +52,8 @@ DispatchResult NoMotionDispatcher::dispatch(
 
   if (parsed.message.type == MessageType::HELLO) {
     if (writeHelloOk(parsed.message.backendSessionNonce, identity, output,
-                     capacity, outputLength, p1MotionEnabled_)) {
+                     capacity, outputLength, p1MotionEnabled_,
+                     &commandStatusCache)) {
       session.establish(parsed.message.backendSessionNonce);
     }
     return {parsed.status, outputLength};
