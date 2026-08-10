@@ -19,9 +19,10 @@ facts until the relevant level passes:
 | Actuator | Control path | STEP/DIR or device identity | HOME/contact | Direction | Positions/steps | Dry route | Liquid route |
 |---|---|---|---|---|---|---|---|
 | V1-V8 | Arduino Mega | D22-D37 assignments confirmed | D39/D38/D43/D40/D41/D42/D3/D2; released LOW, active HIGH | HOME direction confirmed individually | 400 steps/90 degrees; 0/90/180 repeatability confirmed | selected P1/P2 Waste routes confirmed; all-port isolation pending | pending |
-| P1/P2 | Arduino Mega | P1 D46/D47; P2 D48/D49 | P1 D45; P2 D44; `INPUT_PULLUP`; released LOW, active HIGH | HOME LOW; away HIGH for both | 20,000-pulse dry round trip passed; 20,500 approved mechanical maximum; volume calibration pending | separate Waste routes confirmed | pending |
+| P1/P2 | Arduino Mega | P1 D46/D47; P2 D48/D49 | P1 D45; P2 D44; `INPUT_PULLUP`; released LOW, active HIGH | HOME LOW; away HIGH for both | 20,000-pulse dry round trip passed; 20,500 approved mechanical maximum; nominal 20 mL full stroke and demo-only 1,025 steps/mL estimate; precision calibration pending | separate Waste routes confirmed | pending |
 | COLUMN_BOTTOM_VALVE | Arduino Mega / DM542T | STEP D12; DIR D13 | D10; released LOW, active HIGH | HOME LOW | CLOSED 4 degrees; OPEN 94 degrees; 80,000 pulses/rev; 1,000-us interval | mechanical dry actuation confirmed; fluid route pending | pending |
 | SF_BOTTOM_VALVE | host USB / U2D2 / XL430-W250-T | stable FTDI by-id path; ID 2; model 1060; 57,600 baud; Protocol 2.0 | internal position/error/voltage/temperature telemetry confirmed | positive raw direction from CLOSED to OPEN | CLOSED 2559; OPEN 3697; profile velocity 20; acceleration 1 | repeated mechanical dry actuation confirmed | pending |
+| Carousel | Arduino control path unconfirmed / CL57T closed-loop driver | TS-series closed-loop NEMA 23 kit; nominal 3.0 Nm; product-page model `1-CL57T-S30A-V41`; pins unconfirmed | unconfirmed | unconfirmed | DIP settings, scaling, stations, speed, and positions unconfirmed | not applicable | pending |
 
 The detailed evidence, measured values, limitations, and precedence rules for
 these promoted confirmations are canonical in `HARDWARE_CONFIRMATIONS.md`.

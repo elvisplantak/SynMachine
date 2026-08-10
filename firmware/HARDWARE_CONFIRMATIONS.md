@@ -383,7 +383,10 @@ does not by itself verify liquid routing through the physical valve ports.
 
 ### Confirmed facts: P1 and P2 syringe orientation
 
-- P1 and P2 use 10 mL syringes.
+- On 2026-08-10 the user corrected the earlier 10 mL record and confirmed that
+  P1 and P2 use 20 mL syringes. The 20 mL value is the nominal volume over the
+  maximum syringe stroke used for the demo; it is not an analytical
+  gravimetric calibration.
 - P1 and P2 have the same confirmed mechanical syringe orientation.
 - For both P1 and P2, position `0` is the home-switch end and corresponds to the maximum syringe chamber volume.
 - For both P1 and P2, position `20500` is the recovered approximate minimum-volume, practically empty position.
@@ -509,6 +512,48 @@ Pump speed was acceptable at `PUMP_STEP_INTERVAL_US = 1500`. A future UI
 setting may request pump speed, but firmware must own and validate the allowed
 range and reject unsupported values. No final UI control, protocol field, or
 validated speed range is established by this confirmation.
+
+### Provisional P1/P2 demo volume model — 2026-08-10
+
+The user confirmed a nominal 20 mL syringe capacity over the maximum stroke for
+both pumps. Precise measurement is intentionally deferred until suitable
+calibration equipment is available. Dead volume is intentionally ignored for
+the demo.
+
+If the currently approved 20,500-step mechanical span is provisionally treated
+as the full nominal 20 mL stroke, the resulting demo-only linear estimate is:
+
+- approximately `1,025 steps/mL`
+- approximately `0.0009756 mL/step`
+
+This estimate is adequate only as a starting value for a non-analytical demo.
+It does not establish delivered-volume accuracy, syringe usable-volume margins,
+line compliance, backlash compensation, fluid-dependent behavior, or a final
+production `steps/mL` calibration. Wet and gravimetric calibration remain
+pending.
+
+### Confirmed carousel motor/driver identification — 2026-08-10
+
+The user identified the installed carousel actuator from the supplied product
+page as a StepperOnline TS-series closed-loop NEMA 23 kit rated at nominal
+`3.0 Nm`, with a `CL57T` closed-loop stepper driver. The product-page model
+visible in the supplied screenshot is `1-CL57T-S30A-V41`.
+
+This confirmation currently establishes only the actuator family and driver
+model. The installed driver's DIP-switch positions are not visible and remain
+unconfirmed. The following also remain unconfirmed and must not be inferred
+from a generic product table or another driver:
+
+- exact installed motor part number and encoder specification
+- driver supply voltage and control-input selector
+- STEP/DIR/ENA Arduino pins and electrical polarity
+- DIP-switch current and pulses-per-revolution configuration
+- direction, HOME/index sensing, carousel station count, and station positions
+- safe speed, acceleration, travel bounds, fault/alarm behavior, and recovery
+- successful installed motion under carousel load
+
+The carousel remains deferred for a separate, explicitly authorized
+commissioning procedure.
 
 ### Common DM542T driver DIP layout — 2026-08-08
 
