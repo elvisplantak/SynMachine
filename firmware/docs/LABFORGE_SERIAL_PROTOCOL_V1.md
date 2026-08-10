@@ -605,8 +605,10 @@ after an accepted command reaches its execution boundary and MUST NOT be used
 for request rejection. Their presence does not authorize firmware upload,
 physical execution, or unattended operation.
 
-`PUMP_HOME_SWITCH_UNEXPECTED` means that HOME becomes active outside an
-allowed homing arrival. An initially active HOME input during an untrusted
+`PUMP_HOME_SWITCH_UNEXPECTED` means that HOME remains stably active for the
+configured 30 ms interval outside an allowed homing arrival. Motion pauses
+while this unexpected activation is checked; a shorter inactive-again glitch
+resumes without catch-up pulses. An initially active HOME input during an untrusted
 `PUMP_HOME` operation is held motionless and accepted as zero only after the
 configured stability interval. A repeated `PUMP_HOME` from trusted zero may
 first perform the bounded release stage. `PUMP_HOME_SWITCH_STUCK` means that a

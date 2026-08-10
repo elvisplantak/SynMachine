@@ -388,10 +388,47 @@ void test_unexpected_home_during_absolute_move_invalidates_position() {
   reachFirstRise(nowUs);
   TEST_ASSERT_EQUAL(P1MotionResult::NONE, runOnePulse(controller, io, nowUs));
   io.home = true;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::CONFIRMING_UNEXPECTED_HOME,
+                    controller.state());
+  TEST_ASSERT_FALSE(io.step);
+  nowUs += kP1HomeStableUs;
   TEST_ASSERT_EQUAL(P1MotionResult::HOME_SWITCH_UNEXPECTED,
                     controller.update(nowUs));
   TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED, controller.positionTrust());
   TEST_ASSERT_FALSE(io.step);
+}
+
+void test_short_unexpected_home_glitch_pauses_then_resumes_without_catch_up() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  establishHome(controller, io, nowUs);
+  io.home = false;
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY,
+                    controller.prepareMoveAbsolute(10));
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  reachFirstRise(nowUs);
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, runOnePulse(controller, io, nowUs));
+  const unsigned risesBeforeGlitch = io.risingEdges;
+
+  io.home = true;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  nowUs += kP1HomeStableUs - 1;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL_UINT32(risesBeforeGlitch, io.risingEdges);
+
+  io.home = false;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::MOVING, controller.state());
+  TEST_ASSERT_EQUAL(P1PositionTrust::TRUSTED, controller.positionTrust());
+  TEST_ASSERT_EQUAL_UINT32(risesBeforeGlitch, io.risingEdges);
+  nowUs += kP1StepIntervalUs - 1;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL_UINT32(risesBeforeGlitch, io.risingEdges);
+  ++nowUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL_UINT32(risesBeforeGlitch + 1, io.risingEdges);
 }
 
 void test_abort_during_home_release_search_and_absolute_motion() {
@@ -523,6 +560,7 @@ int main(int, char**) {
   RUN_TEST(test_move_requires_stable_home_release_and_ignores_one_sample_bounce);
   RUN_TEST(test_move_allows_confirmed_home_release_after_home_release_limit);
   RUN_TEST(test_unexpected_home_during_absolute_move_invalidates_position);
+  RUN_TEST(test_short_unexpected_home_glitch_pauses_then_resumes_without_catch_up);
   RUN_TEST(test_abort_during_home_release_search_and_absolute_motion);
   RUN_TEST(test_abort_after_atomic_pulse_keeps_step_low);
   RUN_TEST(test_abort_after_completion_does_not_corrupt_trusted_position);

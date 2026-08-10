@@ -43,8 +43,10 @@ wire semantics remain canonical in `LABFORGE_SERIAL_PROTOCOL_V1.md`.
   than the repeated-homing release allowance. It cannot complete while HOME
   remains active, including when the requested target is inside the physical
   release zone.
-- Missing HOME, stuck HOME, or unexpected HOME activation stops STEP LOW and
-  invalidates position trust.
+- Missing HOME or stuck HOME stops STEP LOW and invalidates position trust.
+  Unexpected HOME activation during an absolute move first pauses STEP and must
+  remain active for the full 30 ms stability interval before it fails closed;
+  a shorter glitch resumes without catch-up pulses or shortened edge spacing.
 - Local abort forces STEP LOW, stops future pulses, returns the controller to
   idle, and invalidates position trust whenever execution had started. Abort
   after completion is a no-op and preserves the completed trusted position. A

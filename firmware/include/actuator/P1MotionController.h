@@ -36,6 +36,7 @@ enum class P1MotionState : uint8_t {
   CONFIRMING_HOME_ACTIVE,
   MOVING,
   CONFIRMING_MOVE_RELEASE,
+  CONFIRMING_UNEXPECTED_HOME,
 };
 enum class P1PrepareResult : uint8_t {
   READY,

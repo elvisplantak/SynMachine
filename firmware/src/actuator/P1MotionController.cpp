@@ -124,6 +124,17 @@ P1MotionResult P1MotionController::update(uint32_t nowUs) {
     return P1MotionResult::NONE;
   }
 
+  if (state_ == P1MotionState::CONFIRMING_UNEXPECTED_HOME) {
+    if (!io_.homeActive()) {
+      resumePulses(nowUs);
+      state_ = P1MotionState::MOVING;
+    } else if (timeReached(nowUs, homeStableSinceUs_ + kP1HomeStableUs)) {
+      trust_ = P1PositionTrust::UNTRUSTED;
+      return finish(P1MotionResult::HOME_SWITCH_UNEXPECTED);
+    }
+    return P1MotionResult::NONE;
+  }
+
   if (state_ == P1MotionState::SEARCHING_HOME && io_.homeActive()) {
     pauseForHomeStability(P1MotionState::CONFIRMING_HOME_ACTIVE, nowUs);
     return P1MotionResult::NONE;
@@ -146,8 +157,8 @@ P1MotionResult P1MotionController::update(uint32_t nowUs) {
         return finish(P1MotionResult::HOME_SWITCH_STUCK);
       }
     } else if (io_.homeActive()) {
-      trust_ = P1PositionTrust::UNTRUSTED;
-      return finish(P1MotionResult::HOME_SWITCH_UNEXPECTED);
+      pauseForHomeStability(P1MotionState::CONFIRMING_UNEXPECTED_HOME, nowUs);
+      return P1MotionResult::NONE;
     }
   }
 
