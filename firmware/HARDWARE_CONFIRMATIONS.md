@@ -529,6 +529,31 @@ mechanical failure to actuate the switch can still cause damage before the
 software pulse bound is reached. Production or unattended use remains blocked
 until an independent protection or a different safe recovery design exists.
 
+### Confirmed production P1 GPIO and LABFORGE/1 motion — 2026-08-11
+
+The supervised dry physical integration test used firmware commit
+`5e1dbc79ba959d3c49bcecb8262c9714b950d010` and the previously confirmed safe
+route `P1 -> V1(180 degrees) -> V2(180 degrees) -> Waste`.
+
+The production Serial/lifecycle path and GPIO controller completed:
+
+1. `PUMP_HOME` with `ACCEPTED -> STARTED -> COMPLETED` lifecycle reporting.
+2. An absolute move from HOME/zero to 2,000 steps.
+3. A stronger sequence consisting of HOME, an absolute move to 10,000 steps,
+   a two-second stationary observation, and an absolute return to 2,000 steps.
+
+The operator physically confirmed the commanded movement in both directions
+and reported that the complete stronger test passed without mechanical impact,
+slipping, binding, abnormal noise, or other unusual behavior. The final
+firmware includes stable confirmation of an unexpected HOME activation before
+failing motion, so a transient HOME sample does not immediately terminate a
+move.
+
+This confirms the P1 Arduino GPIO, LABFORGE/1 command lifecycle, homing, and
+absolute-position motion path for the supervised dry demo. It is not a wet
+volume calibration and does not authorize unattended or production operation;
+the accepted demo-only HOME assumptions above remain unchanged.
+
 ### Confirmed carousel control path and position model — 2026-08-10
 
 The user physically identified the lowest installed driver as the carousel
