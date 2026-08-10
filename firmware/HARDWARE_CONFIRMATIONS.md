@@ -36,19 +36,122 @@ The user explicitly confirmed these physical Arduino signal-pin assignments:
 
 The user also explicitly confirmed that the motor driver is a `DM542T`.
 
+### Confirmed `COLUMN_BOTTOM_VALVE` geared motor and driver setup — 2026-08-06
+
+The user identified the motor as StepperOnline `17HS15-1584S-MG50`, a bipolar
+NEMA 17 stepper with an integrated 50:1 planetary gearbox. Manufacturer data
+supplied and checked during commissioning specifies:
+
+- rated current per phase: `1.58 A`
+- phase resistance: `1.65 ohm`
+- phase inductance: `3.2 mH +/-20% at 1 kHz`
+- motor step angle: `1.8 degrees`
+- gearbox ratio: `50:1`
+- gearbox efficiency: `90%`
+- maximum permissible gearbox torque: `10 Nm`
+- motor leads: `A+ black`, `A- green`, `B+ red`, `B- blue`
+
+The connected `DM542T` is configured for 5 V control input and does not use
+the ENA input. On 2026-08-06 its DIP switches were changed, with driver power
+off, to:
+
+| Switch | Setting | Purpose |
+|---|---|---|
+| SW1 | ON | current selection |
+| SW2 | OFF | current selection |
+| SW3 | ON | current selection |
+| SW4 | OFF | half current while idle |
+| SW5 | OFF | microstep selection |
+| SW6 | OFF | microstep selection |
+| SW7 | ON | microstep selection |
+| SW8 | ON | microstep selection |
+
+This selects `1.91 A peak / 1.36 A RMS` and `1600 pulses/revolution` at the
+motor. With the 50:1 gearbox, the derived nominal output-shaft scaling is:
+
+- `80,000 pulses/output revolution`
+- `20,000 pulses/output 90 degrees`
+- approximately `4,444 pulses/output 20 degrees`
+- approximately `2,222 pulses/output 10 degrees`
+
+The previous driver setting was interpreted as `2.84 A peak / 2.03 A RMS`.
+The motor and other energized steppers became too hot to touch comfortably
+after roughly ten minutes, so physical testing was stopped and the COLUMN
+driver current was reduced before further commissioning. Thermal behavior at
+the new setting remains to be verified.
+
+### Confirmed `COLUMN_BOTTOM_VALVE` switch and basic motion — 2026-08-07
+
+The user physically traced and reconfirmed `PUL+ -> D12` and `DIR+ -> D13`.
+After resolving a failed Arduino upload/USB-port timeout, bounded motion tests
+with the 50:1 gearbox scaling succeeded:
+
+- repeated nominal 10-degree forward/return motion completed successfully
+- a nominal 90-degree move using 20,000 STEP pulses completed successfully
+- a subsequent nominal 90-degree motion test under the installed mechanical
+  load completed successfully
+- no unexpected motion behavior was reported during those successful tests
+
+The manually operated HOME switch on D10 was also tested independently with
+the motor driver off:
+
+- released: `LOW`
+- pressed: `HIGH`
+- release after pressing returned cleanly to `LOW`
+
+This confirms basic STEP actuation, output-shaft scaling, and HOME input
+polarity. The user also physically confirmed that the return direction used
+for the 80-degree move was toward HOME. That move used `DIR=LOW`, therefore:
+
+- direction toward HOME: `DIR=LOW`
+- direction away from HOME: `DIR=HIGH`
+
+Longer-duration thermal behavior remains unverified.
+
+### Confirmed `COLUMN_BOTTOM_VALVE` homing sequence and speed limit — 2026-08-07
+
+A complete geared-output test succeeded with the following sequence:
+
+1. move toward HOME with `DIR=LOW`
+2. detect D10 `HIGH / ACTIVE` after 2,173 STEP pulses
+3. move 20,889 pulses (`94` nominal output degrees) away with `DIR=HIGH`
+4. move 20,000 pulses (`90` nominal output degrees) back with `DIR=LOW`
+5. finish approximately 4 degrees from HOME with D10 `LOW`
+
+The sequence completed without a firmware-reported HOME or positioning error.
+However, at `STEP_INTERVAL_US = 500` the user observed some mechanical shaft or
+coupling slip. Therefore `500 us` is not an approved operating interval. The
+previously tested and retained commissioning value is:
+
+- `STEP_INTERVAL_US = 1000`
+- `STEP_HIGH_US = 20`
+
+The 1,000-us interval is the current confirmed reliable speed for this geared
+actuator. Faster operation requires separate mechanical investigation and
+revalidation; it must not be inferred from the fact that the motor still turns
+at 500 us.
+
+### Confirmed `COLUMN_BOTTOM_VALVE` operating positions — 2026-08-08
+
+The user visually confirmed the functional positions from the HOME reference:
+
+- `OPEN = 94 degrees from HOME`
+- `CLOSED = 4 degrees from HOME`
+
+The 4-degree CLOSED offset is intentional: it is just far enough away from HOME
+to release the HOME switch. The user explicitly stated that these positions are
+visually known and do not require another positioning test. This confirmation
+defines the actuator positions; leak testing and fluidic execution remain
+pending separately.
+
 This wiring update does not confirm:
 
-- home-switch contact selection such as `NC` versus `NO`
-- input polarity or the electrical meaning of `HIGH` and `LOW`
-- motor rotation direction
 - valve open and closed directions
-- valve angles or step counts
 - homing behavior
 - early-switch handling
-- driver current or microstep settings
+- longer-duration thermal behavior with the 2026-08-06 driver settings
 - `ENA` wiring or behavior
 - motor power wiring
-- successful actuation
 - leak-tightness
 - fluidic routing through the valve
 - safe physical execution
@@ -60,17 +163,71 @@ The user explicitly confirmed that `SF_BOTTOM_VALVE` is actuated by a
 connected directly to the host computer over USB. It is therefore not assigned
 Arduino Mega `STEP`, `DIR`, or `HOME` pins.
 
-This connection update does not yet confirm:
+At the time of this connection-only confirmation, the following remained
+unconfirmed and were handled by the later commissioning records below:
 
-- the DYNAMIXEL device ID or USB device identity
-- baud rate or protocol configuration
-- operating mode
 - torque-enable policy
 - position limits or raw position values
 - which commanded position means physically open or closed
 - motion speed, profile acceleration, or timeout behavior
 - actuator fault handling or loss-of-communication behavior
 - successful actuation, leak-tightness, or safe physical execution
+
+### Confirmed `SF_BOTTOM_VALVE` read-only identity and status — 2026-08-08
+
+A powered, read-only scan through the dedicated U2D2 USB adapter confirmed:
+
+- stable host adapter path:
+  `/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTA2U3CN-if00-port0`
+- DYNAMIXEL ID: `2`
+- model number: `1060` (`XL430-W250`)
+- firmware version: `46`
+- baud rate: `57600` (`Baud Rate` register value `1`)
+- protocol: DYNAMIXEL Protocol `2.0`
+- operating mode: `3` (`Position Control Mode`)
+
+The same read-only observation reported `Torque Enable = 0`,
+`Hardware Error Status = 0`, `Present Input Voltage = 12.1 V`,
+`Present Temperature = 32 C`, and `Present Position = 2583`. These are
+time-specific observations, not permanent operating limits or position
+semantics. No register was written and no actuator motion was requested.
+
+This does not yet confirm the production torque-enable policy, profile
+velocity or acceleration, bounded motion behavior, raw OPEN/CLOSED positions,
+or safe physical actuation.
+
+### Confirmed `SF_BOTTOM_VALVE` motion and position calibration — 2026-08-08
+
+The user visually observed and explicitly confirmed successful bounded motion
+of the `XL430-W250-T` on DYNAMIXEL ID `2`. Motion in both directions completed
+without impact, slipping, or unusual sound. The user also confirmed that the
+test speed was appropriate.
+
+After iterative visual alignment, the stable read-only position observed with
+torque disabled was explicitly accepted as the calibrated closed position:
+
+- `CLOSED = 2559` raw position units
+- the selected direction from `CLOSED` toward `OPEN` is the positive raw
+  position direction
+- `OPEN = 3697` raw position units (`2559 + 1138`, nominally 100 degrees)
+- confirmed commissioning profile: `Profile Velocity = 20`
+- confirmed commissioning profile: `Profile Acceleration = 1`
+
+The final 100-degree OPEN/CLOSED sequence was executed twice with a two-second
+OPEN dwell and was visually confirmed by the user both times. The measured
+OPEN positions were `3677` and `3678` while moving toward the commanded
+`OPEN = 3697`. After torque disable, the stable observed closed-side position
+was approximately `2574` while the calibrated command remains
+`CLOSED = 2559`. Both repetitions completed without impact, slipping, unusual
+sound, or a reported hardware error. The two-second dwell was a commissioning
+test parameter and is not yet a production timing requirement.
+
+The `CLOSED` value is tied to the current physical coupling and alignment of
+this actuator. Mechanical disassembly, horn/coupling adjustment, actuator
+replacement, or position-reset changes require recalibration before automatic
+operation. The production implementation must still enforce position bounds,
+communication timeout behavior, hardware-error checks, and torque disable on
+failure.
 
 ### Confirmed V1-V8 valve position semantics — 2026-08-04
 
@@ -85,33 +242,138 @@ This confirms the intended logical position mapping. It does not yet confirm
 that any individual valve physically reaches the commanded position, uses the
 expected direction or step count, or provides the expected fluidic route.
 
-### Unverified Arduino pin candidates for commissioning — 2026-08-04
+### Arduino pin commissioning — updated 2026-08-05
 
-The available partially outdated wiring notes suggest the following map. The
-user considers this map likely correct, but it remains an input to
-commissioning rather than a confirmed physical fact until tested:
+The available partially outdated wiring notes suggested the following map.
+Controlled motor and manual HOME-switch testing subsequently confirmed all
+listed entries, with detailed pump confirmation recorded below:
 
 | Actuator | STEP candidate | DIR candidate | HOME candidate |
 |---|---:|---:|---:|
-| V1 | D22 | D23 | D39 |
-| V2 | D24 | D25 | D38 |
-| V3 | D26 | D27 | D43 |
-| V4 | D28 | D29 | D40 |
-| V5 | D30 | D31 | D41 |
-| V6 | D32 | D33 | D42 |
+| V1 | D22 confirmed | D23 confirmed | D39 confirmed |
+| V2 | D24 confirmed | D25 confirmed | D38 confirmed |
+| V3 | D26 confirmed | D27 confirmed | D43 confirmed |
+| V4 | D28 confirmed | D29 confirmed | D40 confirmed |
+| V5 | D30 confirmed | D31 confirmed | D41 confirmed |
+| V6 | D32 confirmed | D33 confirmed | D42 confirmed |
 | P1 | D46 | D47 | D45 |
 | P2 | D48 | D49 | D44 |
 
-V7 and V8 are not present in those notes. Sequential allocation makes
-`D34/D35` and `D36/D37` useful first commissioning candidates for their
-`STEP/DIR` pairs, but this is an inference only and MUST NOT be treated as a
-confirmed assignment. Their HOME pins are unknown.
+Controlled sequential motion testing on 2026-08-05 confirmed that the listed
+STEP/DIR pairs actuate V1-V6 as labelled. V7 and V8, which were absent from the
+old notes, were also physically identified:
+
+| Actuator | STEP confirmed | DIR confirmed | HOME |
+|---|---:|---:|---:|
+| V7 | D36 | D37 | D3 confirmed |
+| V8 | D34 | D35 | D2 confirmed |
+
+The V1-V7 HOME inputs were manually tested and confirmed as released `LOW` and
+active `HIGH`. After repair of its mechanical wiring error, the V8 HOME input
+was manually tested on 2026-08-07 and confirmed with the same semantics:
+released `LOW`, pressed `HIGH`, and a clean return to `LOW` after release.
+
+### Confirmed V1-V8 direction polarity — 2026-08-05
+
+A finite cascade test commanded 200 STEP pulses (approximately 45 degrees) at
+`DIR=LOW` for each valve. Visual observation established the direction relative
+to its HOME position:
+
+| Valve | `DIR=LOW` movement | Direction toward HOME |
+|---|---|---|
+| V1 | away from HOME | `HIGH` |
+| V2 | toward HOME | `LOW` |
+| V3 | away from HOME | `HIGH` |
+| V4 | away from HOME | `HIGH` |
+| V5 | away from HOME | `HIGH` |
+| V6 | toward HOME | `LOW` |
+| V7 | away from HOME | `HIGH` |
+| V8 | away from HOME | `HIGH` |
+
+This confirms signal polarity relative to HOME and V1-V8 HOME switch operation.
+Fluidic port alignment remains separate from these electrical and mechanical
+tests. In particular, the physically observed V3 and V5 polarity differs
+from the older recovered-program assumptions, so the 2026-08-05 physical test
+must take precedence.
+
+### Confirmed V1-V7 homing execution — 2026-08-06
+
+A bounded cascade test homed V1-V7 individually using the confirmed HOME pins
+and direction levels above. Each valve stopped when its HOME input became
+`HIGH`, paused briefly, then moved 356 steps away from HOME (nominally about
+80.1 degrees at the recovered 400-steps-per-90-degrees assumption). Results:
+
+| Valve | Steps taken to HOME | Final HOME input | Result |
+|---|---:|---|---|
+| V1 | 615 | `LOW / RELEASED` | PASS |
+| V2 | 223 | `LOW / RELEASED` | PASS |
+| V3 | 602 | `LOW / RELEASED` | PASS |
+| V4 | 627 | `LOW / RELEASED` | PASS |
+| V5 | 595 | `LOW / RELEASED` | PASS |
+| V6 | 232 | `LOW / RELEASED` | PASS |
+| V7 | 568 | `LOW / RELEASED` | PASS |
+
+The user visually confirmed that all seven moved toward HOME, stopped briefly
+at switch activation, moved back to approximately 80 degrees, released their
+HOME levers, and produced no unusual noise, binding, or other unexpected
+behavior. This confirms bounded homing execution and HOME release for V1-V7.
+It does not constitute precise angular calibration or fluidic port alignment.
+
+### Confirmed V1-V7 nominal position stepping — 2026-08-06
+
+A three-phase position test was completed successfully for V1-V7:
+
+1. Each valve homed and moved 400 steps away from HOME to nominal 90 degrees.
+2. Each valve moved another 400 steps to nominal 180 degrees.
+3. Each valve moved back toward HOME and stopped on switch activation.
+
+All seven valves reported PASS at nominal 90 and nominal 180, and the user
+visually confirmed that every phase proceeded as intended. Return-to-HOME
+results from nominal 180 were:
+
+| Valve | Steps from nominal 180 to HOME | Result |
+|---|---:|---|
+| V1 | 801 | PASS |
+| V2 | 800 | PASS |
+| V3 | 801 | PASS |
+| V4 | 799 | PASS |
+| V5 | 800 | PASS |
+| V6 | 799 | PASS |
+| V7 | 800 | PASS |
+
+The 799-801-step return range confirms that 400-step increments consistently
+produce the intended nominal 90-degree spacing and that 800 steps spans the
+nominal HOME-to-180 range within one detected step for V1-V7. This verifies
+repeatable mechanical position stepping, but not the liquid routing associated
+with each physical port.
+
+### Confirmed V8 homing and nominal position stepping — 2026-08-07
+
+After repair and manual confirmation of the D2 HOME input, V8 completed the
+same staged position test:
+
+- bounded HOME search with `DIR=HIGH`: HOME found after 585 steps
+- HOME to nominal 90 degrees: 400 steps, PASS
+- nominal 90 to nominal 180 degrees: 400 steps, PASS
+- nominal 180 degrees back to HOME: 800 steps, PASS
+
+The user visually confirmed that all V8 phases proceeded as intended. This
+confirms bounded V8 homing and repeatable nominal 0/90/180 stepping, completing
+the equivalent electrical and mechanical commissioning checks for V1-V8. It
+does not by itself verify liquid routing through the physical valve ports.
 
 ### Pending verification and commissioning
 
 - Leak testing and liquid route testing remain pending.
-- Verification of every valve angle, every physical valve route, and V1-V8 actuation remains pending.
-- Verification of `SF_BOTTOM_VALVE` and `COLUMN_BOTTOM_VALVE` actuation remains pending.
+- Verification of every physical valve route remains pending. STEP/DIR pair
+  identity, direction polarity, HOME inputs, bounded homing, and repeatable
+  nominal 0/90/180 stepping are confirmed for V1-V8 above.
+- `SF_BOTTOM_VALVE` identity, basic dry actuation, direction, test profile, and
+  raw OPEN/CLOSED calibration are confirmed above. Leak-tightness, liquid-route
+  execution, and production fault handling remain pending.
+- `COLUMN_BOTTOM_VALVE` basic actuation, homing, and functional OPEN/CLOSED
+  positions are confirmed above; longer-duration thermal behavior and fluidic
+  execution remain pending.
 - Pump volumetric calibration remains pending.
 - Safe execution interlocks and end-to-end hardware execution remain pending.
 - Automatic phase detection and automatic or actual liquid-phase separation are not confirmed.
@@ -129,6 +391,155 @@ confirmed assignment. Their HOME pins are unknown.
 - For both P1 and P2, movement toward `20500` decreases syringe chamber volume and physically dispenses.
 - The tested move `20000 -> 10000` aspirated liquid from B1 into P1.
 - The tested move `10000 -> 20000` dispensed liquid from P1 toward the Reactor.
+
+### Confirmed P1/P2 HOME inputs — 2026-08-08
+
+Manual press-and-release tests were completed first with the main motor supply
+off and then repeated with it on. Both tests produced the same clean transitions
+without false activation:
+
+- `P1 HOME = D45`
+- `P2 HOME = D44`
+- input configuration: `INPUT_PULLUP`
+- released state: `LOW`
+- pressed/active state: `HIGH`
+
+Each switch produced the expected `LOW -> HIGH -> LOW` sequence. Tests that
+used plain `INPUT` did not detect the switches; the recovered working `Pump`
+implementation and the successful physical retest both require
+`INPUT_PULLUP`.
+
+### Confirmed P1 Waste-route homing and short motion — 2026-08-08
+
+The user physically verified the dry, unobstructed route:
+
+- `P1 -> V1.k1`
+- `V1 = 180 degrees` (`k1 <-> k2`)
+- `V1.k2 -> V2.k1`
+- `V2 = 180 degrees` (`k1 <-> k2`)
+- `V2.k2 -> shared Waste`
+
+A controlled commissioning sequence then completed successfully:
+
+1. V1 homed and moved to nominal 180 degrees.
+2. V2 homed and moved to nominal 180 degrees.
+3. P1 homed toward `DIR=LOW`, finding HOME after 20,048 search pulses.
+4. P1 moved 1,000 pulses away from HOME with `DIR=HIGH`.
+5. P1 returned toward HOME with `DIR=LOW`; HOME activated after 998 pulses.
+6. The test stopped at HOME with V1 and V2 remaining at nominal 180 degrees.
+
+This physically confirms for P1:
+
+- STEP `D46`
+- DIR `D47`
+- HOME `D45`, `INPUT_PULLUP`, active `HIGH`
+- direction toward HOME: `DIR=LOW`
+- direction away from HOME: `DIR=HIGH`
+- the P1-to-Waste valve route listed above
+
+The near-full-stroke homing distance is consistent with P1 having started near
+its recovered far-end position, but it does not calibrate volume or validate
+`20500` as a production travel limit. The 998-versus-1,000-pulse return reflects
+the physical switch activation point/hysteresis and is not a volume calibration.
+
+### Confirmed P2 Waste-route homing and short motion — 2026-08-08
+
+The user physically verified and commissioned the dry Waste route:
+
+- `P2 -> V3.k1`
+- `V3 = 180 degrees` (`k1 <-> k2`) to `V7.k1`
+- `V7 = 90 degrees` (`k1 <-> k3`) to `V8.k1`
+- `V8 = 90 degrees` (`k1 <-> k3`) to `V5.k1`
+- `V5 = 180 degrees` (`k1 <-> k2`) to shared Waste
+
+A controlled commissioning sequence completed successfully:
+
+1. V3 homed and moved to nominal 180 degrees.
+2. V7 homed and moved to nominal 90 degrees.
+3. V8 homed and moved to nominal 90 degrees.
+4. V5 homed and moved to nominal 180 degrees.
+5. P2 homed toward `DIR=LOW`, finding HOME after 20,028 search pulses.
+6. P2 moved 1,000 pulses away from HOME with `DIR=HIGH`.
+7. P2 returned toward HOME with `DIR=LOW`; HOME activated after 999 pulses.
+8. The test stopped at HOME with the Waste route remaining configured.
+
+This physically confirms for P2:
+
+- STEP `D48`
+- DIR `D49`
+- HOME `D44`, `INPUT_PULLUP`, active `HIGH`
+- direction toward HOME: `DIR=LOW`
+- direction away from HOME: `DIR=HIGH`
+- the P2-to-Waste valve route listed above
+
+The initial 20,028-pulse homing distance records only the arbitrary starting
+position of this test. It is not a calibration result or validation of the
+recovered `20500` endpoint. The 999-versus-1,000-pulse return is consistent
+with the physical HOME-switch activation point/hysteresis and is not a volume
+calibration.
+
+### P1/P2 20,000-pulse dry-travel results — 2026-08-08
+
+A combined bounded dry-air test used the confirmed Waste routes and completed
+without a firmware-reported error:
+
+- P1: HOME to 20,000 pulses away, then HOME detected after 20,003 return
+  pulses; final position 200 pulses away from HOME with D45 released `LOW`.
+- P2: initially on HOME, switch released after 140 pulses, re-homed after 190
+  search pulses, moved 20,000 pulses away, then HOME detected after 19,998
+  return pulses; final position 200 pulses away from HOME with D44 released
+  `LOW`.
+- The test retained `PUMP_STEP_INTERVAL_US = 1500` and `STEP_HIGH_US = 20`.
+
+These results confirm repeatable near-full dry travel in both directions at the
+tested pulse timing and leave both pumps off their HOME switches. They do not
+calibrate volume, prove that 20,000 is a safe production endpoint under every
+load, or replace the user's physical observation for binding, impact, skipped
+steps, abnormal noise, or end clearance.
+
+The user subsequently confirmed that the 20,000-pulse test produced no
+mechanical-end impact, binding, skipped motion, slipping, or abnormal noise.
+The user also confirmed that position `20500` has been physically exercised
+successfully multiple times and may be retained as the currently approved
+maximum step position for both pumps. This confirms mechanical reach, not
+volume accuracy; wet testing and `steps/ml` calibration are intentionally
+deferred.
+
+Pump speed was acceptable at `PUMP_STEP_INTERVAL_US = 1500`. A future UI
+setting may request pump speed, but firmware must own and validate the allowed
+range and reject unsupported values. No final UI control, protocol field, or
+validated speed range is established by this confirmation.
+
+### Common DM542T driver DIP layout — 2026-08-08
+
+The user confirmed that all currently discussed stepper drivers are `DM542T`
+except the carousel driver, which is explicitly deferred for separate work.
+The `COLUMN_BOTTOM_VALVE` DM542T is also an exception because its separately
+confirmed DIP configuration is documented above.
+
+For the remaining DM542T drivers used by V1-V8 and P1/P2, the user confirmed
+the same physical lever pattern:
+
+- SW1: down
+- SW2: down
+- SW3: up
+- SW4: up
+- SW5: up
+- SW6: up
+- SW7: down
+- SW8: down
+
+These are recorded as physical up/down positions only. They must not be
+silently translated to `ON/OFF`, current, or pulses-per-revolution without a
+clear orientation reference and the table from the installed driver. The
+carousel driver is not covered by this confirmation.
+
+The user declined a new formal thermal-soak test because these motors have
+already operated repeatedly for extended periods under observation. The user
+reports that they warm during operation but remain controlled and have not
+shown concerning thermal behavior. This operational history is accepted for
+the current commissioning stage; it is not a measured temperature profile or
+a manufacturer-limit validation.
 
 ### Confirmed limitations
 

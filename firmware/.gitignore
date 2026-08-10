@@ -11,3 +11,7 @@ out/
 *.tmp
 *~
 .DS_Store
+.venv-dynamixel/
+.venv-platformio/
+__pycache__/
+*.py[cod]
