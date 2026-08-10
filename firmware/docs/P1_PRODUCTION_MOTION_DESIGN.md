@@ -29,7 +29,7 @@ wire semantics remain canonical in `LABFORGE_SERIAL_PROTOCOL_V1.md`.
   so a one-sample glitch cannot establish trusted zero.
 - An initially active HOME at untrusted boot is confirmed without first moving
   away. A repeated home from trusted zero first holds STEP inactive and checks
-  HOME stability. Stable active HOME permits release by no more than 200 pulses
+  HOME stability. Stable active HOME permits release by no more than 400 pulses
   before searching again; stable inactive HOME contradicts trusted zero and
   fails closed without a STEP rising edge toward HOME.
 - The production runtime calls nonblocking `update()` regularly at a

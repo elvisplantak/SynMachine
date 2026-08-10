@@ -10,7 +10,7 @@ constexpr uint32_t kP1StepIntervalUs = 1500;
 constexpr uint16_t kP1StepHighUs = 20;
 constexpr uint16_t kP1DirectionSetupUs = 5;
 constexpr uint32_t kP1HomeStableUs = 30000;
-constexpr uint16_t kP1HomeReleaseMaximumSteps = 200;
+constexpr uint16_t kP1HomeReleaseMaximumSteps = 400;
 
 static_assert(kP1StepHighUs < kP1StepIntervalUs,
               "P1 STEP high time must be shorter than its pulse interval");

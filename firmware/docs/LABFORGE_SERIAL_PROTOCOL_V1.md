@@ -313,7 +313,7 @@ protection, that pulse bound is not fail-safe against a missing HOME signal and
 does not approve unattended or production operation. An initially active HOME
 at untrusted boot is stability-confirmed without away motion. Repeated homing
 from trusted zero first holds STEP inactive while checking HOME stability. A
-stable active signal may then use at most 200 away pulses to release HOME before
+stable active signal may then use at most 400 away pulses to release HOME before
 searching again; a stable inactive signal is inconsistent with trusted zero and
 fails closed without movement toward HOME. HOME activation and release must
 remain stable for 30 ms while motion is paused before they affect state or
@@ -610,7 +610,7 @@ allowed homing arrival. An initially active HOME input during an untrusted
 `PUMP_HOME` operation is held motionless and accepted as zero only after the
 configured stability interval. A repeated `PUMP_HOME` from trusted zero may
 first perform the bounded release stage. `PUMP_HOME_SWITCH_STUCK` means that an
-allowed release did not clear HOME within 200 pulses, or that an absolute move
+allowed release did not clear HOME within 400 pulses, or that an absolute move
 away from zero reached its requested target while HOME was still active.
 Expected stable HOME arrival is part of the `PUMP_HOME` contract, not the
 non-homing command contract.
