@@ -9,9 +9,9 @@
 
 ### UI
 
-- Branch: `codex/harden-env-ignore-rules-2026-07-30`
-- HEAD before this checkpoint documentation update:
-  `2715b92035277626ebb86e8a38906d1c683896bf`
+- Branch: `codex/update-current-state-p1-p2-v1-v8`
+- Base HEAD before this checkpoint documentation update:
+  `e37d5aef97f9ff20b0e60ecb5997d723a2a2870a`
 - Working tree was clean before this checkpoint documentation update.
 
 ### Backend
@@ -23,6 +23,32 @@
   checkpoint.
 
 ### Firmware
+
+- Current V1-V8 software-integration checkpoint:
+  - branch: `codex/v1-v8-production-runtime`
+  - base reviewed commit: `e0644d5c2ec503ebb706723b04e0b7454a03a8ef`
+    (`Integrate V1-V8 valve runtime`)
+  - `VALVE_HOME` and `VALVE_SET_POSITION` are integrated for V1-V8 with
+    confirmed STEP, DIR, HOME, polarity, direction, and 0/90/180-degree
+    coordinate semantics from `HARDWARE_CONFIRMATIONS.md`;
+  - every valve retains independent position trust, while P1, P2, and V1-V8
+    share one global physical-command lifecycle owner;
+  - HOME transitions use a 30 ms continuous-stability policy with STEP held
+    inactive during resolution, bounded 20 us STEP HIGH pulses, and no
+    catch-up pulse bursts;
+  - request rejection and post-STARTED execution failures remain distinct;
+  - the corrected checkpoint passes `144/144` native tests and the Mega build
+    uses `34,210 / 253,952` flash bytes and `2,676 / 8,192` static SRAM bytes;
+  - follow-up review corrections cover HOME candidate bounce, explicit valve
+    failure behavior, and exact contract rejection behavior;
+  - the no-LTO AVR stack analysis removed simultaneous double parsing and
+    places the worst credible project path at approximately `3.8 KB`, leaving
+    approximately `1.7 KB` after static data before interrupt/runtime margin;
+  - firmware upload and supervised V1-V8 production-path execution remain
+    separate approval gates and have not occurred for this checkpoint; and
+  - the 1,600-pulse missing-HOME software timeout is not established as
+    mechanical protection. Demo-only acceptance of missing-HOME overtravel
+    risk remains an explicit user decision.
 
 - Current P2 software-integration checkpoint:
   - branch: `codex/p1-motion-safety-hardening`
