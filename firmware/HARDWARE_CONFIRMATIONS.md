@@ -554,6 +554,32 @@ absolute-position motion path for the supervised dry demo. It is not a wet
 volume calibration and does not authorize unattended or production operation;
 the accepted demo-only HOME assumptions above remain unchanged.
 
+### Confirmed production P2 GPIO and LABFORGE/1 motion — 2026-08-11
+
+The supervised dry physical integration test used firmware commit
+`e01d9084227d7180209c12d60ca4743db4465588` and the previously confirmed safe
+route `P2 -> V3(180 degrees) -> V7(90 degrees) -> V8(90 degrees) -> V5(180
+degrees) -> Waste`.
+
+The firmware was uploaded to the Arduino Mega through its stable USB by-id path
+and upload verification completed successfully. The production Serial/lifecycle
+path and the independent P2 GPIO controller then completed:
+
+1. `PUMP_HOME` with `ACCEPTED -> STARTED -> COMPLETED` lifecycle reporting.
+2. A stronger sequence consisting of HOME, an absolute move to 5,000 steps, a
+   two-second stationary observation, and a return to HOME.
+3. A final HOME followed by an absolute move to 2,000 steps, where P2 was left
+   parked before machine power was switched off.
+
+The operator physically confirmed the correct movement, HOME-switch stop, and
+smooth execution. No mechanical impact, slipping, binding, leakage, abnormal
+noise, or other unusual behavior was observed.
+
+This confirms the P2 Arduino GPIO, LABFORGE/1 command lifecycle, homing, and
+absolute-position motion path for the supervised dry demo. It does not establish
+wet volume accuracy or authorize unattended or production operation; the
+accepted demo-only HOME assumptions above remain unchanged.
+
 ### Confirmed carousel control path and position model — 2026-08-10
 
 The user physically identified the lowest installed driver as the carousel

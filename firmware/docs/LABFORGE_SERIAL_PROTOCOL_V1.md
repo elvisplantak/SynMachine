@@ -284,8 +284,8 @@ before `ACCEPTED`. It serializes `STARTED` before invoking the controller start
 boundary; the first possible driver-affecting action after that frame is the
 confirmed selected-pump DIR write, followed by the configured DIR-to-STEP setup
 interval. The command is connected to the independent Arduino P1 and P2
-adapters. P1 has been physically exercised through this runtime; P2 integration
-is software-verified but has not yet been uploaded or physically exercised.
+adapters. P1 and P2 have each been physically exercised through this runtime at
+separate supervised dry checkpoints.
 
 The second approved pump command schema is `PUMP_HOME`. Its `arguments` object
 contains exactly `pump:"P1"` or `pump:"P2"`; missing, additional, incorrectly
@@ -331,8 +331,8 @@ abort primitive forces STEP inactive, stops future pulses, and invalidates
 position trust after execution starts. DIR is established at least 5 us before
 the first STEP rising edge, per the installed DM542T timing contract. These
 rules are implemented and natively tested. P1 was physically validated at its
-separate supervised checkpoint; P2 upload and physical invocation remain
-separate explicit approval gates.
+separate supervised checkpoint, and P2 was subsequently validated at its own
+supervised dry checkpoint.
 
 ### `REJECTED`
 
@@ -744,12 +744,14 @@ It now also validates session-bound `QUERY_STATUS` messages, emits bounded
 deterministic trusted or untrusted `STATUS` responses, and uses a testable
 dispatcher for bounded parser, session, and boot-ID protocol errors.
 It also includes a two-entry volatile command-status cache and bounded
-`QUERY_COMMAND` / `COMMAND_STATUS` responses. The integrated P1 runtime
+`QUERY_COMMAND` / `COMMAND_STATUS` responses. The integrated pump runtime
 populates the cache, and cache lifecycle-integrity and identifier validation
 are enforced. The approved
-`PUMP_MOVE_ABSOLUTE_STEPS` and `PUMP_HOME` P1 contracts add exact bounded schema
-validation and compact semantic identity. A nonblocking P1 motion-controller
-foundation now implements boot-time untrusted position, explicit homing,
+`PUMP_MOVE_ABSOLUTE_STEPS` and `PUMP_HOME` P1/P2 contracts add exact bounded
+schema validation and compact semantic identity. A nonblocking P1
+motion-controller
+foundation, instantiated independently for P1 and P2, now implements boot-time
+untrusted position, explicit homing,
 stable HOME confirmation including trusted-zero pre-motion validation, bounded
 active-switch release and HOME search,
 absolute step tracking, direction-setup and pulse timing, local abort, and
@@ -757,19 +759,19 @@ fail-closed trust invalidation. The accepted supervised-demo homing assumption
 and its unresolved missing-switch overtravel risk are recorded in the hardware
 confirmations and P1 design; this is not an unattended-production safety claim.
 Native tests use a fake pin adapter. The production dispatcher, lifecycle
-output, Arduino P1 adapter, and confirmed P1 STEP/DIR/HOME pins are connected in
-the Mega build. Each STEP pulse is lowered by a bounded 20 us pulse primitive,
-independently of parser or Serial latency, and consecutive rising edges are
-never scheduled closer than 1500 us. Serial output is handed to the AVR
+output, independent Arduino P1/P2 adapters, and confirmed STEP/DIR/HOME pins are
+connected in the Mega build. Each STEP pulse is lowered by a bounded 20 us pulse
+primitive, independently of parser or Serial latency, and consecutive rising
+edges are never scheduled closer than 1500 us. Serial output is handed to the AVR
 transport cooperatively in fixed chunks, with motion servicing between chunks.
 STARTED uses a two-phase transport boundary: cache mutation and motion start
 occur only after the complete frame is handed to Serial. Session
 replacement leaves active motion unchanged, suppresses lifecycle output tied
 to the replaced nonce, reports BUSY from the cache, and relies on
 `QUERY_COMMAND` for recovery. Serial input and output work are bounded per loop
-so the P1 update cadence remains materially shorter than the 30 ms HOME
-stability interval. Physical upload/execution and backend orchestration remain
-deferred.
+so the active pump update cadence remains materially shorter than the 30 ms HOME
+stability interval. P1 and P2 firmware upload and supervised dry physical
+execution have been completed; backend orchestration remains deferred.
 Fail-closed recovery and provisioning remain unresolved.
-This firmware has not been uploaded or physically tested. No component is
-claimed to measure delivered volume or provide exactly-once physical execution.
+No component is claimed to measure delivered volume or provide exactly-once
+physical execution.

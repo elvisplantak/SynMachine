@@ -45,6 +45,13 @@ runtime; no blocking delay is added for HOME stability or motion scheduling.
 
 ## Checkpoint boundary
 
-Native tests and Mega compilation verify this software integration. Upload,
-Serial Monitor use, and physical P2 movement remain a separate supervised
-checkpoint.
+Native tests and Mega compilation verify the software integration. The separate
+supervised dry physical checkpoint subsequently verified firmware upload,
+`PUMP_HOME`, HOME-to-5,000-to-HOME motion with a two-second dwell, and a final
+HOME-to-2,000-step parking move through the production Serial/lifecycle and P2
+GPIO path. The operator reported smooth execution without impact, slipping,
+binding, leakage, abnormal noise, or another unusual event.
+
+This checkpoint does not establish wet volume calibration or unattended safety.
+The accepted supervised-demo HOME assumptions in `HARDWARE_CONFIRMATIONS.md`
+remain unchanged.
