@@ -1,7 +1,7 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-08-10
-- Development phase: P1 production Serial/runtime software integration; physical upload deferred
+- Checkpoint date: 2026-08-11
+- Development phase: P1 physically validated; P2 production Serial/runtime software integration complete with physical upload deferred
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
@@ -23,6 +23,24 @@
   checkpoint.
 
 ### Firmware
+
+- Current P2 software-integration checkpoint:
+  - branch: `codex/p1-motion-safety-hardening`
+  - commit: `e01d9084227d7180209c12d60ca4743db4465588`
+    (`Integrate P2 pump runtime`)
+  - the exact pump contracts now accept P1 and P2 while preserving the
+    `1..20500` absolute target range;
+  - P2 uses the confirmed D48 STEP, D49 DIR, and D44 HOME pins through an
+    independent Arduino adapter and controller state;
+  - P1 and P2 share the reviewed motion/lifecycle implementation but retain
+    independent position trust;
+  - only one pump command may execute globally at a time;
+  - focused P2 contract/cache/runtime tests: `42/42 passed`;
+  - complete warning-clean native suite: `123/123 passed`;
+  - Mega 2560 build: successful;
+  - flash: `31,300 / 253,952 bytes` (`12.3%`);
+  - static RAM: `2,288 / 8,192 bytes` (`27.9%`); and
+  - P2 firmware upload and physical execution have not yet been performed.
 
 - Current P1 runtime checkpoint:
   - branch: `codex/p1-motion-safety-hardening`
