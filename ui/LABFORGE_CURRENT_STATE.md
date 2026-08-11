@@ -47,8 +47,9 @@
   - firmware upload and supervised V1-V8 production-path execution remain
     separate approval gates and have not occurred for this checkpoint; and
   - the 1,600-pulse missing-HOME software timeout is not established as
-    mechanical protection. Demo-only acceptance of missing-HOME overtravel
-    risk remains an explicit user decision.
+    mechanical protection. The user explicitly accepts missing-HOME overtravel
+    only as a supervised-demo risk with the operator at the power switch;
+    unattended and production operation remain out of scope.
 
 - Current P2 software-integration checkpoint:
   - branch: `codex/p1-motion-safety-hardening`
