@@ -265,8 +265,9 @@ Required: `protocol`, `type`, `backend_session_nonce`, `controller_boot_id`,
 ```
 
 The first approved Service-mode command contract is
-`PUMP_MOVE_ABSOLUTE_STEPS`, initially restricted to `P1`. Its `arguments`
-object contains exactly `pump:"P1"` and integer `target_steps` in `1..20500`.
+`PUMP_MOVE_ABSOLUTE_STEPS`, supported for `P1` and `P2`. Its `arguments`
+object contains exactly `pump:"P1"` or `pump:"P2"` and integer
+`target_steps` in `1..20500`.
 Argument order is irrelevant; missing, additional, incorrectly typed, zero, or
 out-of-range arguments are invalid. The command expresses an absolute software
 step target, not a calibrated volume. `0..20500` is only the representable
@@ -278,36 +279,38 @@ caller-supplied direction, speed, homing, or route argument.
 {"protocol":"LABFORGE/1","type":"COMMAND","backend_session_nonce":"123e4567-e89b-12d3-a456-426614174000","controller_boot_id":4294967295,"phase_execution_id":"phase-execution-1","operation_command_id":"323e4567-e89b-12d3-a456-426614174002","command":"PUMP_MOVE_ABSOLUTE_STEPS","arguments":{"pump":"P1","target_steps":10000}}
 ```
 
-The production P1 runtime performs side-effect-free validation and preparation
+The production pump runtime performs side-effect-free validation and preparation
 before `ACCEPTED`. It serializes `STARTED` before invoking the controller start
 boundary; the first possible driver-affecting action after that frame is the
-confirmed P1 DIR write, followed by the configured DIR-to-STEP setup interval.
-The command is connected to the Arduino P1 adapter, but this checkpoint has not
-been uploaded or physically executed.
+confirmed selected-pump DIR write, followed by the configured DIR-to-STEP setup
+interval. The command is connected to the independent Arduino P1 and P2
+adapters. P1 has been physically exercised through this runtime; P2 integration
+is software-verified but has not yet been uploaded or physically exercised.
 
-The second approved P1 command schema is `PUMP_HOME`. Its `arguments` object
-contains exactly `pump:"P1"`; missing, additional, incorrectly typed, or other
-pump values are invalid. It has no caller-supplied direction, speed, route, or
-limit. Issuing this command is a backend assertion that a previously verified
-safe fluid route is already configured, because P1 homing can move fluid and
-firmware does not own or infer route policy.
+The second approved pump command schema is `PUMP_HOME`. Its `arguments` object
+contains exactly `pump:"P1"` or `pump:"P2"`; missing, additional, incorrectly
+typed, or other pump values are invalid. It has no caller-supplied direction,
+speed, route, or limit. Issuing this command is a backend assertion that a
+previously verified safe fluid route is already configured, because pump
+homing can move fluid and firmware does not own or infer route policy.
 
 ```json
 {"protocol":"LABFORGE/1","type":"COMMAND","backend_session_nonce":"123e4567-e89b-12d3-a456-426614174000","controller_boot_id":4294967295,"phase_execution_id":"phase-execution-1","operation_command_id":"323e4567-e89b-12d3-a456-426614174002","command":"PUMP_HOME","arguments":{"pump":"P1"}}
 ```
 
-The implemented P1 motion-controller and Serial lifecycle runtime are
+The implemented pump motion-controller and Serial lifecycle runtime are
 nonblocking and connected to the production dispatcher and Arduino pin
-adapter. Position
-trust begins `UNTRUSTED` after every boot. Only successful `PUMP_HOME`
+adapters. P1 and P2 keep independent position trust, which begins `UNTRUSTED`
+after every boot. Only successful `PUMP_HOME` for the selected pump
 execution may establish coordinate zero and `TRUSTED` position. An absolute
 move is refused while position is untrusted; target zero requires `PUMP_HOME`
 rather than ordinary absolute motion. Preparation is side-effect-free. A
 separate start call performs the first driver-affecting `DIR` write so the
 runtime can serialize `STARTED` immediately before crossing that boundary.
 
-Homing uses the confirmed P1 polarity and direction. Under the user's accepted
-supervised-demo assumption, startup HOME search may begin from an untrusted
+Homing uses the confirmed polarity and direction for the selected pump. Under
+the user's accepted supervised-demo assumption, startup HOME search may begin
+from an untrusted
 position and is bounded to 20,500 pulses. Because P1/P2 have no independent end
 protection, that pulse bound is not fail-safe against a missing HOME signal and
 does not approve unattended or production operation. An initially active HOME
@@ -317,8 +320,8 @@ stable active signal may then use at most 400 away pulses to release HOME before
 searching again; a stable inactive signal is inconsistent with trusted zero and
 fails closed without movement toward HOME. HOME activation and release must
 remain stable for 30 ms while motion is paused before they affect state or
-establish trusted zero. The integrated P1 runtime must call the nonblocking `update()`
-method regularly at a cadence materially shorter than this interval so the
+establish trusted zero. The integrated pump runtime must call the nonblocking
+`update()` method regularly at a cadence materially shorter than this interval so the
 sampling-based stability policy is meaningful; blocking delays are prohibited.
 Absolute
 movement from confirmed zero uses the same bounded stable-release policy and
@@ -327,8 +330,9 @@ unexpected activation terminates motion and leaves position untrusted. A local
 abort primitive forces STEP inactive, stops future pulses, and invalidates
 position trust after execution starts. DIR is established at least 5 us before
 the first STEP rising edge, per the installed DM542T timing contract. These
-rules are implemented and natively tested. Upload and physical invocation
-remain separate explicit approval gates.
+rules are implemented and natively tested. P1 was physically validated at its
+separate supervised checkpoint; P2 upload and physical invocation remain
+separate explicit approval gates.
 
 ### `REJECTED`
 

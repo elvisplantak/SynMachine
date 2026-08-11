@@ -15,12 +15,16 @@ PumpHomeContractStatus parsePumpHome(const InboundMessage& message,
 
   const Argument& argument = message.arguments[0];
   if (strcmp(argument.key, "pump") != 0 ||
-      argument.type != ArgumentType::STRING ||
-      strcmp(argument.value.stringValue, "P1") != 0) {
+      argument.type != ArgumentType::STRING) {
     return PumpHomeContractStatus::INVALID_ARGUMENTS;
   }
 
-  command = {PumpId::P1};
+  if (strcmp(argument.value.stringValue, "P1") == 0)
+    command = {PumpId::P1};
+  else if (strcmp(argument.value.stringValue, "P2") == 0)
+    command = {PumpId::P2};
+  else
+    return PumpHomeContractStatus::INVALID_ARGUMENTS;
   return PumpHomeContractStatus::VALID;
 }
 

@@ -166,6 +166,25 @@ void test_semantic_identity_rejects_absolute_zero_but_accepts_home_zero() {
                     positiveMoveCache.storeDetailed(value));
 }
 
+void test_semantic_identity_accepts_p2_and_detects_pump_change() {
+  CommandStatusCache cache;
+  CommandStatusRecord value = record(OPERATION_1, CommandState::ACCEPTED);
+  value.semanticIdentityKnown = true;
+  value.semanticIdentity = {CommandKind::PUMP_MOVE_ABSOLUTE_STEPS, PumpId::P2,
+                            5000};
+  TEST_ASSERT_EQUAL(CommandStatusStoreResult::STORED,
+                    cache.storeDetailed(value));
+
+  value.semanticIdentity.pump = PumpId::P1;
+  TEST_ASSERT_EQUAL(CommandStatusStoreResult::IDENTITY_CONFLICT,
+                    cache.storeDetailed(value));
+
+  CommandStatusCache homeCache;
+  value.semanticIdentity = {CommandKind::PUMP_HOME, PumpId::P2, 0};
+  TEST_ASSERT_EQUAL(CommandStatusStoreResult::STORED,
+                    homeCache.storeDetailed(value));
+}
+
 void test_started_abort_is_precise_cached_execution_failure() {
   CommandStatusCache cache;
   CommandStatusRecord value = record(OPERATION_1, CommandState::ACCEPTED);
@@ -452,6 +471,7 @@ int main(int, char**) {
   RUN_TEST(test_invalid_record_combinations_are_rejected);
   RUN_TEST(test_rejection_and_execution_error_categories_do_not_cross);
   RUN_TEST(test_semantic_identity_rejects_absolute_zero_but_accepts_home_zero);
+  RUN_TEST(test_semantic_identity_accepts_p2_and_detects_pump_change);
   RUN_TEST(test_started_abort_is_precise_cached_execution_failure);
   RUN_TEST(test_exact_unknown_and_completed_frames);
   RUN_TEST(test_all_states_maximum_frame_and_transactional_failure);

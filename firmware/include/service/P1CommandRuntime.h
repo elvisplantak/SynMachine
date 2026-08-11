@@ -15,6 +15,8 @@ namespace labforge {
 class P1CommandRuntime {
  public:
   explicit P1CommandRuntime(P1MotionController& controller);
+  P1CommandRuntime(P1MotionController& p1Controller,
+                   P1MotionController& p2Controller);
 
   DispatchResult dispatch(const uint8_t* payload, size_t length,
                           const BootIdentityResult& identity,
@@ -57,8 +59,11 @@ class P1CommandRuntime {
               uint8_t* output, size_t capacity, size_t& outputLength);
   void finish(P1MotionResult result, CommandStatusCache& cache);
   void handleSessionReplacement(const char* newNonce);
+  P1MotionController* controllerFor(PumpId pump);
 
-  P1MotionController& controller_;
+  P1MotionController& p1Controller_;
+  P1MotionController* p2Controller_ = nullptr;
+  P1MotionController* activeController_ = nullptr;
   MessageParser parser_;
   NoMotionDispatcher protocolDispatcher_;
   RuntimeState runtimeState_ = RuntimeState::IDLE;

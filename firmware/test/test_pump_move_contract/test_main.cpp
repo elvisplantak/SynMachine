@@ -54,7 +54,7 @@ class FakeExecutor : public PumpMoveAbsoluteStepsExecutor {
   }
 };
 
-void test_contract_accepts_only_exact_p1_schema_in_any_key_order() {
+void test_contract_accepts_exact_supported_pump_schema_in_any_key_order() {
   PumpMoveAbsoluteStepsCommand command{};
   InboundMessage message =
       parseCommand("{\"pump\":\"P1\",\"target_steps\":10000}");
@@ -67,11 +67,17 @@ void test_contract_accepts_only_exact_p1_schema_in_any_key_order() {
   TEST_ASSERT_EQUAL(PumpMoveContractStatus::VALID,
                     parsePumpMoveAbsoluteSteps(message, command));
   TEST_ASSERT_EQUAL_UINT16(20500, command.targetSteps);
+
+  message = parseCommand("{\"pump\":\"P2\",\"target_steps\":1}");
+  TEST_ASSERT_EQUAL(PumpMoveContractStatus::VALID,
+                    parsePumpMoveAbsoluteSteps(message, command));
+  TEST_ASSERT_EQUAL(PumpId::P2, command.pump);
+  TEST_ASSERT_EQUAL_UINT16(1, command.targetSteps);
 }
 
 void test_contract_rejects_wrong_types_ranges_and_extra_arguments() {
   const char* invalid[] = {
-      "{\"pump\":\"P2\",\"target_steps\":1}",
+      "{\"pump\":\"P3\",\"target_steps\":1}",
       "{\"pump\":\"P1\",\"target_steps\":0}",
       "{\"pump\":\"P1\",\"target_steps\":-1}",
       "{\"pump\":\"P1\",\"target_steps\":20501}",
@@ -201,7 +207,7 @@ void test_busy_cache_is_distinct_from_internal_cache_error() {
 
 int main(int, char**) {
   UNITY_BEGIN();
-  RUN_TEST(test_contract_accepts_only_exact_p1_schema_in_any_key_order);
+  RUN_TEST(test_contract_accepts_exact_supported_pump_schema_in_any_key_order);
   RUN_TEST(test_contract_rejects_wrong_types_ranges_and_extra_arguments);
   RUN_TEST(test_service_completes_once_and_exact_replay_never_executes_again);
   RUN_TEST(test_same_operation_with_changed_target_or_phase_conflicts);

@@ -25,7 +25,7 @@ InboundMessage parseCommand(const char* command, const char* arguments) {
   return parsed.message;
 }
 
-void test_accepts_only_exact_p1_argument() {
+void test_accepts_exact_supported_pump_argument() {
   PumpHomeCommand command{};
   const InboundMessage message = parseCommand("PUMP_HOME", "{\"pump\":\"P1\"}");
   TEST_ASSERT_EQUAL(PumpHomeContractStatus::VALID,
@@ -34,12 +34,18 @@ void test_accepts_only_exact_p1_argument() {
   const CommandSemanticIdentity identity = semanticIdentity(command);
   TEST_ASSERT_EQUAL(CommandKind::PUMP_HOME, identity.command);
   TEST_ASSERT_EQUAL_UINT16(0, identity.targetSteps);
+
+  const InboundMessage p2Message =
+      parseCommand("PUMP_HOME", "{\"pump\":\"P2\"}");
+  TEST_ASSERT_EQUAL(PumpHomeContractStatus::VALID,
+                    parsePumpHome(p2Message, command));
+  TEST_ASSERT_EQUAL(PumpId::P2, command.pump);
 }
 
 void test_rejects_wrong_pump_type_missing_and_extra_arguments() {
   const char* invalid[] = {
       "{}",
-      "{\"pump\":\"P2\"}",
+      "{\"pump\":\"P3\"}",
       "{\"pump\":1}",
       "{\"pump\":\"P1\",\"speed\":1}",
   };
@@ -63,7 +69,7 @@ void test_rejects_other_command_name() {
 
 int main(int, char**) {
   UNITY_BEGIN();
-  RUN_TEST(test_accepts_only_exact_p1_argument);
+  RUN_TEST(test_accepts_exact_supported_pump_argument);
   RUN_TEST(test_rejects_wrong_pump_type_missing_and_extra_arguments);
   RUN_TEST(test_rejects_other_command_name);
   return UNITY_END();

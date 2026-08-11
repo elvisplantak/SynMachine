@@ -52,7 +52,13 @@ ErrorCorrelation commandCorrelation(const InboundMessage& message) {
 }  // namespace
 
 P1CommandRuntime::P1CommandRuntime(P1MotionController& controller)
-    : controller_(controller), protocolDispatcher_(true) {}
+    : p1Controller_(controller), protocolDispatcher_(true) {}
+
+P1CommandRuntime::P1CommandRuntime(P1MotionController& p1Controller,
+                                   P1MotionController& p2Controller)
+    : p1Controller_(p1Controller),
+      p2Controller_(&p2Controller),
+      protocolDispatcher_(true) {}
 
 DispatchResult P1CommandRuntime::dispatch(
     const uint8_t* payload, size_t length, const BootIdentityResult& identity,
@@ -145,9 +151,15 @@ DispatchResult P1CommandRuntime::dispatchCommand(
     return {ParseStatus::VALID_MESSAGE, outputLength};
   }
 
+  P1MotionController* selectedController = controllerFor(semantic.pump);
+  if (selectedController == nullptr) {
+    reject(message, identity, cache, CommandErrorCode::INVALID_FIELD, output,
+           capacity, outputLength, &semantic);
+    return {ParseStatus::VALID_MESSAGE, outputLength};
+  }
   prepared = semantic.command == CommandKind::PUMP_HOME
-                 ? controller_.prepareHome()
-                 : controller_.prepareMoveAbsolute(semantic.targetSteps);
+                 ? selectedController->prepareHome()
+                 : selectedController->prepareMoveAbsolute(semantic.targetSteps);
   if (prepared != P1PrepareResult::READY) {
     reject(message, identity, cache, preflightError(prepared), output,
            capacity, outputLength, &semantic);
@@ -156,8 +168,10 @@ DispatchResult P1CommandRuntime::dispatchCommand(
 
   if (!accept(message, semantic, identity, cache, output, capacity,
               outputLength)) {
-    controller_.abort();
+    selectedController->abort();
     outputLength = 0;
+  } else {
+    activeController_ = selectedController;
   }
   return {ParseStatus::VALID_MESSAGE, outputLength};
 }
@@ -230,7 +244,8 @@ bool P1CommandRuntime::confirmStartedFrameWritten(uint32_t nowUs,
   started.state = CommandState::STARTED;
   if (!cache.store(started)) return false;
   activeRecord_ = started;
-  if (!controller_.start(nowUs)) return false;
+  if (activeController_ == nullptr || !activeController_->start(nowUs))
+    return false;
   runtimeState_ = RuntimeState::RUNNING;
   return true;
 }
@@ -243,7 +258,8 @@ bool P1CommandRuntime::startedFrameTransportFailed() {
 
 void P1CommandRuntime::update(uint32_t nowUs, CommandStatusCache& cache) {
   if (runtimeState_ != RuntimeState::RUNNING) return;
-  const P1MotionResult result = controller_.update(nowUs);
+  if (activeController_ == nullptr) return;
+  const P1MotionResult result = activeController_->update(nowUs);
   if (result != P1MotionResult::NONE) finish(result, cache);
 }
 
@@ -267,10 +283,12 @@ void P1CommandRuntime::finish(P1MotionResult result,
                         ? RuntimeState::IDLE
                         : RuntimeState::EMIT_TERMINAL;
   }
+  activeController_ = nullptr;
 }
 
 bool P1CommandRuntime::abort(CommandStatusCache& cache) {
-  if (runtimeState_ != RuntimeState::RUNNING || !controller_.abort())
+  if (runtimeState_ != RuntimeState::RUNNING || activeController_ == nullptr ||
+      !activeController_->abort())
     return false;
   activeRecord_.state = CommandState::FAILED;
   activeRecord_.executionStarted = true;
@@ -279,7 +297,14 @@ bool P1CommandRuntime::abort(CommandStatusCache& cache) {
   runtimeState_ = suppressUnsolicitedLifecycle_
                       ? RuntimeState::IDLE
                       : RuntimeState::EMIT_TERMINAL;
+  activeController_ = nullptr;
   return true;
+}
+
+P1MotionController* P1CommandRuntime::controllerFor(PumpId pump) {
+  if (pump == PumpId::P1) return &p1Controller_;
+  if (pump == PumpId::P2) return p2Controller_;
+  return nullptr;
 }
 
 void P1CommandRuntime::handleSessionReplacement(const char* newNonce) {

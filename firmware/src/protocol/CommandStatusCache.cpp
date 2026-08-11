@@ -54,7 +54,7 @@ bool validError(CommandErrorCode error) {
 }
 
 bool validSemanticIdentity(const CommandSemanticIdentity& identity) {
-  if (identity.pump != PumpId::P1) return false;
+  if (identity.pump != PumpId::P1 && identity.pump != PumpId::P2) return false;
   if (identity.command == CommandKind::PUMP_HOME)
     return identity.targetSteps == 0;
   return identity.command == CommandKind::PUMP_MOVE_ABSOLUTE_STEPS &&

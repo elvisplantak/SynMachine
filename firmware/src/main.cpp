@@ -2,6 +2,7 @@
 
 #include "actuator/P1MotionController.h"
 #include "arduino/ArduinoP1MotionIo.h"
+#include "arduino/ArduinoP2MotionIo.h"
 #include "identity/ArduinoEepromStorage.h"
 #include "identity/BootIdentityStore.h"
 #include "protocol/CommandLifecycleWriter.h"
@@ -26,7 +27,10 @@ labforge::SessionState sessionState;
 labforge::CommandStatusCache commandStatusCache;
 labforge::ArduinoP1MotionIo p1MotionIo;
 labforge::P1MotionController p1MotionController(p1MotionIo);
-labforge::P1CommandRuntime p1CommandRuntime(p1MotionController);
+labforge::ArduinoP2MotionIo p2MotionIo;
+labforge::P1MotionController p2MotionController(p2MotionIo);
+labforge::P1CommandRuntime p1CommandRuntime(p1MotionController,
+                                           p2MotionController);
 uint8_t protocolOutputFrame[labforge::kCommandStatusFrameCapacity];
 labforge::CooperativeFrameTransport frameTransport;
 volatile labforge::ParseStatus lastParseStatus = labforge::ParseStatus::NO_FRAME;
@@ -65,6 +69,7 @@ void serviceFrameTransport() {
 void setup() {
   // Pin setup is motion-inactive. Commands remain gated by HELLO/session checks.
   p1MotionIo.begin();
+  p2MotionIo.begin();
   Serial.begin(labforge::kSerialBaud);
   bootIdentityResult = bootIdentityStore.initialize();
 }

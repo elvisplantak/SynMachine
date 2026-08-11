@@ -527,6 +527,59 @@ void test_home_completion_is_cached_and_duplicate_only_replays() {
   TEST_ASSERT_EQUAL_UINT32(risingEdges, io.risingEdges);
 }
 
+void test_p2_command_selects_only_p2_controller() {
+  FakeIo p1Io;
+  FakeIo p2Io;
+  P1MotionController p1Controller(p1Io);
+  P1MotionController p2Controller(p2Io);
+  P1CommandRuntime runtime(p1Controller, p2Controller);
+  SessionState session;
+  establishSession(session);
+  CommandStatusCache cache;
+  char command[384];
+  makeCommand(command, sizeof(command), "PUMP_HOME", "{\"pump\":\"P2\"}");
+  uint8_t output[kCommandLifecycleFrameCapacity]{};
+
+  dispatch(runtime, session, cache, command, output, sizeof(output));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "\"type\":\"ACCEPTED\""));
+  size_t length = 0;
+  bool startsMotion = false;
+  TEST_ASSERT_TRUE(runtime.nextLifecycleFrame(
+      IDENTITY, cache, output, sizeof(output), length, startsMotion));
+  TEST_ASSERT_TRUE(startsMotion);
+  TEST_ASSERT_TRUE(runtime.confirmStartedFrameWritten(100, cache));
+
+  TEST_ASSERT_EQUAL_UINT32(0, p1Io.directionWrites);
+  TEST_ASSERT_EQUAL_UINT32(0, p1Io.risingEdges);
+  TEST_ASSERT_EQUAL_UINT32(1, p2Io.directionWrites);
+  runtime.update(100 + kP1DirectionSetupUs, cache);
+  TEST_ASSERT_EQUAL_UINT32(0, p1Io.risingEdges);
+  TEST_ASSERT_EQUAL_UINT32(1, p2Io.risingEdges);
+  TEST_ASSERT_EQUAL(PumpId::P2,
+                    cache.find(OPERATION)->record.semanticIdentity.pump);
+}
+
+void test_p2_is_rejected_when_runtime_has_no_p2_controller() {
+  FakeIo p1Io;
+  P1MotionController p1Controller(p1Io);
+  P1CommandRuntime runtime(p1Controller);
+  SessionState session;
+  establishSession(session);
+  CommandStatusCache cache;
+  char command[384];
+  makeCommand(command, sizeof(command), "PUMP_HOME", "{\"pump\":\"P2\"}");
+  uint8_t output[kCommandLifecycleFrameCapacity]{};
+
+  dispatch(runtime, session, cache, command, output, sizeof(output));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "\"type\":\"REJECTED\""));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "\"error_code\":\"INVALID_FIELD\""));
+  TEST_ASSERT_EQUAL_UINT32(0, p1Io.directionWrites);
+  TEST_ASSERT_EQUAL_UINT32(0, p1Io.risingEdges);
+}
+
 }  // namespace
 
 int main(int, char**) {
@@ -545,5 +598,7 @@ int main(int, char**) {
   RUN_TEST(test_hello_advertises_only_integrated_p1_capabilities);
   RUN_TEST(test_invalid_move_is_rejected_without_gpio_writes);
   RUN_TEST(test_home_completion_is_cached_and_duplicate_only_replays);
+  RUN_TEST(test_p2_command_selects_only_p2_controller);
+  RUN_TEST(test_p2_is_rejected_when_runtime_has_no_p2_controller);
   return UNITY_END();
 }

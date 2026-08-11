@@ -53,7 +53,7 @@ enum class CommandKind : uint8_t {
   PUMP_HOME,
   PUMP_MOVE_ABSOLUTE_STEPS,
 };
-enum class PumpId : uint8_t { NONE, P1 };
+enum class PumpId : uint8_t { NONE, P1, P2 };
 
 struct CommandSemanticIdentity {
   CommandKind command;

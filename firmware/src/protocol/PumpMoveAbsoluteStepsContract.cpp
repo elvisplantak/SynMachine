@@ -19,11 +19,15 @@ PumpMoveContractStatus parsePumpMoveAbsoluteSteps(
   for (uint8_t i = 0; i < message.argumentCount; ++i) {
     const Argument& argument = message.arguments[i];
     if (strcmp(argument.key, "pump") == 0) {
-      if (pumpFound || argument.type != ArgumentType::STRING ||
-          strcmp(argument.value.stringValue, "P1") != 0) {
+      if (pumpFound || argument.type != ArgumentType::STRING) {
         return PumpMoveContractStatus::INVALID_ARGUMENTS;
       }
-      parsed.pump = PumpId::P1;
+      if (strcmp(argument.value.stringValue, "P1") == 0)
+        parsed.pump = PumpId::P1;
+      else if (strcmp(argument.value.stringValue, "P2") == 0)
+        parsed.pump = PumpId::P2;
+      else
+        return PumpMoveContractStatus::INVALID_ARGUMENTS;
       pumpFound = true;
     } else if (strcmp(argument.key, "target_steps") == 0) {
       if (targetFound || argument.type != ArgumentType::INTEGER ||
