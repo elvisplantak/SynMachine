@@ -29,8 +29,10 @@ remains a supervised demo with the operator present at the power switch.
 - Search has a software timeout after 1,600 pulses. This limits command
   execution time but is not established as a physically safe missing-HOME
   travel bound and must not be described as mechanical protection. The
-  supervised-demo acceptance of missing-HOME overtravel risk remains a user
-  decision. Missing/inconsistent HOME, stuck HOME, abort, or motion failure
+  user explicitly accepts the missing-HOME overtravel risk only for supervised
+  demo operation with the operator at the power switch. HOME switches are
+  treated as functional; unattended and production operation remain out of
+  scope. Missing/inconsistent HOME, stuck HOME, abort, or motion failure
   invalidates trust.
 - Late servicing emits no catch-up burst and never shortens rising-edge spacing.
 

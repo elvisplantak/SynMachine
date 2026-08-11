@@ -529,6 +529,18 @@ mechanical failure to actuate the switch can still cause damage before the
 software pulse bound is reached. Production or unattended use remains blocked
 until an independent protection or a different safe recovery design exists.
 
+### Accepted demo-only V1-V8 homing assumption — 2026-08-11
+
+The user explicitly confirmed that the same supervised-demo assumption applies
+to V1-V8. Their manually tested HOME switches are treated as functional, the
+operator remains physically present at the power switch, and possible
+mechanical overtravel if a HOME signal fails is an accepted demo-only risk.
+Unattended and production operation remain out of scope.
+
+The V1-V8 1,600-pulse HOME-search limit is only a software execution timeout.
+It has not been physically established as a mechanically safe missing-HOME
+travel bound and must not be represented as independent end protection.
+
 ### Confirmed production P1 GPIO and LABFORGE/1 motion — 2026-08-11
 
 The supervised dry physical integration test used firmware commit
