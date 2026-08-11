@@ -66,6 +66,40 @@ void test_valve_position_accepts_only_canonical_angles() {
           command));
 }
 
+void test_valve_home_rejects_missing_extra_wrong_type_and_unsupported_value() {
+  for (const char* arguments : {
+           "{}",
+           "{\"valve\":\"V1\",\"extra\":1}",
+           "{\"valve\":1}",
+           "{\"valve\":\"V0\"}",
+           "{\"valve\":\"V9\"}",
+       }) {
+    ValveHomeCommand command{};
+    TEST_ASSERT_EQUAL(
+        ValveHomeContractStatus::INVALID_ARGUMENTS,
+        parseValveHome(parseCommand("VALVE_HOME", arguments), command));
+  }
+}
+
+void test_valve_position_rejects_missing_extra_wrong_types_and_angles() {
+  for (const char* arguments : {
+           "{\"valve\":\"V1\"}",
+           "{\"position_degrees\":90}",
+           "{\"valve\":\"V1\",\"position_degrees\":90,\"extra\":1}",
+           "{\"valve\":1,\"position_degrees\":90}",
+           "{\"valve\":\"V1\",\"position_degrees\":\"90\"}",
+           "{\"valve\":\"V9\",\"position_degrees\":90}",
+           "{\"valve\":\"V1\",\"position_degrees\":45}",
+           "{\"valve\":\"V1\",\"position_degrees\":270}",
+       }) {
+    ValveSetPositionCommand command{};
+    TEST_ASSERT_EQUAL(
+        ValveSetPositionContractStatus::INVALID_ARGUMENTS,
+        parseValveSetPosition(parseCommand("VALVE_SET_POSITION", arguments),
+                              command));
+  }
+}
+
 void test_valve_semantic_identity_distinguishes_valve_and_position() {
   const CommandSemanticIdentity home =
       semanticIdentity(ValveHomeCommand{ValveId::V2});
@@ -85,6 +119,10 @@ int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_valve_home_accepts_only_v1_through_v8);
   RUN_TEST(test_valve_position_accepts_only_canonical_angles);
+  RUN_TEST(
+      test_valve_home_rejects_missing_extra_wrong_type_and_unsupported_value);
+  RUN_TEST(
+      test_valve_position_rejects_missing_extra_wrong_types_and_angles);
   RUN_TEST(test_valve_semantic_identity_distinguishes_valve_and_position);
   return UNITY_END();
 }

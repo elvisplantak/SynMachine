@@ -73,18 +73,25 @@ ValveMotionResult ValveMotionController::update(uint32_t nowUs) {
     return ValveMotionResult::NONE;
 
   if (state_ == ValveMotionState::CONFIRMING_HOME) {
-    if (!io_.homeActive()) {
-      if (trust_ == ValvePositionTrust::TRUSTED && positionSteps_ == 0) {
-        pauseForHome(nowUs, ValveMotionState::CONFIRMING_TRUSTED_HOME);
-      } else {
-        beginMotion(ValveMotionState::SEARCHING_HOME,
-                    directionTowardHomeHigh_, nowUs);
-      }
-    } else if (timeReached(nowUs, homeStableSinceUs_ + kValveHomeStableUs)) {
+    const bool homeActive = io_.homeActive();
+    if (homeActive != homeCandidateActive_) {
+      homeCandidateActive_ = homeActive;
+      homeStableSinceUs_ = nowUs;
+      return ValveMotionResult::NONE;
+    }
+    if (!timeReached(nowUs, homeStableSinceUs_ + kValveHomeStableUs))
+      return ValveMotionResult::NONE;
+    if (homeActive) {
       positionSteps_ = 0;
       trust_ = ValvePositionTrust::TRUSTED;
       return finish(ValveMotionResult::COMPLETED);
     }
+    if (trust_ == ValvePositionTrust::TRUSTED && positionSteps_ == 0) {
+      trust_ = ValvePositionTrust::UNTRUSTED;
+      return finish(ValveMotionResult::HOME_SWITCH_UNEXPECTED);
+    }
+    beginMotion(ValveMotionState::SEARCHING_HOME, directionTowardHomeHigh_,
+                nowUs);
     return ValveMotionResult::NONE;
   }
 
@@ -150,6 +157,11 @@ ValveMotionResult ValveMotionController::update(uint32_t nowUs) {
     return ValveMotionResult::NONE;
   }
 
+  if (releasingHome_ && stageSteps_ >= kValveStepsPer90Degrees) {
+    trust_ = ValvePositionTrust::UNTRUSTED;
+    return finish(ValveMotionResult::HOME_SWITCH_STUCK);
+  }
+
   if (directionHigh_ == directionTowardHomeHigh_)
     --positionSteps_;
   else
@@ -195,6 +207,7 @@ void ValveMotionController::pauseForHome(uint32_t nowUs,
   io_.writeStep(false);
   state_ = state;
   homeStableSinceUs_ = nowUs;
+  homeCandidateActive_ = io_.homeActive();
 }
 
 bool ValveMotionController::pulseDue(uint32_t nowUs) const {

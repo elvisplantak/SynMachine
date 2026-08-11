@@ -12,10 +12,11 @@ class FakeIo final : public ValveMotionIo {
   bool direction = false;
   uint16_t pulses = 0;
   uint16_t lastHighUs = 0;
+  bool step = false;
 
   bool homeActive() const override { return home; }
   void writeDirection(bool high) override { direction = high; }
-  void writeStep(bool) override {}
+  void writeStep(bool high) override { step = high; }
   void pulseStep(uint16_t highUs) override {
     ++pulses;
     lastHighUs = highUs;
@@ -51,6 +52,66 @@ void test_home_uses_configured_direction_and_stable_high() {
   TEST_ASSERT_EQUAL(ValveMotionResult::COMPLETED,
                     controller.update(now + kValveHomeStableUs));
   TEST_ASSERT_EQUAL_UINT16(kValveStepHighUs, io.lastHighUs);
+}
+
+void test_home_candidate_bounce_holds_step_until_stable_resolution() {
+  FakeIo io;
+  ValveMotionController controller(io, true);
+  uint32_t now = 100;
+  TEST_ASSERT_EQUAL(ValvePrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(now));
+  now += kValveDirectionSetupUs;
+  TEST_ASSERT_EQUAL(ValveMotionResult::NONE, controller.update(now));
+  TEST_ASSERT_EQUAL_UINT16(1, io.pulses);
+
+  io.home = true;
+  TEST_ASSERT_EQUAL(ValveMotionResult::NONE, controller.update(++now));
+  const uint16_t pulsesAtCandidate = io.pulses;
+  TEST_ASSERT_FALSE(io.step);
+
+  io.home = false;
+  now += 1000;
+  TEST_ASSERT_EQUAL(ValveMotionResult::NONE, controller.update(now));
+  TEST_ASSERT_EQUAL_UINT16(pulsesAtCandidate, io.pulses);
+  TEST_ASSERT_EQUAL(ValveMotionResult::NONE,
+                    controller.update(now + kValveHomeStableUs - 1));
+  TEST_ASSERT_EQUAL_UINT16(pulsesAtCandidate, io.pulses);
+
+  io.home = true;
+  now += kValveHomeStableUs;
+  TEST_ASSERT_EQUAL(ValveMotionResult::NONE, controller.update(now));
+  TEST_ASSERT_EQUAL(ValveMotionResult::COMPLETED,
+                    controller.update(now + kValveHomeStableUs));
+  TEST_ASSERT_EQUAL_UINT16(pulsesAtCandidate, io.pulses);
+  TEST_ASSERT_FALSE(io.step);
+}
+
+void test_stable_low_after_home_candidate_may_resume_search() {
+  FakeIo io;
+  ValveMotionController controller(io, false);
+  uint32_t now = 100;
+  TEST_ASSERT_EQUAL(ValvePrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(now));
+  now += kValveDirectionSetupUs;
+  controller.update(now);
+  io.home = true;
+  controller.update(++now);
+  const uint16_t pulsesAtCandidate = io.pulses;
+
+  io.home = false;
+  controller.update(++now);
+  TEST_ASSERT_EQUAL(ValveMotionResult::NONE,
+                    controller.update(now + kValveHomeStableUs - 1));
+  TEST_ASSERT_EQUAL_UINT16(pulsesAtCandidate, io.pulses);
+  now += kValveHomeStableUs;
+  TEST_ASSERT_EQUAL(ValveMotionResult::NONE, controller.update(now));
+  TEST_ASSERT_EQUAL(ValveMotionState::SEARCHING_HOME, controller.state());
+  TEST_ASSERT_EQUAL_UINT16(pulsesAtCandidate, io.pulses);
+  TEST_ASSERT_FALSE(io.step);
+
+  now += kValveDirectionSetupUs;
+  TEST_ASSERT_EQUAL(ValveMotionResult::NONE, controller.update(now));
+  TEST_ASSERT_EQUAL_UINT16(pulsesAtCandidate + 1, io.pulses);
 }
 
 void test_move_home_to_90_releases_switch_and_emits_400_pulses() {
@@ -145,6 +206,72 @@ void test_abort_invalidates_started_motion() {
                     controller.positionTrust());
 }
 
+void test_missing_home_times_out_untrusted_with_step_inactive() {
+  FakeIo io;
+  ValveMotionController controller(io, true);
+  uint32_t now = 100;
+  TEST_ASSERT_EQUAL(ValvePrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(now));
+  ValveMotionResult result = ValveMotionResult::NONE;
+  for (uint16_t i = 0; i < kValveMaximumSearchSteps; ++i) {
+    now = nextPulse(now);
+    result = controller.update(now);
+  }
+  TEST_ASSERT_EQUAL(ValveMotionResult::MOTION_TIMEOUT, result);
+  TEST_ASSERT_EQUAL_UINT16(kValveMaximumSearchSteps, io.pulses);
+  TEST_ASSERT_EQUAL(ValvePositionTrust::UNTRUSTED,
+                    controller.positionTrust());
+  TEST_ASSERT_FALSE(io.step);
+  TEST_ASSERT_FALSE(controller.busy());
+}
+
+void test_home_stuck_during_release_fails_untrusted_with_step_inactive() {
+  FakeIo io;
+  ValveMotionController controller(io, true);
+  uint32_t now = 100;
+  establishHome(controller, io, now);
+  TEST_ASSERT_EQUAL(ValvePrepareResult::READY,
+                    controller.prepareSetPosition(90));
+  TEST_ASSERT_TRUE(controller.start(now));
+  ValveMotionResult result = ValveMotionResult::NONE;
+  for (uint16_t i = 0; i < kValveStepsPer90Degrees; ++i) {
+    now = nextPulse(now);
+    result = controller.update(now);
+  }
+  TEST_ASSERT_EQUAL(ValveMotionResult::HOME_SWITCH_STUCK, result);
+  TEST_ASSERT_EQUAL(ValvePositionTrust::UNTRUSTED,
+                    controller.positionTrust());
+  TEST_ASSERT_FALSE(io.step);
+  TEST_ASSERT_FALSE(controller.busy());
+}
+
+void test_stable_unexpected_home_fails_untrusted_with_step_inactive() {
+  FakeIo io;
+  ValveMotionController controller(io, true);
+  uint32_t now = 100;
+  establishHome(controller, io, now);
+  TEST_ASSERT_EQUAL(ValvePrepareResult::READY,
+                    controller.prepareSetPosition(90));
+  TEST_ASSERT_TRUE(controller.start(now));
+  io.home = false;
+  controller.update(now);
+  now += kValveHomeStableUs;
+  controller.update(now);
+  now = nextPulse(now);
+  controller.update(now);
+
+  io.home = true;
+  controller.update(++now);
+  TEST_ASSERT_EQUAL(ValveMotionResult::NONE,
+                    controller.update(now + kValveHomeStableUs - 1));
+  TEST_ASSERT_EQUAL(ValveMotionResult::HOME_SWITCH_UNEXPECTED,
+                    controller.update(now + kValveHomeStableUs));
+  TEST_ASSERT_EQUAL(ValvePositionTrust::UNTRUSTED,
+                    controller.positionTrust());
+  TEST_ASSERT_FALSE(io.step);
+  TEST_ASSERT_FALSE(controller.busy());
+}
+
 }  // namespace
 
 void setUp() {}
@@ -153,10 +280,15 @@ void tearDown() {}
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_home_uses_configured_direction_and_stable_high);
+  RUN_TEST(test_home_candidate_bounce_holds_step_until_stable_resolution);
+  RUN_TEST(test_stable_low_after_home_candidate_may_resume_search);
   RUN_TEST(test_move_home_to_90_releases_switch_and_emits_400_pulses);
   RUN_TEST(test_repeated_home_at_trusted_zero_ignores_short_low_glitch);
   RUN_TEST(test_repeated_home_at_trusted_zero_fails_closed_on_stable_low);
   RUN_TEST(test_no_catch_up_burst_after_late_update);
   RUN_TEST(test_abort_invalidates_started_motion);
+  RUN_TEST(test_missing_home_times_out_untrusted_with_step_inactive);
+  RUN_TEST(test_home_stuck_during_release_fails_untrusted_with_step_inactive);
+  RUN_TEST(test_stable_unexpected_home_fails_untrusted_with_step_inactive);
   return UNITY_END();
 }

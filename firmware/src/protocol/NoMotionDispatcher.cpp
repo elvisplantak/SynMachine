@@ -41,6 +41,15 @@ DispatchResult NoMotionDispatcher::dispatch(
     SessionState& session, const CommandStatusCache& commandStatusCache,
     uint8_t* output, size_t capacity) const {
   const ParseResult parsed = parser_.parse(payload, length);
+  return dispatchParsed(parsed, payload, length, identity, session,
+                        commandStatusCache, output, capacity);
+}
+
+DispatchResult NoMotionDispatcher::dispatchParsed(
+    const ParseResult& parsed, const uint8_t* payload, size_t length,
+    const BootIdentityResult& identity, SessionState& session,
+    const CommandStatusCache& commandStatusCache, uint8_t* output,
+    size_t capacity) const {
   size_t outputLength = 0;
   if (parsed.status != ParseStatus::VALID_MESSAGE) {
     const ErrorCorrelation correlation =

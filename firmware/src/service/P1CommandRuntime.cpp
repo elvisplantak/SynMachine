@@ -89,8 +89,8 @@ DispatchResult P1CommandRuntime::dispatch(
         parsed.status == ParseStatus::VALID_MESSAGE &&
         parsed.message.type == MessageType::HELLO && session.active() &&
         strcmp(session.nonce(), parsed.message.backendSessionNonce) != 0;
-    const DispatchResult result = protocolDispatcher_.dispatch(
-        payload, length, identity, session, cache, output, capacity);
+    const DispatchResult result = protocolDispatcher_.dispatchParsed(
+        parsed, payload, length, identity, session, cache, output, capacity);
     if (replacesSession && result.outputLength > 0)
       handleSessionReplacement(parsed.message.backendSessionNonce);
     return result;

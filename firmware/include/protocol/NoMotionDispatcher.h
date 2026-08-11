@@ -26,6 +26,11 @@ class NoMotionDispatcher {
                           const CommandStatusCache& commandStatusCache,
                           uint8_t* output,
                           size_t capacity) const;
+  DispatchResult dispatchParsed(
+      const ParseResult& parsed, const uint8_t* payload, size_t length,
+      const BootIdentityResult& identity, SessionState& session,
+      const CommandStatusCache& commandStatusCache, uint8_t* output,
+      size_t capacity) const;
   DispatchResult lineTooLong(const BootIdentityResult& identity,
                              uint8_t* output, size_t capacity) const;
 

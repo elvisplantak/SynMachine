@@ -30,12 +30,13 @@ class ValveIo final : public ValveMotionIo {
   unsigned directionWrites = 0;
   unsigned pulses = 0;
   bool direction = false;
+  bool step = false;
   bool homeActive() const override { return home; }
   void writeDirection(bool high) override {
     direction = high;
     ++directionWrites;
   }
-  void writeStep(bool) override {}
+  void writeStep(bool high) override { step = high; }
   void pulseStep(uint16_t) override { ++pulses; }
 };
 
@@ -48,6 +49,32 @@ void makeCommand(char* frame, size_t capacity, const char* command,
       "\"phase_execution_id\":\"phase-1\","
       "\"operation_command_id\":\"%s\",\"command\":\"%s\","
       "\"arguments\":%s}", NONCE, OPERATION, command, arguments);
+}
+
+void dispatchAndStart(P1CommandRuntime& runtime, SessionState& session,
+                      CommandStatusCache& cache, const char* commandName,
+                      const char* arguments, uint32_t now) {
+  char command[384];
+  makeCommand(command, sizeof(command), commandName, arguments);
+  uint8_t output[kCommandLifecycleFrameCapacity]{};
+  runtime.dispatch(reinterpret_cast<const uint8_t*>(command),
+                   std::strlen(command), IDENTITY, session, cache, output,
+                   sizeof(output));
+  size_t length = 0;
+  bool startsMotion = false;
+  TEST_ASSERT_TRUE(runtime.nextLifecycleFrame(
+      IDENTITY, cache, output, sizeof(output), length, startsMotion));
+  TEST_ASSERT_TRUE(startsMotion);
+  TEST_ASSERT_TRUE(runtime.confirmStartedFrameWritten(now, cache));
+}
+
+void establishValveHome(ValveMotionController& valve, ValveIo& io,
+                        uint32_t now) {
+  io.home = true;
+  TEST_ASSERT_EQUAL(ValvePrepareResult::READY, valve.prepareHome());
+  TEST_ASSERT_TRUE(valve.start(now));
+  TEST_ASSERT_EQUAL(ValveMotionResult::COMPLETED,
+                    valve.update(now + kValveHomeStableUs));
 }
 
 void test_v8_home_waits_for_complete_started_frame_then_selects_only_v8() {
@@ -118,6 +145,94 @@ void test_position_requires_that_selected_valve_has_been_homed() {
   TEST_ASSERT_EQUAL_UINT32(0, valveIo.pulses);
 }
 
+void test_runtime_maps_missing_home_to_valve_motion_timeout() {
+  PumpIo pumpIo;
+  P1MotionController p1(pumpIo);
+  P1MotionController p2(pumpIo);
+  ValveIo io;
+  ValveMotionController valve(io, true);
+  ValveMotionController* pointers[] = {&valve};
+  P1CommandRuntime runtime(p1, p2, pointers, 1);
+  SessionState session;
+  session.establish(NONCE);
+  CommandStatusCache cache;
+  uint32_t now = 100;
+  dispatchAndStart(runtime, session, cache, "VALVE_HOME",
+                   "{\"valve\":\"V1\"}", now);
+  for (uint16_t i = 0; i < kValveMaximumSearchSteps; ++i) {
+    now += kValveStepIntervalUs;
+    runtime.update(now, cache);
+  }
+  const CommandStatusEntry* entry = cache.find(OPERATION);
+  TEST_ASSERT_NOT_NULL(entry);
+  TEST_ASSERT_EQUAL(CommandState::FAILED, entry->record.state);
+  TEST_ASSERT_EQUAL(CommandErrorCode::VALVE_MOTION_TIMEOUT,
+                    entry->record.errorCode);
+  TEST_ASSERT_EQUAL(ValvePositionTrust::UNTRUSTED, valve.positionTrust());
+  TEST_ASSERT_FALSE(io.step);
+}
+
+void test_runtime_maps_stuck_home_during_release() {
+  PumpIo pumpIo;
+  P1MotionController p1(pumpIo);
+  P1MotionController p2(pumpIo);
+  ValveIo io;
+  ValveMotionController valve(io, true);
+  establishValveHome(valve, io, 100);
+  ValveMotionController* pointers[] = {&valve};
+  P1CommandRuntime runtime(p1, p2, pointers, 1);
+  SessionState session;
+  session.establish(NONCE);
+  CommandStatusCache cache;
+  uint32_t now = 40000;
+  dispatchAndStart(runtime, session, cache, "VALVE_SET_POSITION",
+                   "{\"valve\":\"V1\",\"position_degrees\":90}", now);
+  for (uint16_t i = 0; i < kValveStepsPer90Degrees; ++i) {
+    now += kValveStepIntervalUs;
+    runtime.update(now, cache);
+  }
+  const CommandStatusEntry* entry = cache.find(OPERATION);
+  TEST_ASSERT_NOT_NULL(entry);
+  TEST_ASSERT_EQUAL(CommandState::FAILED, entry->record.state);
+  TEST_ASSERT_EQUAL(CommandErrorCode::VALVE_HOME_SWITCH_STUCK,
+                    entry->record.errorCode);
+  TEST_ASSERT_EQUAL(ValvePositionTrust::UNTRUSTED, valve.positionTrust());
+  TEST_ASSERT_FALSE(io.step);
+}
+
+void test_runtime_maps_stable_unexpected_home_during_positioning() {
+  PumpIo pumpIo;
+  P1MotionController p1(pumpIo);
+  P1MotionController p2(pumpIo);
+  ValveIo io;
+  ValveMotionController valve(io, true);
+  establishValveHome(valve, io, 100);
+  ValveMotionController* pointers[] = {&valve};
+  P1CommandRuntime runtime(p1, p2, pointers, 1);
+  SessionState session;
+  session.establish(NONCE);
+  CommandStatusCache cache;
+  uint32_t now = 40000;
+  dispatchAndStart(runtime, session, cache, "VALVE_SET_POSITION",
+                   "{\"valve\":\"V1\",\"position_degrees\":90}", now);
+  io.home = false;
+  runtime.update(now, cache);
+  now += kValveHomeStableUs;
+  runtime.update(now, cache);
+  now += kValveStepIntervalUs;
+  runtime.update(now, cache);
+  io.home = true;
+  runtime.update(++now, cache);
+  runtime.update(now + kValveHomeStableUs, cache);
+  const CommandStatusEntry* entry = cache.find(OPERATION);
+  TEST_ASSERT_NOT_NULL(entry);
+  TEST_ASSERT_EQUAL(CommandState::FAILED, entry->record.state);
+  TEST_ASSERT_EQUAL(CommandErrorCode::VALVE_HOME_SWITCH_UNEXPECTED,
+                    entry->record.errorCode);
+  TEST_ASSERT_EQUAL(ValvePositionTrust::UNTRUSTED, valve.positionTrust());
+  TEST_ASSERT_FALSE(io.step);
+}
+
 }  // namespace
 
 void setUp() {}
@@ -127,5 +242,8 @@ int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_v8_home_waits_for_complete_started_frame_then_selects_only_v8);
   RUN_TEST(test_position_requires_that_selected_valve_has_been_homed);
+  RUN_TEST(test_runtime_maps_missing_home_to_valve_motion_timeout);
+  RUN_TEST(test_runtime_maps_stuck_home_during_release);
+  RUN_TEST(test_runtime_maps_stable_unexpected_home_during_positioning);
   return UNITY_END();
 }

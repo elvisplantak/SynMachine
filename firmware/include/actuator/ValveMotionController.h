@@ -78,6 +78,7 @@ class ValveMotionController {
   uint16_t stageSteps_ = 0;
   uint32_t nextPulseUs_ = 0;
   uint32_t homeStableSinceUs_ = 0;
+  bool homeCandidateActive_ = false;
   bool directionHigh_ = false;
   bool releasingHome_ = false;
 };
