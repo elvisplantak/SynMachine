@@ -50,7 +50,7 @@ PumpMoveContractStatus parsePumpMoveAbsoluteSteps(
 CommandSemanticIdentity semanticIdentity(
     const PumpMoveAbsoluteStepsCommand& command) {
   return {CommandKind::PUMP_MOVE_ABSOLUTE_STEPS, command.pump,
-          command.targetSteps};
+          command.targetSteps, ValveId::NONE, 0};
 }
 
 }  // namespace labforge

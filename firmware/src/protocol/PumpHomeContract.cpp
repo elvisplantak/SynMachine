@@ -29,7 +29,7 @@ PumpHomeContractStatus parsePumpHome(const InboundMessage& message,
 }
 
 CommandSemanticIdentity semanticIdentity(const PumpHomeCommand& command) {
-  return {CommandKind::PUMP_HOME, command.pump, 0};
+  return {CommandKind::PUMP_HOME, command.pump, 0, ValveId::NONE, 0};
 }
 
 }  // namespace labforge

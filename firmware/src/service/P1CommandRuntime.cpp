@@ -6,6 +6,8 @@
 #include "protocol/ProtocolErrorWriter.h"
 #include "protocol/PumpHomeContract.h"
 #include "protocol/PumpMoveAbsoluteStepsContract.h"
+#include "protocol/ValveHomeContract.h"
+#include "protocol/ValveSetPositionContract.h"
 
 namespace labforge {
 namespace {
@@ -25,6 +27,12 @@ CommandStatusRecord makeRecord(
 
 CommandErrorCode preflightError(P1PrepareResult result) {
   if (result == P1PrepareResult::BUSY) return CommandErrorCode::CONTROLLER_BUSY;
+  return CommandErrorCode::INVALID_FIELD;
+}
+
+CommandErrorCode preflightError(ValvePrepareResult result) {
+  if (result == ValvePrepareResult::BUSY)
+    return CommandErrorCode::CONTROLLER_BUSY;
   return CommandErrorCode::INVALID_FIELD;
 }
 
@@ -58,6 +66,16 @@ P1CommandRuntime::P1CommandRuntime(P1MotionController& p1Controller,
                                    P1MotionController& p2Controller)
     : p1Controller_(p1Controller),
       p2Controller_(&p2Controller),
+      protocolDispatcher_(true) {}
+
+P1CommandRuntime::P1CommandRuntime(
+    P1MotionController& p1Controller, P1MotionController& p2Controller,
+    ValveMotionController* const* valveControllers,
+    uint8_t valveControllerCount)
+    : p1Controller_(p1Controller),
+      p2Controller_(&p2Controller),
+      valveControllers_(valveControllers),
+      valveControllerCount_(valveControllerCount),
       protocolDispatcher_(true) {}
 
 DispatchResult P1CommandRuntime::dispatch(
@@ -107,6 +125,12 @@ DispatchResult P1CommandRuntime::dispatchCommand(
   PumpMoveAbsoluteStepsCommand move{};
   const PumpMoveContractStatus moveStatus =
       parsePumpMoveAbsoluteSteps(message, move);
+  ValveHomeCommand valveHome{};
+  const ValveHomeContractStatus valveHomeStatus =
+      parseValveHome(message, valveHome);
+  ValveSetPositionCommand valvePosition{};
+  const ValveSetPositionContractStatus valvePositionStatus =
+      parseValveSetPosition(message, valvePosition);
 
   CommandSemanticIdentity semantic{};
   P1PrepareResult prepared = P1PrepareResult::INVALID_TARGET;
@@ -114,10 +138,17 @@ DispatchResult P1CommandRuntime::dispatchCommand(
     semantic = semanticIdentity(home);
   } else if (moveStatus == PumpMoveContractStatus::VALID) {
     semantic = semanticIdentity(move);
+  } else if (valveHomeStatus == ValveHomeContractStatus::VALID) {
+    semantic = semanticIdentity(valveHome);
+  } else if (valvePositionStatus == ValveSetPositionContractStatus::VALID) {
+    semantic = semanticIdentity(valvePosition);
   } else {
     const bool supported =
         homeStatus != PumpHomeContractStatus::UNSUPPORTED_COMMAND ||
-        moveStatus != PumpMoveContractStatus::UNSUPPORTED_COMMAND;
+        moveStatus != PumpMoveContractStatus::UNSUPPORTED_COMMAND ||
+        valveHomeStatus != ValveHomeContractStatus::UNSUPPORTED_COMMAND ||
+        valvePositionStatus !=
+            ValveSetPositionContractStatus::UNSUPPORTED_COMMAND;
     reject(message, identity, cache,
            supported ? CommandErrorCode::INVALID_FIELD
                      : CommandErrorCode::UNSUPPORTED_COMMAND,
@@ -151,27 +182,52 @@ DispatchResult P1CommandRuntime::dispatchCommand(
     return {ParseStatus::VALID_MESSAGE, outputLength};
   }
 
-  P1MotionController* selectedController = controllerFor(semantic.pump);
-  if (selectedController == nullptr) {
-    reject(message, identity, cache, CommandErrorCode::INVALID_FIELD, output,
-           capacity, outputLength, &semantic);
-    return {ParseStatus::VALID_MESSAGE, outputLength};
-  }
-  prepared = semantic.command == CommandKind::PUMP_HOME
-                 ? selectedController->prepareHome()
-                 : selectedController->prepareMoveAbsolute(semantic.targetSteps);
-  if (prepared != P1PrepareResult::READY) {
-    reject(message, identity, cache, preflightError(prepared), output,
-           capacity, outputLength, &semantic);
-    return {ParseStatus::VALID_MESSAGE, outputLength};
+  P1MotionController* selectedController = nullptr;
+  ValveMotionController* selectedValveController = nullptr;
+  if (semantic.command == CommandKind::PUMP_HOME ||
+      semantic.command == CommandKind::PUMP_MOVE_ABSOLUTE_STEPS) {
+    selectedController = controllerFor(semantic.pump);
+    if (selectedController == nullptr) {
+      reject(message, identity, cache, CommandErrorCode::INVALID_FIELD, output,
+             capacity, outputLength, &semantic);
+      return {ParseStatus::VALID_MESSAGE, outputLength};
+    }
+    prepared = semantic.command == CommandKind::PUMP_HOME
+                   ? selectedController->prepareHome()
+                   : selectedController->prepareMoveAbsolute(
+                         semantic.targetSteps);
+    if (prepared != P1PrepareResult::READY) {
+      reject(message, identity, cache, preflightError(prepared), output,
+             capacity, outputLength, &semantic);
+      return {ParseStatus::VALID_MESSAGE, outputLength};
+    }
+  } else {
+    selectedValveController = controllerFor(semantic.valve);
+    if (selectedValveController == nullptr) {
+      reject(message, identity, cache, CommandErrorCode::INVALID_FIELD, output,
+             capacity, outputLength, &semantic);
+      return {ParseStatus::VALID_MESSAGE, outputLength};
+    }
+    const ValvePrepareResult valvePrepared =
+        semantic.command == CommandKind::VALVE_HOME
+            ? selectedValveController->prepareHome()
+            : selectedValveController->prepareSetPosition(
+                  semantic.targetDegrees);
+    if (valvePrepared != ValvePrepareResult::READY) {
+      reject(message, identity, cache, preflightError(valvePrepared), output,
+             capacity, outputLength, &semantic);
+      return {ParseStatus::VALID_MESSAGE, outputLength};
+    }
   }
 
   if (!accept(message, semantic, identity, cache, output, capacity,
               outputLength)) {
-    selectedController->abort();
+    if (selectedController != nullptr) selectedController->abort();
+    if (selectedValveController != nullptr) selectedValveController->abort();
     outputLength = 0;
   } else {
     activeController_ = selectedController;
+    activeValveController_ = selectedValveController;
   }
   return {ParseStatus::VALID_MESSAGE, outputLength};
 }
@@ -244,7 +300,11 @@ bool P1CommandRuntime::confirmStartedFrameWritten(uint32_t nowUs,
   started.state = CommandState::STARTED;
   if (!cache.store(started)) return false;
   activeRecord_ = started;
-  if (activeController_ == nullptr || !activeController_->start(nowUs))
+  const bool motionStarted = activeController_ != nullptr
+                                 ? activeController_->start(nowUs)
+                                 : activeValveController_ != nullptr &&
+                                       activeValveController_->start(nowUs);
+  if (!motionStarted)
     return false;
   runtimeState_ = RuntimeState::RUNNING;
   return true;
@@ -258,9 +318,13 @@ bool P1CommandRuntime::startedFrameTransportFailed() {
 
 void P1CommandRuntime::update(uint32_t nowUs, CommandStatusCache& cache) {
   if (runtimeState_ != RuntimeState::RUNNING) return;
-  if (activeController_ == nullptr) return;
-  const P1MotionResult result = activeController_->update(nowUs);
-  if (result != P1MotionResult::NONE) finish(result, cache);
+  if (activeController_ != nullptr) {
+    const P1MotionResult result = activeController_->update(nowUs);
+    if (result != P1MotionResult::NONE) finish(result, cache);
+  } else if (activeValveController_ != nullptr) {
+    const ValveMotionResult result = activeValveController_->update(nowUs);
+    if (result != ValveMotionResult::NONE) finishValve(result, cache);
+  }
 }
 
 void P1CommandRuntime::finish(P1MotionResult result,
@@ -286,10 +350,37 @@ void P1CommandRuntime::finish(P1MotionResult result,
   activeController_ = nullptr;
 }
 
+void P1CommandRuntime::finishValve(ValveMotionResult result,
+                                   CommandStatusCache& cache) {
+  if (result == ValveMotionResult::COMPLETED) {
+    activeRecord_.state = CommandState::COMPLETED;
+  } else {
+    activeRecord_.state = CommandState::FAILED;
+    activeRecord_.executionStarted = true;
+    if (result == ValveMotionResult::MOTION_TIMEOUT)
+      activeRecord_.errorCode = CommandErrorCode::VALVE_MOTION_TIMEOUT;
+    else if (result == ValveMotionResult::HOME_SWITCH_STUCK)
+      activeRecord_.errorCode = CommandErrorCode::VALVE_HOME_SWITCH_STUCK;
+    else
+      activeRecord_.errorCode =
+          CommandErrorCode::VALVE_HOME_SWITCH_UNEXPECTED;
+  }
+  if (cache.store(activeRecord_)) {
+    runtimeState_ = suppressUnsolicitedLifecycle_
+                        ? RuntimeState::IDLE
+                        : RuntimeState::EMIT_TERMINAL;
+  }
+  activeValveController_ = nullptr;
+}
+
 bool P1CommandRuntime::abort(CommandStatusCache& cache) {
-  if (runtimeState_ != RuntimeState::RUNNING || activeController_ == nullptr ||
-      !activeController_->abort())
+  if (runtimeState_ != RuntimeState::RUNNING)
     return false;
+  const bool aborted = activeController_ != nullptr
+                           ? activeController_->abort()
+                           : activeValveController_ != nullptr &&
+                                 activeValveController_->abort();
+  if (!aborted) return false;
   activeRecord_.state = CommandState::FAILED;
   activeRecord_.executionStarted = true;
   activeRecord_.errorCode = CommandErrorCode::COMMAND_ABORTED;
@@ -298,7 +389,17 @@ bool P1CommandRuntime::abort(CommandStatusCache& cache) {
                       ? RuntimeState::IDLE
                       : RuntimeState::EMIT_TERMINAL;
   activeController_ = nullptr;
+  activeValveController_ = nullptr;
   return true;
+}
+
+ValveMotionController* P1CommandRuntime::controllerFor(ValveId valve) {
+  if (valve < ValveId::V1 || valve > ValveId::V8 ||
+      valveControllers_ == nullptr)
+    return nullptr;
+  const uint8_t index = static_cast<uint8_t>(valve) -
+                        static_cast<uint8_t>(ValveId::V1);
+  return index < valveControllerCount_ ? valveControllers_[index] : nullptr;
 }
 
 P1MotionController* P1CommandRuntime::controllerFor(PumpId pump) {

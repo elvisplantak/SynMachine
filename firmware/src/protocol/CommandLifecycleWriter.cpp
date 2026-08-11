@@ -39,6 +39,12 @@ const char* errorText(CommandErrorCode error) {
     return "PUMP_HOME_SWITCH_UNEXPECTED";
   if (error == CommandErrorCode::PUMP_HOME_SWITCH_STUCK)
     return "PUMP_HOME_SWITCH_STUCK";
+  if (error == CommandErrorCode::VALVE_MOTION_TIMEOUT)
+    return "VALVE_MOTION_TIMEOUT";
+  if (error == CommandErrorCode::VALVE_HOME_SWITCH_UNEXPECTED)
+    return "VALVE_HOME_SWITCH_UNEXPECTED";
+  if (error == CommandErrorCode::VALVE_HOME_SWITCH_STUCK)
+    return "VALVE_HOME_SWITCH_STUCK";
   if (error == CommandErrorCode::COMMAND_ABORTED) return "COMMAND_ABORTED";
   return nullptr;
 }

@@ -50,16 +50,32 @@ bool validError(CommandErrorCode error) {
          error == CommandErrorCode::PUMP_MOTION_TIMEOUT ||
          error == CommandErrorCode::PUMP_HOME_SWITCH_UNEXPECTED ||
          error == CommandErrorCode::PUMP_HOME_SWITCH_STUCK ||
+         error == CommandErrorCode::VALVE_MOTION_TIMEOUT ||
+         error == CommandErrorCode::VALVE_HOME_SWITCH_UNEXPECTED ||
+         error == CommandErrorCode::VALVE_HOME_SWITCH_STUCK ||
          error == CommandErrorCode::COMMAND_ABORTED;
 }
 
 bool validSemanticIdentity(const CommandSemanticIdentity& identity) {
-  if (identity.pump != PumpId::P1 && identity.pump != PumpId::P2) return false;
   if (identity.command == CommandKind::PUMP_HOME)
-    return identity.targetSteps == 0;
-  return identity.command == CommandKind::PUMP_MOVE_ABSOLUTE_STEPS &&
-         identity.targetSteps >= 1 &&
-         identity.targetSteps <= kP1MaximumAbsoluteSteps;
+    return (identity.pump == PumpId::P1 || identity.pump == PumpId::P2) &&
+           identity.targetSteps == 0 && identity.valve == ValveId::NONE &&
+           identity.targetDegrees == 0;
+  if (identity.command == CommandKind::PUMP_MOVE_ABSOLUTE_STEPS)
+    return (identity.pump == PumpId::P1 || identity.pump == PumpId::P2) &&
+           identity.targetSteps >= 1 &&
+           identity.targetSteps <= kP1MaximumAbsoluteSteps &&
+           identity.valve == ValveId::NONE && identity.targetDegrees == 0;
+  const bool validValve = identity.valve >= ValveId::V1 &&
+                          identity.valve <= ValveId::V8;
+  if (identity.command == CommandKind::VALVE_HOME)
+    return identity.pump == PumpId::NONE && identity.targetSteps == 0 &&
+           validValve && identity.targetDegrees == 0;
+  return identity.command == CommandKind::VALVE_SET_POSITION &&
+         identity.pump == PumpId::NONE && identity.targetSteps == 0 &&
+         validValve && (identity.targetDegrees == 0 ||
+                        identity.targetDegrees == 90 ||
+                        identity.targetDegrees == 180);
 }
 
 }  // namespace
@@ -76,6 +92,9 @@ CommandErrorCategory commandErrorCategory(CommandErrorCode error) {
   if (error == CommandErrorCode::PUMP_MOTION_TIMEOUT ||
       error == CommandErrorCode::PUMP_HOME_SWITCH_UNEXPECTED ||
       error == CommandErrorCode::PUMP_HOME_SWITCH_STUCK ||
+      error == CommandErrorCode::VALVE_MOTION_TIMEOUT ||
+      error == CommandErrorCode::VALVE_HOME_SWITCH_UNEXPECTED ||
+      error == CommandErrorCode::VALVE_HOME_SWITCH_STUCK ||
       error == CommandErrorCode::COMMAND_ABORTED) {
     return CommandErrorCategory::EXECUTION_FAILURE;
   }
@@ -85,7 +104,8 @@ CommandErrorCategory commandErrorCategory(CommandErrorCode error) {
 bool commandSemanticIdentityEqual(const CommandSemanticIdentity& left,
                                   const CommandSemanticIdentity& right) {
   return left.command == right.command && left.pump == right.pump &&
-         left.targetSteps == right.targetSteps;
+         left.targetSteps == right.targetSteps && left.valve == right.valve &&
+         left.targetDegrees == right.targetDegrees;
 }
 
 bool commandLifecycleTransitionAllowed(CommandState from, CommandState to,

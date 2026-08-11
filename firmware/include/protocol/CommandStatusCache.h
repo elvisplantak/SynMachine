@@ -28,6 +28,9 @@ enum class CommandErrorCode : uint8_t {
   PUMP_MOTION_TIMEOUT,
   PUMP_HOME_SWITCH_UNEXPECTED,
   PUMP_HOME_SWITCH_STUCK,
+  VALVE_MOTION_TIMEOUT,
+  VALVE_HOME_SWITCH_UNEXPECTED,
+  VALVE_HOME_SWITCH_STUCK,
   COMMAND_ABORTED,
 };
 
@@ -52,13 +55,28 @@ enum class CommandKind : uint8_t {
   NONE,
   PUMP_HOME,
   PUMP_MOVE_ABSOLUTE_STEPS,
+  VALVE_HOME,
+  VALVE_SET_POSITION,
 };
 enum class PumpId : uint8_t { NONE, P1, P2 };
+enum class ValveId : uint8_t { NONE, V1, V2, V3, V4, V5, V6, V7, V8 };
 
 struct CommandSemanticIdentity {
+  constexpr CommandSemanticIdentity(
+      CommandKind commandValue = CommandKind::NONE,
+      PumpId pumpValue = PumpId::NONE, uint16_t targetStepsValue = 0,
+      ValveId valveValue = ValveId::NONE, uint16_t targetDegreesValue = 0)
+      : command(commandValue),
+        pump(pumpValue),
+        targetSteps(targetStepsValue),
+        valve(valveValue),
+        targetDegrees(targetDegreesValue) {}
+
   CommandKind command;
   PumpId pump;
   uint16_t targetSteps;
+  ValveId valve;
+  uint16_t targetDegrees;
 };
 
 struct CommandStatusRecord {

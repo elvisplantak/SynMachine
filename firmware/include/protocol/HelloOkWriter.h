@@ -8,7 +8,7 @@
 
 namespace labforge {
 
-constexpr size_t kHelloOkFrameCapacity = 320;
+constexpr size_t kHelloOkFrameCapacity = 384;
 
 bool writeHelloOk(const char* nonce, const BootIdentityResult& identity,
                   uint8_t* output, size_t capacity, size_t& outputLength,

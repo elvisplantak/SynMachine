@@ -16,9 +16,9 @@ are compact symbolic JSON and do not define actuator command names.
 ## 1. Document status and boundaries
 
 This is an approved design contract with the implementation status documented
-in Section 22. The firmware implements the protocol shell and the first
-production-wired P1 command runtime described there. The backend does not yet
-implement the real serial adapter in this contract.
+in Section 22. The firmware implements the protocol shell and the
+production-wired P1/P2 and V1-V8 command runtime described there. The backend
+does not yet implement the real serial adapter in this contract.
 
 Sections 2–19 define approved requirements and implementation order. Section 20
 lists explicitly deferred functionality, and Section 21 lists unresolved
@@ -245,7 +245,8 @@ valid parsed `HELLO`, with deterministic field order and no `reset_cause`. A
 trusted production runtime emits its numeric boot ID, `controller_state`
 `"IDLE"` or `"BUSY"` according to the command cache,
 `software_state_trust:"TRUSTED"`, and capabilities
-`PUMP_HOME` and `PUMP_MOVE_ABSOLUTE_STEPS`. The protocol-only writer mode keeps
+`PUMP_HOME`, `PUMP_MOVE_ABSOLUTE_STEPS`, `VALVE_HOME`, and
+`VALVE_SET_POSITION`. The protocol-only writer mode keeps
 the empty capability list used by its focused tests. An untrusted identity emits
 `controller_boot_id:null`,
 `controller_state:"IDENTITY_UNTRUSTED"`, and
@@ -286,6 +287,28 @@ confirmed selected-pump DIR write, followed by the configured DIR-to-STEP setup
 interval. The command is connected to the independent Arduino P1 and P2
 adapters. P1 and P2 have each been physically exercised through this runtime at
 separate supervised dry checkpoints.
+
+The approved rotary-valve commands are `VALVE_HOME` and
+`VALVE_SET_POSITION`, supported for `V1` through `V8`. `VALVE_HOME` contains
+exactly `valve`. `VALVE_SET_POSITION` contains exactly `valve` and integer
+`position_degrees`, restricted to `0`, `90`, or `180`. Position zero uses the
+homing path; 90 and 180 require position trust established by successful
+homing. The complete `STARTED` frame is handed to Serial before any valve DIR
+or STEP side effect, and only one physical command may be active globally.
+
+```json
+{"protocol":"LABFORGE/1","type":"COMMAND","backend_session_nonce":"123e4567-e89b-12d3-a456-426614174000","controller_boot_id":4294967295,"phase_execution_id":"phase-execution-1","operation_command_id":"323e4567-e89b-12d3-a456-426614174002","command":"VALVE_SET_POSITION","arguments":{"valve":"V4","position_degrees":180}}
+```
+
+Each valve has independent position trust, initially untrusted after boot.
+HOME arrival, release, and trusted-zero consistency are stability-checked for
+30 ms while STEP remains inactive. A transient inactive sample at trusted zero
+never authorizes movement farther toward HOME; persistent inconsistency fails
+closed and invalidates trust. The runtime must service `update()` frequently
+enough for sampling-based stability to be meaningful and must not add blocking
+delays. The initial motion profile uses confirmed 20 us STEP HIGH and 5 us DIR
+setup timing with a conservative 2,000 us rising-edge interval pending the
+dedicated supervised production-path checkpoint.
 
 The second approved pump command schema is `PUMP_HOME`. Its `arguments` object
 contains exactly `pump:"P1"` or `pump:"P2"`; missing, additional, incorrectly
@@ -599,7 +622,7 @@ Error codes include:
 - `CONTROLLER_BUSY`
 - `UNKNOWN_COMMAND`
 
-Future actuator-specific errors MUST be added only after actuator contracts
+Other actuator-specific errors MUST be added only after actuator contracts
 exist.
 
 The approved P1 motion contracts reserve the precise execution-failure codes
@@ -627,6 +650,11 @@ non-homing command contract.
 deliberately stopped by the local abort path. It is a cached
 `FAILED(execution_started:true)` outcome. It is not a request rejection,
 timeout, HOME fault, or proof of a particular partial physical result.
+
+The valve contracts reserve the execution-only codes `VALVE_MOTION_TIMEOUT`,
+`VALVE_HOME_SWITCH_UNEXPECTED`, and `VALVE_HOME_SWITCH_STUCK`. They are never
+request-rejection codes, and each invalidates the selected valve's position
+trust.
 
 ## 15. Retry-safety policy
 
@@ -772,6 +800,10 @@ to the replaced nonce, reports BUSY from the cache, and relies on
 so the active pump update cadence remains materially shorter than the 30 ms HOME
 stability interval. P1 and P2 firmware upload and supervised dry physical
 execution have been completed; backend orchestration remains deferred.
+The dispatcher also includes exact `VALVE_HOME` and `VALVE_SET_POSITION`
+contracts and independent V1-V8 controllers wired to the confirmed Mega pins.
+Native contract/controller/runtime verification is complete; upload and
+supervised physical execution through this production path remain deferred.
 Fail-closed recovery and provisioning remain unresolved.
 No component is claimed to measure delivered volume or provide exactly-once
 physical execution.

@@ -1,9 +1,9 @@
 # LabForge hardware commissioning plan
 
-- Status: dry commissioning completed for the currently installed valves and
-  syringe pumps, except carousel commissioning; liquid commissioning and
-  production integration remain pending
-- Updated: 2026-08-10
+- Status: dry commissioning completed for the installed actuators; V1-V8
+  production software integration complete; liquid commissioning and
+  supervised production-path physical validation remain pending
+- Updated: 2026-08-11
 
 This plan separates electrical identification, minimal motion, homing,
 position verification, dry-route checks, and liquid testing. Passing an
@@ -49,8 +49,8 @@ Explicitly deferred or still pending:
 
 - leak testing and liquid verification of physical routes
 - pump `steps/ml`, volumetric repeatability, and validated wet speed range
-- production actuator adapters, safety interlocks, disconnect/recovery and
-  fault-injection behavior
+- remaining production actuator adapters, safety interlocks,
+  disconnect/recovery and fault-injection behavior
 - end-to-end backend/firmware/UI execution
 
 ## Commissioning procedure reference

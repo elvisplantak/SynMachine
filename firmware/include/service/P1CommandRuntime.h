@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "actuator/P1MotionController.h"
+#include "actuator/ValveMotionController.h"
 #include "identity/BootIdentityStore.h"
 #include "protocol/CommandStatusCache.h"
 #include "protocol/MessageParser.h"
@@ -17,6 +18,10 @@ class P1CommandRuntime {
   explicit P1CommandRuntime(P1MotionController& controller);
   P1CommandRuntime(P1MotionController& p1Controller,
                    P1MotionController& p2Controller);
+  P1CommandRuntime(P1MotionController& p1Controller,
+                   P1MotionController& p2Controller,
+                   ValveMotionController* const* valveControllers,
+                   uint8_t valveControllerCount);
 
   DispatchResult dispatch(const uint8_t* payload, size_t length,
                           const BootIdentityResult& identity,
@@ -58,12 +63,17 @@ class P1CommandRuntime {
               const BootIdentityResult& identity, CommandStatusCache& cache,
               uint8_t* output, size_t capacity, size_t& outputLength);
   void finish(P1MotionResult result, CommandStatusCache& cache);
+  void finishValve(ValveMotionResult result, CommandStatusCache& cache);
   void handleSessionReplacement(const char* newNonce);
   P1MotionController* controllerFor(PumpId pump);
+  ValveMotionController* controllerFor(ValveId valve);
 
   P1MotionController& p1Controller_;
   P1MotionController* p2Controller_ = nullptr;
   P1MotionController* activeController_ = nullptr;
+  ValveMotionController* const* valveControllers_ = nullptr;
+  uint8_t valveControllerCount_ = 0;
+  ValveMotionController* activeValveController_ = nullptr;
   MessageParser parser_;
   NoMotionDispatcher protocolDispatcher_;
   RuntimeState runtimeState_ = RuntimeState::IDLE;

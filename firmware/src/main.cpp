@@ -3,6 +3,7 @@
 #include "actuator/P1MotionController.h"
 #include "arduino/ArduinoP1MotionIo.h"
 #include "arduino/ArduinoP2MotionIo.h"
+#include "arduino/ArduinoValveMotionIo.h"
 #include "identity/ArduinoEepromStorage.h"
 #include "identity/BootIdentityStore.h"
 #include "protocol/CommandLifecycleWriter.h"
@@ -29,8 +30,24 @@ labforge::ArduinoP1MotionIo p1MotionIo;
 labforge::P1MotionController p1MotionController(p1MotionIo);
 labforge::ArduinoP2MotionIo p2MotionIo;
 labforge::P1MotionController p2MotionController(p2MotionIo);
-labforge::P1CommandRuntime p1CommandRuntime(p1MotionController,
-                                           p2MotionController);
+labforge::ArduinoValveMotionIo valveMotionIo[] = {
+    {22, 23, 39}, {24, 25, 38}, {26, 27, 43}, {28, 29, 40},
+    {30, 31, 41}, {32, 33, 42}, {36, 37, 3},  {34, 35, 2},
+};
+labforge::ValveMotionController valveMotionControllers[] = {
+    {valveMotionIo[0], true}, {valveMotionIo[1], false},
+    {valveMotionIo[2], true}, {valveMotionIo[3], true},
+    {valveMotionIo[4], true}, {valveMotionIo[5], false},
+    {valveMotionIo[6], true}, {valveMotionIo[7], true},
+};
+labforge::ValveMotionController* valveControllerPointers[] = {
+    &valveMotionControllers[0], &valveMotionControllers[1],
+    &valveMotionControllers[2], &valveMotionControllers[3],
+    &valveMotionControllers[4], &valveMotionControllers[5],
+    &valveMotionControllers[6], &valveMotionControllers[7],
+};
+labforge::P1CommandRuntime p1CommandRuntime(
+    p1MotionController, p2MotionController, valveControllerPointers, 8);
 uint8_t protocolOutputFrame[labforge::kCommandStatusFrameCapacity];
 labforge::CooperativeFrameTransport frameTransport;
 volatile labforge::ParseStatus lastParseStatus = labforge::ParseStatus::NO_FRAME;
@@ -70,6 +87,7 @@ void setup() {
   // Pin setup is motion-inactive. Commands remain gated by HELLO/session checks.
   p1MotionIo.begin();
   p2MotionIo.begin();
+  for (labforge::ArduinoValveMotionIo& io : valveMotionIo) io.begin();
   Serial.begin(labforge::kSerialBaud);
   bootIdentityResult = bootIdentityStore.initialize();
 }
