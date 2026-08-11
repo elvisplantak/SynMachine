@@ -1,7 +1,7 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-08-11
-- Development phase: P1 physically validated; P2 production Serial/runtime software integration complete with physical upload deferred
+- Development phase: P1 and P2 production Serial/runtime paths physically validated in supervised dry tests
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
@@ -39,8 +39,13 @@
   - complete warning-clean native suite: `123/123 passed`;
   - Mega 2560 build: successful;
   - flash: `31,300 / 253,952 bytes` (`12.3%`);
-  - static RAM: `2,288 / 8,192 bytes` (`27.9%`); and
-  - P2 firmware upload and physical execution have not yet been performed.
+  - static RAM: `2,288 / 8,192 bytes` (`27.9%`);
+  - verified firmware upload to the Arduino Mega completed successfully;
+  - supervised `PUMP_HOME` physically confirmed correct movement and HOME stop;
+  - HOME -> 5,000 steps -> two-second dwell -> HOME completed smoothly;
+  - final HOME -> 2,000-step parking move completed smoothly; and
+  - no impact, slipping, binding, leakage, abnormal noise, or other unusual
+    event was observed before machine power was switched off.
 
 - Current P1 runtime checkpoint:
   - branch: `codex/p1-motion-safety-hardening`
@@ -67,7 +72,9 @@
   - refreshed no-LTO AVR stack analysis places the worst credible integrated
     parser/dispatch path at approximately `5.0 KB`, leaving approximately
     `0.9 KB` before interrupt/runtime margin; and
-  - physical upload and execution were not performed.
+  - P1 was subsequently uploaded and physically validated through the
+    production Serial/lifecycle path as recorded in
+    `HARDWARE_CONFIRMATIONS.md`.
 
 - Completed and pushed EEPROM bootstrap:
   - branch: `codex/labforge-v1-arduino-eeprom-identity-bootstrap`
