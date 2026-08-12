@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 #include "actuator/P1MotionController.h"
+#include "actuator/ColumnBottomValveMotionController.h"
 #include "arduino/ArduinoP1MotionIo.h"
 #include "arduino/ArduinoP2MotionIo.h"
 #include "arduino/ArduinoValveMotionIo.h"
@@ -46,8 +47,12 @@ labforge::ValveMotionController* valveControllerPointers[] = {
     &valveMotionControllers[4], &valveMotionControllers[5],
     &valveMotionControllers[6], &valveMotionControllers[7],
 };
+labforge::ArduinoValveMotionIo columnValveMotionIo(12, 13, 10);
+labforge::ColumnBottomValveMotionController columnValveMotionController(
+    columnValveMotionIo);
 labforge::P1CommandRuntime p1CommandRuntime(
-    p1MotionController, p2MotionController, valveControllerPointers, 8);
+    p1MotionController, p2MotionController, valveControllerPointers, 8,
+    columnValveMotionController);
 uint8_t protocolOutputFrame[labforge::kCommandStatusFrameCapacity];
 labforge::CooperativeFrameTransport frameTransport;
 volatile labforge::ParseStatus lastParseStatus = labforge::ParseStatus::NO_FRAME;
@@ -88,6 +93,7 @@ void setup() {
   p1MotionIo.begin();
   p2MotionIo.begin();
   for (labforge::ArduinoValveMotionIo& io : valveMotionIo) io.begin();
+  columnValveMotionIo.begin();
   Serial.begin(labforge::kSerialBaud);
   bootIdentityResult = bootIdentityStore.initialize();
 }

@@ -72,6 +72,12 @@ const char* errorText(CommandErrorCode error) {
     return LABFORGE_TEXT("VALVE_HOME_SWITCH_UNEXPECTED");
   if (error == CommandErrorCode::VALVE_HOME_SWITCH_STUCK)
     return LABFORGE_TEXT("VALVE_HOME_SWITCH_STUCK");
+  if (error == CommandErrorCode::COLUMN_VALVE_MOTION_TIMEOUT)
+    return LABFORGE_TEXT("COLUMN_VALVE_MOTION_TIMEOUT");
+  if (error == CommandErrorCode::COLUMN_VALVE_HOME_SWITCH_UNEXPECTED)
+    return LABFORGE_TEXT("COLUMN_VALVE_HOME_SWITCH_UNEXPECTED");
+  if (error == CommandErrorCode::COLUMN_VALVE_HOME_SWITCH_STUCK)
+    return LABFORGE_TEXT("COLUMN_VALVE_HOME_SWITCH_STUCK");
   if (error == CommandErrorCode::COMMAND_ABORTED)
     return LABFORGE_TEXT("COMMAND_ABORTED");
   return nullptr;

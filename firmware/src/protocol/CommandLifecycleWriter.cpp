@@ -45,6 +45,12 @@ const char* errorText(CommandErrorCode error) {
     return "VALVE_HOME_SWITCH_UNEXPECTED";
   if (error == CommandErrorCode::VALVE_HOME_SWITCH_STUCK)
     return "VALVE_HOME_SWITCH_STUCK";
+  if (error == CommandErrorCode::COLUMN_VALVE_MOTION_TIMEOUT)
+    return "COLUMN_VALVE_MOTION_TIMEOUT";
+  if (error == CommandErrorCode::COLUMN_VALVE_HOME_SWITCH_UNEXPECTED)
+    return "COLUMN_VALVE_HOME_SWITCH_UNEXPECTED";
+  if (error == CommandErrorCode::COLUMN_VALVE_HOME_SWITCH_STUCK)
+    return "COLUMN_VALVE_HOME_SWITCH_STUCK";
   if (error == CommandErrorCode::COMMAND_ABORTED) return "COMMAND_ABORTED";
   return nullptr;
 }

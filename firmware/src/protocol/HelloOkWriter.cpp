@@ -33,7 +33,9 @@ bool writeHelloOk(const char* nonce, const BootIdentityResult& identity,
                 "\"software_state_trust\":\"TRUSTED\","
                 "\"capabilities\":[\"PUMP_HOME\","
                 "\"PUMP_MOVE_ABSOLUTE_STEPS\",\"VALVE_HOME\","
-                "\"VALVE_SET_POSITION\"]}\n"),
+                "\"VALVE_SET_POSITION\","
+                "\"COLUMN_BOTTOM_VALVE_HOME\","
+                "\"COLUMN_BOTTOM_VALVE_SET_POSITION\"]}\n"),
             nonce, static_cast<unsigned long>(identity.controllerBootId),
             controllerState)
       : identity.trusted

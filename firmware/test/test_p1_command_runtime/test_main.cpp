@@ -472,6 +472,11 @@ void test_hello_advertises_integrated_pump_and_valve_capabilities() {
                               "\"VALVE_HOME\""));
   TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
                               "\"VALVE_SET_POSITION\""));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "\"COLUMN_BOTTOM_VALVE_HOME\""));
+  TEST_ASSERT_NOT_NULL(strstr(
+      reinterpret_cast<char*>(output),
+      "\"COLUMN_BOTTOM_VALVE_SET_POSITION\""));
   TEST_ASSERT_NULL(strstr(reinterpret_cast<char*>(output), "CAROUSEL"));
 }
 

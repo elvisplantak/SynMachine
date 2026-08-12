@@ -53,6 +53,9 @@ bool validError(CommandErrorCode error) {
          error == CommandErrorCode::VALVE_MOTION_TIMEOUT ||
          error == CommandErrorCode::VALVE_HOME_SWITCH_UNEXPECTED ||
          error == CommandErrorCode::VALVE_HOME_SWITCH_STUCK ||
+         error == CommandErrorCode::COLUMN_VALVE_MOTION_TIMEOUT ||
+         error == CommandErrorCode::COLUMN_VALVE_HOME_SWITCH_UNEXPECTED ||
+         error == CommandErrorCode::COLUMN_VALVE_HOME_SWITCH_STUCK ||
          error == CommandErrorCode::COMMAND_ABORTED;
 }
 
@@ -71,11 +74,19 @@ bool validSemanticIdentity(const CommandSemanticIdentity& identity) {
   if (identity.command == CommandKind::VALVE_HOME)
     return identity.pump == PumpId::NONE && identity.targetSteps == 0 &&
            validValve && identity.targetDegrees == 0;
-  return identity.command == CommandKind::VALVE_SET_POSITION &&
+  if (identity.command == CommandKind::VALVE_SET_POSITION)
+    return identity.pump == PumpId::NONE && identity.targetSteps == 0 &&
+           validValve && (identity.targetDegrees == 0 ||
+                          identity.targetDegrees == 90 ||
+                          identity.targetDegrees == 180);
+  if (identity.command == CommandKind::COLUMN_BOTTOM_VALVE_HOME)
+    return identity.pump == PumpId::NONE && identity.targetSteps == 0 &&
+           identity.valve == ValveId::NONE && identity.targetDegrees == 0;
+  return identity.command ==
+             CommandKind::COLUMN_BOTTOM_VALVE_SET_POSITION &&
          identity.pump == PumpId::NONE && identity.targetSteps == 0 &&
-         validValve && (identity.targetDegrees == 0 ||
-                        identity.targetDegrees == 90 ||
-                        identity.targetDegrees == 180);
+         identity.valve == ValveId::NONE &&
+         (identity.targetDegrees == 4 || identity.targetDegrees == 94);
 }
 
 }  // namespace
@@ -95,6 +106,9 @@ CommandErrorCategory commandErrorCategory(CommandErrorCode error) {
       error == CommandErrorCode::VALVE_MOTION_TIMEOUT ||
       error == CommandErrorCode::VALVE_HOME_SWITCH_UNEXPECTED ||
       error == CommandErrorCode::VALVE_HOME_SWITCH_STUCK ||
+      error == CommandErrorCode::COLUMN_VALVE_MOTION_TIMEOUT ||
+      error == CommandErrorCode::COLUMN_VALVE_HOME_SWITCH_UNEXPECTED ||
+      error == CommandErrorCode::COLUMN_VALVE_HOME_SWITCH_STUCK ||
       error == CommandErrorCode::COMMAND_ABORTED) {
     return CommandErrorCategory::EXECUTION_FAILURE;
   }

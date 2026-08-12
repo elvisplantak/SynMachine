@@ -144,17 +144,10 @@ visually known and do not require another positioning test. This confirmation
 defines the actuator positions; leak testing and fluidic execution remain
 pending separately.
 
-This wiring update does not confirm:
-
-- valve open and closed directions
-- homing behavior
-- early-switch handling
-- longer-duration thermal behavior with the 2026-08-06 driver settings
-- `ENA` wiring or behavior
-- motor power wiring
-- leak-tightness
-- fluidic routing through the valve
-- safe physical execution
+These confirmations still do not establish longer-duration thermal behavior
+with the 2026-08-06 driver settings, `ENA` wiring or behavior, leak-tightness,
+fluidic routing through the valve, independent secondary end protection, or
+safe unattended/production execution.
 
 ### Confirmed `SF_BOTTOM_VALVE` actuator and connection — 2026-08-04
 

@@ -17,8 +17,9 @@ are compact symbolic JSON and do not define actuator command names.
 
 This is an approved design contract with the implementation status documented
 in Section 22. The firmware implements the protocol shell and the
-production-wired P1/P2 and V1-V8 command runtime described there. The backend
-does not yet implement the real serial adapter in this contract.
+production-wired P1/P2, V1-V8, and COLUMN_BOTTOM_VALVE command runtime described
+there. The backend does not yet implement the real serial adapter in this
+contract.
 
 Sections 2–19 define approved requirements and implementation order. Section 20
 lists explicitly deferred functionality, and Section 21 lists unresolved
@@ -309,6 +310,23 @@ enough for sampling-based stability to be meaningful and must not add blocking
 delays. The initial motion profile uses confirmed 20 us STEP HIGH and 5 us DIR
 setup timing with a conservative 2,000 us rising-edge interval pending the
 dedicated supervised production-path checkpoint.
+
+The approved geared column-bottom-valve commands are
+`COLUMN_BOTTOM_VALVE_HOME`, with an exactly empty `arguments` object, and
+`COLUMN_BOTTOM_VALVE_SET_POSITION`, with exactly one integer
+`position_degrees` restricted to `4` (CLOSED) or `94` (OPEN). HOME is coordinate
+zero; the confirmed 80,000-pulse output revolution maps CLOSED to 889 pulses and
+OPEN to 20,889 pulses. Positioning requires trust established by successful
+homing. HOME completes at the switch, while parking at the intentional
+4-degree CLOSED offset is a separate positioning command.
+
+The column controller uses confirmed D12 STEP, D13 DIR, D10 HOME, DIR LOW toward
+HOME, bounded 20 us STEP HIGH, 5 us DIR setup, and a confirmed 1,000 us minimum
+rising-edge interval. HOME stability is sampled for 30 ms with STEP inactive.
+Its 80,000-pulse search timeout bounds software execution but is not independent
+mechanical protection or a proven safe missing-HOME distance. This remains a
+supervised-demo assumption: HOME is treated as functional, the operator remains
+at the power switch, and unattended/production operation is out of scope.
 
 The second approved pump command schema is `PUMP_HOME`. Its `arguments` object
 contains exactly `pump:"P1"` or `pump:"P2"`; missing, additional, incorrectly
@@ -656,6 +674,11 @@ The valve contracts reserve the execution-only codes `VALVE_MOTION_TIMEOUT`,
 request-rejection codes, and each invalidates the selected valve's position
 trust.
 
+The column-bottom-valve contracts analogously reserve
+`COLUMN_VALVE_MOTION_TIMEOUT`, `COLUMN_VALVE_HOME_SWITCH_UNEXPECTED`, and
+`COLUMN_VALVE_HOME_SWITCH_STUCK` as execution-only failures. Each invalidates
+column position trust and none is a request-rejection code.
+
 ## 15. Retry-safety policy
 
 Only `HELLO`, `QUERY_STATUS`, and `QUERY_COMMAND` are automatically retryable.
@@ -802,8 +825,12 @@ stability interval. P1 and P2 firmware upload and supervised dry physical
 execution have been completed; backend orchestration remains deferred.
 The dispatcher also includes exact `VALVE_HOME` and `VALVE_SET_POSITION`
 contracts and independent V1-V8 controllers wired to the confirmed Mega pins.
-Native contract/controller/runtime verification is complete; upload and
-supervised physical execution through this production path remain deferred.
+Native contract/controller/runtime verification and supervised dry production-
+path execution are complete for V1-V8. It also includes the exact
+`COLUMN_BOTTOM_VALVE_HOME` and `COLUMN_BOTTOM_VALVE_SET_POSITION` contracts and
+a separate geared-motion controller wired to D12/D13/D10. Column native
+contract/controller/runtime verification is complete; upload and supervised
+physical execution through this production path remain deferred.
 Fail-closed recovery and provisioning remain unresolved.
 No component is claimed to measure delivered volume or provide exactly-once
 physical execution.

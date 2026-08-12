@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "protocol/CommandLifecycleWriter.h"
+#include "protocol/ColumnBottomValveContract.h"
 #include "protocol/ProtocolErrorWriter.h"
 #include "protocol/PumpHomeContract.h"
 #include "protocol/PumpMoveAbsoluteStepsContract.h"
@@ -32,6 +33,12 @@ CommandErrorCode preflightError(P1PrepareResult result) {
 
 CommandErrorCode preflightError(ValvePrepareResult result) {
   if (result == ValvePrepareResult::BUSY)
+    return CommandErrorCode::CONTROLLER_BUSY;
+  return CommandErrorCode::INVALID_FIELD;
+}
+
+CommandErrorCode preflightError(ColumnValvePrepareResult result) {
+  if (result == ColumnValvePrepareResult::BUSY)
     return CommandErrorCode::CONTROLLER_BUSY;
   return CommandErrorCode::INVALID_FIELD;
 }
@@ -76,6 +83,18 @@ P1CommandRuntime::P1CommandRuntime(
       p2Controller_(&p2Controller),
       valveControllers_(valveControllers),
       valveControllerCount_(valveControllerCount),
+      protocolDispatcher_(true) {}
+
+P1CommandRuntime::P1CommandRuntime(
+    P1MotionController& p1Controller, P1MotionController& p2Controller,
+    ValveMotionController* const* valveControllers,
+    uint8_t valveControllerCount,
+    ColumnBottomValveMotionController& columnValveController)
+    : p1Controller_(p1Controller),
+      p2Controller_(&p2Controller),
+      valveControllers_(valveControllers),
+      valveControllerCount_(valveControllerCount),
+      columnValveController_(&columnValveController),
       protocolDispatcher_(true) {}
 
 DispatchResult P1CommandRuntime::dispatch(
@@ -131,6 +150,9 @@ DispatchResult P1CommandRuntime::dispatchCommand(
   ValveSetPositionCommand valvePosition{};
   const ValveSetPositionContractStatus valvePositionStatus =
       parseValveSetPosition(message, valvePosition);
+  ColumnBottomValveCommand columnValve{};
+  const ColumnValveContractStatus columnValveStatus =
+      parseColumnBottomValve(message, columnValve);
 
   CommandSemanticIdentity semantic{};
   P1PrepareResult prepared = P1PrepareResult::INVALID_TARGET;
@@ -142,13 +164,16 @@ DispatchResult P1CommandRuntime::dispatchCommand(
     semantic = semanticIdentity(valveHome);
   } else if (valvePositionStatus == ValveSetPositionContractStatus::VALID) {
     semantic = semanticIdentity(valvePosition);
+  } else if (columnValveStatus == ColumnValveContractStatus::VALID) {
+    semantic = semanticIdentity(columnValve);
   } else {
     const bool supported =
         homeStatus != PumpHomeContractStatus::UNSUPPORTED_COMMAND ||
         moveStatus != PumpMoveContractStatus::UNSUPPORTED_COMMAND ||
         valveHomeStatus != ValveHomeContractStatus::UNSUPPORTED_COMMAND ||
         valvePositionStatus !=
-            ValveSetPositionContractStatus::UNSUPPORTED_COMMAND;
+            ValveSetPositionContractStatus::UNSUPPORTED_COMMAND ||
+        columnValveStatus != ColumnValveContractStatus::UNSUPPORTED_COMMAND;
     reject(message, identity, cache,
            supported ? CommandErrorCode::INVALID_FIELD
                      : CommandErrorCode::UNSUPPORTED_COMMAND,
@@ -184,6 +209,7 @@ DispatchResult P1CommandRuntime::dispatchCommand(
 
   P1MotionController* selectedController = nullptr;
   ValveMotionController* selectedValveController = nullptr;
+  ColumnBottomValveMotionController* selectedColumnValveController = nullptr;
   if (semantic.command == CommandKind::PUMP_HOME ||
       semantic.command == CommandKind::PUMP_MOVE_ABSOLUTE_STEPS) {
     selectedController = controllerFor(semantic.pump);
@@ -201,7 +227,8 @@ DispatchResult P1CommandRuntime::dispatchCommand(
              capacity, outputLength, &semantic);
       return {ParseStatus::VALID_MESSAGE, outputLength};
     }
-  } else {
+  } else if (semantic.command == CommandKind::VALVE_HOME ||
+             semantic.command == CommandKind::VALVE_SET_POSITION) {
     selectedValveController = controllerFor(semantic.valve);
     if (selectedValveController == nullptr) {
       reject(message, identity, cache, CommandErrorCode::INVALID_FIELD, output,
@@ -218,16 +245,36 @@ DispatchResult P1CommandRuntime::dispatchCommand(
              capacity, outputLength, &semantic);
       return {ParseStatus::VALID_MESSAGE, outputLength};
     }
+  } else {
+    selectedColumnValveController = columnValveController_;
+    if (selectedColumnValveController == nullptr) {
+      reject(message, identity, cache, CommandErrorCode::INVALID_FIELD, output,
+             capacity, outputLength, &semantic);
+      return {ParseStatus::VALID_MESSAGE, outputLength};
+    }
+    const ColumnValvePrepareResult columnPrepared =
+        semantic.command == CommandKind::COLUMN_BOTTOM_VALVE_HOME
+            ? selectedColumnValveController->prepareHome()
+            : selectedColumnValveController->prepareSetPosition(
+                  semantic.targetDegrees);
+    if (columnPrepared != ColumnValvePrepareResult::READY) {
+      reject(message, identity, cache, preflightError(columnPrepared), output,
+             capacity, outputLength, &semantic);
+      return {ParseStatus::VALID_MESSAGE, outputLength};
+    }
   }
 
   if (!accept(message, semantic, identity, cache, output, capacity,
               outputLength)) {
     if (selectedController != nullptr) selectedController->abort();
     if (selectedValveController != nullptr) selectedValveController->abort();
+    if (selectedColumnValveController != nullptr)
+      selectedColumnValveController->abort();
     outputLength = 0;
   } else {
     activeController_ = selectedController;
     activeValveController_ = selectedValveController;
+    activeColumnValveController_ = selectedColumnValveController;
   }
   return {ParseStatus::VALID_MESSAGE, outputLength};
 }
@@ -302,8 +349,10 @@ bool P1CommandRuntime::confirmStartedFrameWritten(uint32_t nowUs,
   activeRecord_ = started;
   const bool motionStarted = activeController_ != nullptr
                                  ? activeController_->start(nowUs)
-                                 : activeValveController_ != nullptr &&
-                                       activeValveController_->start(nowUs);
+                                 : activeValveController_ != nullptr
+                                 ? activeValveController_->start(nowUs)
+                                 : activeColumnValveController_ != nullptr &&
+                                       activeColumnValveController_->start(nowUs);
   if (!motionStarted)
     return false;
   runtimeState_ = RuntimeState::RUNNING;
@@ -324,7 +373,36 @@ void P1CommandRuntime::update(uint32_t nowUs, CommandStatusCache& cache) {
   } else if (activeValveController_ != nullptr) {
     const ValveMotionResult result = activeValveController_->update(nowUs);
     if (result != ValveMotionResult::NONE) finishValve(result, cache);
+  } else if (activeColumnValveController_ != nullptr) {
+    const ColumnValveMotionResult result =
+        activeColumnValveController_->update(nowUs);
+    if (result != ColumnValveMotionResult::NONE)
+      finishColumnValve(result, cache);
   }
+}
+
+void P1CommandRuntime::finishColumnValve(ColumnValveMotionResult result,
+                                         CommandStatusCache& cache) {
+  if (result == ColumnValveMotionResult::COMPLETED) {
+    activeRecord_.state = CommandState::COMPLETED;
+  } else {
+    activeRecord_.state = CommandState::FAILED;
+    activeRecord_.executionStarted = true;
+    if (result == ColumnValveMotionResult::MOTION_TIMEOUT)
+      activeRecord_.errorCode = CommandErrorCode::COLUMN_VALVE_MOTION_TIMEOUT;
+    else if (result == ColumnValveMotionResult::HOME_SWITCH_STUCK)
+      activeRecord_.errorCode =
+          CommandErrorCode::COLUMN_VALVE_HOME_SWITCH_STUCK;
+    else
+      activeRecord_.errorCode =
+          CommandErrorCode::COLUMN_VALVE_HOME_SWITCH_UNEXPECTED;
+  }
+  if (cache.store(activeRecord_)) {
+    runtimeState_ = suppressUnsolicitedLifecycle_
+                        ? RuntimeState::IDLE
+                        : RuntimeState::EMIT_TERMINAL;
+  }
+  activeColumnValveController_ = nullptr;
 }
 
 void P1CommandRuntime::finish(P1MotionResult result,
@@ -378,8 +456,10 @@ bool P1CommandRuntime::abort(CommandStatusCache& cache) {
     return false;
   const bool aborted = activeController_ != nullptr
                            ? activeController_->abort()
-                           : activeValveController_ != nullptr &&
-                                 activeValveController_->abort();
+                           : activeValveController_ != nullptr
+                           ? activeValveController_->abort()
+                           : activeColumnValveController_ != nullptr &&
+                                 activeColumnValveController_->abort();
   if (!aborted) return false;
   activeRecord_.state = CommandState::FAILED;
   activeRecord_.executionStarted = true;
@@ -390,6 +470,7 @@ bool P1CommandRuntime::abort(CommandStatusCache& cache) {
                       : RuntimeState::EMIT_TERMINAL;
   activeController_ = nullptr;
   activeValveController_ = nullptr;
+  activeColumnValveController_ = nullptr;
   return true;
 }
 
