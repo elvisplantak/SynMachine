@@ -614,17 +614,20 @@ accepted demo-only HOME assumptions above remain unchanged.
 
 ### Confirmed end-to-end P1/P2 Service path — 2026-08-12
 
-The supervised dry test exercised the complete host-to-machine path through
-the Service UI/backend boundary, the durable backend command journal, the
-LABFORGE/1 Serial session, production firmware lifecycle handling, and the
-confirmed Arduino Mega GPIO controllers. The operator manually established
-and visually confirmed the safe Waste routes before enabling motor power:
+The first supervised dry test exercised the backend API, durable backend
+command journal, LABFORGE/1 Serial session, production firmware lifecycle
+handling, and confirmed Arduino Mega GPIO controllers. A subsequent supervised
+test exercised the same four operations by clicking the actual Service UI,
+thereby additionally confirming the frontend-to-backend boundary. The operator
+manually established and visually confirmed the safe Waste routes before
+enabling motor power:
 
 - `P1 -> V1(180 degrees) -> V2(180 degrees) -> Waste`
 - `P2 -> V3(180 degrees) -> V7(90 degrees) -> V8(90 degrees) -> V5(180 degrees) -> Waste`
 
-The following commands each reached a terminal `COMPLETED` result through the
-backend API and production firmware:
+The following commands each reached a terminal `COMPLETED` result first through
+direct backend API invocation and then, in the final end-to-end test, through
+the Service UI:
 
 1. P1 `PUMP_HOME`
 2. P1 `PUMP_MOVE_ABSOLUTE_STEPS` to `2,000`
@@ -634,8 +637,9 @@ backend API and production firmware:
 The operator physically confirmed correct movement toward HOME, correct stop
 on each HOME switch, and smooth absolute movement away from HOME. No impact,
 slipping, binding, abnormal sound, or other unusual physical behavior was
-observed. P1 and P2 were left at 2,000 steps before machine motor power was
-explicitly switched off.
+observed in either run. In the final UI-driven test, the UI displayed a
+successful terminal result for all four operations. P1 and P2 were left at
+2,000 steps before machine motor power was explicitly switched off.
 
 During host integration, an initial API request failed before any Serial byte
 or actuator movement because the SQLite command-journal connection was used
