@@ -8,8 +8,10 @@ version = "0.1.0"
 description = "LabForge Guided Demo backend foundation"
 requires-python = ">=3.12"
 dependencies = [
+    "dynamixel-sdk>=3.7,<4",
     "fastapi",
     "pydantic",
+    "pyserial>=3.5,<4",
     "uvicorn",
 ]
 

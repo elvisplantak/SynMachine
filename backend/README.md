@@ -2,7 +2,20 @@
 
 This repository will contain the LabForge backend and domain core. Its current focus is the Guided Demo and the data needed by Demo Log, separate from the sibling UI and firmware repositories.
 
-The first foundation is intentionally narrow: validated demo configuration, configured fluid-plan calculation, run phases, phase-dependent control policy, and a minimal FastAPI health endpoint. It does not include execution, persistence, serial communication, or hardware integration. Arduino pin assignments belong to firmware, not the backend.
+The backend contains the Guided Demo domain, persistence and execution boundaries.
+Arduino pin assignments and low-level Arduino motion remain firmware-owned.
+
+The host-connected `SF_BOTTOM_VALVE` has a production adapter for its confirmed
+U2D2/DYNAMIXEL XL430-W250-T path. The adapter is intentionally composed around
+the Arduino `HardwareContract`: it owns only the SF valve and delegates all
+other hardware commands. Application startup does not construct or run the
+physical adapter yet; that belongs to the later complete runtime-composition
+checkpoint.
+
+Confirmed defaults are ID `2`, baud `57600`, Protocol `2.0`, `CLOSED=2559`,
+`OPEN=3697`, Profile Velocity `20`, and Profile Acceleration `1`. The stable
+U2D2 `/dev/serial/by-id/...` path is supplied explicitly through
+`SfBottomValveConfiguration`; the backend never guesses a `/dev/ttyUSB*` path.
 
 ## Local setup
 
