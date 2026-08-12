@@ -9,7 +9,17 @@
 
 ### UI
 
-- Branch: `codex/sf-bottom-valve-service-ui`
+- Branch: `codex/pump-service-ui`
+- P1 and P2 Service cards now call the durable Arduino backend command API for
+  explicit `HOME` and raw `MOVE_ABSOLUTE_STEPS` actions in the canonical
+  `1..20500` range.
+- Each action creates a fresh caller-owned phase/operation identity, requires
+  an inline physical safe-route checkbox, locks its controls while pending,
+  and reports only the terminal lifecycle result returned by the backend.
+- Pump Service commands do not use browser confirmation popups and do not
+  automatically retry unknown or failed outcomes.
+- Volume, speed, relative-motion, calibration, and priming actions remain
+  intentionally disabled pending their separate contracts and calibration.
 - SF bottom valve Service control calls the confirmed backend API with explicit
   `OPEN` and `CLOSED` actions, disables controls while motion is pending, and
   shows only backend-confirmed positions as confirmed.
@@ -24,6 +34,20 @@
   displayed the corresponding backend-confirmed state after each command.
 
 ### Backend
+
+- Arduino Service integration checkpoint:
+  - branch: `codex/arduino-serial-backend-integration`;
+  - commit: `a2c78187e0741deb2971f830fd67dc8431071967`;
+  - an explicitly configured production Serial runtime owns the Arduino
+    session and a separate SQLite durable-command journal;
+  - `/api/v1/service/pumps/command` accepts caller-owned command identities,
+    P1/P2 `HOME` or absolute targets in `1..20500`, and a literal
+    `safe_route_confirmed:true` boundary;
+  - durable intent is persisted before first Serial transmission, identity
+    conflicts fail with HTTP 409, unavailable/failed Serial execution fails
+    with HTTP 503, and commands are never automatically retried; and
+  - focused backend verification passed `41` tests, the complete suite passed
+    `1053` tests, and Ruff completed cleanly.
 
 - SF bottom valve Dynamixel backend checkpoint:
   - branch: `codex/sf-bottom-valve-dynamixel-backend`;

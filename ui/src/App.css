@@ -871,6 +871,74 @@ body {
   font-size: 23px;
 }
 
+.pumpServiceHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pumpServiceHeading h3 {
+  margin: 0 0 6px;
+}
+
+.pumpServiceHeading span,
+.serviceControlNotice {
+  color: #8ea3bf;
+}
+
+.pumpServiceStatus {
+  border: 1px solid rgba(89, 134, 197, 0.45);
+  border-radius: 999px;
+  padding: 7px 11px;
+  color: #aac1df;
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.pumpServiceStatus.running {
+  border-color: rgba(242, 190, 72, 0.55);
+  color: #f2d28b;
+}
+
+.pumpServiceStatus.completed {
+  border-color: rgba(76, 210, 157, 0.55);
+  color: #8fe8bd;
+}
+
+.pumpServiceStatus.failed {
+  border-color: rgba(255, 98, 110, 0.55);
+  color: #ff9aa3;
+}
+
+.pumpTargetField,
+.safeRouteConfirmation {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  color: #b9cce3;
+  font-size: 15px;
+}
+
+.pumpTargetField input {
+  width: min(100%, 240px);
+}
+
+.safeRouteConfirmation {
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  max-width: 680px;
+  line-height: 1.45;
+}
+
+.safeRouteConfirmation input {
+  margin-top: 3px;
+}
+
+.pumpServiceCard .serviceStatusList strong {
+  overflow-wrap: anywhere;
+}
+
 .pumpSummaryGrid .serviceStatusList span {
   padding: 11px 0;
   font-size: 17px;

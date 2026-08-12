@@ -397,6 +397,12 @@ type ServiceSection =
 type SfBottomValveState = "OPEN" | "CLOSED";
 type SfBottomValveCommandStatus = "idle" | "moving" | "confirmed" | "error";
 type CommissioningPump = "P1" | "P2";
+type PumpServiceCommandStatus = "idle" | "running" | "completed" | "failed";
+type PumpServiceState = {
+  status: PumpServiceCommandStatus;
+  message: string;
+  operationCommandId: string | null;
+};
 type PumpCommissioningFields = {
   workingFull: string;
   workingEmpty: string;
@@ -1081,6 +1087,124 @@ function SfBottomValveServiceControl() {
   );
 }
 
+const initialPumpServiceState: PumpServiceState = {
+  status: "idle",
+  message: "No command has been executed in this UI session.",
+  operationCommandId: null,
+};
+
+function PumpServiceControl({ pump }: { pump: CommissioningPump }) {
+  const [targetSteps, setTargetSteps] = useState("2000");
+  const [safeRouteConfirmed, setSafeRouteConfirmed] = useState(false);
+  const [commandState, setCommandState] = useState<PumpServiceState>(initialPumpServiceState);
+  const running = commandState.status === "running";
+  const parsedTarget = Number(targetSteps);
+  const targetValid = Number.isInteger(parsedTarget) && parsedTarget >= 1 && parsedTarget <= 20500;
+
+  const executeCommand = async (command: "HOME" | "MOVE_ABSOLUTE_STEPS") => {
+    if (!safeRouteConfirmed || (command === "MOVE_ABSOLUTE_STEPS" && !targetValid)) {
+      return;
+    }
+
+    const operationCommandId = crypto.randomUUID();
+    const phaseExecutionId = `service-${pump.toLowerCase()}-${Date.now()}`;
+    setCommandState({
+      status: "running",
+      message: command === "HOME" ? `Homing ${pump}…` : `Moving ${pump} to ${parsedTarget} steps…`,
+      operationCommandId,
+    });
+
+    try {
+      const response = await fetch("/api/v1/service/pumps/command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phase_execution_id: phaseExecutionId,
+          operation_command_id: operationCommandId,
+          pump,
+          command,
+          ...(command === "MOVE_ABSOLUTE_STEPS" ? { target_steps: parsedTarget } : {}),
+          safe_route_confirmed: true,
+        }),
+      });
+      const payload = await response.json().catch(() => null) as {
+        detail?: string;
+        operation_command_id?: string;
+        state?: string;
+        error_code?: string | null;
+        execution_started?: boolean | null;
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.detail ?? `Backend returned HTTP ${response.status}`);
+      }
+      if (payload?.operation_command_id !== operationCommandId || payload.state !== "COMPLETED") {
+        const failure = payload?.error_code ? ` (${payload.error_code})` : "";
+        throw new Error(`Command ended in ${payload?.state ?? "an unknown state"}${failure}.`);
+      }
+
+      setCommandState({
+        status: "completed",
+        message: command === "HOME"
+          ? `${pump} HOME completed.`
+          : `${pump} reached ${parsedTarget} steps.`,
+        operationCommandId,
+      });
+    } catch (error) {
+      setCommandState({
+        status: "failed",
+        message: error instanceof Error ? error.message : "Unknown backend error",
+        operationCommandId,
+      });
+    }
+  };
+
+  return (
+    <section className="serviceGroup pumpServiceCard" aria-labelledby={`${pump}-service-heading`}>
+      <div className="pumpServiceHeading">
+        <div>
+          <h3 id={`${pump}-service-heading`}>{pump} syringe pump</h3>
+          <span>Arduino Mega · absolute range 1–20500 steps</span>
+        </div>
+        <strong className={`pumpServiceStatus ${commandState.status}`}>
+          {running ? "Running" : commandState.status}
+        </strong>
+      </div>
+      <div className="serviceStatusList">
+        <span>Last command result<strong>{commandState.message}</strong></span>
+        <span>Operation command ID<strong>{commandState.operationCommandId ?? "Not assigned"}</strong></span>
+      </div>
+      <label className="pumpTargetField">
+        Absolute target, steps
+        <input
+          type="number"
+          min="1"
+          max="20500"
+          step="1"
+          value={targetSteps}
+          disabled={running}
+          onChange={(event) => setTargetSteps(event.target.value)}
+        />
+      </label>
+      {!targetValid && <p className="commissioningValidation" role="alert">Target must be a whole number from 1 to 20500.</p>}
+      <label className="safeRouteConfirmation">
+        <input
+          type="checkbox"
+          checked={safeRouteConfirmed}
+          disabled={running}
+          onChange={(event) => setSafeRouteConfirmed(event.target.checked)}
+        />
+        I have physically confirmed a safe fluid route for this pump command.
+      </label>
+      <div className="serviceActionRow">
+        <button type="button" disabled={running || !safeRouteConfirmed} onClick={() => void executeCommand("HOME")}>Home</button>
+        <button type="button" disabled={running || !safeRouteConfirmed || !targetValid} onClick={() => void executeCommand("MOVE_ABSOLUTE_STEPS")}>Move to position</button>
+      </div>
+      <p className="serviceControlNotice">Supervised direct hardware command. Unknown outcomes are not retried automatically.</p>
+    </section>
+  );
+}
+
 const emptyPumpCommissioningFields: PumpCommissioningFields = {
   workingFull: "",
   workingEmpty: "",
@@ -1135,14 +1259,14 @@ function PumpCommissioning() {
         ))}
       </div>
 
-      <div className="commissioningNotice" role="note">Hardware actions are unavailable in this frontend draft.</div>
+      <div className="commissioningNotice" role="note">Live HOME and absolute-position actions are available in the pump cards above. Calibration and speed controls remain inactive.</div>
 
       <section className="commissioningBlock">
         <div className="commissioningBlockTitle"><h3>Current information</h3><span className="commissioningBadge confirmedBadge">Confirmed orientation</span></div>
         <dl className="commissioningInfoGrid">
           <div><dt>Selected pump</dt><dd>{selectedPump}</dd></div>
-          <div><dt>Hardware connection</dt><dd>Not connected to backend</dd></div>
-          <div><dt>Homing state</dt><dd>Unknown — frontend draft</dd></div>
+          <div><dt>Hardware connection</dt><dd>Service command path available above</dd></div>
+          <div><dt>Homing state</dt><dd>Not persisted in this UI session</dd></div>
           <div><dt>Current position</dt><dd>Unavailable</dd></div>
           <div><dt>Syringe capacity</dt><dd>20 mL</dd></div>
           <div><dt>Home position</dt><dd>0 steps</dd></div>
@@ -1208,7 +1332,7 @@ function PumpCommissioning() {
 
       <aside className="commissioningEngineeringNote">
         <strong>Startup and homing note</strong>
-        <ul><li>Normal cold startup requires homing all confirmed motorized valves and both pumps.</li><li>Pump homing is not repeated before every normal stroke.</li><li>Re-homing is required after loss of trusted position, including power interruption or interrupted motion.</li><li>The Column bottom valve homing direction and open/closed mapping remain pending physical confirmation.</li></ul>
+        <ul><li>Normal cold startup requires homing all confirmed motorized valves and both pumps.</li><li>Pump homing is not repeated before every normal stroke.</li><li>Re-homing is required after loss of trusted position, including power interruption or interrupted motion.</li><li>The Column bottom valve uses its separately confirmed 4° CLOSED and 94° OPEN positions.</li></ul>
       </aside>
     </section>
   );
@@ -1254,8 +1378,8 @@ function ServiceSectionContent({ section }: { section: ServiceSection }) {
   if (section === "pumps") {
     return (
       <>
-        <div className="serviceSectionHeading servicePumpsHeading"><span className="panelEyebrow">Syringe pump draft</span><h2>Pumps</h2><p>P1 and P2 use separate aspirate and dispense phases.</p></div>
-        <div className="serviceTwoColumn pumpSummaryGrid">{["P1", "P2"].map((pump) => <section className="serviceGroup" key={pump}><h3>{pump} syringe pump</h3><div className="serviceStatusList"><span>Homing state<strong>Unknown</strong></span><span>Syringe position<strong>Not connected</strong></span><span>Commanded volume<strong>Not configured</strong></span><span>Commanded rate<strong>Not configured</strong></span></div><div className="serviceActionRow"><DisabledServiceButton>Home</DisabledServiceButton><DisabledServiceButton>Aspirate</DisabledServiceButton><DisabledServiceButton>Dispense</DisabledServiceButton></div></section>)}</div>
+        <div className="serviceSectionHeading servicePumpsHeading"><span className="panelEyebrow">Supervised hardware service</span><h2>Pumps</h2><p>P1 and P2 expose HOME and raw absolute-step positioning through the durable backend command path. Volume control remains pending calibration.</p></div>
+        <div className="serviceTwoColumn pumpSummaryGrid">{(["P1", "P2"] as const).map((pump) => <PumpServiceControl pump={pump} key={pump} />)}</div>
         <PumpCommissioning />
       </>
     );
