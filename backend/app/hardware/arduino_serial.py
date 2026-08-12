@@ -146,6 +146,10 @@ class ArduinoSerialClient:
     def capabilities(self) -> frozenset[str]:
         return self._capabilities
 
+    @property
+    def controller_boot_id(self) -> int | None:
+        return self._controller_boot_id
+
     def connect(self) -> HelloOk:
         self.close()
         try:
