@@ -13,8 +13,9 @@
 - SF bottom valve Service control calls the confirmed backend API with explicit
   `OPEN` and `CLOSED` actions, disables controls while motion is pending, and
   shows only backend-confirmed positions as confirmed.
-- Each physical command requires an explicit browser confirmation; other
-  actuator controls remain disabled at this checkpoint.
+- The live buttons execute directly without a browser popup, remain disabled
+  while motion is pending, and other actuator controls remain disabled at this
+  checkpoint.
 - The Vite development server proxies `/api` to the local backend on
   `127.0.0.1:8000`.
 

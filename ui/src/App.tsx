@@ -1029,9 +1029,6 @@ function SfBottomValveServiceControl() {
   const [message, setMessage] = useState("No position has been confirmed in this UI session.");
 
   const commandState = async (state: SfBottomValveState) => {
-    if (!window.confirm(`Move the SF bottom valve to ${state}? Keep the mechanism supervised.`)) {
-      return;
-    }
     setCommandStatus("moving");
     setMessage(`Moving SF bottom valve to ${state}…`);
 
