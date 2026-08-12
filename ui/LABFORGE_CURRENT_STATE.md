@@ -20,6 +20,12 @@
   automatically retry unknown or failed outcomes.
 - Volume, speed, relative-motion, calibration, and priming actions remain
   intentionally disabled pending their separate contracts and calibration.
+- The complete P1/P2 Service path was physically validated in a supervised dry
+  test through UI/backend intent handling, LABFORGE/1 Serial, production
+  firmware, and Arduino GPIO: both pumps completed HOME followed by an absolute
+  move to 2,000 steps on their manually confirmed Waste routes, with no impact,
+  slipping, binding, or abnormal sound. Machine motor power was then switched
+  off explicitly.
 - SF bottom valve Service control calls the confirmed backend API with explicit
   `OPEN` and `CLOSED` actions, disables controls while motion is pending, and
   shows only backend-confirmed positions as confirmed.
@@ -37,7 +43,9 @@
 
 - Arduino Service integration checkpoint:
   - branch: `codex/arduino-serial-backend-integration`;
-  - commit: `a2c78187e0741deb2971f830fd67dc8431071967`;
+  - commits: `a2c78187e0741deb2971f830fd67dc8431071967`,
+    `94a2c46` (`Wait for Mega reset before serial handshake`), and `8456841`
+    (`Make Arduino journal thread safe`);
   - an explicitly configured production Serial runtime owns the Arduino
     session and a separate SQLite durable-command journal;
   - `/api/v1/service/pumps/command` accepts caller-owned command identities,
@@ -46,8 +54,12 @@
   - durable intent is persisted before first Serial transmission, identity
     conflicts fail with HTTP 409, unavailable/failed Serial execution fails
     with HTTP 503, and commands are never automatically retried; and
-  - focused backend verification passed `41` tests, the complete suite passed
-    `1053` tests, and Ruff completed cleanly.
+  - the runtime waits for the Mega USB-reset settling interval before HELLO,
+    and the SQLite journal serializes access across FastAPI worker threads;
+  - focused regression verification passed and the complete suite passed
+    `1055` tests, with Ruff clean; and
+  - P1 HOME/2,000 and P2 HOME/2,000 were physically completed through this
+    backend path in supervised dry operation.
 
 - SF bottom valve Dynamixel backend checkpoint:
   - branch: `codex/sf-bottom-valve-dynamixel-backend`;
