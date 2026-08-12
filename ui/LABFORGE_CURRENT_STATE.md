@@ -18,6 +18,10 @@
   checkpoint.
 - The Vite development server proxies `/api` to the local backend on
   `127.0.0.1:8000`.
+- The live UI path was physically validated in supervised operation: `Open`
+  moved the valve to its confirmed open position, `Close` returned it to the
+  physically confirmed closed position without a browser popup, and the UI
+  displayed the corresponding backend-confirmed state after each command.
 
 ### Backend
 
