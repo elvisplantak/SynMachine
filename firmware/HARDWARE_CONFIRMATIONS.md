@@ -612,6 +612,44 @@ absolute-position motion path for the supervised dry demo. It does not establish
 wet volume accuracy or authorize unattended or production operation; the
 accepted demo-only HOME assumptions above remain unchanged.
 
+### Confirmed end-to-end P1/P2 Service path — 2026-08-12
+
+The supervised dry test exercised the complete host-to-machine path through
+the Service UI/backend boundary, the durable backend command journal, the
+LABFORGE/1 Serial session, production firmware lifecycle handling, and the
+confirmed Arduino Mega GPIO controllers. The operator manually established
+and visually confirmed the safe Waste routes before enabling motor power:
+
+- `P1 -> V1(180 degrees) -> V2(180 degrees) -> Waste`
+- `P2 -> V3(180 degrees) -> V7(90 degrees) -> V8(90 degrees) -> V5(180 degrees) -> Waste`
+
+The following commands each reached a terminal `COMPLETED` result through the
+backend API and production firmware:
+
+1. P1 `PUMP_HOME`
+2. P1 `PUMP_MOVE_ABSOLUTE_STEPS` to `2,000`
+3. P2 `PUMP_HOME`
+4. P2 `PUMP_MOVE_ABSOLUTE_STEPS` to `2,000`
+
+The operator physically confirmed correct movement toward HOME, correct stop
+on each HOME switch, and smooth absolute movement away from HOME. No impact,
+slipping, binding, abnormal sound, or other unusual physical behavior was
+observed. P1 and P2 were left at 2,000 steps before machine motor power was
+explicitly switched off.
+
+During host integration, an initial API request failed before any Serial byte
+or actuator movement because the SQLite command-journal connection was used
+from a different backend worker thread. The backend was corrected to serialize
+access to a cross-thread-enabled connection and regression-tested. The backend
+also waits for the Arduino Mega USB-reset settling interval before performing
+the LABFORGE/1 handshake. These host corrections were in effect for all four
+successful physical commands listed above.
+
+This confirms the complete supervised dry P1/P2 Service control path. It does
+not establish wet volume calibration, dead-volume compensation, leak-tightness,
+automatic route planning, or unattended/production operation. The accepted
+demo-only HOME assumptions remain unchanged.
+
 ### Confirmed carousel control path and position model — 2026-08-10
 
 The user physically identified the lowest installed driver as the carousel
