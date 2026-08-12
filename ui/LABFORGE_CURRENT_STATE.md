@@ -21,11 +21,16 @@
 - Volume, speed, relative-motion, calibration, and priming actions remain
   intentionally disabled pending their separate contracts and calibration.
 - The complete P1/P2 Service path was physically validated in a supervised dry
-  test through UI/backend intent handling, LABFORGE/1 Serial, production
-  firmware, and Arduino GPIO: both pumps completed HOME followed by an absolute
-  move to 2,000 steps on their manually confirmed Waste routes, with no impact,
-  slipping, binding, or abnormal sound. Machine motor power was then switched
-  off explicitly.
+  test using the actual UI controls through backend intent handling,
+  LABFORGE/1 Serial, production firmware, and Arduino GPIO: both pumps
+  completed HOME followed by an absolute move to 2,000 steps on their manually
+  confirmed Waste routes, all four UI operations reported success, and no
+  impact, slipping, binding, or abnormal sound was observed. Machine motor
+  power was then switched off explicitly.
+- Minor deferred UI issue: after the safe-route checkbox enables a pump action,
+  the enabled button does not change to a sufficiently distinct visual color.
+  This did not prevent execution and is not part of the confirmed hardware
+  behavior.
 - SF bottom valve Service control calls the confirmed backend API with explicit
   `OPEN` and `CLOSED` actions, disables controls while motion is pending, and
   shows only backend-confirmed positions as confirmed.
