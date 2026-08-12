@@ -73,6 +73,7 @@ class SerialPort(Protocol):
 class ArduinoSerialConfiguration:
     port: str
     baud_rate: int = 115200
+    reset_settle_seconds: float = 2.5
     handshake_timeout_seconds: float = 2.0
     command_timeout_seconds: float = 60.0
     read_chunk_size: int = 64
@@ -82,6 +83,8 @@ class ArduinoSerialConfiguration:
             raise ValueError("Arduino serial port must not be empty")
         if self.baud_rate <= 0:
             raise ValueError("Arduino baud rate must be positive")
+        if self.reset_settle_seconds < 0:
+            raise ValueError("Arduino reset settle time must not be negative")
         if self.handshake_timeout_seconds <= 0 or self.command_timeout_seconds <= 0:
             raise ValueError("Arduino timeouts must be positive")
         if not 1 <= self.read_chunk_size <= 512:
@@ -109,12 +112,14 @@ class ArduinoSerialClient:
         *,
         port_factory: Callable[[ArduinoSerialConfiguration], SerialPort] | None = None,
         monotonic: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
         nonce_factory: Callable[[], uuid.UUID] = uuid.uuid4,
         request_id_factory: Callable[[], uuid.UUID] = uuid.uuid4,
     ) -> None:
         self._configuration = configuration
         self._port_factory = port_factory or self._open_port
         self._monotonic = monotonic
+        self._sleep = sleep
         self._nonce_factory = nonce_factory
         self._request_id_factory = request_id_factory
         self._port: SerialPort | None = None
@@ -154,6 +159,10 @@ class ArduinoSerialClient:
         self.close()
         try:
             self._port = self._port_factory(self._configuration)
+            # Opening the Mega 2560 USB serial port asserts DTR and resets the
+            # board. Wait for the bootloader and firmware setup before sending
+            # HELLO; otherwise the first frame can be consumed during reset.
+            self._sleep(self._configuration.reset_settle_seconds)
             self._parser = NdjsonStreamParser()
             self._pending_messages.clear()
             nonce = str(self._nonce_factory())

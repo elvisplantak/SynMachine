@@ -86,10 +86,29 @@ def client_for(incoming: bytes) -> tuple[ArduinoSerialClient, FakePort]:
         ArduinoSerialConfiguration(port="/dev/test", command_timeout_seconds=0.1),
         port_factory=lambda _: port,
         monotonic=Clock(),
+        sleep=lambda _: None,
         nonce_factory=lambda: NONCE,
         request_id_factory=lambda: REQUEST_ID,
     )
     return client, port
+
+
+def test_handshake_waits_for_mega_reset_before_sending_hello() -> None:
+    port = FakePort(hello_ok())
+    sleeps: list[float] = []
+    client = ArduinoSerialClient(
+        ArduinoSerialConfiguration(port="/dev/test", reset_settle_seconds=2.5),
+        port_factory=lambda _: port,
+        monotonic=Clock(),
+        sleep=sleeps.append,
+        nonce_factory=lambda: NONCE,
+        request_id_factory=lambda: REQUEST_ID,
+    )
+
+    client.connect()
+
+    assert sleeps == [2.5]
+    assert len(port.writes) == 1
 
 
 def test_handshake_establishes_trusted_session_and_capabilities() -> None:
@@ -240,6 +259,7 @@ def test_multiple_lifecycle_frames_in_one_read_are_not_discarded() -> None:
         ),
         port_factory=lambda _: port,
         monotonic=Clock(),
+        sleep=lambda _: None,
         nonce_factory=lambda: NONCE,
         request_id_factory=lambda: REQUEST_ID,
     )
