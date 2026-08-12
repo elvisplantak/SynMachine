@@ -1,7 +1,7 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-08-11
-- Development phase: P1 and P2 production Serial/runtime paths physically validated in supervised dry tests
+- Checkpoint date: 2026-08-12
+- Development phase: P1, P2, and V1-V8 production Serial/runtime paths physically validated in supervised dry tests
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
@@ -44,8 +44,14 @@
   - the no-LTO AVR stack analysis removed simultaneous double parsing and
     places the worst credible project path at approximately `3.8 KB`, leaving
     approximately `1.7 KB` after static data before interrupt/runtime margin;
-  - firmware upload and supervised V1-V8 production-path execution remain
-    separate approval gates and have not occurred for this checkpoint; and
+  - firmware commit `c6a523440f4c187f092926db242d7b9e317d94a3` was uploaded
+    and flash-verified on the Arduino Mega;
+  - the production Serial/lifecycle path was physically validated first with
+    V1 HOME and then with the complete V1-V8 cascade: each valve homed and
+    moved to nominal 90 degrees, with a two-second dwell between valves;
+  - every command completed with `ACCEPTED -> STARTED -> COMPLETED`, and the
+    user confirmed correct HOME behavior, released switches at final 90-degree
+    positions, and no impact, slipping, or abnormal sound; and
   - the 1,600-pulse missing-HOME software timeout is not established as
     mechanical protection. The user explicitly accepts missing-HOME overtravel
     only as a supervised-demo risk with the operator at the power switch;
