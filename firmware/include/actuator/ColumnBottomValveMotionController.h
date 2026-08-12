@@ -75,6 +75,7 @@ class ColumnBottomValveMotionController {
   bool homeCandidateActive_ = false;
   bool directionHigh_ = false;
   bool releasingHome_ = false;
+  bool releaseTravelExhausted_ = false;
 };
 
 }  // namespace labforge

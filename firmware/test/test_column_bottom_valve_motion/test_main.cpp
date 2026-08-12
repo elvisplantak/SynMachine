@@ -13,6 +13,7 @@ class FakeIo final : public ValveMotionIo {
   bool step = false;
   uint32_t pulses = 0;
   uint16_t lastHighUs = 0;
+  uint32_t releaseHomeAfterPulse = 0;
 
   bool homeActive() const override { return home; }
   void writeDirection(bool high) override { direction = high; }
@@ -20,6 +21,8 @@ class FakeIo final : public ValveMotionIo {
   void pulseStep(uint16_t highUs) override {
     ++pulses;
     lastHighUs = highUs;
+    if (releaseHomeAfterPulse != 0 && pulses == releaseHomeAfterPulse)
+      home = false;
   }
 };
 
@@ -110,6 +113,31 @@ void test_untrusted_position_rejects_move_and_abort_invalidates_trust() {
   TEST_ASSERT_FALSE(io.step);
 }
 
+void test_final_closed_pulse_may_release_home_without_extra_travel() {
+  FakeIo io;
+  ColumnBottomValveMotionController controller(io);
+  uint32_t now = 100;
+  establishHome(controller, io, now);
+  io.releaseHomeAfterPulse = kColumnValveClosedSteps;
+  TEST_ASSERT_EQUAL(ColumnValvePrepareResult::READY,
+                    controller.prepareSetPosition(4));
+  TEST_ASSERT_TRUE(controller.start(now));
+  runPulses(controller, now, kColumnValveClosedSteps);
+  TEST_ASSERT_EQUAL_UINT32(kColumnValveClosedSteps, io.pulses);
+  TEST_ASSERT_FALSE(io.home);
+  TEST_ASSERT_EQUAL(ColumnValveMotionResult::NONE,
+                    controller.update(now + kColumnValveHomeStableUs - 1));
+  TEST_ASSERT_EQUAL_UINT32(kColumnValveClosedSteps, io.pulses);
+  TEST_ASSERT_EQUAL(ColumnValveMotionResult::COMPLETED,
+                    controller.update(now + kColumnValveHomeStableUs));
+  TEST_ASSERT_EQUAL_UINT32(kColumnValveClosedSteps, io.pulses);
+  TEST_ASSERT_EQUAL_UINT32(kColumnValveClosedSteps,
+                           controller.positionSteps());
+  TEST_ASSERT_EQUAL(ColumnValvePositionTrust::TRUSTED,
+                    controller.positionTrust());
+  TEST_ASSERT_FALSE(io.step);
+}
+
 void test_stuck_and_unexpected_home_fail_closed() {
   FakeIo io;
   ColumnBottomValveMotionController controller(io);
@@ -118,10 +146,13 @@ void test_stuck_and_unexpected_home_fail_closed() {
   TEST_ASSERT_EQUAL(ColumnValvePrepareResult::READY,
                     controller.prepareSetPosition(4));
   TEST_ASSERT_TRUE(controller.start(now));
-  runPulses(controller, now, kColumnValveClosedSteps - 1);
-  now += kColumnValveStepIntervalUs;
+  runPulses(controller, now, kColumnValveClosedSteps);
+  TEST_ASSERT_EQUAL_UINT32(kColumnValveClosedSteps, io.pulses);
+  TEST_ASSERT_EQUAL(ColumnValveMotionResult::NONE,
+                    controller.update(now + kColumnValveHomeStableUs - 1));
+  TEST_ASSERT_EQUAL_UINT32(kColumnValveClosedSteps, io.pulses);
   TEST_ASSERT_EQUAL(ColumnValveMotionResult::HOME_SWITCH_STUCK,
-                    controller.update(now));
+                    controller.update(now + kColumnValveHomeStableUs));
   TEST_ASSERT_EQUAL(ColumnValvePositionTrust::UNTRUSTED,
                     controller.positionTrust());
   TEST_ASSERT_FALSE(io.step);
@@ -170,6 +201,7 @@ int main(int, char**) {
   RUN_TEST(test_home_uses_low_direction_and_stable_high);
   RUN_TEST(test_closed_and_open_use_confirmed_absolute_steps);
   RUN_TEST(test_untrusted_position_rejects_move_and_abort_invalidates_trust);
+  RUN_TEST(test_final_closed_pulse_may_release_home_without_extra_travel);
   RUN_TEST(test_stuck_and_unexpected_home_fail_closed);
   RUN_TEST(test_missing_home_times_out_and_invalidates_trust);
   return UNITY_END();

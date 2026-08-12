@@ -110,13 +110,25 @@ ColumnValveMotionResult ColumnBottomValveMotionController::update(
   }
 
   if (state_ == ColumnValveMotionState::CONFIRMING_HOME_RELEASE) {
-    if (io_.homeActive()) {
-      releasingHome_ = true;
+    const bool homeActive = io_.homeActive();
+    if (homeActive != homeCandidateActive_) {
+      homeCandidateActive_ = homeActive;
+      homeStableSinceUs_ = nowUs;
+      return ColumnValveMotionResult::NONE;
+    }
+    if (!timeReached(nowUs, homeStableSinceUs_ + kColumnValveHomeStableUs))
+      return ColumnValveMotionResult::NONE;
+    if (!homeActive) {
+      releasingHome_ = false;
+      releaseTravelExhausted_ = false;
+      if (positionSteps_ == targetSteps_)
+        return finish(ColumnValveMotionResult::COMPLETED);
       nextPulseUs_ = nowUs + kColumnValveStepIntervalUs;
       state_ = ColumnValveMotionState::MOVING;
-    } else if (timeReached(nowUs,
-                           homeStableSinceUs_ + kColumnValveHomeStableUs)) {
-      releasingHome_ = false;
+    } else if (releaseTravelExhausted_) {
+      trust_ = ColumnValvePositionTrust::UNTRUSTED;
+      return finish(ColumnValveMotionResult::HOME_SWITCH_STUCK);
+    } else {
       nextPulseUs_ = nowUs + kColumnValveStepIntervalUs;
       state_ = ColumnValveMotionState::MOVING;
     }
@@ -164,14 +176,15 @@ ColumnValveMotionResult ColumnBottomValveMotionController::update(
     return ColumnValveMotionResult::NONE;
   }
 
-  if (releasingHome_ && stageSteps_ >= kColumnValveClosedSteps) {
-    trust_ = ColumnValvePositionTrust::UNTRUSTED;
-    return finish(ColumnValveMotionResult::HOME_SWITCH_STUCK);
-  }
   if (directionHigh_ == kDirectionTowardHomeHigh)
     --positionSteps_;
   else
     ++positionSteps_;
+  if (releasingHome_ && stageSteps_ >= kColumnValveClosedSteps) {
+    releaseTravelExhausted_ = true;
+    pauseForHome(nowUs, ColumnValveMotionState::CONFIRMING_HOME_RELEASE);
+    return ColumnValveMotionResult::NONE;
+  }
   if (positionSteps_ == targetSteps_)
     return finish(ColumnValveMotionResult::COMPLETED);
   return ColumnValveMotionResult::NONE;
@@ -184,6 +197,7 @@ bool ColumnBottomValveMotionController::abort() {
   io_.writeStep(false);
   state_ = ColumnValveMotionState::IDLE;
   releasingHome_ = false;
+  releaseTravelExhausted_ = false;
   if (started) trust_ = ColumnValvePositionTrust::UNTRUSTED;
   return true;
 }
@@ -207,6 +221,7 @@ void ColumnBottomValveMotionController::beginMotion(
   state_ = state;
   directionHigh_ = directionHigh;
   stageSteps_ = 0;
+  releaseTravelExhausted_ = false;
   nextPulseUs_ = nowUs + kColumnValveDirectionSetupUs;
   io_.writeDirection(directionHigh);
 }
@@ -234,6 +249,7 @@ ColumnValveMotionResult ColumnBottomValveMotionController::finish(
   io_.writeStep(false);
   state_ = ColumnValveMotionState::IDLE;
   releasingHome_ = false;
+  releaseTravelExhausted_ = false;
   return result;
 }
 
