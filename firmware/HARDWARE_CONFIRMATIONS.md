@@ -541,6 +541,33 @@ The V1-V8 1,600-pulse HOME-search limit is only a software execution timeout.
 It has not been physically established as a mechanically safe missing-HOME
 travel bound and must not be represented as independent end protection.
 
+### Confirmed production V1-V8 GPIO and LABFORGE/1 motion — 2026-08-12
+
+Firmware commit `c6a523440f4c187f092926db242d7b9e317d94a3` was built,
+uploaded, and flash-verified on the Arduino Mega through its stable USB by-id
+path. A no-motion LABFORGE/1 handshake then reported controller state `IDLE`,
+trusted software identity, and the expected pump and valve capabilities.
+
+The supervised production Serial/lifecycle test first executed `VALVE_HOME`
+for V1 alone. It completed with the truthful `ACCEPTED -> STARTED -> COMPLETED`
+lifecycle, and the user physically confirmed correct movement toward HOME,
+correct stop on HOME, and no impact, slipping, or abnormal sound.
+
+A subsequent supervised cascade executed, for each valve V1 through V8 in
+order, `VALVE_HOME` followed by `VALVE_SET_POSITION` to nominal 90 degrees,
+with a two-second dwell between valves. Every individual command completed
+with `ACCEPTED -> STARTED -> COMPLETED`; firmware reported no failure,
+rejection, or timeout. The user physically confirmed that all eight valves
+homed, moved back to approximately 90 degrees, released their HOME switches,
+and completed without impact, slipping, or abnormal sound. V1-V8 were left at
+nominal 90 degrees after the test.
+
+This confirms the V1-V8 Arduino GPIO, LABFORGE/1 lifecycle, HOME, and nominal
+90-degree production-runtime paths for the supervised dry demo. It does not
+verify liquid routing or leak-tightness and does not authorize unattended or
+production operation; the accepted demo-only HOME assumptions above remain
+unchanged.
+
 ### Confirmed production P1 GPIO and LABFORGE/1 motion — 2026-08-11
 
 The supervised dry physical integration test used firmware commit
