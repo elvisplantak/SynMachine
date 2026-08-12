@@ -745,6 +745,69 @@ body {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.sfBottomValveCard {
+  margin-bottom: 18px;
+  border-color: rgba(56, 189, 248, 0.42);
+}
+
+.sfBottomValveHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.sfBottomValveHeading h3 {
+  margin: 0 0 5px;
+}
+
+.sfBottomValveHeading span,
+.serviceControlNotice {
+  color: #8ea3bf;
+}
+
+.sfBottomValveStatus {
+  border: 1px solid rgba(142, 163, 191, 0.34);
+  border-radius: 999px;
+  padding: 7px 11px;
+  color: #cbd8e8;
+  background: rgba(15, 31, 51, 0.85);
+}
+
+.sfBottomValveStatus.moving {
+  color: #facc15;
+  border-color: rgba(250, 204, 21, 0.42);
+}
+
+.sfBottomValveStatus.confirmed {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.42);
+}
+
+.sfBottomValveStatus.error {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.48);
+}
+
+.sfBottomValveCard .serviceActionRow button:not(:disabled) {
+  color: #e3f2ff;
+  border-color: rgba(56, 189, 248, 0.55);
+  background: rgba(14, 116, 144, 0.22);
+  cursor: pointer;
+  opacity: 1;
+}
+
+.sfBottomValveCard .serviceActionRow button:not(:disabled):hover,
+.sfBottomValveCard .serviceActionRow button:not(:disabled):focus-visible {
+  border-color: #38bdf8;
+  background: rgba(14, 116, 144, 0.38);
+}
+
+.serviceControlNotice {
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+
 .valveServiceCard > div:first-child {
   display: flex;
   justify-content: space-between;

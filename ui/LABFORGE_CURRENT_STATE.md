@@ -9,12 +9,30 @@
 
 ### UI
 
-- Branch: `codex/update-current-state-p1-p2-v1-v8`
-- Base HEAD before this checkpoint documentation update:
-  `e37d5aef97f9ff20b0e60ecb5997d723a2a2870a`
-- Working tree was clean before this checkpoint documentation update.
+- Branch: `codex/sf-bottom-valve-service-ui`
+- SF bottom valve Service control calls the confirmed backend API with explicit
+  `OPEN` and `CLOSED` actions, disables controls while motion is pending, and
+  shows only backend-confirmed positions as confirmed.
+- Each physical command requires an explicit browser confirmation; other
+  actuator controls remain disabled at this checkpoint.
+- The Vite development server proxies `/api` to the local backend on
+  `127.0.0.1:8000`.
 
 ### Backend
+
+- SF bottom valve Dynamixel backend checkpoint:
+  - branch: `codex/sf-bottom-valve-dynamixel-backend`;
+  - commits: `9de415565eb9e8137c7bf7d885104f4f9c1ecb5f` and
+    `e9b6144d390294030593508f28a1e101885dcb9d`;
+  - confirmed XL430-W250-T/U2D2 adapter uses ID `2`, baud `57600`, Protocol
+    `2.0`, `CLOSED=2559`, `OPEN=3697`, velocity `20`, acceleration `1`, and
+    disables torque after every terminal outcome;
+  - the runtime is enabled only by an explicit stable U2D2 path and exposes a
+    narrow Service API for `OPEN`/`CLOSED` with confirmed-position success;
+  - overlapping actuator commands are rejected; and
+  - the production backend path was physically validated through
+    `CLOSED -> OPEN -> CLOSED`, with all responses `200 OK` and the user
+    confirming orderly movement and the final physically closed position.
 
 - Branch: `codex/labforge-v1-message-models-parser-contract-fixes`
 - HEAD: `7f8697c6b3ea02f1ff9450faa2d55149ace2f180`

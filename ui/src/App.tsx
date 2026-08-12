@@ -394,6 +394,8 @@ type ServiceSection =
   | "cameras"
   | "diagnostics"
   | "calibration";
+type SfBottomValveState = "OPEN" | "CLOSED";
+type SfBottomValveCommandStatus = "idle" | "moving" | "confirmed" | "error";
 type CommissioningPump = "P1" | "P2";
 type PumpCommissioningFields = {
   workingFull: string;
@@ -1021,6 +1023,67 @@ function DisabledServiceButton({ children }: { children: string }) {
   return <button type="button" disabled aria-disabled="true">{children}</button>;
 }
 
+function SfBottomValveServiceControl() {
+  const [confirmedState, setConfirmedState] = useState<SfBottomValveState | null>(null);
+  const [commandStatus, setCommandStatus] = useState<SfBottomValveCommandStatus>("idle");
+  const [message, setMessage] = useState("No position has been confirmed in this UI session.");
+
+  const commandState = async (state: SfBottomValveState) => {
+    if (!window.confirm(`Move the SF bottom valve to ${state}? Keep the mechanism supervised.`)) {
+      return;
+    }
+    setCommandStatus("moving");
+    setMessage(`Moving SF bottom valve to ${state}…`);
+
+    try {
+      const response = await fetch("/api/v1/service/sf-bottom-valve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state }),
+      });
+      const payload = await response.json().catch(() => null) as {
+        detail?: string;
+        position_confirmed?: boolean;
+        state?: SfBottomValveState;
+      } | null;
+
+      if (!response.ok || payload?.position_confirmed !== true || payload.state !== state) {
+        throw new Error(payload?.detail ?? `Backend returned HTTP ${response.status}`);
+      }
+
+      setConfirmedState(state);
+      setCommandStatus("confirmed");
+      setMessage(`${state} position confirmed by the actuator.`);
+    } catch (error) {
+      setCommandStatus("error");
+      setMessage(error instanceof Error ? error.message : "Unknown backend error");
+    }
+  };
+
+  return (
+    <section className="serviceGroup sfBottomValveCard" aria-labelledby="sf-bottom-valve-heading">
+      <div className="sfBottomValveHeading">
+        <div>
+          <h3 id="sf-bottom-valve-heading">SF bottom valve</h3>
+          <span>Dynamixel XL430-W250-T · U2D2</span>
+        </div>
+        <strong className={`sfBottomValveStatus ${commandStatus}`}>
+          {commandStatus === "moving" ? "Moving" : confirmedState ?? "Unknown"}
+        </strong>
+      </div>
+      <div className="serviceStatusList">
+        <span>Last confirmed state<strong>{confirmedState ?? "Not confirmed"}</strong></span>
+        <span>Command result<strong>{message}</strong></span>
+      </div>
+      <div className="serviceActionRow">
+        <button type="button" disabled={commandStatus === "moving"} onClick={() => void commandState("OPEN")}>Open</button>
+        <button type="button" disabled={commandStatus === "moving"} onClick={() => void commandState("CLOSED")}>Close</button>
+      </div>
+      <p className="serviceControlNotice">Direct hardware command through the backend. Keep the mechanism supervised.</p>
+    </section>
+  );
+}
+
 const emptyPumpCommissioningFields: PumpCommissioningFields = {
   workingFull: "",
   workingEmpty: "",
@@ -1084,7 +1147,7 @@ function PumpCommissioning() {
           <div><dt>Hardware connection</dt><dd>Not connected to backend</dd></div>
           <div><dt>Homing state</dt><dd>Unknown — frontend draft</dd></div>
           <div><dt>Current position</dt><dd>Unavailable</dd></div>
-          <div><dt>Syringe capacity</dt><dd>10 mL</dd></div>
+          <div><dt>Syringe capacity</dt><dd>20 mL</dd></div>
           <div><dt>Home position</dt><dd>0 steps</dd></div>
           <div><dt>Recovered max travel</dt><dd>20500 steps</dd></div>
           <div><dt>Aspiration direction</dt><dd>Toward 0</dd></div>
@@ -1204,7 +1267,8 @@ function ServiceSectionContent({ section }: { section: ServiceSection }) {
   if (section === "valves") {
     return (
       <>
-        <div className="serviceSectionHeading"><span className="panelEyebrow">Valve control draft</span><h2>Valves</h2><p>Confirmed mapping: 0° closed, 90° k1 ↔ k3, 180° k1 ↔ k2.</p></div>
+        <div className="serviceSectionHeading"><span className="panelEyebrow">Valve control</span><h2>Valves</h2><p>V1–V8 remain disabled in this UI checkpoint. The separately connected SF bottom valve is available through its confirmed backend adapter.</p></div>
+        <SfBottomValveServiceControl />
         <div className="valveServiceGrid">{Array.from({ length: 8 }, (_, index) => `V${index + 1}`).map((valve) => <section className="serviceGroup valveServiceCard" key={valve}><div><h3>{valve}</h3><span>State: Unknown</span></div><div className="serviceActionRow"><DisabledServiceButton>Home</DisabledServiceButton><DisabledServiceButton>Closed</DisabledServiceButton><DisabledServiceButton>k1 ↔ k3</DisabledServiceButton><DisabledServiceButton>k1 ↔ k2</DisabledServiceButton></div></section>)}</div>
       </>
     );
@@ -1241,9 +1305,9 @@ function ServiceScreen({ onNavigate }: { onNavigate: (screen: Screen) => void })
   const [activeSection, setActiveSection] = useState<ServiceSection>("overview");
   return (
     <main className="appShell serviceShell">
-      <header className="topBar serviceTopBar"><div><div className="serviceHeadingRow"><div className="brand">Service</div><div className="serviceDraftLabel">Frontend draft — no hardware control</div></div><div className="subBrand">Manual control, diagnostics, and calibration</div></div><div className="topBarActions"><TopNavigation activeScreen="service" onNavigate={onNavigate} /></div></header>
+      <header className="topBar serviceTopBar"><div><div className="serviceHeadingRow"><div className="brand">Service</div><div className="serviceDraftLabel">Supervised hardware service</div></div><div className="subBrand">Manual control, diagnostics, and calibration</div></div><div className="topBarActions"><TopNavigation activeScreen="service" onNavigate={onNavigate} /></div></header>
       <div className="serviceLayout">
-        <aside className="serviceNavigation" aria-label="Service sections"><span className="panelEyebrow">Technical workspace</span>{serviceSections.map((section) => <button key={section.id} type="button" aria-pressed={activeSection === section.id} onClick={() => setActiveSection(section.id)}>{section.label}</button>)}<p>Direct hardware control is not implemented. Service mode does not bypass backend safety rules.</p></aside>
+        <aside className="serviceNavigation" aria-label="Service sections"><span className="panelEyebrow">Technical workspace</span>{serviceSections.map((section) => <button key={section.id} type="button" aria-pressed={activeSection === section.id} onClick={() => setActiveSection(section.id)}>{section.label}</button>)}<p>Only explicitly enabled controls are live. Service mode does not bypass backend safety rules.</p></aside>
         <section className="serviceContent"><ServiceSectionContent section={activeSection} /></section>
       </div>
     </main>
