@@ -17,6 +17,19 @@ Confirmed defaults are ID `2`, baud `57600`, Protocol `2.0`, `CLOSED=2559`,
 U2D2 `/dev/serial/by-id/...` path is supplied explicitly through
 `SfBottomValveConfiguration`; the backend never guesses a `/dev/ttyUSB*` path.
 
+Enable the local Service API for this actuator by exporting the confirmed,
+stable U2D2 path before starting Uvicorn:
+
+```bash
+export LABFORGE_SF_BOTTOM_VALVE_PORT=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTA2U3CN-if00-port0
+uvicorn app.main:app --reload
+```
+
+`POST /api/v1/service/sf-bottom-valve` accepts exactly `{"state":"OPEN"}` or
+`{"state":"CLOSED"}`. If the environment variable is absent, the endpoint
+fails closed with HTTP `503`; importing or starting the backend never opens the
+U2D2 or moves the actuator.
+
 ## Local setup
 
 Ubuntu with Python 3.12:

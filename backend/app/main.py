@@ -13,11 +13,16 @@ from app.demo.application_service import (
     GuidedDemoApplicationError,
     GuidedDemoApplicationService,
 )
+from app.demo.hardware_contract import BottomValveState, HardwareCommandError
 from app.demo.lifecycle import LifecycleTransitionError
 from app.demo.machine_lifecycle import MachineTransitionError
 from app.demo.machine_models import MachineSnapshot
 from app.demo.models import DemoConfiguration, DemoExecutionSettings
 from app.demo.run_models import DemoRun
+from app.hardware.runtime_configuration import (
+    build_sf_bottom_valve_from_environment,
+)
+from app.hardware.sf_bottom_valve import SfBottomValveControl
 from app.persistence.sqlite_store import PersistenceConflictError, SQLiteStore
 from app.startup_bootstrap import bootstrap_process_startup
 
@@ -59,6 +64,19 @@ class RunMachineResponse(BaseModel):
     machine: MachineSnapshot | None
 
 
+class SfBottomValveCommandRequest(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    state: BottomValveState
+
+
+class SfBottomValveCommandResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    state: BottomValveState
+    position_confirmed: bool
+
+
 def _configured_database_path(database_path: str | Path | None) -> Path:
     if database_path is not None:
         return Path(database_path)
@@ -69,6 +87,7 @@ def create_app(
     database_path: str | Path | None = None,
     *,
     startup_clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+    sf_bottom_valve: SfBottomValveControl | None = None,
 ) -> FastAPI:
     configured_database_path = _configured_database_path(database_path)
 
@@ -108,10 +127,44 @@ def create_app(
             content={"detail": str(error)},
         )
 
+    @application.exception_handler(HardwareCommandError)
+    async def handle_hardware_command_error(
+        request: Request,
+        error: HardwareCommandError,
+    ) -> JSONResponse:
+        del request
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"detail": str(error)},
+        )
+
     @application.get("/health", summary="Report backend availability")
     def health() -> dict[str, str]:
         """Report backend application availability only."""
         return {"status": "available"}
+
+    @application.post(
+        f"{API_PREFIX}/service/sf-bottom-valve",
+        response_model=SfBottomValveCommandResponse,
+        summary="Move the host-connected SF bottom valve",
+        description=(
+            "Service-only synchronous command. Success confirms that the configured "
+            "DYNAMIXEL reached the calibrated OPEN or CLOSED target."
+        ),
+    )
+    def set_sf_bottom_valve(
+        command: SfBottomValveCommandRequest,
+    ) -> SfBottomValveCommandResponse:
+        if sf_bottom_valve is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="SF bottom valve hardware is not configured",
+            )
+        sf_bottom_valve.set_state(command.state)
+        return SfBottomValveCommandResponse(
+            state=command.state,
+            position_confirmed=True,
+        )
 
     @application.get(
         f"{API_PREFIX}/machine",
@@ -246,4 +299,6 @@ def create_app(
     return application
 
 
-app = create_app()
+app = create_app(
+    sf_bottom_valve=build_sf_bottom_valve_from_environment(os.environ),
+)

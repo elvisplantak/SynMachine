@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from threading import Lock
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
@@ -67,6 +68,10 @@ class DynamixelSession(Protocol):
     def write(self, device_id: int, register: Register, value: int) -> None: ...
 
     def close(self) -> None: ...
+
+
+class SfBottomValveControl(Protocol):
+    def set_state(self, state: BottomValveState) -> None: ...
 
 
 SessionFactory = Callable[[SfBottomValveConfiguration], DynamixelSession]
@@ -150,10 +155,19 @@ class SfBottomValveActuator:
         self._session_factory = session_factory
         self._clock = clock
         self._sleep = sleep
+        self._command_lock = Lock()
 
     def set_state(self, state: BottomValveState) -> None:
         if not isinstance(state, BottomValveState):
             raise ValueError(f"unsupported SF bottom valve state: {state!r}")
+        if not self._command_lock.acquire(blocking=False):
+            raise HardwareCommandError("SF bottom valve command already active")
+        try:
+            self._set_state_locked(state)
+        finally:
+            self._command_lock.release()
+
+    def _set_state_locked(self, state: BottomValveState) -> None:
         target = (
             self._configuration.open_position
             if state is BottomValveState.OPEN

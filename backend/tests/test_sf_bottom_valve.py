@@ -222,6 +222,28 @@ def test_cleanup_failure_after_success_is_reported_and_port_close_is_attempted()
     assert session.closed
 
 
+def test_rejects_overlapping_command_before_opening_second_session() -> None:
+    session = FakeSession(positions=(2559, 3697))
+    overlapping_error: HardwareCommandError | None = None
+    actuator: SfBottomValveActuator
+
+    def session_factory(_: SfBottomValveConfiguration) -> FakeSession:
+        nonlocal overlapping_error
+        try:
+            actuator.set_state(BottomValveState.CLOSED)
+        except HardwareCommandError as error:
+            overlapping_error = error
+        return session
+
+    actuator = SfBottomValveActuator(configuration(), session_factory=session_factory)
+
+    actuator.set_state(BottomValveState.OPEN)
+
+    assert overlapping_error is not None
+    assert str(overlapping_error) == "SF bottom valve command already active"
+    assert session.closed
+
+
 @pytest.mark.parametrize(
     "overrides",
     [

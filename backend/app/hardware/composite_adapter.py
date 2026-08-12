@@ -3,7 +3,7 @@ from decimal import Decimal
 from app.demo.calibration_models import PumpId
 from app.demo.hardware_contract import BottomValveState, HardwareContract
 from app.demo.operation_models import SymbolicRouteId
-from app.hardware.sf_bottom_valve import SfBottomValveActuator
+from app.hardware.sf_bottom_valve import SfBottomValveControl
 
 
 class DynamixelSfBottomValveAdapter(HardwareContract):
@@ -12,7 +12,7 @@ class DynamixelSfBottomValveAdapter(HardwareContract):
     def __init__(
         self,
         arduino_hardware: HardwareContract,
-        sf_bottom_valve: SfBottomValveActuator,
+        sf_bottom_valve: SfBottomValveControl,
     ) -> None:
         self._arduino_hardware = arduino_hardware
         self._sf_bottom_valve = sf_bottom_valve
