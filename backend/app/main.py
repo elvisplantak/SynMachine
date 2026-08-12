@@ -3,11 +3,11 @@ from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal, Protocol
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.demo.application_service import (
     GuidedDemoApplicationError,
@@ -20,8 +20,15 @@ from app.demo.machine_models import MachineSnapshot
 from app.demo.models import DemoConfiguration, DemoExecutionSettings
 from app.demo.run_models import DemoRun
 from app.hardware.runtime_configuration import (
+    ArduinoRuntime,
+    build_arduino_runtime_from_environment,
     build_sf_bottom_valve_from_environment,
 )
+from app.hardware.arduino_command_journal import (
+    ArduinoCommandIdentityConflictError,
+    ArduinoCommandJournalEntry,
+)
+from app.hardware.arduino_serial import ArduinoSerialError
 from app.hardware.sf_bottom_valve import SfBottomValveControl
 from app.persistence.sqlite_store import PersistenceConflictError, SQLiteStore
 from app.startup_bootstrap import bootstrap_process_startup
@@ -77,6 +84,51 @@ class SfBottomValveCommandResponse(BaseModel):
     position_confirmed: bool
 
 
+class ArduinoCommandExecutor(Protocol):
+    def execute(
+        self,
+        *,
+        phase_execution_id: str,
+        operation_command_id: str,
+        command: str,
+        arguments: dict[str, str | int | bool],
+    ) -> ArduinoCommandJournalEntry: ...
+
+
+class PumpServiceCommandRequest(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+
+    phase_execution_id: Annotated[str, Field(pattern=r"^[A-Za-z0-9_.:-]{1,64}$")]
+    operation_command_id: Annotated[
+        str,
+        Field(pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"),
+    ]
+    pump: Literal["P1", "P2"]
+    command: Literal["HOME", "MOVE_ABSOLUTE_STEPS"]
+    target_steps: int | None = None
+    safe_route_confirmed: Literal[True]
+
+    @model_validator(mode="after")
+    def validate_command_arguments(self) -> "PumpServiceCommandRequest":
+        if self.command == "HOME" and self.target_steps is not None:
+            raise ValueError("HOME must not include target_steps")
+        if self.command == "MOVE_ABSOLUTE_STEPS" and not (
+            self.target_steps is not None and 1 <= self.target_steps <= 20500
+        ):
+            raise ValueError("MOVE_ABSOLUTE_STEPS requires target_steps in 1..20500")
+        return self
+
+
+class PumpServiceCommandResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    operation_command_id: str
+    state: str
+    result: dict[str, str | int | bool] | None
+    error_code: str | None
+    execution_started: bool | None
+
+
 def _configured_database_path(database_path: str | Path | None) -> Path:
     if database_path is not None:
         return Path(database_path)
@@ -88,6 +140,8 @@ def create_app(
     *,
     startup_clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     sf_bottom_valve: SfBottomValveControl | None = None,
+    arduino_commands: ArduinoCommandExecutor | None = None,
+    arduino_runtime: ArduinoRuntime | None = None,
 ) -> FastAPI:
     configured_database_path = _configured_database_path(database_path)
 
@@ -100,7 +154,13 @@ def create_app(
                 store,
                 occurred_at,
             )
-        yield
+        if arduino_runtime is not None:
+            arduino_runtime.start()
+        try:
+            yield
+        finally:
+            if arduino_runtime is not None:
+                arduino_runtime.close()
 
     application = FastAPI(title="LabForge backend", lifespan=lifespan)
 
@@ -164,6 +224,60 @@ def create_app(
         return SfBottomValveCommandResponse(
             state=command.state,
             position_confirmed=True,
+        )
+
+    @application.post(
+        f"{API_PREFIX}/service/pumps/command",
+        response_model=PumpServiceCommandResponse,
+        summary="Execute a durable supervised P1/P2 command",
+        description=(
+            "Service-only command. The caller must durably own both command IDs and "
+            "explicitly confirm a physically safe fluid route. Unknown outcomes are "
+            "never automatically retried."
+        ),
+    )
+    def execute_pump_service_command(
+        request: PumpServiceCommandRequest,
+    ) -> PumpServiceCommandResponse:
+        executor = arduino_commands
+        if executor is None and arduino_runtime is not None:
+            executor = arduino_runtime.executor
+        if executor is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Arduino hardware is not configured",
+            )
+        command = (
+            "PUMP_HOME"
+            if request.command == "HOME"
+            else "PUMP_MOVE_ABSOLUTE_STEPS"
+        )
+        arguments: dict[str, str | int | bool] = {"pump": request.pump}
+        if request.target_steps is not None:
+            arguments["target_steps"] = request.target_steps
+        try:
+            entry = executor.execute(
+                phase_execution_id=request.phase_execution_id,
+                operation_command_id=request.operation_command_id,
+                command=command,
+                arguments=arguments,
+            )
+        except ArduinoCommandIdentityConflictError as error:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(error),
+            ) from error
+        except ArduinoSerialError as error:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=str(error),
+            ) from error
+        return PumpServiceCommandResponse(
+            operation_command_id=entry.operation_command_id,
+            state=entry.state.value,
+            result=entry.result,
+            error_code=entry.error_code,
+            execution_started=entry.execution_started,
         )
 
     @application.get(
@@ -299,6 +413,8 @@ def create_app(
     return application
 
 
+_arduino_runtime = build_arduino_runtime_from_environment(os.environ)
 app = create_app(
     sf_bottom_valve=build_sf_bottom_valve_from_environment(os.environ),
+    arduino_runtime=_arduino_runtime,
 )
