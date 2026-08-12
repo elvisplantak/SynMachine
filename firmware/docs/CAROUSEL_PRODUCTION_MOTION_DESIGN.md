@@ -22,7 +22,10 @@ tube position. The accepted smooth one-position profile is:
 `CAROUSEL_SET_REFERENCE` accepts exactly one integer `position` in `1..40`.
 It records an operator-aligned tube position and emits no DIR or STEP side
 effect. It is required after every controller boot and after any motion abort
-or other loss of pulse accounting.
+or other loss of pulse accounting. A successful replacement of the active
+backend session also invalidates the volatile carousel reference without
+causing physical movement. The replacement session must issue a fresh explicit
+`CAROUSEL_SET_REFERENCE` before another carousel move.
 
 `CAROUSEL_MOVE_TO_POSITION` accepts the same position range. It moves only in
 the confirmed `DIR=HIGH` logical-forward direction, including wrap from
@@ -33,7 +36,13 @@ Both commands use the normal LABFORGE/1 operation identity and truthful
 `ACCEPTED -> STARTED -> terminal` lifecycle. A move cannot produce DIR or STEP
 side effects until the complete STARTED frame has been handed to the Serial
 transport. Deliberate abort after STARTED produces `COMMAND_ABORTED` and
-invalidates carousel position trust.
+invalidates carousel position trust. This includes an interrupted
+`CAROUSEL_SET_REFERENCE`: an older trusted reference is not retained if a new
+reference command crossed STARTED but did not complete. Execution failure or
+any other uncertainty in carousel pulse accounting likewise invalidates the
+reference. Session replacement does not restart, replay, or itself move an
+already running carousel command; after that command finishes, its reference
+remains unusable in the replacement session until explicitly re-established.
 
 ## Column outlet interlock
 
@@ -48,8 +57,8 @@ that. Firmware does not contain a compound fraction-collection workflow.
 
 ## AVR resource checkpoint
 
-The integrated warning-clean Mega build uses 38,246 of 253,952 bytes of flash
-and 2,889 of 8,192 bytes of static SRAM. A warning-enabled AVR
+The integrated warning-clean Mega build uses 38,384 of 253,952 bytes of flash
+and 2,890 of 8,192 bytes of static SRAM. A warning-enabled AVR
 `-fstack-usage` build without LTO reports the largest individual project frames
 as 2,075 bytes for `MessageParser::parse()`, 1,055 bytes for
 `MessageParser::recoverErrorCorrelation()`, 972 bytes for

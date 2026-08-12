@@ -76,11 +76,16 @@ CarouselMotionResult CarouselMotionController::update(uint32_t nowUs) {
 
 bool CarouselMotionController::abort() {
   if (state_ == CarouselMotionState::IDLE) return false;
-  const bool started = state_ == CarouselMotionState::MOVING;
+  const bool started = state_ == CarouselMotionState::MOVING ||
+                       state_ == CarouselMotionState::REFERENCE_PENDING;
   io_.writeStep(false);
   state_ = CarouselMotionState::IDLE;
   if (started) trust_ = CarouselPositionTrust::UNTRUSTED;
   return true;
+}
+
+void CarouselMotionController::invalidatePositionTrust() {
+  trust_ = CarouselPositionTrust::UNTRUSTED;
 }
 
 CarouselMotionState CarouselMotionController::state() const { return state_; }

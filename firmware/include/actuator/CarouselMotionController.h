@@ -46,6 +46,7 @@ class CarouselMotionController {
   bool start(uint32_t nowUs);
   CarouselMotionResult update(uint32_t nowUs);
   bool abort();
+  void invalidatePositionTrust();
 
   CarouselMotionState state() const;
   CarouselPositionTrust positionTrust() const;

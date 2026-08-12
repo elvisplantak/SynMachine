@@ -572,6 +572,8 @@ P1MotionController* P1CommandRuntime::controllerFor(PumpId pump) {
 }
 
 void P1CommandRuntime::handleSessionReplacement(const char* newNonce) {
+  if (carouselController_ != nullptr)
+    carouselController_->invalidatePositionTrust();
   if (runtimeState_ == RuntimeState::IDLE ||
       strcmp(lifecycleNonce_, newNonce) == 0)
     return;
