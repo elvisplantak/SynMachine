@@ -76,6 +76,37 @@ void test_started_reference_abort_invalidates_previous_trust_without_motion() {
                     controller.positionTrust());
 }
 
+void test_invalidated_pending_reference_cannot_restore_trust() {
+  FakeIo io;
+  CarouselMotionController controller(io);
+  reference(controller, 5);
+  TEST_ASSERT_EQUAL(CarouselPrepareResult::READY,
+                    controller.prepareSetReference(12));
+  TEST_ASSERT_TRUE(controller.start(100));
+  controller.invalidatePositionTrust();
+  TEST_ASSERT_EQUAL(CarouselMotionResult::COMPLETED, controller.update(100));
+  TEST_ASSERT_EQUAL_UINT8(12, controller.position());
+  TEST_ASSERT_EQUAL(CarouselPositionTrust::UNTRUSTED,
+                    controller.positionTrust());
+  TEST_ASSERT_EQUAL_UINT16(0, io.pulses);
+  TEST_ASSERT_EQUAL_UINT16(0, io.directionWrites);
+}
+
+void test_invalidated_prepared_reference_cannot_restore_trust_after_start() {
+  FakeIo io;
+  CarouselMotionController controller(io);
+  reference(controller, 5);
+  TEST_ASSERT_EQUAL(CarouselPrepareResult::READY,
+                    controller.prepareSetReference(12));
+  controller.invalidatePositionTrust();
+  TEST_ASSERT_TRUE(controller.start(100));
+  TEST_ASSERT_EQUAL(CarouselMotionResult::COMPLETED, controller.update(100));
+  TEST_ASSERT_EQUAL(CarouselPositionTrust::UNTRUSTED,
+                    controller.positionTrust());
+  TEST_ASSERT_EQUAL_UINT16(0, io.pulses);
+  TEST_ASSERT_EQUAL_UINT16(0, io.directionWrites);
+}
+
 void test_one_position_uses_confirmed_profile_and_pulse_count() {
   FakeIo io;
   CarouselMotionController controller(io);
@@ -151,6 +182,8 @@ int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_reference_is_motionless_and_trusts_position);
   RUN_TEST(test_started_reference_abort_invalidates_previous_trust_without_motion);
+  RUN_TEST(test_invalidated_pending_reference_cannot_restore_trust);
+  RUN_TEST(test_invalidated_prepared_reference_cannot_restore_trust_after_start);
   RUN_TEST(test_one_position_uses_confirmed_profile_and_pulse_count);
   RUN_TEST(test_wrap_and_no_catch_up_burst);
   RUN_TEST(test_untrusted_move_is_rejected_and_abort_invalidates_started_move);

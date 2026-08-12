@@ -21,6 +21,7 @@ CarouselPrepareResult CarouselMotionController::prepareSetReference(
   if (busy()) return CarouselPrepareResult::BUSY;
   if (!validPosition(position)) return CarouselPrepareResult::INVALID_POSITION;
   targetPosition_ = position;
+  referenceMayEstablishTrust_ = true;
   state_ = CarouselMotionState::PREPARED_REFERENCE;
   return CarouselPrepareResult::READY;
 }
@@ -60,7 +61,9 @@ bool CarouselMotionController::start(uint32_t nowUs) {
 CarouselMotionResult CarouselMotionController::update(uint32_t nowUs) {
   if (state_ == CarouselMotionState::REFERENCE_PENDING) {
     position_ = targetPosition_;
-    trust_ = CarouselPositionTrust::TRUSTED;
+    if (referenceMayEstablishTrust_)
+      trust_ = CarouselPositionTrust::TRUSTED;
+    referenceMayEstablishTrust_ = false;
     state_ = CarouselMotionState::IDLE;
     return CarouselMotionResult::COMPLETED;
   }
@@ -80,12 +83,14 @@ bool CarouselMotionController::abort() {
                        state_ == CarouselMotionState::REFERENCE_PENDING;
   io_.writeStep(false);
   state_ = CarouselMotionState::IDLE;
+  referenceMayEstablishTrust_ = false;
   if (started) trust_ = CarouselPositionTrust::UNTRUSTED;
   return true;
 }
 
 void CarouselMotionController::invalidatePositionTrust() {
   trust_ = CarouselPositionTrust::UNTRUSTED;
+  referenceMayEstablishTrust_ = false;
 }
 
 CarouselMotionState CarouselMotionController::state() const { return state_; }

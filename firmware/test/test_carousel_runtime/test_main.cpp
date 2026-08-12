@@ -281,6 +281,97 @@ void test_session_replacement_during_move_does_not_replay_and_leaves_untrusted()
   TEST_ASSERT_NOT_NULL(entry);
   TEST_ASSERT_EQUAL(CommandState::COMPLETED, entry->record.state);
 }
+
+void test_session_replacement_after_reference_started_cannot_restore_trust() {
+  PumpIo pumpIo; P1MotionController p1(pumpIo), p2(pumpIo);
+  ValveIo columnIo; ColumnBottomValveMotionController column(columnIo);
+  closeColumn(column, columnIo);
+  CarouselIo io; CarouselMotionController carousel(io);
+  P1CommandRuntime runtime(p1, p2, nullptr, 0, column, carousel);
+  SessionState session; session.establish(NONCE); CommandStatusCache cache;
+  char command[384]; uint8_t output[kHelloOkFrameCapacity]{};
+  makeCommand(command, sizeof(command),
+              "323e4567-e89b-12d3-a456-426614174009",
+              "CAROUSEL_SET_REFERENCE", 7);
+  runtime.dispatch(reinterpret_cast<const uint8_t*>(command), std::strlen(command),
+                   IDENTITY, session, cache, output, sizeof(output));
+  completeLifecycle(runtime, cache, output, sizeof(output), 100);
+
+  const char hello[] =
+      "{\"protocol\":\"LABFORGE/1\",\"type\":\"HELLO\","
+      "\"backend_session_nonce\":\"223e4567-e89b-12d3-a456-426614174001\"}";
+  runtime.dispatch(reinterpret_cast<const uint8_t*>(hello), std::strlen(hello),
+                   IDENTITY, session, cache, output, sizeof(output));
+  runtime.update(100, cache);
+  TEST_ASSERT_EQUAL(CarouselPositionTrust::UNTRUSTED,
+                    carousel.positionTrust());
+  TEST_ASSERT_EQUAL_UINT16(0, io.directionWrites);
+  TEST_ASSERT_EQUAL_UINT16(0, io.pulses);
+
+  makeCommandForNonce(command, sizeof(command), NONCE_B,
+                      "323e4567-e89b-12d3-a456-426614174010",
+                      "CAROUSEL_MOVE_TO_POSITION", 8);
+  runtime.dispatch(reinterpret_cast<const uint8_t*>(command), std::strlen(command),
+                   IDENTITY, session, cache, output, sizeof(output));
+  const CommandStatusEntry* rejected =
+      cache.find("323e4567-e89b-12d3-a456-426614174010");
+  TEST_ASSERT_NOT_NULL(rejected);
+  TEST_ASSERT_EQUAL(CommandState::REJECTED, rejected->record.state);
+  TEST_ASSERT_EQUAL(CommandErrorCode::INVALID_FIELD,
+                    rejected->record.errorCode);
+
+  makeCommandForNonce(command, sizeof(command), NONCE_B,
+                      "323e4567-e89b-12d3-a456-426614174011",
+                      "CAROUSEL_SET_REFERENCE", 8);
+  runtime.dispatch(reinterpret_cast<const uint8_t*>(command), std::strlen(command),
+                   IDENTITY, session, cache, output, sizeof(output));
+  completeLifecycle(runtime, cache, output, sizeof(output), 200);
+  runtime.update(200, cache);
+  TEST_ASSERT_EQUAL(CarouselPositionTrust::TRUSTED,
+                    carousel.positionTrust());
+  TEST_ASSERT_EQUAL_UINT8(8, carousel.position());
+  TEST_ASSERT_EQUAL_UINT16(0, io.directionWrites);
+  TEST_ASSERT_EQUAL_UINT16(0, io.pulses);
+}
+
+void test_session_replacement_before_reference_started_cannot_restore_trust() {
+  PumpIo pumpIo; P1MotionController p1(pumpIo), p2(pumpIo);
+  ValveIo columnIo; ColumnBottomValveMotionController column(columnIo);
+  CarouselIo io; CarouselMotionController carousel(io);
+  P1CommandRuntime runtime(p1, p2, nullptr, 0, column, carousel);
+  SessionState session; session.establish(NONCE); CommandStatusCache cache;
+  char command[384]; uint8_t output[kHelloOkFrameCapacity]{};
+  makeCommand(command, sizeof(command),
+              "323e4567-e89b-12d3-a456-426614174012",
+              "CAROUSEL_SET_REFERENCE", 7);
+  runtime.dispatch(reinterpret_cast<const uint8_t*>(command), std::strlen(command),
+                   IDENTITY, session, cache, output, sizeof(output));
+
+  const char hello[] =
+      "{\"protocol\":\"LABFORGE/1\",\"type\":\"HELLO\","
+      "\"backend_session_nonce\":\"223e4567-e89b-12d3-a456-426614174001\"}";
+  runtime.dispatch(reinterpret_cast<const uint8_t*>(hello), std::strlen(hello),
+                   IDENTITY, session, cache, output, sizeof(output));
+  completeLifecycle(runtime, cache, output, sizeof(output), 100);
+  runtime.update(100, cache);
+  TEST_ASSERT_EQUAL(CarouselPositionTrust::UNTRUSTED,
+                    carousel.positionTrust());
+  TEST_ASSERT_EQUAL_UINT16(0, io.directionWrites);
+  TEST_ASSERT_EQUAL_UINT16(0, io.pulses);
+
+  makeCommandForNonce(command, sizeof(command), NONCE_B,
+                      "323e4567-e89b-12d3-a456-426614174013",
+                      "CAROUSEL_SET_REFERENCE", 9);
+  runtime.dispatch(reinterpret_cast<const uint8_t*>(command), std::strlen(command),
+                   IDENTITY, session, cache, output, sizeof(output));
+  completeLifecycle(runtime, cache, output, sizeof(output), 200);
+  runtime.update(200, cache);
+  TEST_ASSERT_EQUAL(CarouselPositionTrust::TRUSTED,
+                    carousel.positionTrust());
+  TEST_ASSERT_EQUAL_UINT8(9, carousel.position());
+  TEST_ASSERT_EQUAL_UINT16(0, io.directionWrites);
+  TEST_ASSERT_EQUAL_UINT16(0, io.pulses);
+}
 }  // namespace
 
 int main(int, char**) {
@@ -292,5 +383,7 @@ int main(int, char**) {
   RUN_TEST(test_started_reference_abort_is_failed_and_invalidates_previous_trust);
   RUN_TEST(test_session_replacement_invalidates_idle_reference_without_gpio);
   RUN_TEST(test_session_replacement_during_move_does_not_replay_and_leaves_untrusted);
+  RUN_TEST(test_session_replacement_after_reference_started_cannot_restore_trust);
+  RUN_TEST(test_session_replacement_before_reference_started_cannot_restore_trust);
   return UNITY_END();
 }

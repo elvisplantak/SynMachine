@@ -65,6 +65,7 @@ class CarouselMotionController {
   uint16_t totalPulses_ = 0;
   uint16_t emittedPulses_ = 0;
   uint32_t nextPulseUs_ = 0;
+  bool referenceMayEstablishTrust_ = false;
 };
 
 }  // namespace labforge
