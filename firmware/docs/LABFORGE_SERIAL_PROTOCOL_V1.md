@@ -247,7 +247,8 @@ trusted production runtime emits its numeric boot ID, `controller_state`
 `"IDLE"` or `"BUSY"` according to the command cache,
 `software_state_trust:"TRUSTED"`, and capabilities
 `PUMP_HOME`, `PUMP_MOVE_ABSOLUTE_STEPS`, `VALVE_HOME`, and
-`VALVE_SET_POSITION`. The protocol-only writer mode keeps
+`VALVE_SET_POSITION`, the two column-bottom-valve commands, and
+`CAROUSEL_SET_REFERENCE` / `CAROUSEL_MOVE_TO_POSITION`. The protocol-only writer mode keeps
 the empty capability list used by its focused tests. An untrusted identity emits
 `controller_boot_id:null`,
 `controller_state:"IDENTITY_UNTRUSTED"`, and
@@ -327,6 +328,20 @@ Its 80,000-pulse search timeout bounds software execution but is not independent
 mechanical protection or a proven safe missing-HOME distance. This remains a
 supervised-demo assumption: HOME is treated as functional, the operator remains
 at the power switch, and unattended/production operation is out of scope.
+
+The approved carousel commands are `CAROUSEL_SET_REFERENCE` and
+`CAROUSEL_MOVE_TO_POSITION`. Each contains exactly one integer `position` in
+`1..40`. The carousel has no HOME sensor, so reference is an operator assertion
+after manual tube alignment and produces no GPIO motion. A move requires this
+volatile position trust, advances only in the confirmed logical-forward
+`DIR=HIGH` direction (including 40-to-1 wrap), and uses 250 STEP pulses per tube.
+Abort after movement begins invalidates position trust.
+
+Carousel movement is also rejected with
+`CAROUSEL_COLUMN_VALVE_NOT_CLOSED` unless firmware has trusted column-valve
+state at the confirmed 4-degree CLOSED position. The backend still owns the
+close/move/reopen orchestration. Full timing and deferred hardware limitations
+are recorded in `docs/CAROUSEL_PRODUCTION_MOTION_DESIGN.md`.
 
 The second approved pump command schema is `PUMP_HOME`. Its `arguments` object
 contains exactly `pump:"P1"` or `pump:"P2"`; missing, additional, incorrectly
@@ -831,6 +846,11 @@ path execution are complete for V1-V8. It also includes the exact
 a separate geared-motion controller wired to D12/D13/D10. Column native
 contract/controller/runtime verification is complete; upload and supervised
 physical execution through this production path remain deferred.
+The dispatcher additionally includes exact carousel reference/move contracts,
+the D8/D9 adapter, confirmed smooth 250-pulse-per-position controller profile,
+volatile manual-reference trust, and a trusted-CLOSED column interlock. Native
+verification is complete at this software checkpoint; firmware upload and
+physical execution through this production path remain separately gated.
 Fail-closed recovery and provisioning remain unresolved.
 No component is claimed to measure delivered volume or provide exactly-once
 physical execution.

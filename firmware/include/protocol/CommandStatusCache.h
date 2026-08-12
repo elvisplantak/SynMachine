@@ -34,6 +34,7 @@ enum class CommandErrorCode : uint8_t {
   COLUMN_VALVE_MOTION_TIMEOUT,
   COLUMN_VALVE_HOME_SWITCH_UNEXPECTED,
   COLUMN_VALVE_HOME_SWITCH_STUCK,
+  CAROUSEL_COLUMN_VALVE_NOT_CLOSED,
   COMMAND_ABORTED,
 };
 
@@ -62,6 +63,8 @@ enum class CommandKind : uint8_t {
   VALVE_SET_POSITION,
   COLUMN_BOTTOM_VALVE_HOME,
   COLUMN_BOTTOM_VALVE_SET_POSITION,
+  CAROUSEL_SET_REFERENCE,
+  CAROUSEL_MOVE_TO_POSITION,
 };
 enum class PumpId : uint8_t { NONE, P1, P2 };
 enum class ValveId : uint8_t { NONE, V1, V2, V3, V4, V5, V6, V7, V8 };
@@ -70,18 +73,21 @@ struct CommandSemanticIdentity {
   constexpr CommandSemanticIdentity(
       CommandKind commandValue = CommandKind::NONE,
       PumpId pumpValue = PumpId::NONE, uint16_t targetStepsValue = 0,
-      ValveId valveValue = ValveId::NONE, uint16_t targetDegreesValue = 0)
+      ValveId valveValue = ValveId::NONE, uint16_t targetDegreesValue = 0,
+      uint8_t carouselPositionValue = 0)
       : command(commandValue),
         pump(pumpValue),
         targetSteps(targetStepsValue),
         valve(valveValue),
-        targetDegrees(targetDegreesValue) {}
+        targetDegrees(targetDegreesValue),
+        carouselPosition(carouselPositionValue) {}
 
   CommandKind command;
   PumpId pump;
   uint16_t targetSteps;
   ValveId valve;
   uint16_t targetDegrees;
+  uint8_t carouselPosition;
 };
 
 struct CommandStatusRecord {

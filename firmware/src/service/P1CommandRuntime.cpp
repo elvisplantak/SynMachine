@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "protocol/CommandLifecycleWriter.h"
+#include "protocol/CarouselContract.h"
 #include "protocol/ColumnBottomValveContract.h"
 #include "protocol/ProtocolErrorWriter.h"
 #include "protocol/PumpHomeContract.h"
@@ -39,6 +40,12 @@ CommandErrorCode preflightError(ValvePrepareResult result) {
 
 CommandErrorCode preflightError(ColumnValvePrepareResult result) {
   if (result == ColumnValvePrepareResult::BUSY)
+    return CommandErrorCode::CONTROLLER_BUSY;
+  return CommandErrorCode::INVALID_FIELD;
+}
+
+CommandErrorCode preflightError(CarouselPrepareResult result) {
+  if (result == CarouselPrepareResult::BUSY)
     return CommandErrorCode::CONTROLLER_BUSY;
   return CommandErrorCode::INVALID_FIELD;
 }
@@ -83,6 +90,20 @@ P1CommandRuntime::P1CommandRuntime(
       p2Controller_(&p2Controller),
       valveControllers_(valveControllers),
       valveControllerCount_(valveControllerCount),
+      protocolDispatcher_(true) {}
+
+P1CommandRuntime::P1CommandRuntime(
+    P1MotionController& p1Controller, P1MotionController& p2Controller,
+    ValveMotionController* const* valveControllers,
+    uint8_t valveControllerCount,
+    ColumnBottomValveMotionController& columnValveController,
+    CarouselMotionController& carouselController)
+    : p1Controller_(p1Controller),
+      p2Controller_(&p2Controller),
+      valveControllers_(valveControllers),
+      valveControllerCount_(valveControllerCount),
+      columnValveController_(&columnValveController),
+      carouselController_(&carouselController),
       protocolDispatcher_(true) {}
 
 P1CommandRuntime::P1CommandRuntime(
@@ -153,6 +174,9 @@ DispatchResult P1CommandRuntime::dispatchCommand(
   ColumnBottomValveCommand columnValve{};
   const ColumnValveContractStatus columnValveStatus =
       parseColumnBottomValve(message, columnValve);
+  CarouselCommand carousel{};
+  const CarouselContractStatus carouselStatus =
+      parseCarousel(message, carousel);
 
   CommandSemanticIdentity semantic{};
   P1PrepareResult prepared = P1PrepareResult::INVALID_TARGET;
@@ -166,6 +190,8 @@ DispatchResult P1CommandRuntime::dispatchCommand(
     semantic = semanticIdentity(valvePosition);
   } else if (columnValveStatus == ColumnValveContractStatus::VALID) {
     semantic = semanticIdentity(columnValve);
+  } else if (carouselStatus == CarouselContractStatus::VALID) {
+    semantic = semanticIdentity(carousel);
   } else {
     const bool supported =
         homeStatus != PumpHomeContractStatus::UNSUPPORTED_COMMAND ||
@@ -173,7 +199,8 @@ DispatchResult P1CommandRuntime::dispatchCommand(
         valveHomeStatus != ValveHomeContractStatus::UNSUPPORTED_COMMAND ||
         valvePositionStatus !=
             ValveSetPositionContractStatus::UNSUPPORTED_COMMAND ||
-        columnValveStatus != ColumnValveContractStatus::UNSUPPORTED_COMMAND;
+        columnValveStatus != ColumnValveContractStatus::UNSUPPORTED_COMMAND ||
+        carouselStatus != CarouselContractStatus::UNSUPPORTED_COMMAND;
     reject(message, identity, cache,
            supported ? CommandErrorCode::INVALID_FIELD
                      : CommandErrorCode::UNSUPPORTED_COMMAND,
@@ -210,6 +237,7 @@ DispatchResult P1CommandRuntime::dispatchCommand(
   P1MotionController* selectedController = nullptr;
   ValveMotionController* selectedValveController = nullptr;
   ColumnBottomValveMotionController* selectedColumnValveController = nullptr;
+  CarouselMotionController* selectedCarouselController = nullptr;
   if (semantic.command == CommandKind::PUMP_HOME ||
       semantic.command == CommandKind::PUMP_MOVE_ABSOLUTE_STEPS) {
     selectedController = controllerFor(semantic.pump);
@@ -245,7 +273,9 @@ DispatchResult P1CommandRuntime::dispatchCommand(
              capacity, outputLength, &semantic);
       return {ParseStatus::VALID_MESSAGE, outputLength};
     }
-  } else {
+  } else if (semantic.command == CommandKind::COLUMN_BOTTOM_VALVE_HOME ||
+             semantic.command ==
+                 CommandKind::COLUMN_BOTTOM_VALVE_SET_POSITION) {
     selectedColumnValveController = columnValveController_;
     if (selectedColumnValveController == nullptr) {
       reject(message, identity, cache, CommandErrorCode::INVALID_FIELD, output,
@@ -262,6 +292,34 @@ DispatchResult P1CommandRuntime::dispatchCommand(
              capacity, outputLength, &semantic);
       return {ParseStatus::VALID_MESSAGE, outputLength};
     }
+  } else {
+    selectedCarouselController = carouselController_;
+    if (selectedCarouselController == nullptr) {
+      reject(message, identity, cache, CommandErrorCode::INVALID_FIELD, output,
+             capacity, outputLength, &semantic);
+      return {ParseStatus::VALID_MESSAGE, outputLength};
+    }
+    if (semantic.command == CommandKind::CAROUSEL_MOVE_TO_POSITION &&
+        (columnValveController_ == nullptr ||
+         columnValveController_->positionTrust() !=
+             ColumnValvePositionTrust::TRUSTED ||
+         columnValveController_->positionSteps() != kColumnValveClosedSteps)) {
+      reject(message, identity, cache,
+             CommandErrorCode::CAROUSEL_COLUMN_VALVE_NOT_CLOSED, output,
+             capacity, outputLength, &semantic);
+      return {ParseStatus::VALID_MESSAGE, outputLength};
+    }
+    const CarouselPrepareResult carouselPrepared =
+        semantic.command == CommandKind::CAROUSEL_SET_REFERENCE
+            ? selectedCarouselController->prepareSetReference(
+                  semantic.carouselPosition)
+            : selectedCarouselController->prepareMoveToPosition(
+                  semantic.carouselPosition);
+    if (carouselPrepared != CarouselPrepareResult::READY) {
+      reject(message, identity, cache, preflightError(carouselPrepared), output,
+             capacity, outputLength, &semantic);
+      return {ParseStatus::VALID_MESSAGE, outputLength};
+    }
   }
 
   if (!accept(message, semantic, identity, cache, output, capacity,
@@ -270,11 +328,14 @@ DispatchResult P1CommandRuntime::dispatchCommand(
     if (selectedValveController != nullptr) selectedValveController->abort();
     if (selectedColumnValveController != nullptr)
       selectedColumnValveController->abort();
+    if (selectedCarouselController != nullptr)
+      selectedCarouselController->abort();
     outputLength = 0;
   } else {
     activeController_ = selectedController;
     activeValveController_ = selectedValveController;
     activeColumnValveController_ = selectedColumnValveController;
+    activeCarouselController_ = selectedCarouselController;
   }
   return {ParseStatus::VALID_MESSAGE, outputLength};
 }
@@ -351,8 +412,10 @@ bool P1CommandRuntime::confirmStartedFrameWritten(uint32_t nowUs,
                                  ? activeController_->start(nowUs)
                                  : activeValveController_ != nullptr
                                  ? activeValveController_->start(nowUs)
-                                 : activeColumnValveController_ != nullptr &&
-                                       activeColumnValveController_->start(nowUs);
+                                 : activeColumnValveController_ != nullptr
+                                 ? activeColumnValveController_->start(nowUs)
+                                 : activeCarouselController_ != nullptr &&
+                                       activeCarouselController_->start(nowUs);
   if (!motionStarted)
     return false;
   runtimeState_ = RuntimeState::RUNNING;
@@ -378,7 +441,23 @@ void P1CommandRuntime::update(uint32_t nowUs, CommandStatusCache& cache) {
         activeColumnValveController_->update(nowUs);
     if (result != ColumnValveMotionResult::NONE)
       finishColumnValve(result, cache);
+  } else if (activeCarouselController_ != nullptr) {
+    const CarouselMotionResult result =
+        activeCarouselController_->update(nowUs);
+    if (result != CarouselMotionResult::NONE) finishCarousel(result, cache);
   }
+}
+
+void P1CommandRuntime::finishCarousel(CarouselMotionResult result,
+                                      CommandStatusCache& cache) {
+  if (result != CarouselMotionResult::COMPLETED) return;
+  activeRecord_.state = CommandState::COMPLETED;
+  if (cache.store(activeRecord_)) {
+    runtimeState_ = suppressUnsolicitedLifecycle_
+                        ? RuntimeState::IDLE
+                        : RuntimeState::EMIT_TERMINAL;
+  }
+  activeCarouselController_ = nullptr;
 }
 
 void P1CommandRuntime::finishColumnValve(ColumnValveMotionResult result,
@@ -458,8 +537,10 @@ bool P1CommandRuntime::abort(CommandStatusCache& cache) {
                            ? activeController_->abort()
                            : activeValveController_ != nullptr
                            ? activeValveController_->abort()
-                           : activeColumnValveController_ != nullptr &&
-                                 activeColumnValveController_->abort();
+                           : activeColumnValveController_ != nullptr
+                           ? activeColumnValveController_->abort()
+                           : activeCarouselController_ != nullptr &&
+                                 activeCarouselController_->abort();
   if (!aborted) return false;
   activeRecord_.state = CommandState::FAILED;
   activeRecord_.executionStarted = true;
@@ -471,6 +552,7 @@ bool P1CommandRuntime::abort(CommandStatusCache& cache) {
   activeController_ = nullptr;
   activeValveController_ = nullptr;
   activeColumnValveController_ = nullptr;
+  activeCarouselController_ = nullptr;
   return true;
 }
 

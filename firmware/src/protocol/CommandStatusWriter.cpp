@@ -78,6 +78,8 @@ const char* errorText(CommandErrorCode error) {
     return LABFORGE_TEXT("COLUMN_VALVE_HOME_SWITCH_UNEXPECTED");
   if (error == CommandErrorCode::COLUMN_VALVE_HOME_SWITCH_STUCK)
     return LABFORGE_TEXT("COLUMN_VALVE_HOME_SWITCH_STUCK");
+  if (error == CommandErrorCode::CAROUSEL_COLUMN_VALVE_NOT_CLOSED)
+    return LABFORGE_TEXT("CAROUSEL_COLUMN_VALVE_NOT_CLOSED");
   if (error == CommandErrorCode::COMMAND_ABORTED)
     return LABFORGE_TEXT("COMMAND_ABORTED");
   return nullptr;

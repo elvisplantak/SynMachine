@@ -5,6 +5,7 @@
 
 #include "actuator/P1MotionController.h"
 #include "protocol/CommandLifecycleWriter.h"
+#include "protocol/CommandStatusWriter.h"
 #include "protocol/CooperativeFrameTransport.h"
 #include "service/P1CommandRuntime.h"
 
@@ -287,7 +288,7 @@ void test_session_replacement_keeps_running_and_suppresses_old_lifecycle() {
   CommandStatusCache cache;
   char command[384];
   makeCommand(command, sizeof(command), "PUMP_HOME", "{\"pump\":\"P1\"}");
-  uint8_t output[kCommandLifecycleFrameCapacity]{};
+  uint8_t output[kCommandStatusFrameCapacity]{};
   dispatch(runtime, session, cache, command, output, sizeof(output));
   size_t length = 0;
   bool startsMotion = false;
@@ -332,7 +333,7 @@ void test_session_replacement_after_short_started_write_uses_new_nonce() {
   CommandStatusCache cache;
   char command[384];
   makeCommand(command, sizeof(command), "PUMP_HOME", "{\"pump\":\"P1\"}");
-  uint8_t output[kCommandLifecycleFrameCapacity]{};
+  uint8_t output[kCommandStatusFrameCapacity]{};
   dispatch(runtime, session, cache, command, output, sizeof(output));
 
   size_t length = 0;
@@ -458,7 +459,7 @@ void test_hello_advertises_integrated_pump_and_valve_capabilities() {
       "{\"protocol\":\"LABFORGE/1\",\"type\":\"HELLO\","
       "\"backend_session_nonce\":"
       "\"123e4567-e89b-12d3-a456-426614174000\"}";
-  uint8_t output[kCommandLifecycleFrameCapacity]{};
+  uint8_t output[kCommandStatusFrameCapacity]{};
 
   dispatch(runtime, session, cache, hello, output, sizeof(output));
 
@@ -477,7 +478,10 @@ void test_hello_advertises_integrated_pump_and_valve_capabilities() {
   TEST_ASSERT_NOT_NULL(strstr(
       reinterpret_cast<char*>(output),
       "\"COLUMN_BOTTOM_VALVE_SET_POSITION\""));
-  TEST_ASSERT_NULL(strstr(reinterpret_cast<char*>(output), "CAROUSEL"));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "\"CAROUSEL_SET_REFERENCE\""));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "\"CAROUSEL_MOVE_TO_POSITION\""));
 }
 
 void test_invalid_move_is_rejected_without_gpio_writes() {

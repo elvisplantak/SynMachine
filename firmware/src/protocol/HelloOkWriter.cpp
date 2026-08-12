@@ -18,14 +18,18 @@ bool writeHelloOk(const char* nonce, const BootIdentityResult& identity,
                   uint8_t* output, size_t capacity, size_t& outputLength,
                   bool p1MotionEnabled,
                   const CommandStatusCache* commandStatusCache) {
-  char frame[kHelloOkFrameCapacity];
+  if (output == nullptr || capacity == 0) {
+    outputLength = 0;
+    return false;
+  }
+  char* frame = reinterpret_cast<char*>(output);
   const char* controllerState =
       commandStatusCache != nullptr && commandStatusCache->active() != nullptr
           ? "BUSY"
           : "IDLE";
   const int written = identity.trusted && p1MotionEnabled
       ? LABFORGE_SNPRINTF(
-            frame, sizeof(frame),
+            frame, capacity,
             LABFORGE_FORMAT(
                 "{\"protocol\":\"LABFORGE/1\",\"type\":\"HELLO_OK\","
                 "\"backend_session_nonce\":\"%s\",\"controller_boot_id\":%lu,"
@@ -35,12 +39,14 @@ bool writeHelloOk(const char* nonce, const BootIdentityResult& identity,
                 "\"PUMP_MOVE_ABSOLUTE_STEPS\",\"VALVE_HOME\","
                 "\"VALVE_SET_POSITION\","
                 "\"COLUMN_BOTTOM_VALVE_HOME\","
-                "\"COLUMN_BOTTOM_VALVE_SET_POSITION\"]}\n"),
+                "\"COLUMN_BOTTOM_VALVE_SET_POSITION\","
+                "\"CAROUSEL_SET_REFERENCE\","
+                "\"CAROUSEL_MOVE_TO_POSITION\"]}\n"),
             nonce, static_cast<unsigned long>(identity.controllerBootId),
             controllerState)
       : identity.trusted
       ? LABFORGE_SNPRINTF(
-            frame, sizeof(frame),
+            frame, capacity,
             LABFORGE_FORMAT(
                 "{\"protocol\":\"LABFORGE/1\",\"type\":\"HELLO_OK\","
                 "\"backend_session_nonce\":\"%s\",\"controller_boot_id\":%lu,"
@@ -48,7 +54,7 @@ bool writeHelloOk(const char* nonce, const BootIdentityResult& identity,
                 "\"software_state_trust\":\"TRUSTED\",\"capabilities\":[]}\n"),
             nonce, static_cast<unsigned long>(identity.controllerBootId))
       : LABFORGE_SNPRINTF(
-            frame, sizeof(frame),
+            frame, capacity,
             LABFORGE_FORMAT(
                 "{\"protocol\":\"LABFORGE/1\",\"type\":\"HELLO_OK\","
                 "\"backend_session_nonce\":\"%s\",\"controller_boot_id\":null,"
@@ -56,11 +62,9 @@ bool writeHelloOk(const char* nonce, const BootIdentityResult& identity,
                 "\"software_state_trust\":\"UNTRUSTED\",\"capabilities\":[]}\n"),
             nonce);
   outputLength = 0;
-  if (written < 0 || static_cast<size_t>(written) >= sizeof(frame) ||
-      static_cast<size_t>(written) > capacity) {
+  if (written < 0 || static_cast<size_t>(written) >= capacity) {
     return false;
   }
-  memcpy(output, frame, static_cast<size_t>(written));
   outputLength = static_cast<size_t>(written);
   return true;
 }
