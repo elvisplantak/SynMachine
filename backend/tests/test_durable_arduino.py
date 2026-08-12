@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -73,6 +74,24 @@ def test_intent_is_durable_before_first_serial_command_byte(tmp_path) -> None:
         )
         assert result.state is ArduinoCommandJournalState.COMPLETED
         assert result.result == {"position_steps": 0}
+
+
+def test_journal_can_persist_and_complete_from_fastapi_worker_thread(tmp_path) -> None:
+    with SQLiteArduinoCommandJournal(tmp_path / "commands.db") as journal:
+        client = FakeClient(journal)
+        executor = DurableArduinoCommandExecutor(client, journal)  # type: ignore[arg-type]
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            result = pool.submit(
+                executor.execute,
+                phase_execution_id="phase-1",
+                operation_command_id=OPERATION_ID,
+                command="PUMP_HOME",
+                arguments={"pump": "P1"},
+            ).result()
+
+        assert result.state is ArduinoCommandJournalState.COMPLETED
+        assert journal.load(OPERATION_ID) == result
 
 
 def test_transport_failure_is_durable_unknown_and_never_auto_retried(tmp_path) -> None:
