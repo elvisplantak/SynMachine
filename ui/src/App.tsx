@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import "./App.css";
 
 type ValveState = "closed" | "k1k3" | "k1k2";
@@ -1107,16 +1107,58 @@ const initialPumpServiceState: PumpServiceState = {
   operationCommandId: null,
 };
 
+let arduinoServiceCommandActive = false;
+const arduinoServiceCommandListeners = new Set<() => void>();
+
+function useArduinoServiceCommandActive(): boolean {
+  return useSyncExternalStore(
+    (listener) => {
+      arduinoServiceCommandListeners.add(listener);
+      return () => {
+        arduinoServiceCommandListeners.delete(listener);
+      };
+    },
+    () => arduinoServiceCommandActive,
+  );
+}
+
+function notifyArduinoServiceCommandChange() {
+  arduinoServiceCommandListeners.forEach((listener) => listener());
+}
+
+function acquireArduinoServiceCommand(): boolean {
+  if (arduinoServiceCommandActive) {
+    return false;
+  }
+  arduinoServiceCommandActive = true;
+  notifyArduinoServiceCommandChange();
+  return true;
+}
+
+function releaseArduinoServiceCommand() {
+  arduinoServiceCommandActive = false;
+  notifyArduinoServiceCommandChange();
+}
+
 function PumpServiceControl({ pump }: { pump: CommissioningPump }) {
   const [targetSteps, setTargetSteps] = useState("2000");
   const [safeRouteConfirmed, setSafeRouteConfirmed] = useState(false);
   const [commandState, setCommandState] = useState<PumpServiceState>(initialPumpServiceState);
   const running = commandState.status === "running";
+  const arduinoBusy = useArduinoServiceCommandActive();
   const parsedTarget = Number(targetSteps);
   const targetValid = Number.isInteger(parsedTarget) && parsedTarget >= 1 && parsedTarget <= 20500;
 
   const executeCommand = async (command: "HOME" | "MOVE_ABSOLUTE_STEPS") => {
     if (!safeRouteConfirmed || (command === "MOVE_ABSOLUTE_STEPS" && !targetValid)) {
+      return;
+    }
+    if (!acquireArduinoServiceCommand()) {
+      setCommandState({
+        status: "failed",
+        message: "Another Arduino Service command is already active.",
+        operationCommandId: null,
+      });
       return;
     }
 
@@ -1170,6 +1212,8 @@ function PumpServiceControl({ pump }: { pump: CommissioningPump }) {
         message: error instanceof Error ? error.message : "Unknown backend error",
         operationCommandId,
       });
+    } finally {
+      releaseArduinoServiceCommand();
     }
   };
 
@@ -1196,7 +1240,7 @@ function PumpServiceControl({ pump }: { pump: CommissioningPump }) {
           max="20500"
           step="1"
           value={targetSteps}
-          disabled={running}
+          disabled={arduinoBusy}
           onChange={(event) => setTargetSteps(event.target.value)}
         />
       </label>
@@ -1205,14 +1249,14 @@ function PumpServiceControl({ pump }: { pump: CommissioningPump }) {
         <input
           type="checkbox"
           checked={safeRouteConfirmed}
-          disabled={running}
+          disabled={arduinoBusy}
           onChange={(event) => setSafeRouteConfirmed(event.target.checked)}
         />
         I have physically confirmed a safe fluid route for this pump command.
       </label>
       <div className="serviceActionRow">
-        <button type="button" disabled={running || !safeRouteConfirmed} onClick={() => void executeCommand("HOME")}>Home</button>
-        <button type="button" disabled={running || !safeRouteConfirmed || !targetValid} onClick={() => void executeCommand("MOVE_ABSOLUTE_STEPS")}>Move to position</button>
+        <button type="button" disabled={arduinoBusy || !safeRouteConfirmed} onClick={() => void executeCommand("HOME")}>Home</button>
+        <button type="button" disabled={arduinoBusy || !safeRouteConfirmed || !targetValid} onClick={() => void executeCommand("MOVE_ABSOLUTE_STEPS")}>Move to position</button>
       </div>
       <p className="serviceControlNotice">Supervised direct hardware command. Unknown outcomes are not retried automatically.</p>
     </section>
@@ -1223,8 +1267,17 @@ function ValveServiceControl({ valve }: { valve: CommissioningValve }) {
   const [confirmedPosition, setConfirmedPosition] = useState<ValvePosition | null>(null);
   const [commandState, setCommandState] = useState<PumpServiceState>(initialPumpServiceState);
   const running = commandState.status === "running";
+  const arduinoBusy = useArduinoServiceCommandActive();
 
   const executeCommand = async (command: "HOME" | "SET_POSITION", position?: ValvePosition) => {
+    if (!acquireArduinoServiceCommand()) {
+      setCommandState({
+        status: "failed",
+        message: "Another Arduino Service command is already active.",
+        operationCommandId: null,
+      });
+      return;
+    }
     const operationCommandId = crypto.randomUUID();
     const phaseExecutionId = `service-${valve.toLowerCase()}-${Date.now()}`;
     const targetLabel = command === "HOME" ? "HOME" : `${position}°`;
@@ -1274,6 +1327,8 @@ function ValveServiceControl({ valve }: { valve: CommissioningValve }) {
         message: error instanceof Error ? error.message : "Unknown backend error",
         operationCommandId,
       });
+    } finally {
+      releaseArduinoServiceCommand();
     }
   };
 
@@ -1294,10 +1349,10 @@ function ValveServiceControl({ valve }: { valve: CommissioningValve }) {
         <span>Operation command ID<strong>{commandState.operationCommandId ?? "Not assigned"}</strong></span>
       </div>
       <div className="serviceActionRow">
-        <button type="button" disabled={running} onClick={() => void executeCommand("HOME")}>Home</button>
-        <button type="button" disabled={running} onClick={() => void executeCommand("SET_POSITION", 0)}>Closed</button>
-        <button type="button" disabled={running} onClick={() => void executeCommand("SET_POSITION", 90)}>k1 ↔ k3</button>
-        <button type="button" disabled={running} onClick={() => void executeCommand("SET_POSITION", 180)}>k1 ↔ k2</button>
+        <button type="button" disabled={arduinoBusy} onClick={() => void executeCommand("HOME")}>Home</button>
+        <button type="button" disabled={arduinoBusy} onClick={() => void executeCommand("SET_POSITION", 0)}>Closed</button>
+        <button type="button" disabled={arduinoBusy} onClick={() => void executeCommand("SET_POSITION", 90)}>k1 ↔ k3</button>
+        <button type="button" disabled={arduinoBusy} onClick={() => void executeCommand("SET_POSITION", 180)}>k1 ↔ k2</button>
       </div>
       <p className="serviceControlNotice">Supervised direct hardware command. Unknown outcomes are not retried automatically.</p>
     </section>
@@ -1308,8 +1363,17 @@ function ColumnBottomValveServiceControl() {
   const [confirmedPosition, setConfirmedPosition] = useState<ColumnBottomValvePosition | null>(null);
   const [commandState, setCommandState] = useState<PumpServiceState>(initialPumpServiceState);
   const running = commandState.status === "running";
+  const arduinoBusy = useArduinoServiceCommandActive();
 
   const executeCommand = async (command: "HOME" | "SET_POSITION", position?: 4 | 94) => {
+    if (!acquireArduinoServiceCommand()) {
+      setCommandState({
+        status: "failed",
+        message: "Another Arduino Service command is already active.",
+        operationCommandId: null,
+      });
+      return;
+    }
     const operationCommandId = crypto.randomUUID();
     const phaseExecutionId = `service-column-bottom-valve-${Date.now()}`;
     const targetLabel = command === "HOME" ? "HOME reference" : position === 4 ? "CLOSED" : "OPEN";
@@ -1359,6 +1423,8 @@ function ColumnBottomValveServiceControl() {
         message: error instanceof Error ? error.message : "Unknown backend error",
         operationCommandId,
       });
+    } finally {
+      releaseArduinoServiceCommand();
     }
   };
 
@@ -1387,9 +1453,9 @@ function ColumnBottomValveServiceControl() {
         <span>Operation command ID<strong>{commandState.operationCommandId ?? "Not assigned"}</strong></span>
       </div>
       <div className="serviceActionRow">
-        <button type="button" disabled={running} onClick={() => void executeCommand("HOME")}>Home reference</button>
-        <button type="button" disabled={running} onClick={() => void executeCommand("SET_POSITION", 4)}>Closed · 4°</button>
-        <button type="button" disabled={running} onClick={() => void executeCommand("SET_POSITION", 94)}>Open · 94°</button>
+        <button type="button" disabled={arduinoBusy} onClick={() => void executeCommand("HOME")}>Home reference</button>
+        <button type="button" disabled={arduinoBusy} onClick={() => void executeCommand("SET_POSITION", 4)}>Closed · 4°</button>
+        <button type="button" disabled={arduinoBusy} onClick={() => void executeCommand("SET_POSITION", 94)}>Open · 94°</button>
       </div>
       <p className="serviceControlNotice">HOME establishes 0° only; move separately to 4° for CLOSED. Supervised direct hardware command with no automatic retry.</p>
     </section>
@@ -1403,12 +1469,21 @@ function CarouselServiceControl() {
   const [commandState, setCommandState] = useState<PumpServiceState>(initialPumpServiceState);
   const [lastCompletedPosition, setLastCompletedPosition] = useState<number | null>(null);
   const running = commandState.status === "running";
+  const arduinoBusy = useArduinoServiceCommandActive();
   const parsedPosition = Number(position);
   const positionValid = Number.isInteger(parsedPosition) && parsedPosition >= 1 && parsedPosition <= 40;
 
   const executeCommand = async (command: "SET_REFERENCE" | "MOVE_TO_POSITION") => {
     const confirmed = command === "SET_REFERENCE" ? manualAlignmentConfirmed : columnClosedConfirmed;
     if (!positionValid || !confirmed) {
+      return;
+    }
+    if (!acquireArduinoServiceCommand()) {
+      setCommandState({
+        status: "failed",
+        message: "Another Arduino Service command is already active.",
+        operationCommandId: null,
+      });
       return;
     }
 
@@ -1470,6 +1545,8 @@ function CarouselServiceControl() {
         message: error instanceof Error ? error.message : "Unknown backend error",
         operationCommandId,
       });
+    } finally {
+      releaseArduinoServiceCommand();
     }
   };
 
@@ -1497,7 +1574,7 @@ function CarouselServiceControl() {
           max="40"
           step="1"
           value={position}
-          disabled={running}
+          disabled={arduinoBusy}
           onChange={(event) => setPosition(event.target.value)}
         />
       </label>
@@ -1506,22 +1583,22 @@ function CarouselServiceControl() {
         <input
           type="checkbox"
           checked={manualAlignmentConfirmed}
-          disabled={running}
+          disabled={arduinoBusy}
           onChange={(event) => setManualAlignmentConfirmed(event.target.checked)}
         />
         I manually aligned the selected tube position. Setting the reference must not move the carousel.
       </label>
-      <button className="carouselPrimaryAction" type="button" disabled={running || !positionValid || !manualAlignmentConfirmed} onClick={() => void executeCommand("SET_REFERENCE")}>Set manual reference</button>
+      <button className="carouselPrimaryAction" type="button" disabled={arduinoBusy || !positionValid || !manualAlignmentConfirmed} onClick={() => void executeCommand("SET_REFERENCE")}>Set manual reference</button>
       <label className="safeRouteConfirmation">
         <input
           type="checkbox"
           checked={columnClosedConfirmed}
-          disabled={running}
+          disabled={arduinoBusy}
           onChange={(event) => setColumnClosedConfirmed(event.target.checked)}
         />
         I confirmed the Column bottom valve was homed and moved to CLOSED · 4° in the current controller session.
       </label>
-      <button className="carouselPrimaryAction" type="button" disabled={running || !positionValid || !columnClosedConfirmed} onClick={() => void executeCommand("MOVE_TO_POSITION")}>Move to selected tube</button>
+      <button className="carouselPrimaryAction" type="button" disabled={arduinoBusy || !positionValid || !columnClosedConfirmed} onClick={() => void executeCommand("MOVE_TO_POSITION")}>Move to selected tube</button>
       <p className="serviceControlNotice">The firmware independently requires a trusted manual reference and trusted CLOSED Column valve state. Session replacement invalidates the carousel reference.</p>
     </section>
   );

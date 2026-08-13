@@ -9,6 +9,12 @@
 
 ### UI
 
+- All Arduino-backed Service controls now share a synchronous global command
+  guard. The guard closes same-tick and cross-card click races before React's
+  next render, notifies every mounted Arduino control, and disables pumps,
+  V1-V8, the Column bottom valve, and carousel controls while one Arduino
+  request is active. Backend serialization remains the authoritative boundary.
+  UI lint and the production build pass.
 - Carousel now has a dedicated Service section for operator-confirmed manual
   reference and logical-forward movement to tube positions `1..40`. Reference
   and movement use separate inline confirmations, fresh caller-owned command
@@ -40,7 +46,10 @@
   terminally rejected as `INVALID_FIELD` before execution; another V6
   180-degree command had already completed, no outcome remained unknown, and
   no automatic retry occurred. Final journaled positions were V1, V2, and
-  V4-V8 at 90 degrees and V3 at 180 degrees.
+  V4-V8 at 90 degrees and V3 at 180 degrees. Follow-up V6 and V8 180-to-90
+  retests completed successfully. A second accidental V8 90-degree request was
+  also rejected as `INVALID_FIELD` before execution; this led to the shared
+  backend Serial concurrency correction recorded below.
 - Branch: `codex/pump-service-ui`
 - P1 and P2 Service cards now call the durable Arduino backend command API for
   explicit `HOME` and raw `MOVE_ABSOLUTE_STEPS` actions in the canonical
@@ -87,6 +96,15 @@
 
 ### Backend
 
+- The production `DurableArduinoCommandExecutor` now owns a global nonblocking
+  command/recovery lock around the complete journal/Serial/lifecycle
+  transaction. A concurrent request fails with known `CONTROLLER_BUSY` before
+  creating an intent or sending Serial bytes, preventing FastAPI worker threads
+  from interleaving writes or lifecycle reads on the shared Serial client. A
+  deterministic concurrency regression test holds the first fake Serial
+  command active and proves the second performs no Serial call and creates no
+  journal row. Focused Service/concurrency tests passed `36/36`, the complete
+  backend suite passed `1073` tests, and Ruff is clean.
 - Carousel Arduino Service integration is implemented on branch
   `codex/v1-v8-service-backend-ui`: the strict
   `/api/v1/service/carousel/command` boundary accepts caller-owned identities,
