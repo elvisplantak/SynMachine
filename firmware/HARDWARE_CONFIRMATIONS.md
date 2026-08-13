@@ -149,6 +149,27 @@ with the 2026-08-06 driver settings, `ENA` wiring or behavior, leak-tightness,
 fluidic routing through the valve, independent secondary end protection, or
 safe unattended/production execution.
 
+### Deferred Column Service UI attempt with coupling removed — 2026-08-13
+
+After a successful V1 HOME-to-90-degree smoke test, the user attempted
+`COLUMN_BOTTOM_VALVE_HOME` from the live Service UI while the Column valve
+shaft/coupling pin was intentionally removed pending replacement to prevent
+future slipping. The disconnected mechanism could not provide a valid
+end-to-end mechanical HOME test or actuate the installed HOME relationship as
+normally assembled.
+
+The backend command timed out before receiving a terminal lifecycle result and
+durably recorded `OUTCOME_UNKNOWN`. It was not retried. The UI and backend were
+stopped, and the user explicitly confirmed that machine motor power was then
+switched off. Five accidental SF bottom valve UI requests during this session
+all failed closed with HTTP 503 because the U2D2 runtime was not configured;
+the backend did not open or command the SF actuator.
+
+This attempt confirms no Column HOME or operating position. After the new
+shaft/coupling pin is installed, testing must begin in a new controller session
+with a fresh command identity and a supervised HOME operation before CLOSED or
+OPEN positioning. The prior unknown command must never be resent.
+
 ### Confirmed `SF_BOTTOM_VALVE` actuator and connection — 2026-08-04
 
 The user explicitly confirmed that `SF_BOTTOM_VALVE` is actuated by a
