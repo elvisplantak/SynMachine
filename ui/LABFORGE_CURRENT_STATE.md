@@ -9,6 +9,16 @@
 
 ### UI
 
+- A supervised V1 regression smoke test after the host concurrency correction
+  completed HOME and 90-degree positioning. A following Column HOME attempt is
+  not a valid mechanical test because the shaft/coupling pin had been removed
+  pending replacement; the backend timed out and durably recorded
+  `OUTCOME_UNKNOWN`. The command was not retried, UI/backend were stopped, and
+  the user confirmed motor power was switched off. The Column test is deferred
+  until reassembly and must restart with a new controller session, fresh
+  identity, and HOME before CLOSED/OPEN. Five accidental SF UI requests failed
+  closed with HTTP 503 because U2D2 was not configured, so no SF hardware
+  command occurred.
 - All Arduino-backed Service controls now share a synchronous global command
   guard. The guard closes same-tick and cross-card click races before React's
   next render, notifies every mounted Arduino control, and disables pumps,
