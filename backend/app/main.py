@@ -170,6 +170,38 @@ class ColumnBottomValveServiceCommandRequest(BaseModel):
         return self
 
 
+class CarouselServiceCommandRequest(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+
+    phase_execution_id: Annotated[str, Field(pattern=r"^[A-Za-z0-9_.:-]{1,64}$")]
+    operation_command_id: Annotated[
+        str,
+        Field(pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"),
+    ]
+    command: Literal["SET_REFERENCE", "MOVE_TO_POSITION"]
+    position: Annotated[int, Field(ge=1, le=40)]
+    manual_alignment_confirmed: Literal[True] | None = None
+    column_bottom_valve_closed_confirmed: Literal[True] | None = None
+
+    @model_validator(mode="after")
+    def validate_command_boundary(self) -> "CarouselServiceCommandRequest":
+        if self.command == "SET_REFERENCE":
+            if self.manual_alignment_confirmed is not True:
+                raise ValueError("SET_REFERENCE requires manual_alignment_confirmed=true")
+            if self.column_bottom_valve_closed_confirmed is not None:
+                raise ValueError(
+                    "SET_REFERENCE must not include column_bottom_valve_closed_confirmed"
+                )
+        else:
+            if self.column_bottom_valve_closed_confirmed is not True:
+                raise ValueError(
+                    "MOVE_TO_POSITION requires column_bottom_valve_closed_confirmed=true"
+                )
+            if self.manual_alignment_confirmed is not None:
+                raise ValueError("MOVE_TO_POSITION must not include manual_alignment_confirmed")
+        return self
+
+
 def _configured_database_path(database_path: str | Path | None) -> Path:
     if database_path is not None:
         return Path(database_path)
@@ -405,6 +437,57 @@ def create_app(
                 operation_command_id=request.operation_command_id,
                 command=command,
                 arguments=arguments,
+            )
+        except ArduinoCommandIdentityConflictError as error:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(error),
+            ) from error
+        except ArduinoSerialError as error:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=str(error),
+            ) from error
+        return PumpServiceCommandResponse(
+            operation_command_id=entry.operation_command_id,
+            state=entry.state.value,
+            result=entry.result,
+            error_code=entry.error_code,
+            execution_started=entry.execution_started,
+        )
+
+    @application.post(
+        f"{API_PREFIX}/service/carousel/command",
+        response_model=PumpServiceCommandResponse,
+        summary="Execute a durable supervised carousel command",
+        description=(
+            "Service-only manual reference assertion or move to position 1..40. "
+            "Movement also remains protected by the firmware trusted-CLOSED column "
+            "valve interlock. Unknown outcomes are never automatically retried."
+        ),
+    )
+    def execute_carousel_service_command(
+        request: CarouselServiceCommandRequest,
+    ) -> PumpServiceCommandResponse:
+        executor = arduino_commands
+        if executor is None and arduino_runtime is not None:
+            executor = arduino_runtime.executor
+        if executor is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Arduino hardware is not configured",
+            )
+        command = (
+            "CAROUSEL_SET_REFERENCE"
+            if request.command == "SET_REFERENCE"
+            else "CAROUSEL_MOVE_TO_POSITION"
+        )
+        try:
+            entry = executor.execute(
+                phase_execution_id=request.phase_execution_id,
+                operation_command_id=request.operation_command_id,
+                command=command,
+                arguments={"position": request.position},
             )
         except ArduinoCommandIdentityConflictError as error:
             raise HTTPException(
