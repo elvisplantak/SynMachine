@@ -150,6 +150,26 @@ class ValveServiceCommandRequest(BaseModel):
         return self
 
 
+class ColumnBottomValveServiceCommandRequest(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+
+    phase_execution_id: Annotated[str, Field(pattern=r"^[A-Za-z0-9_.:-]{1,64}$")]
+    operation_command_id: Annotated[
+        str,
+        Field(pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"),
+    ]
+    command: Literal["HOME", "SET_POSITION"]
+    position_degrees: Literal[4, 94] | None = None
+
+    @model_validator(mode="after")
+    def validate_command_arguments(self) -> "ColumnBottomValveServiceCommandRequest":
+        if self.command == "HOME" and self.position_degrees is not None:
+            raise ValueError("HOME must not include position_degrees")
+        if self.command == "SET_POSITION" and self.position_degrees is None:
+            raise ValueError("SET_POSITION requires position_degrees")
+        return self
+
+
 def _configured_database_path(database_path: str | Path | None) -> Path:
     if database_path is not None:
         return Path(database_path)
@@ -323,6 +343,60 @@ def create_app(
             )
         command = "VALVE_HOME" if request.command == "HOME" else "VALVE_SET_POSITION"
         arguments: dict[str, str | int | bool] = {"valve": request.valve}
+        if request.position_degrees is not None:
+            arguments["position_degrees"] = request.position_degrees
+        try:
+            entry = executor.execute(
+                phase_execution_id=request.phase_execution_id,
+                operation_command_id=request.operation_command_id,
+                command=command,
+                arguments=arguments,
+            )
+        except ArduinoCommandIdentityConflictError as error:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(error),
+            ) from error
+        except ArduinoSerialError as error:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=str(error),
+            ) from error
+        return PumpServiceCommandResponse(
+            operation_command_id=entry.operation_command_id,
+            state=entry.state.value,
+            result=entry.result,
+            error_code=entry.error_code,
+            execution_started=entry.execution_started,
+        )
+
+    @application.post(
+        f"{API_PREFIX}/service/column-bottom-valve/command",
+        response_model=PumpServiceCommandResponse,
+        summary="Execute a durable supervised column bottom valve command",
+        description=(
+            "Service-only HOME or confirmed 4/94-degree position command. HOME "
+            "establishes coordinate zero; CLOSED is the separate 4-degree position. "
+            "Unknown outcomes are never automatically retried."
+        ),
+    )
+    def execute_column_bottom_valve_service_command(
+        request: ColumnBottomValveServiceCommandRequest,
+    ) -> PumpServiceCommandResponse:
+        executor = arduino_commands
+        if executor is None and arduino_runtime is not None:
+            executor = arduino_runtime.executor
+        if executor is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Arduino hardware is not configured",
+            )
+        command = (
+            "COLUMN_BOTTOM_VALVE_HOME"
+            if request.command == "HOME"
+            else "COLUMN_BOTTOM_VALVE_SET_POSITION"
+        )
+        arguments: dict[str, str | int | bool] = {}
         if request.position_degrees is not None:
             arguments["position_degrees"] = request.position_degrees
         try:
