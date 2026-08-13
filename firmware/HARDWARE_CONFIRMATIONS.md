@@ -561,6 +561,36 @@ verify liquid routing or leak-tightness and does not authorize unattended or
 production operation; the accepted demo-only HOME assumptions above remain
 unchanged.
 
+### Confirmed end-to-end V1-V8 Service UI path — 2026-08-13
+
+The user explicitly authorized and performed a supervised dry V1-V8 test from
+the live Service UI through the backend durable-command API, LABFORGE/1 Serial,
+the production firmware runtime, and Arduino GPIO. The operator remained at the
+machine and selected the commands manually rather than using an automatic
+cascade.
+
+The durable journal recorded 39 requests on trusted controller boot ID 34:
+
+- 38 commands reached terminal `COMPLETED` with `execution_started=true`;
+- every valve V1 through V8 completed `VALVE_HOME`, 90-degree positioning, and
+  180-degree positioning;
+- 0-degree positioning also completed for V1-V4 and V6-V8; V5 0 degrees was
+  not requested in this session; and
+- one additional V6 180-degree request was terminally rejected as
+  `INVALID_FIELD` with `execution_started=false`, so it caused no actuator
+  movement. V6 had already completed a separate 180-degree request and later
+  completed its final 90-degree request.
+
+The user physically reported that all eight valves operated as planned. The
+final journaled positions were V1, V2, and V4-V8 at nominal 90 degrees, and V3
+at nominal 180 degrees. No outcome remained unknown and no automatic retry was
+performed.
+
+This confirms the supervised end-to-end V1-V8 Service UI control path. It does
+not verify liquid routing, port isolation, leak-tightness, missing-HOME
+mechanical protection, or unattended/production operation; the accepted
+demo-only HOME assumptions remain unchanged.
+
 ### Confirmed production P1 GPIO and LABFORGE/1 motion — 2026-08-11
 
 The supervised dry physical integration test used firmware commit
