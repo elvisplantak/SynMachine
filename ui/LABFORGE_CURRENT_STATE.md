@@ -32,7 +32,15 @@
 - The UI maps the confirmed semantics as `0 degrees = closed`,
   `90 degrees = k1 <-> k3`, and `180 degrees = k1 <-> k2`. This software
   checkpoint has passed lint and the production build; no physical execution
-  was performed in this phase.
+  was performed during the software implementation phase. A subsequent
+  supervised dry end-to-end Service UI test completed 38 commands across
+  V1-V8: every valve completed HOME, 90 degrees, and 180 degrees; 0 degrees
+  completed for V1-V4 and V6-V8. The user physically confirmed that all eight
+  valves operated as planned. One additional V6 180-degree request was
+  terminally rejected as `INVALID_FIELD` before execution; another V6
+  180-degree command had already completed, no outcome remained unknown, and
+  no automatic retry occurred. Final journaled positions were V1, V2, and
+  V4-V8 at 90 degrees and V3 at 180 degrees.
 - Branch: `codex/pump-service-ui`
 - P1 and P2 Service cards now call the durable Arduino backend command API for
   explicit `HOME` and raw `MOVE_ABSOLUTE_STEPS` actions in the canonical
