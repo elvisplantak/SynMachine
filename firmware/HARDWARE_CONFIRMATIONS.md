@@ -586,6 +586,17 @@ final journaled positions were V1, V2, and V4-V8 at nominal 90 degrees, and V3
 at nominal 180 degrees. No outcome remained unknown and no automatic retry was
 performed.
 
+Focused follow-up retests then completed V6 at 180 degrees and returned it to
+90 degrees, and completed V8 at 180 degrees and returned it to 90 degrees. The
+user confirmed V6 movement; both V8 commands had terminal `COMPLETED` lifecycle
+results. A separate accidental V8 90-degree request was rejected as
+`INVALID_FIELD` with `execution_started=false`. Together with the earlier V6
+rejection, this exposed a backend concurrency gap: the SQLite journal was
+thread-safe, but the shared durable executor/Serial transaction was not
+globally serialized across FastAPI worker threads. The backend and UI were
+stopped before diagnosis and no further physical command was issued as part of
+the software correction.
+
 This confirms the supervised end-to-end V1-V8 Service UI control path. It does
 not verify liquid routing, port isolation, leak-tightness, missing-HOME
 mechanical protection, or unattended/production operation; the accepted
