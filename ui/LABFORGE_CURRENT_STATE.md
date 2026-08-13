@@ -43,6 +43,15 @@
   moved the valve to its confirmed open position, `Close` returned it to the
   physically confirmed closed position without a browser popup, and the UI
   displayed the corresponding backend-confirmed state after each command.
+- Active-route SVG rendering was optimized on branch
+  `codex/ui-svg-render-performance` at commit
+  `54152b83ece5b037122d9d0c307df4fe0a734df4`: the animated dash path no longer
+  carries the expensive `drop-shadow`; a separate static glow path preserves
+  the visual appearance without repeatedly repainting the filter.
+- The user compared the optimized UI on the actual workstation and confirmed
+  that opening it no longer increases the processor-fan speed. Closing the UI
+  did not reduce the existing fan speed either, so the optimized screen was not
+  producing a perceptible additional CPU/fan load during that observation.
 
 ### Backend
 
@@ -425,6 +434,16 @@ No firmware upload, Serial Monitor use, physical P1 execution, PR, or merge to
 `main` is authorized by that approval. The next boundary is an explicit
 physical integration/test authorization or a separately scoped software
 checkpoint for another actuator.
+
+The later supervised-demo checkpoints supersede that historical boundary:
+P1/P2, V1-V8, the column-bottom valve, the carousel, and the separate
+SF-bottom DYNAMIXEL path have production software checkpoints, with the
+physically executed confirmations recorded above and in firmware
+`HARDWARE_CONFIRMATIONS.md`. The immediate next software phase is to complete
+the remaining backend/UI integration around Arduino-managed valves, the column
+bottom valve, and carousel Service controls, then perform separately authorized
+supervised UI-to-hardware tests. Wet-route testing, pump volume calibration,
+and full Guided Demo orchestration remain later phases.
 
 ## Current limitations and unresolved physical decisions
 
