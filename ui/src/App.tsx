@@ -412,6 +412,8 @@ type PumpServiceState = {
   message: string;
   operationCommandId: string | null;
 };
+type CommissioningValve = "V1" | "V2" | "V3" | "V4" | "V5" | "V6" | "V7" | "V8";
+type ValvePosition = 0 | 90 | 180;
 type PumpCommissioningFields = {
   workingFull: string;
   workingEmpty: string;
@@ -1214,6 +1216,91 @@ function PumpServiceControl({ pump }: { pump: CommissioningPump }) {
   );
 }
 
+function ValveServiceControl({ valve }: { valve: CommissioningValve }) {
+  const [confirmedPosition, setConfirmedPosition] = useState<ValvePosition | null>(null);
+  const [commandState, setCommandState] = useState<PumpServiceState>(initialPumpServiceState);
+  const running = commandState.status === "running";
+
+  const executeCommand = async (command: "HOME" | "SET_POSITION", position?: ValvePosition) => {
+    const operationCommandId = crypto.randomUUID();
+    const phaseExecutionId = `service-${valve.toLowerCase()}-${Date.now()}`;
+    const targetLabel = command === "HOME" ? "HOME" : `${position}°`;
+    setCommandState({
+      status: "running",
+      message: `Moving ${valve} to ${targetLabel}…`,
+      operationCommandId,
+    });
+
+    try {
+      const response = await fetch("/api/v1/service/valves/command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phase_execution_id: phaseExecutionId,
+          operation_command_id: operationCommandId,
+          valve,
+          command,
+          ...(position === undefined ? {} : { position_degrees: position }),
+        }),
+      });
+      const payload = await response.json().catch(() => null) as {
+        detail?: string;
+        operation_command_id?: string;
+        state?: string;
+        error_code?: string | null;
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.detail ?? `Backend returned HTTP ${response.status}`);
+      }
+      if (payload?.operation_command_id !== operationCommandId || payload.state !== "COMPLETED") {
+        const failure = payload?.error_code ? ` (${payload.error_code})` : "";
+        throw new Error(`Command ended in ${payload?.state ?? "an unknown state"}${failure}.`);
+      }
+
+      const completedPosition = position ?? 0;
+      setConfirmedPosition(completedPosition);
+      setCommandState({
+        status: "completed",
+        message: `${valve} reached ${completedPosition}° (${completedPosition === 0 ? "closed" : completedPosition === 90 ? "k1 ↔ k3" : "k1 ↔ k2"}).`,
+        operationCommandId,
+      });
+    } catch (error) {
+      setCommandState({
+        status: "failed",
+        message: error instanceof Error ? error.message : "Unknown backend error",
+        operationCommandId,
+      });
+    }
+  };
+
+  return (
+    <section className="serviceGroup valveServiceCard" aria-labelledby={`${valve}-service-heading`}>
+      <div className="valveServiceHeading">
+        <div>
+          <h3 id={`${valve}-service-heading`}>{valve}</h3>
+          <span>Arduino Mega · 0° / 90° / 180°</span>
+        </div>
+        <strong className={`pumpServiceStatus ${commandState.status}`}>
+          {running ? "Running" : confirmedPosition === null ? commandState.status : `${confirmedPosition}°`}
+        </strong>
+      </div>
+      <div className="serviceStatusList">
+        <span>Last confirmed position<strong>{confirmedPosition === null ? "Not confirmed" : `${confirmedPosition}°`}</strong></span>
+        <span>Last command result<strong>{commandState.message}</strong></span>
+        <span>Operation command ID<strong>{commandState.operationCommandId ?? "Not assigned"}</strong></span>
+      </div>
+      <div className="serviceActionRow">
+        <button type="button" disabled={running} onClick={() => void executeCommand("HOME")}>Home</button>
+        <button type="button" disabled={running} onClick={() => void executeCommand("SET_POSITION", 0)}>Closed</button>
+        <button type="button" disabled={running} onClick={() => void executeCommand("SET_POSITION", 90)}>k1 ↔ k3</button>
+        <button type="button" disabled={running} onClick={() => void executeCommand("SET_POSITION", 180)}>k1 ↔ k2</button>
+      </div>
+      <p className="serviceControlNotice">Supervised direct hardware command. Unknown outcomes are not retried automatically.</p>
+    </section>
+  );
+}
+
 const emptyPumpCommissioningFields: PumpCommissioningFields = {
   workingFull: "",
   workingEmpty: "",
@@ -1397,9 +1484,9 @@ function ServiceSectionContent({ section }: { section: ServiceSection }) {
   if (section === "valves") {
     return (
       <>
-        <div className="serviceSectionHeading"><span className="panelEyebrow">Valve control</span><h2>Valves</h2><p>V1–V8 remain disabled in this UI checkpoint. The separately connected SF bottom valve is available through its confirmed backend adapter.</p></div>
+        <div className="serviceSectionHeading"><span className="panelEyebrow">Supervised hardware service</span><h2>Valves</h2><p>V1–V8 expose HOME and canonical 0° / 90° / 180° positioning through the durable Arduino backend path. The SF bottom valve remains on its separate confirmed adapter.</p></div>
         <SfBottomValveServiceControl />
-        <div className="valveServiceGrid">{Array.from({ length: 8 }, (_, index) => `V${index + 1}`).map((valve) => <section className="serviceGroup valveServiceCard" key={valve}><div><h3>{valve}</h3><span>State: Unknown</span></div><div className="serviceActionRow"><DisabledServiceButton>Home</DisabledServiceButton><DisabledServiceButton>Closed</DisabledServiceButton><DisabledServiceButton>k1 ↔ k3</DisabledServiceButton><DisabledServiceButton>k1 ↔ k2</DisabledServiceButton></div></section>)}</div>
+        <div className="valveServiceGrid">{(["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8"] as CommissioningValve[]).map((valve) => <ValveServiceControl valve={valve} key={valve} />)}</div>
       </>
     );
   }

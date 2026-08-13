@@ -1,6 +1,6 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-08-12
+- Checkpoint date: 2026-08-13
 - Development phase: P1, P2, and V1-V8 production Serial/runtime paths physically validated in supervised dry tests
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
@@ -9,6 +9,15 @@
 
 ### UI
 
+- V1-V8 Service cards now call the durable Arduino backend command API for
+  explicit `HOME` and canonical `SET_POSITION` actions at `0`, `90`, or `180`
+  degrees. Each command creates fresh caller-owned phase/operation identities,
+  locks its card while pending, never retries automatically, and records a
+  confirmed UI position only after the backend returns terminal `COMPLETED`.
+- The UI maps the confirmed semantics as `0 degrees = closed`,
+  `90 degrees = k1 <-> k3`, and `180 degrees = k1 <-> k2`. This software
+  checkpoint has passed lint and the production build; no physical execution
+  was performed in this phase.
 - Branch: `codex/pump-service-ui`
 - P1 and P2 Service cards now call the durable Arduino backend command API for
   explicit `HOME` and raw `MOVE_ABSOLUTE_STEPS` actions in the canonical
@@ -55,6 +64,16 @@
 
 ### Backend
 
+- V1-V8 Arduino Service integration is implemented on branch
+  `codex/v1-v8-service-backend-ui`: the strict
+  `/api/v1/service/valves/command` boundary accepts caller-owned identities,
+  `V1` through `V8`, and exactly `HOME` or `SET_POSITION` at `0`, `90`, or
+  `180` degrees; maps them to the canonical LABFORGE/1 valve contracts; uses
+  the existing durable command journal/Serial executor; preserves HTTP 409
+  identity conflicts and HTTP 503 unavailable/unknown outcomes; and never
+  retries a physical command. Focused tests passed `12/12`, the complete
+  backend suite passed `1060` tests, and Ruff is clean. No physical execution
+  was performed in this phase.
 - Arduino Service integration checkpoint:
   - branch: `codex/arduino-serial-backend-integration`;
   - commits: `a2c78187e0741deb2971f830fd67dc8431071967`,
