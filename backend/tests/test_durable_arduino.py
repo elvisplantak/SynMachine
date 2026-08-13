@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 
 import pytest
 
@@ -20,6 +21,7 @@ from app.hardware.durable_arduino import DurableArduinoCommandExecutor
 from app.protocol import CommandStatus
 
 OPERATION_ID = "323e4567-e89b-12d3-a456-426614174002"
+SECOND_OPERATION_ID = "423e4567-e89b-12d3-a456-426614174003"
 
 
 @dataclass
@@ -45,6 +47,25 @@ class FakeClient:
         assert operation_command_id == OPERATION_ID
         assert self.query_result is not None
         return self.query_result
+
+
+class BlockingClient:
+    controller_boot_id = 7
+
+    def __init__(self) -> None:
+        self.entered = Event()
+        self.release = Event()
+        self.execute_calls = 0
+
+    def execute(self, **values: object) -> ArduinoCommandResult:
+        del values
+        self.execute_calls += 1
+        self.entered.set()
+        assert self.release.wait(timeout=2)
+        return ArduinoCommandResult(result={}, accepted=True, started=True)
+
+    def query_command(self, operation_command_id: str) -> CommandStatus:
+        raise AssertionError(f"unexpected recovery query for {operation_command_id}")
 
 
 def command_status(state: str, **extra: object) -> CommandStatus:
@@ -92,6 +113,36 @@ def test_journal_can_persist_and_complete_from_fastapi_worker_thread(tmp_path) -
 
         assert result.state is ArduinoCommandJournalState.COMPLETED
         assert journal.load(OPERATION_ID) == result
+
+
+def test_concurrent_command_is_known_busy_without_second_serial_call(tmp_path) -> None:
+    with SQLiteArduinoCommandJournal(tmp_path / "commands.db") as journal:
+        client = BlockingClient()
+        executor = DurableArduinoCommandExecutor(client, journal)  # type: ignore[arg-type]
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            first = pool.submit(
+                executor.execute,
+                phase_execution_id="phase-1",
+                operation_command_id=OPERATION_ID,
+                command="VALVE_SET_POSITION",
+                arguments={"valve": "V1", "position_degrees": 180},
+            )
+            assert client.entered.wait(timeout=2)
+
+            with pytest.raises(ArduinoCommandRejectedError, match="CONTROLLER_BUSY"):
+                executor.execute(
+                    phase_execution_id="phase-2",
+                    operation_command_id=SECOND_OPERATION_ID,
+                    command="VALVE_SET_POSITION",
+                    arguments={"valve": "V2", "position_degrees": 90},
+                )
+
+            client.release.set()
+            assert first.result().state is ArduinoCommandJournalState.COMPLETED
+
+        assert client.execute_calls == 1
+        assert journal.load(SECOND_OPERATION_ID) is None
 
 
 def test_transport_failure_is_durable_unknown_and_never_auto_retried(tmp_path) -> None:
