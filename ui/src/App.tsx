@@ -399,6 +399,7 @@ type ServiceSection =
   | "routeTest"
   | "pumps"
   | "valves"
+  | "carousel"
   | "mixerTemperature"
   | "cameras"
   | "diagnostics"
@@ -1031,6 +1032,7 @@ const serviceSections: { id: ServiceSection; label: string }[] = [
   { id: "routeTest", label: "Route test" },
   { id: "pumps", label: "Pumps" },
   { id: "valves", label: "Valves" },
+  { id: "carousel", label: "Carousel" },
   { id: "mixerTemperature", label: "Mixer & temperature" },
   { id: "cameras", label: "Cameras" },
   { id: "diagnostics", label: "Diagnostics" },
@@ -1394,6 +1396,137 @@ function ColumnBottomValveServiceControl() {
   );
 }
 
+function CarouselServiceControl() {
+  const [position, setPosition] = useState("1");
+  const [manualAlignmentConfirmed, setManualAlignmentConfirmed] = useState(false);
+  const [columnClosedConfirmed, setColumnClosedConfirmed] = useState(false);
+  const [commandState, setCommandState] = useState<PumpServiceState>(initialPumpServiceState);
+  const [lastCompletedPosition, setLastCompletedPosition] = useState<number | null>(null);
+  const running = commandState.status === "running";
+  const parsedPosition = Number(position);
+  const positionValid = Number.isInteger(parsedPosition) && parsedPosition >= 1 && parsedPosition <= 40;
+
+  const executeCommand = async (command: "SET_REFERENCE" | "MOVE_TO_POSITION") => {
+    const confirmed = command === "SET_REFERENCE" ? manualAlignmentConfirmed : columnClosedConfirmed;
+    if (!positionValid || !confirmed) {
+      return;
+    }
+
+    const operationCommandId = crypto.randomUUID();
+    const phaseExecutionId = `service-carousel-${command.toLowerCase()}-${Date.now()}`;
+    setCommandState({
+      status: "running",
+      message: command === "SET_REFERENCE"
+        ? `Recording manual reference at tube ${parsedPosition}…`
+        : `Moving carousel forward to tube ${parsedPosition}…`,
+      operationCommandId,
+    });
+
+    try {
+      const response = await fetch("/api/v1/service/carousel/command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phase_execution_id: phaseExecutionId,
+          operation_command_id: operationCommandId,
+          command,
+          position: parsedPosition,
+          ...(command === "SET_REFERENCE"
+            ? { manual_alignment_confirmed: true }
+            : { column_bottom_valve_closed_confirmed: true }),
+        }),
+      });
+      const payload = await response.json().catch(() => null) as {
+        detail?: string;
+        operation_command_id?: string;
+        state?: string;
+        error_code?: string | null;
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.detail ?? `Backend returned HTTP ${response.status}`);
+      }
+      if (payload?.operation_command_id !== operationCommandId || payload.state !== "COMPLETED") {
+        const failure = payload?.error_code ? ` (${payload.error_code})` : "";
+        throw new Error(`Command ended in ${payload?.state ?? "an unknown state"}${failure}.`);
+      }
+
+      setLastCompletedPosition(parsedPosition);
+      setCommandState({
+        status: "completed",
+        message: command === "SET_REFERENCE"
+          ? `Manual reference at tube ${parsedPosition} completed without carousel motion.`
+          : `Move to tube ${parsedPosition} completed.`,
+        operationCommandId,
+      });
+      if (command === "SET_REFERENCE") {
+        setManualAlignmentConfirmed(false);
+      } else {
+        setColumnClosedConfirmed(false);
+      }
+    } catch (error) {
+      setCommandState({
+        status: "failed",
+        message: error instanceof Error ? error.message : "Unknown backend error",
+        operationCommandId,
+      });
+    }
+  };
+
+  return (
+    <section className="serviceGroup carouselServiceCard" aria-labelledby="carousel-service-heading">
+      <div className="pumpServiceHeading">
+        <div>
+          <h3 id="carousel-service-heading">Fraction carousel</h3>
+          <span>Arduino Mega · 40 positions · logical-forward movement only</span>
+        </div>
+        <strong className={`pumpServiceStatus ${commandState.status}`}>
+          {running ? "Running" : commandState.status}
+        </strong>
+      </div>
+      <div className="serviceStatusList">
+        <span>Last completed position command<strong>{lastCompletedPosition ?? "Not completed"}</strong></span>
+        <span>Command result<strong>{commandState.message}</strong></span>
+        <span>Operation command ID<strong>{commandState.operationCommandId ?? "Not assigned"}</strong></span>
+      </div>
+      <label className="pumpTargetField">
+        Tube position
+        <input
+          type="number"
+          min="1"
+          max="40"
+          step="1"
+          value={position}
+          disabled={running}
+          onChange={(event) => setPosition(event.target.value)}
+        />
+      </label>
+      {!positionValid && <p className="commissioningValidation" role="alert">Position must be a whole number from 1 to 40.</p>}
+      <label className="safeRouteConfirmation">
+        <input
+          type="checkbox"
+          checked={manualAlignmentConfirmed}
+          disabled={running}
+          onChange={(event) => setManualAlignmentConfirmed(event.target.checked)}
+        />
+        I manually aligned the selected tube position. Setting the reference must not move the carousel.
+      </label>
+      <button className="carouselPrimaryAction" type="button" disabled={running || !positionValid || !manualAlignmentConfirmed} onClick={() => void executeCommand("SET_REFERENCE")}>Set manual reference</button>
+      <label className="safeRouteConfirmation">
+        <input
+          type="checkbox"
+          checked={columnClosedConfirmed}
+          disabled={running}
+          onChange={(event) => setColumnClosedConfirmed(event.target.checked)}
+        />
+        I confirmed the Column bottom valve was homed and moved to CLOSED · 4° in the current controller session.
+      </label>
+      <button className="carouselPrimaryAction" type="button" disabled={running || !positionValid || !columnClosedConfirmed} onClick={() => void executeCommand("MOVE_TO_POSITION")}>Move to selected tube</button>
+      <p className="serviceControlNotice">The firmware independently requires a trusted manual reference and trusted CLOSED Column valve state. Session replacement invalidates the carousel reference.</p>
+    </section>
+  );
+}
+
 const emptyPumpCommissioningFields: PumpCommissioningFields = {
   workingFull: "",
   workingEmpty: "",
@@ -1581,6 +1714,15 @@ function ServiceSectionContent({ section }: { section: ServiceSection }) {
         <SfBottomValveServiceControl />
         <ColumnBottomValveServiceControl />
         <div className="valveServiceGrid">{(["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8"] as CommissioningValve[]).map((valve) => <ValveServiceControl valve={valve} key={valve} />)}</div>
+      </>
+    );
+  }
+
+  if (section === "carousel") {
+    return (
+      <>
+        <div className="serviceSectionHeading"><span className="panelEyebrow">Supervised hardware service</span><h2>Carousel</h2><p>Manually establish the aligned tube reference, then request bounded logical-forward movement to positions 1–40.</p></div>
+        <CarouselServiceControl />
       </>
     );
   }

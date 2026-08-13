@@ -9,6 +9,14 @@
 
 ### UI
 
+- Carousel now has a dedicated Service section for operator-confirmed manual
+  reference and logical-forward movement to tube positions `1..40`. Reference
+  and movement use separate inline confirmations, fresh caller-owned command
+  identities, pending-control locking, and no automatic retry. The UI reports
+  only the last completed command rather than claiming durable trusted
+  position, because controller session replacement invalidates the volatile
+  carousel reference. UI lint and the production build pass; no physical
+  execution was performed in this phase.
 - Column bottom valve Service card now calls the durable Arduino backend path
   for separate `HOME`, `CLOSED`, and `OPEN` actions. The UI truthfully keeps
   `HOME reference = 0 degrees` distinct from the confirmed operating positions
@@ -71,6 +79,16 @@
 
 ### Backend
 
+- Carousel Arduino Service integration is implemented on branch
+  `codex/v1-v8-service-backend-ui`: the strict
+  `/api/v1/service/carousel/command` boundary accepts caller-owned identities,
+  positions `1..40`, and exactly `SET_REFERENCE` with literal manual-alignment
+  confirmation or `MOVE_TO_POSITION` with literal Column-bottom-valve CLOSED
+  confirmation. Only canonical `position` is sent to firmware. The existing
+  firmware trusted-reference and trusted `CLOSED = 4 degrees` interlock remains
+  authoritative, and unknown outcomes are never retried. Focused Service
+  regression tests passed `24/24`, the complete backend suite passed `1072`
+  tests, and Ruff is clean. No physical execution was performed in this phase.
 - Column bottom valve Arduino Service integration is implemented on branch
   `codex/v1-v8-service-backend-ui`: the strict
   `/api/v1/service/column-bottom-valve/command` boundary accepts caller-owned

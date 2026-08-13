@@ -962,6 +962,42 @@ body {
   overflow-wrap: anywhere;
 }
 
+.carouselServiceCard {
+  max-width: 900px;
+  border-color: rgba(56, 189, 248, 0.42);
+}
+
+.carouselServiceCard .serviceStatusList strong {
+  overflow-wrap: anywhere;
+}
+
+.carouselPrimaryAction {
+  min-height: 38px;
+  margin-top: 10px;
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #e3f2ff;
+  background: rgba(14, 116, 144, 0.22);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.carouselPrimaryAction:hover:not(:disabled),
+.carouselPrimaryAction:focus-visible:not(:disabled) {
+  border-color: #38bdf8;
+  background: rgba(14, 116, 144, 0.38);
+}
+
+.carouselPrimaryAction:disabled {
+  color: #65758a;
+  border-color: rgba(89, 134, 197, 0.28);
+  background: rgba(7, 15, 28, 0.55);
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
 .pumpSummaryGrid .serviceStatusList span {
   padding: 11px 0;
   font-size: 17px;
