@@ -2313,10 +2313,20 @@ body {
 }
 
 .activePipe {
+  color: #32caff;
+}
+
+.activePipeGlow {
   stroke: #32caff;
+  opacity: 0.5;
+  filter: drop-shadow(0 0 10px #32caff);
+}
+
+.activePipeFlow {
+  stroke: #32caff;
+  opacity: 1;
   stroke-dasharray: 20 12;
   animation: flow 0.8s linear infinite;
-  filter: drop-shadow(0 0 10px #32caff);
 }
 
 @keyframes flow {

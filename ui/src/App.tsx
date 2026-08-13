@@ -7,7 +7,16 @@ type ValveStubPosition = "right" | "left" | "top";
 type ValvePortMap = Record<ValvePort, ValveStubPosition>;
 
 function Pipe({ d, active = false }: { d: string; active?: boolean }) {
-  return <path d={d} className={active ? "pipe activePipe" : "pipe"} />;
+  if (!active) {
+    return <path d={d} className="pipe" />;
+  }
+
+  return (
+    <g className="activePipe">
+      <path d={d} className="pipe activePipeGlow" />
+      <path d={d} className="pipe activePipeFlow" />
+    </g>
+  );
 }
 
 const defaultValvePortMap: ValvePortMap = {
