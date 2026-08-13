@@ -750,6 +750,11 @@ body {
   border-color: rgba(56, 189, 248, 0.42);
 }
 
+.columnBottomValveCard {
+  margin-bottom: 18px;
+  border-color: rgba(56, 189, 248, 0.42);
+}
+
 .sfBottomValveHeading {
   display: flex;
   justify-content: space-between;

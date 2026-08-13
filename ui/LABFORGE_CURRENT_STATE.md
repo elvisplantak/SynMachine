@@ -9,6 +9,13 @@
 
 ### UI
 
+- Column bottom valve Service card now calls the durable Arduino backend path
+  for separate `HOME`, `CLOSED`, and `OPEN` actions. The UI truthfully keeps
+  `HOME reference = 0 degrees` distinct from the confirmed operating positions
+  `CLOSED = 4 degrees` and `OPEN = 94 degrees`, creates fresh caller-owned
+  identities, locks controls while pending, never retries automatically, and
+  records a confirmed position only after terminal `COMPLETED`. UI lint and the
+  production build pass; no physical execution was performed in this phase.
 - V1-V8 Service cards now call the durable Arduino backend command API for
   explicit `HOME` and canonical `SET_POSITION` actions at `0`, `90`, or `180`
   degrees. Each command creates fresh caller-owned phase/operation identities,
@@ -64,6 +71,16 @@
 
 ### Backend
 
+- Column bottom valve Arduino Service integration is implemented on branch
+  `codex/v1-v8-service-backend-ui`: the strict
+  `/api/v1/service/column-bottom-valve/command` boundary accepts caller-owned
+  identities and exactly `HOME` or `SET_POSITION` at `4` or `94` degrees; maps
+  these to the canonical LABFORGE/1 column contracts with an empty HOME
+  argument object; uses the existing durable command journal/Serial executor;
+  preserves HTTP 409 identity conflicts and HTTP 503 unavailable/unknown
+  outcomes; and never retries a physical command. Focused Service regression
+  tests passed `17/17`, the complete backend suite passed `1065` tests, and
+  Ruff is clean. No physical execution was performed in this phase.
 - V1-V8 Arduino Service integration is implemented on branch
   `codex/v1-v8-service-backend-ui`: the strict
   `/api/v1/service/valves/command` boundary accepts caller-owned identities,
