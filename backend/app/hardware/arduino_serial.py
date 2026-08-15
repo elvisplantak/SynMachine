@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 import uuid
 from collections import deque
@@ -37,6 +38,9 @@ from app.protocol.models import ProtocolMessage
 # host lifecycle window instead of treating 80 seconds as an upper bound.
 COLUMN_BOTTOM_VALVE_HOME_MINIMUM_FULL_SEARCH_SECONDS = 80.0
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 180.0
+COLUMN_DIAGNOSTIC_INTERVAL_SECONDS = 2.0
+
+logger = logging.getLogger(__name__)
 
 
 class ArduinoSerialError(RuntimeError):
@@ -236,18 +240,60 @@ class ArduinoSerialClient:
         accepted = False
         started = False
         deadline = self._monotonic() + self._configuration.command_timeout_seconds
+        diagnostics_enabled = command == "COLUMN_BOTTOM_VALVE_HOME"
+        next_diagnostic_at = (
+            self._monotonic() + COLUMN_DIAGNOSTIC_INTERVAL_SECONDS
+            if diagnostics_enabled
+            else deadline
+        )
+        diagnostic_request_id: str | None = None
         while True:
-            remaining = deadline - self._monotonic()
+            now = self._monotonic()
+            remaining = deadline - now
             if remaining <= 0:
                 raise ArduinoUnavailableError(
                     "Arduino command outcome is unknown after transport timeout"
                 )
+            read_timeout = remaining
+            if diagnostics_enabled and diagnostic_request_id is None:
+                read_timeout = min(remaining, max(0.001, next_diagnostic_at - now))
             try:
-                response = self._read_message(remaining)
+                response = self._read_message(read_timeout)
             except ArduinoUnavailableError as exc:
+                now = self._monotonic()
+                if (
+                    diagnostics_enabled
+                    and diagnostic_request_id is None
+                    and now < deadline
+                    and now >= next_diagnostic_at
+                ):
+                    diagnostic_request_id = str(self._request_id_factory())
+                    self._write_message(
+                        QueryStatus(
+                            protocol="LABFORGE/1",
+                            type="QUERY_STATUS",
+                            backend_session_nonce=self._session_nonce,
+                            controller_boot_id=self._controller_boot_id,
+                            request_id=diagnostic_request_id,
+                        )
+                    )
+                    continue
                 raise ArduinoUnavailableError(
                     "Arduino command outcome is unknown after transport failure"
                 ) from exc
+            if isinstance(response, Status):
+                if diagnostic_request_id is None:
+                    raise ArduinoProtocolError("Unexpected STATUS without diagnostic query")
+                self._validate_query_correlation(response, diagnostic_request_id)
+                logger.info(
+                    "Column HOME diagnostic: state=%s stage_steps=%s home_active=%s",
+                    response.column_motion_state,
+                    response.column_stage_steps,
+                    response.column_home_active,
+                )
+                diagnostic_request_id = None
+                next_diagnostic_at = self._monotonic() + COLUMN_DIAGNOSTIC_INTERVAL_SECONDS
+                continue
             if isinstance(response, ProtocolError):
                 raise ArduinoProtocolError(response.error_code)
             if not isinstance(response, (Rejected, Accepted, Started, Completed, Failed)):

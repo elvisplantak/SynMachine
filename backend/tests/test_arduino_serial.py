@@ -49,11 +49,12 @@ class FakePort:
 
 
 class Clock:
-    def __init__(self) -> None:
+    def __init__(self, step: float = 0.001) -> None:
         self.value = 0.0
+        self.step = step
 
     def __call__(self) -> float:
-        self.value += 0.001
+        self.value += self.step
         return self.value
 
 
@@ -103,6 +104,62 @@ def test_default_command_timeout_has_margin_over_column_home_minimum() -> None:
         configuration.command_timeout_seconds
         > COLUMN_BOTTOM_VALVE_HOME_MINIMUM_FULL_SEARCH_SECONDS
     )
+
+
+def test_column_home_collects_read_only_diagnostics_while_waiting(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class DiagnosticPort(FakePort):
+        def write(self, data: bytes) -> int:
+            written = super().write(data)
+            if json.loads(data)["type"] == "QUERY_STATUS":
+                self.incoming.extend(
+                    frame(
+                        type="STATUS",
+                        backend_session_nonce=str(NONCE),
+                        controller_boot_id=7,
+                        request_id=str(REQUEST_ID),
+                        controller_state="BUSY",
+                        software_state_trust="TRUSTED",
+                        active_operation_command_id=OPERATION_ID,
+                        column_motion_state="SEARCHING_HOME",
+                        column_stage_steps=1234,
+                        column_home_active=False,
+                    )
+                    + lifecycle("COMPLETED", result={})
+                )
+            return written
+
+    port = DiagnosticPort(
+        hello_ok(capabilities=["COLUMN_BOTTOM_VALVE_HOME"])
+        + lifecycle("ACCEPTED")
+        + lifecycle("STARTED")
+    )
+    client = ArduinoSerialClient(
+        ArduinoSerialConfiguration(port="/dev/test", command_timeout_seconds=10.0),
+        port_factory=lambda _: port,
+        monotonic=Clock(step=0.1),
+        sleep=lambda _: None,
+        nonce_factory=lambda: NONCE,
+        request_id_factory=lambda: REQUEST_ID,
+    )
+    client.connect()
+
+    with caplog.at_level("INFO"):
+        result = client.execute(
+            phase_execution_id="phase-1",
+            operation_command_id=OPERATION_ID,
+            command="COLUMN_BOTTOM_VALVE_HOME",
+            arguments={},
+        )
+
+    assert result.result == {}
+    assert [json.loads(item)["type"] for item in port.writes] == [
+        "HELLO",
+        "COMMAND",
+        "QUERY_STATUS",
+    ]
+    assert "state=SEARCHING_HOME stage_steps=1234 home_active=False" in caplog.text
 
 
 def test_handshake_waits_for_mega_reset_before_sending_hello() -> None:
@@ -294,11 +351,17 @@ def test_query_status_is_correlated_and_does_not_send_physical_command() -> None
         controller_state="IDLE",
         software_state_trust="TRUSTED",
         active_operation_command_id=None,
+        column_motion_state="SEARCHING_HOME",
+        column_stage_steps=1234,
+        column_home_active=False,
     )
     client, port = client_for(hello_ok() + status)
     client.connect()
     response = client.query_status()
     assert response.controller_state == "IDLE"
+    assert response.column_motion_state == "SEARCHING_HOME"
+    assert response.column_stage_steps == 1234
+    assert response.column_home_active is False
     assert json.loads(port.writes[1])["type"] == "QUERY_STATUS"
 
 

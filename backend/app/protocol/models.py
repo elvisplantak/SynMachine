@@ -198,6 +198,9 @@ class Status(ControllerStateMessage):
     type: Literal["STATUS"]
     request_id: UuidText
     active_operation_command_id: UuidText | None
+    column_motion_state: Annotated[UpperIdentifier, Field(max_length=40)] | None = None
+    column_stage_steps: Annotated[StrictInt, Field(ge=0, le=UINT32_MAX)] | None = None
+    column_home_active: StrictBool | None = None
 
 
 class QueryCommand(QueryStatus):
