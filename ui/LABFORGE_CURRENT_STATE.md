@@ -30,7 +30,19 @@
   application logger. The request ended `OUTCOME_UNKNOWN` after the operator
   physically removed motor power. A tested backend follow-up now routes each
   snapshot and the last pre-failure snapshot through the enabled Uvicorn error
-  logger at warning level. A repeat diagnostic test remains pending.
+  logger at warning level. The repeat result is recorded below.
+- The repeated instrumented production HOME test isolated the failure:
+  snapshots stayed at `CONFIRMING_HOME`, emitted `stage_steps=0`, and showed
+  mostly D10 HIGH with intermittent LOW samples while motor power was on. After
+  actual motor-power removal, the same request reached HTTP 200 / `COMPLETED`.
+  This rules out timeout and commanded travel as the cause and leaves D10
+  signal instability under powered conditions as the unresolved boundary.
+  The HOME interlock has not been bypassed. For safe session-end parking, the
+  flash-verified commissioning firmware moved exactly 889 DIR HIGH pulses from
+  HOME to physically confirmed CLOSED, ending with D10 LOW; the user then
+  physically switched motor power off. The Mega remains intentionally on the
+  commissioning image and production firmware restore/verification is the
+  mandatory first hardware step next session.
 - A supervised V1 regression smoke test after the host concurrency correction
   completed HOME and 90-degree positioning. A following Column HOME attempt is
   not a valid mechanical test because the shaft/coupling pin had been removed
