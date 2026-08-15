@@ -31,10 +31,12 @@ from app.protocol import (
 from app.protocol.models import ProtocolMessage
 
 
-# Firmware can spend up to 80 seconds in the Column Bottom Valve HOME search.
-# Keep host lifecycle waiting strictly above that physical execution budget.
-COLUMN_BOTTOM_VALVE_HOME_MAXIMUM_NOMINAL_SECONDS = 80.0
-DEFAULT_COMMAND_TIMEOUT_SECONDS = 90.0
+# A full 80,000-pulse Column Bottom Valve HOME search takes at least 80 seconds
+# at the confirmed minimum 1 ms rising-edge interval. Cooperative loop overhead
+# makes wall-clock execution longer, so retain a conservative supervised-demo
+# host lifecycle window instead of treating 80 seconds as an upper bound.
+COLUMN_BOTTOM_VALVE_HOME_MINIMUM_FULL_SEARCH_SECONDS = 80.0
+DEFAULT_COMMAND_TIMEOUT_SECONDS = 180.0
 
 
 class ArduinoSerialError(RuntimeError):

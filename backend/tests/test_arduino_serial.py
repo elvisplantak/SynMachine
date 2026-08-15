@@ -12,7 +12,7 @@ from app.hardware.arduino_serial import (
     ArduinoSerialClient,
     ArduinoSerialConfiguration,
     ArduinoUnavailableError,
-    COLUMN_BOTTOM_VALVE_HOME_MAXIMUM_NOMINAL_SECONDS,
+    COLUMN_BOTTOM_VALVE_HOME_MINIMUM_FULL_SEARCH_SECONDS,
     DEFAULT_COMMAND_TIMEOUT_SECONDS,
 )
 
@@ -95,13 +95,13 @@ def client_for(incoming: bytes) -> tuple[ArduinoSerialClient, FakePort]:
     return client, port
 
 
-def test_default_command_timeout_exceeds_column_home_execution_budget() -> None:
+def test_default_command_timeout_has_margin_over_column_home_minimum() -> None:
     configuration = ArduinoSerialConfiguration(port="/dev/test")
 
     assert configuration.command_timeout_seconds == DEFAULT_COMMAND_TIMEOUT_SECONDS
     assert (
         configuration.command_timeout_seconds
-        > COLUMN_BOTTOM_VALVE_HOME_MAXIMUM_NOMINAL_SECONDS
+        > COLUMN_BOTTOM_VALVE_HOME_MINIMUM_FULL_SEARCH_SECONDS
     )
 
 
