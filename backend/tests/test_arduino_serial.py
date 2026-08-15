@@ -107,8 +107,13 @@ def test_default_command_timeout_has_margin_over_column_home_minimum() -> None:
 
 
 def test_column_home_collects_read_only_diagnostics_while_waiting(
-    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    logged: list[tuple[object, ...]] = []
+    monkeypatch.setattr(
+        "app.hardware.arduino_serial.logger.warning",
+        lambda *arguments: logged.append(arguments),
+    )
     class DiagnosticPort(FakePort):
         def write(self, data: bytes) -> int:
             written = super().write(data)
@@ -145,13 +150,12 @@ def test_column_home_collects_read_only_diagnostics_while_waiting(
     )
     client.connect()
 
-    with caplog.at_level("INFO"):
-        result = client.execute(
-            phase_execution_id="phase-1",
-            operation_command_id=OPERATION_ID,
-            command="COLUMN_BOTTOM_VALVE_HOME",
-            arguments={},
-        )
+    result = client.execute(
+        phase_execution_id="phase-1",
+        operation_command_id=OPERATION_ID,
+        command="COLUMN_BOTTOM_VALVE_HOME",
+        arguments={},
+    )
 
     assert result.result == {}
     assert [json.loads(item)["type"] for item in port.writes] == [
@@ -159,7 +163,14 @@ def test_column_home_collects_read_only_diagnostics_while_waiting(
         "COMMAND",
         "QUERY_STATUS",
     ]
-    assert "state=SEARCHING_HOME stage_steps=1234 home_active=False" in caplog.text
+    assert logged == [
+        (
+            "Column HOME diagnostic: state=%s stage_steps=%s home_active=%s",
+            "SEARCHING_HOME",
+            1234,
+            False,
+        )
+    ]
 
 
 def test_handshake_waits_for_mega_reset_before_sending_hello() -> None:

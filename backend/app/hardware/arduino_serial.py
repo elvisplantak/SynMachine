@@ -40,7 +40,7 @@ COLUMN_BOTTOM_VALVE_HOME_MINIMUM_FULL_SEARCH_SECONDS = 80.0
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 180.0
 COLUMN_DIAGNOSTIC_INTERVAL_SECONDS = 2.0
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 
 class ArduinoSerialError(RuntimeError):
@@ -247,6 +247,7 @@ class ArduinoSerialClient:
             else deadline
         )
         diagnostic_request_id: str | None = None
+        last_column_diagnostic: Status | None = None
         while True:
             now = self._monotonic()
             remaining = deadline - now
@@ -278,6 +279,14 @@ class ArduinoSerialClient:
                         )
                     )
                     continue
+                if last_column_diagnostic is not None:
+                    logger.warning(
+                        "Column HOME transport ended after diagnostic: "
+                        "state=%s stage_steps=%s home_active=%s",
+                        last_column_diagnostic.column_motion_state,
+                        last_column_diagnostic.column_stage_steps,
+                        last_column_diagnostic.column_home_active,
+                    )
                 raise ArduinoUnavailableError(
                     "Arduino command outcome is unknown after transport failure"
                 ) from exc
@@ -285,12 +294,14 @@ class ArduinoSerialClient:
                 if diagnostic_request_id is None:
                     raise ArduinoProtocolError("Unexpected STATUS without diagnostic query")
                 self._validate_query_correlation(response, diagnostic_request_id)
-                logger.info(
+                logger.disabled = False
+                logger.warning(
                     "Column HOME diagnostic: state=%s stage_steps=%s home_active=%s",
                     response.column_motion_state,
                     response.column_stage_steps,
                     response.column_home_active,
                 )
+                last_column_diagnostic = response
                 diagnostic_request_id = None
                 next_diagnostic_at = self._monotonic() + COLUMN_DIAGNOSTIC_INTERVAL_SECONDS
                 continue
