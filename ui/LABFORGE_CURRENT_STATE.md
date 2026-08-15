@@ -116,13 +116,16 @@
 
 ### Backend
 
-- The production Arduino command timeout is now `90 seconds`, strictly above
-  the Column bottom valve firmware's `80-second` maximum nominal HOME-search
-  execution budget. This prevents a valid long HOME search from being reported
-  as an unknown transport outcome merely because the previous `60-second`
-  backend deadline expired first. A regression test preserves the timing
-  relationship; focused tests passed `22/22`, the complete backend suite passed
-  `1074` tests, and Ruff is clean. No hardware command was sent for this change.
+- The production Arduino command timeout is now `180 seconds`. A supervised
+  assembled Column HOME reached and held the physical HOME switch but exceeded
+  the intermediate `90-second` host deadline, producing `OUTCOME_UNKNOWN`.
+  A follow-up test with motor power off and the HOME switch held active returned
+  HTTP 200 and durably recorded `COMPLETED`, confirming D10 sensing and terminal
+  lifecycle delivery. The firmware's 80,000 pulses at a minimum 1 ms interval
+  imply at least 80 seconds rather than an 80-second upper bound, so the host
+  now retains conservative wall-clock margin for the supervised demo. A
+  regression test preserves that configured margin; focused tests passed
+  `22/22`, the complete backend suite passed `1074` tests, and Ruff is clean.
 - The production `DurableArduinoCommandExecutor` now owns a global nonblocking
   command/recovery lock around the complete journal/Serial/lifecycle
   transaction. A concurrent request fails with known `CONTROLLER_BUSY` before
