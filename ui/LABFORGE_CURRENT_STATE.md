@@ -9,6 +9,23 @@
 
 ### UI
 
+- After installation of the replacement Column shaft/coupling pin, an isolated
+  backend-independent commissioning sequence physically reconfirmed D10 HIGH at
+  HOME with motor power off and on, the correct 889-pulse CLOSED position, and
+  smooth motion. Incremental bounded calibration established the visually
+  confirmed OPEN position at 23,850 pulses from CLOSED / 24,739 pulses from
+  HOME, superseding the old 20,889-pulse OPEN target. Production firmware
+  integration, full verification, restore/upload, and the final Service-path
+  HOME/CLOSED/OPEN regression remain in progress.
+- Production Column HOME diagnosis now has correlated read-only snapshots:
+  firmware `STATUS` reports raw D10, the Column motion state, and current-stage
+  pulse count, while the backend probes approximately every two seconds during
+  `COLUMN_BOTTOM_VALVE_HOME`, logs the snapshot, and continues waiting for the
+  original terminal lifecycle. The probes do not emit motion, alter trust, or
+  replace `COMPLETED`/`FAILED`. Firmware native tests pass `177/177`; the Mega
+  build uses `38,946 / 253,952` flash bytes and `3,063 / 8,192` static SRAM.
+  Backend tests pass `1075/1075` and Ruff is clean. Physical execution of this
+  instrumented build remains pending.
 - A supervised V1 regression smoke test after the host concurrency correction
   completed HOME and 90-degree positioning. A following Column HOME attempt is
   not a valid mechanical test because the shaft/coupling pin had been removed
