@@ -316,10 +316,12 @@ The approved geared column-bottom-valve commands are
 `COLUMN_BOTTOM_VALVE_HOME`, with an exactly empty `arguments` object, and
 `COLUMN_BOTTOM_VALVE_SET_POSITION`, with exactly one integer
 `position_degrees` restricted to `4` (CLOSED) or `94` (OPEN). HOME is coordinate
-zero; the confirmed 80,000-pulse output revolution maps CLOSED to 889 pulses and
-OPEN to 20,889 pulses. Positioning requires trust established by successful
-homing. HOME completes at the switch, while parking at the intentional
-4-degree CLOSED offset is a separate positioning command.
+zero; CLOSED maps to 889 pulses and the post-reassembly physically calibrated
+OPEN position maps to 24,739 pulses. The canonical command label remains 94
+degrees; the confirmed physical pulse target is authoritative. Positioning
+requires trust established by successful homing. HOME completes at the switch,
+while parking at the intentional 4-degree CLOSED offset is a separate
+positioning command.
 
 The column controller uses confirmed D12 STEP, D13 DIR, D10 HOME, DIR LOW toward
 HOME, bounded 20 us STEP HIGH, 5 us DIR setup, and a confirmed 1,000 us minimum
@@ -462,6 +464,15 @@ reports the trusted numeric or untrusted null boot ID, reports `IDLE`, `BUSY`,
 or `IDENTITY_UNTRUSTED` as applicable, and includes the active operation ID or
 null. Queries that fail session or boot-ID validation cannot produce `STATUS`
 and instead receive a correlated `PROTOCOL_ERROR`.
+
+When the integrated Column controller is present, `STATUS` additionally emits
+the read-only diagnostic fields `column_motion_state`, `column_stage_steps`,
+and `column_home_active`. They expose controller software state, current-stage
+pulse count, and raw D10 level; they do not establish physical position trust,
+authorize motion, alter lifecycle state, or replace a terminal command result.
+During `COLUMN_BOTTOM_VALVE_HOME`, the host may issue correlated
+`QUERY_STATUS` probes while continuing to wait for the original command's
+terminal lifecycle.
 
 ```json
 {"protocol":"LABFORGE/1","type":"STATUS","backend_session_nonce":"123e4567-e89b-12d3-a456-426614174000","controller_boot_id":4294967295,"request_id":"423e4567-e89b-12d3-a456-426614174003","controller_state":"PROTOCOL_ONLY","software_state_trust":"TRUSTED","active_operation_command_id":null}
@@ -747,7 +758,7 @@ their mandatory minimal cached fields.
 | `COMPLETED` | 301 |
 | `FAILED` | 343 |
 | `QUERY_STATUS` | 194 |
-| `STATUS` | 292 |
+| `STATUS` with Column diagnostics | 402 |
 | `QUERY_COMMAND` | 257 |
 | `COMMAND_STATUS UNKNOWN` | 372 |
 | `COMMAND_STATUS REJECTED` | 418 |

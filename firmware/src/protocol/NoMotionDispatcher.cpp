@@ -24,6 +24,30 @@ ProtocolErrorCode sessionError(SessionValidationResult validation) {
   return ProtocolErrorCode::INVALID_FIELD;
 }
 
+const char* columnStateName(ColumnValveMotionState state) {
+  switch (state) {
+    case ColumnValveMotionState::IDLE:
+      return "IDLE";
+    case ColumnValveMotionState::PREPARED_HOME:
+      return "PREPARED_HOME";
+    case ColumnValveMotionState::PREPARED_MOVE:
+      return "PREPARED_MOVE";
+    case ColumnValveMotionState::CONFIRMING_HOME:
+      return "CONFIRMING_HOME";
+    case ColumnValveMotionState::CONFIRMING_TRUSTED_HOME:
+      return "CONFIRMING_TRUSTED_HOME";
+    case ColumnValveMotionState::CONFIRMING_HOME_RELEASE:
+      return "CONFIRMING_HOME_RELEASE";
+    case ColumnValveMotionState::SEARCHING_HOME:
+      return "SEARCHING_HOME";
+    case ColumnValveMotionState::MOVING:
+      return "MOVING";
+    case ColumnValveMotionState::CONFIRMING_UNEXPECTED_HOME:
+      return "CONFIRMING_UNEXPECTED_HOME";
+  }
+  return "UNKNOWN";
+}
+
 ErrorCorrelation queryCorrelation(const InboundMessage& message) {
   ErrorCorrelation correlation{};
   correlation.kind = ErrorCorrelationKind::QUERY;
@@ -85,9 +109,19 @@ DispatchResult NoMotionDispatcher::dispatchParsed(
   }
 
   if (parsed.message.type == MessageType::QUERY_STATUS) {
+    ColumnValveStatusDiagnostics columnDiagnostics{};
+    const ColumnValveStatusDiagnostics* diagnostics = nullptr;
+    if (columnValveController_ != nullptr) {
+      columnDiagnostics = {
+          columnStateName(columnValveController_->state()),
+          columnValveController_->stageSteps(),
+          columnValveController_->homeActive(),
+      };
+      diagnostics = &columnDiagnostics;
+    }
     writeStatus(parsed.message.backendSessionNonce, parsed.message.requestId,
                 identity, output, capacity, outputLength,
-                &commandStatusCache, p1MotionEnabled_);
+                &commandStatusCache, p1MotionEnabled_, diagnostics);
   } else {
     writeCommandStatus(
         parsed.message.backendSessionNonce, parsed.message.requestId,

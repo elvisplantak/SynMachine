@@ -56,6 +56,28 @@ void test_insufficient_capacity_is_transactional() {
   }
 }
 
+void test_column_diagnostics_are_exact_and_read_only() {
+  uint8_t output[kStatusFrameCapacity];
+  size_t length = 0;
+  const ColumnValveStatusDiagnostics diagnostics{
+      "SEARCHING_HOME", 1234, false};
+  TEST_ASSERT_TRUE(writeStatus(
+      NONCE, REQUEST_ID,
+      {true, 7, IdentityFailureReason::NONE}, output, sizeof(output), length,
+      nullptr, true, &diagnostics));
+  const char expected[] =
+      "{\"protocol\":\"LABFORGE/1\",\"type\":\"STATUS\","
+      "\"backend_session_nonce\":\"123e4567-e89b-12d3-a456-426614174000\","
+      "\"controller_boot_id\":7,"
+      "\"request_id\":\"423e4567-e89b-12d3-a456-426614174003\","
+      "\"controller_state\":\"IDLE\",\"software_state_trust\":\"TRUSTED\","
+      "\"active_operation_command_id\":null,"
+      "\"column_motion_state\":\"SEARCHING_HOME\","
+      "\"column_stage_steps\":1234,\"column_home_active\":false}\n";
+  TEST_ASSERT_EQUAL(strlen(expected), length);
+  TEST_ASSERT_EQUAL_MEMORY(expected, output, length);
+}
+
 void test_only_valid_session_and_boot_identity_can_reach_writer() {
   SessionState session;
   const BootIdentityResult trusted{true, 7, IdentityFailureReason::NONE};
@@ -82,6 +104,7 @@ int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_exact_trusted_and_untrusted_frames);
   RUN_TEST(test_insufficient_capacity_is_transactional);
+  RUN_TEST(test_column_diagnostics_are_exact_and_read_only);
   RUN_TEST(test_only_valid_session_and_boot_identity_can_reach_writer);
   return UNITY_END();
 }

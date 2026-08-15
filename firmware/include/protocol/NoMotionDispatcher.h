@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "identity/BootIdentityStore.h"
+#include "actuator/ColumnBottomValveMotionController.h"
 #include "protocol/CommandStatusCache.h"
 #include "protocol/MessageParser.h"
 #include "protocol/ProtocolTypes.h"
@@ -18,8 +19,11 @@ struct DispatchResult {
 
 class NoMotionDispatcher {
  public:
-  explicit NoMotionDispatcher(bool p1MotionEnabled = false)
-      : p1MotionEnabled_(p1MotionEnabled) {}
+  explicit NoMotionDispatcher(
+      bool p1MotionEnabled = false,
+      ColumnBottomValveMotionController* columnValveController = nullptr)
+      : p1MotionEnabled_(p1MotionEnabled),
+        columnValveController_(columnValveController) {}
   DispatchResult dispatch(const uint8_t* payload, size_t length,
                           const BootIdentityResult& identity,
                           SessionState& session,
@@ -37,6 +41,7 @@ class NoMotionDispatcher {
  private:
   MessageParser parser_;
   bool p1MotionEnabled_;
+  ColumnBottomValveMotionController* columnValveController_;
 };
 
 }  // namespace labforge

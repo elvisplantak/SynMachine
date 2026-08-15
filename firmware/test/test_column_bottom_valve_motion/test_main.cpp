@@ -73,6 +73,10 @@ void test_home_uses_low_direction_and_stable_high() {
 }
 
 void test_closed_and_open_use_confirmed_absolute_steps() {
+  TEST_ASSERT_EQUAL_UINT32(889, kColumnValveClosedSteps);
+  TEST_ASSERT_EQUAL_UINT32(24739, kColumnValveOpenSteps);
+  TEST_ASSERT_EQUAL_UINT32(
+      23850, kColumnValveOpenSteps - kColumnValveClosedSteps);
   FakeIo io;
   ColumnBottomValveMotionController controller(io);
   uint32_t now = 100;

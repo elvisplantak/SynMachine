@@ -212,6 +212,12 @@ ColumnBottomValveMotionController::positionTrust() const {
 uint32_t ColumnBottomValveMotionController::positionSteps() const {
   return positionSteps_;
 }
+uint32_t ColumnBottomValveMotionController::stageSteps() const {
+  return stageSteps_;
+}
+bool ColumnBottomValveMotionController::homeActive() const {
+  return io_.homeActive();
+}
 bool ColumnBottomValveMotionController::busy() const {
   return state_ != ColumnValveMotionState::IDLE;
 }

@@ -104,7 +104,7 @@ P1CommandRuntime::P1CommandRuntime(
       valveControllerCount_(valveControllerCount),
       columnValveController_(&columnValveController),
       carouselController_(&carouselController),
-      protocolDispatcher_(true) {}
+      protocolDispatcher_(true, &columnValveController) {}
 
 P1CommandRuntime::P1CommandRuntime(
     P1MotionController& p1Controller, P1MotionController& p2Controller,
@@ -116,7 +116,7 @@ P1CommandRuntime::P1CommandRuntime(
       valveControllers_(valveControllers),
       valveControllerCount_(valveControllerCount),
       columnValveController_(&columnValveController),
-      protocolDispatcher_(true) {}
+      protocolDispatcher_(true, &columnValveController) {}
 
 DispatchResult P1CommandRuntime::dispatch(
     const uint8_t* payload, size_t length, const BootIdentityResult& identity,

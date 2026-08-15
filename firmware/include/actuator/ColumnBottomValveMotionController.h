@@ -7,7 +7,7 @@
 namespace labforge {
 
 constexpr uint32_t kColumnValveClosedSteps = 889;
-constexpr uint32_t kColumnValveOpenSteps = 20889;
+constexpr uint32_t kColumnValveOpenSteps = 24739;
 constexpr uint32_t kColumnValveMaximumSearchSteps = 80000;
 constexpr uint32_t kColumnValveStepIntervalUs = 1000;
 constexpr uint16_t kColumnValveStepHighUs = 20;
@@ -54,6 +54,8 @@ class ColumnBottomValveMotionController {
   ColumnValveMotionState state() const;
   ColumnValvePositionTrust positionTrust() const;
   uint32_t positionSteps() const;
+  uint32_t stageSteps() const;
+  bool homeActive() const;
   bool busy() const;
 
  private:

@@ -14,8 +14,10 @@ out of scope.
 - `COLUMN_BOTTOM_VALVE_SET_POSITION` accepts exactly one integer
   `position_degrees`, restricted to `4` (CLOSED) or `94` (OPEN).
 - HOME is software coordinate zero. CLOSED is 889 pulses from HOME and OPEN is
-  20,889 pulses from HOME, derived from the confirmed 80,000 pulses per output
-  revolution.
+  24,739 pulses from HOME. The OPEN target was physically recalibrated after
+  installation of the replacement shaft/coupling pin; the canonical command
+  label remains 94 degrees while the confirmed physical pulse target is
+  authoritative.
 - Position trust starts untrusted after boot. Only successful homing establishes
   trusted zero; positioning is rejected while untrusted.
 - `HOME` completes at the switch. Moving to the intentional 4-degree CLOSED

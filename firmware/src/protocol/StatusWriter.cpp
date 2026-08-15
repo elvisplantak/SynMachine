@@ -18,7 +18,8 @@ bool writeStatus(const char* nonce, const char* requestId,
                  const BootIdentityResult& identity, uint8_t* output,
                  size_t capacity, size_t& outputLength,
                  const CommandStatusCache* commandStatusCache,
-                 bool p1MotionEnabled) {
+                 bool p1MotionEnabled,
+                 const ColumnValveStatusDiagnostics* columnDiagnostics) {
   char frame[kStatusFrameCapacity];
   const CommandStatusEntry* active =
       commandStatusCache == nullptr ? nullptr : commandStatusCache->active();
@@ -67,8 +68,26 @@ bool writeStatus(const char* nonce, const char* requestId,
             nonce, requestId);
   }
   outputLength = 0;
-  if (written < 0 || static_cast<size_t>(written) >= sizeof(frame) ||
-      static_cast<size_t>(written) > capacity) {
+  if (written < 0 || static_cast<size_t>(written) >= sizeof(frame)) {
+    return false;
+  }
+  if (columnDiagnostics != nullptr) {
+    const size_t prefixLength = static_cast<size_t>(written) - 2;
+    const int diagnosticWritten = LABFORGE_SNPRINTF(
+        frame + prefixLength, sizeof(frame) - prefixLength,
+        LABFORGE_FORMAT(
+            ",\"column_motion_state\":\"%s\","
+            "\"column_stage_steps\":%lu,\"column_home_active\":%s}\n"),
+        columnDiagnostics->motionState,
+        static_cast<unsigned long>(columnDiagnostics->stageSteps),
+        columnDiagnostics->homeActive ? "true" : "false");
+    if (diagnosticWritten < 0 ||
+        static_cast<size_t>(diagnosticWritten) >= sizeof(frame) - prefixLength) {
+      return false;
+    }
+    written = static_cast<int>(prefixLength) + diagnosticWritten;
+  }
+  if (static_cast<size_t>(written) > capacity) {
     return false;
   }
   memcpy(output, frame, static_cast<size_t>(written));

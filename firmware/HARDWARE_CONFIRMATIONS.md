@@ -170,6 +170,33 @@ shaft/coupling pin is installed, testing must begin in a new controller session
 with a fresh command identity and a supervised HOME operation before CLOSED or
 OPEN positioning. The prior unknown command must never be resent.
 
+### Reassembled `COLUMN_BOTTOM_VALVE` calibration — 2026-08-15
+
+After installation of the replacement shaft/coupling pin, the previous OPEN
+pulse target no longer reached the visually known physical OPEN position. A
+backend-independent, no-motion-on-boot commissioning firmware used only the
+confirmed D10 HOME, D12 STEP, D13 DIR, DIR HIGH away from HOME, 20 us STEP HIGH,
+and 1,000 us rising-edge interval.
+
+With the operator at motor power, the following sequence was physically
+confirmed:
+
+1. D10 read `HIGH` while HOME was pressed with motor power off and on;
+2. 889 DIR HIGH pulses moved from HOME to the correct CLOSED position and
+   released D10 to `LOW`;
+3. incremental bounded DIR HIGH and DIR LOW adjustments located the visually
+   confirmed OPEN position at 23,850 pulses from CLOSED;
+4. therefore the reassembled absolute targets are `CLOSED = 889` pulses and
+   `OPEN = 24,739` pulses from HOME; and
+5. motion was reported smooth, with no abnormal sound, and the user explicitly
+   confirmed the final physical OPEN position.
+
+This post-reassembly calibration supersedes the earlier 20,889-pulse OPEN
+target for production positioning. The canonical Service/API command remains
+`94` degrees as the logical OPEN label; `24,739` is now the authoritative
+physical pulse target. Leak-tightness and liquid-route verification remain
+pending.
+
 ### Confirmed `SF_BOTTOM_VALVE` actuator and connection — 2026-08-04
 
 The user explicitly confirmed that `SF_BOTTOM_VALVE` is actuated by a
