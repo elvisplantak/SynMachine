@@ -25,7 +25,12 @@
   replace `COMPLETED`/`FAILED`. Firmware native tests pass `177/177`; the Mega
   build uses `38,946 / 253,952` flash bytes and `3,063 / 8,192` static SRAM.
   Backend tests pass `1075/1075` and Ruff is clean. Physical execution of this
-  instrumented build remains pending.
+  instrumented build reached a motionless, physically pressed HOME but remained
+  pending; its snapshots were not visible because Uvicorn disabled the original
+  application logger. The request ended `OUTCOME_UNKNOWN` after the operator
+  physically removed motor power. A tested backend follow-up now routes each
+  snapshot and the last pre-failure snapshot through the enabled Uvicorn error
+  logger at warning level. A repeat diagnostic test remains pending.
 - A supervised V1 regression smoke test after the host concurrency correction
   completed HOME and 90-degree positioning. A following Column HOME attempt is
   not a valid mechanical test because the shaft/coupling pin had been removed
