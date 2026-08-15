@@ -1,6 +1,6 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-08-13
+- Checkpoint date: 2026-08-15
 - Development phase: P1, P2, and V1-V8 production Serial/runtime paths physically validated in supervised dry tests
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
@@ -16,7 +16,9 @@
   `OUTCOME_UNKNOWN`. The command was not retried, UI/backend were stopped, and
   the user confirmed motor power was switched off. The Column test is deferred
   until reassembly and must restart with a new controller session, fresh
-  identity, and HOME before CLOSED/OPEN. Five accidental SF UI requests failed
+  identity, and HOME before CLOSED/OPEN. The user has since installed the new
+  shaft/coupling pin; the supervised post-reassembly test is still pending.
+  Five accidental SF UI requests failed
   closed with HTTP 503 because U2D2 was not configured, so no SF hardware
   command occurred.
 - All Arduino-backed Service controls now share a synchronous global command
@@ -114,6 +116,13 @@
 
 ### Backend
 
+- The production Arduino command timeout is now `90 seconds`, strictly above
+  the Column bottom valve firmware's `80-second` maximum nominal HOME-search
+  execution budget. This prevents a valid long HOME search from being reported
+  as an unknown transport outcome merely because the previous `60-second`
+  backend deadline expired first. A regression test preserves the timing
+  relationship; focused tests passed `22/22`, the complete backend suite passed
+  `1074` tests, and Ruff is clean. No hardware command was sent for this change.
 - The production `DurableArduinoCommandExecutor` now owns a global nonblocking
   command/recovery lock around the complete journal/Serial/lifecycle
   transaction. A concurrent request fails with known `CONTROLLER_BUSY` before
