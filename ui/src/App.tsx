@@ -1162,56 +1162,58 @@ function PumpServiceControl({ pump }: { pump: CommissioningPump }) {
       return;
     }
 
-    const operationCommandId = crypto.randomUUID();
-    const phaseExecutionId = `service-${pump.toLowerCase()}-${Date.now()}`;
-    setCommandState({
-      status: "running",
-      message: command === "HOME" ? `Homing ${pump}…` : `Moving ${pump} to ${parsedTarget} steps…`,
-      operationCommandId,
-    });
-
     try {
-      const response = await fetch("/api/v1/service/pumps/command", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phase_execution_id: phaseExecutionId,
-          operation_command_id: operationCommandId,
-          pump,
-          command,
-          ...(command === "MOVE_ABSOLUTE_STEPS" ? { target_steps: parsedTarget } : {}),
-          safe_route_confirmed: true,
-        }),
-      });
-      const payload = await response.json().catch(() => null) as {
-        detail?: string;
-        operation_command_id?: string;
-        state?: string;
-        error_code?: string | null;
-        execution_started?: boolean | null;
-      } | null;
-
-      if (!response.ok) {
-        throw new Error(payload?.detail ?? `Backend returned HTTP ${response.status}`);
-      }
-      if (payload?.operation_command_id !== operationCommandId || payload.state !== "COMPLETED") {
-        const failure = payload?.error_code ? ` (${payload.error_code})` : "";
-        throw new Error(`Command ended in ${payload?.state ?? "an unknown state"}${failure}.`);
-      }
-
+      const operationCommandId = crypto.randomUUID();
+      const phaseExecutionId = `service-${pump.toLowerCase()}-${Date.now()}`;
       setCommandState({
-        status: "completed",
-        message: command === "HOME"
-          ? `${pump} HOME completed.`
-          : `${pump} reached ${parsedTarget} steps.`,
+        status: "running",
+        message: command === "HOME" ? `Homing ${pump}…` : `Moving ${pump} to ${parsedTarget} steps…`,
         operationCommandId,
       });
-    } catch (error) {
-      setCommandState({
-        status: "failed",
-        message: error instanceof Error ? error.message : "Unknown backend error",
-        operationCommandId,
-      });
+
+      try {
+        const response = await fetch("/api/v1/service/pumps/command", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phase_execution_id: phaseExecutionId,
+            operation_command_id: operationCommandId,
+            pump,
+            command,
+            ...(command === "MOVE_ABSOLUTE_STEPS" ? { target_steps: parsedTarget } : {}),
+            safe_route_confirmed: true,
+          }),
+        });
+        const payload = await response.json().catch(() => null) as {
+          detail?: string;
+          operation_command_id?: string;
+          state?: string;
+          error_code?: string | null;
+          execution_started?: boolean | null;
+        } | null;
+
+        if (!response.ok) {
+          throw new Error(payload?.detail ?? `Backend returned HTTP ${response.status}`);
+        }
+        if (payload?.operation_command_id !== operationCommandId || payload.state !== "COMPLETED") {
+          const failure = payload?.error_code ? ` (${payload.error_code})` : "";
+          throw new Error(`Command ended in ${payload?.state ?? "an unknown state"}${failure}.`);
+        }
+
+        setCommandState({
+          status: "completed",
+          message: command === "HOME"
+            ? `${pump} HOME completed.`
+            : `${pump} controller completed target ${parsedTarget} steps.`,
+          operationCommandId,
+        });
+      } catch (error) {
+        setCommandState({
+          status: "failed",
+          message: error instanceof Error ? error.message : "Unknown backend error",
+          operationCommandId,
+        });
+      }
     } finally {
       releaseArduinoServiceCommand();
     }
@@ -1278,55 +1280,57 @@ function ValveServiceControl({ valve }: { valve: CommissioningValve }) {
       });
       return;
     }
-    const operationCommandId = crypto.randomUUID();
-    const phaseExecutionId = `service-${valve.toLowerCase()}-${Date.now()}`;
-    const targetLabel = command === "HOME" ? "HOME" : `${position}°`;
-    setCommandState({
-      status: "running",
-      message: `Moving ${valve} to ${targetLabel}…`,
-      operationCommandId,
-    });
-
     try {
-      const response = await fetch("/api/v1/service/valves/command", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phase_execution_id: phaseExecutionId,
-          operation_command_id: operationCommandId,
-          valve,
-          command,
-          ...(position === undefined ? {} : { position_degrees: position }),
-        }),
-      });
-      const payload = await response.json().catch(() => null) as {
-        detail?: string;
-        operation_command_id?: string;
-        state?: string;
-        error_code?: string | null;
-      } | null;
-
-      if (!response.ok) {
-        throw new Error(payload?.detail ?? `Backend returned HTTP ${response.status}`);
-      }
-      if (payload?.operation_command_id !== operationCommandId || payload.state !== "COMPLETED") {
-        const failure = payload?.error_code ? ` (${payload.error_code})` : "";
-        throw new Error(`Command ended in ${payload?.state ?? "an unknown state"}${failure}.`);
-      }
-
-      const completedPosition = position ?? 0;
-      setConfirmedPosition(completedPosition);
+      const operationCommandId = crypto.randomUUID();
+      const phaseExecutionId = `service-${valve.toLowerCase()}-${Date.now()}`;
+      const targetLabel = command === "HOME" ? "HOME" : `${position}°`;
       setCommandState({
-        status: "completed",
-        message: `${valve} reached ${completedPosition}° (${completedPosition === 0 ? "closed" : completedPosition === 90 ? "k1 ↔ k3" : "k1 ↔ k2"}).`,
+        status: "running",
+        message: `Moving ${valve} to ${targetLabel}…`,
         operationCommandId,
       });
-    } catch (error) {
-      setCommandState({
-        status: "failed",
-        message: error instanceof Error ? error.message : "Unknown backend error",
-        operationCommandId,
-      });
+
+      try {
+        const response = await fetch("/api/v1/service/valves/command", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phase_execution_id: phaseExecutionId,
+            operation_command_id: operationCommandId,
+            valve,
+            command,
+            ...(position === undefined ? {} : { position_degrees: position }),
+          }),
+        });
+        const payload = await response.json().catch(() => null) as {
+          detail?: string;
+          operation_command_id?: string;
+          state?: string;
+          error_code?: string | null;
+        } | null;
+
+        if (!response.ok) {
+          throw new Error(payload?.detail ?? `Backend returned HTTP ${response.status}`);
+        }
+        if (payload?.operation_command_id !== operationCommandId || payload.state !== "COMPLETED") {
+          const failure = payload?.error_code ? ` (${payload.error_code})` : "";
+          throw new Error(`Command ended in ${payload?.state ?? "an unknown state"}${failure}.`);
+        }
+
+        const completedPosition = position ?? 0;
+        setConfirmedPosition(completedPosition);
+        setCommandState({
+          status: "completed",
+          message: `${valve} controller completed target ${completedPosition}° (${completedPosition === 0 ? "closed" : completedPosition === 90 ? "k1 ↔ k3" : "k1 ↔ k2"}).`,
+          operationCommandId,
+        });
+      } catch (error) {
+        setCommandState({
+          status: "failed",
+          message: error instanceof Error ? error.message : "Unknown backend error",
+          operationCommandId,
+        });
+      }
     } finally {
       releaseArduinoServiceCommand();
     }
@@ -1344,7 +1348,7 @@ function ValveServiceControl({ valve }: { valve: CommissioningValve }) {
         </strong>
       </div>
       <div className="serviceStatusList">
-        <span>Last confirmed position<strong>{confirmedPosition === null ? "Not confirmed" : `${confirmedPosition}°`}</strong></span>
+        <span>Last controller-completed target<strong>{confirmedPosition === null ? "Not completed" : `${confirmedPosition}°`}</strong></span>
         <span>Last command result<strong>{commandState.message}</strong></span>
         <span>Operation command ID<strong>{commandState.operationCommandId ?? "Not assigned"}</strong></span>
       </div>
@@ -1374,62 +1378,64 @@ function ColumnBottomValveServiceControl() {
       });
       return;
     }
-    const operationCommandId = crypto.randomUUID();
-    const phaseExecutionId = `service-column-bottom-valve-${Date.now()}`;
-    const targetLabel = command === "HOME" ? "HOME reference" : position === 4 ? "CLOSED" : "OPEN";
-    setCommandState({
-      status: "running",
-      message: `Moving Column bottom valve to ${targetLabel}…`,
-      operationCommandId,
-    });
-
     try {
-      const response = await fetch("/api/v1/service/column-bottom-valve/command", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phase_execution_id: phaseExecutionId,
-          operation_command_id: operationCommandId,
-          command,
-          ...(position === undefined ? {} : { position_degrees: position }),
-        }),
-      });
-      const payload = await response.json().catch(() => null) as {
-        detail?: string;
-        operation_command_id?: string;
-        state?: string;
-        error_code?: string | null;
-      } | null;
-
-      if (!response.ok) {
-        throw new Error(payload?.detail ?? `Backend returned HTTP ${response.status}`);
-      }
-      if (payload?.operation_command_id !== operationCommandId || payload.state !== "COMPLETED") {
-        const failure = payload?.error_code ? ` (${payload.error_code})` : "";
-        throw new Error(`Command ended in ${payload?.state ?? "an unknown state"}${failure}.`);
-      }
-
-      const completedPosition: ColumnBottomValvePosition = position ?? 0;
-      const completedLabel = completedPosition === 0 ? "HOME reference" : completedPosition === 4 ? "CLOSED" : "OPEN";
-      setConfirmedPosition(completedPosition);
+      const operationCommandId = crypto.randomUUID();
+      const phaseExecutionId = `service-column-bottom-valve-${Date.now()}`;
+      const targetLabel = command === "HOME" ? "HOME reference" : position === 4 ? "CLOSED" : "OPEN";
       setCommandState({
-        status: "completed",
-        message: `Column bottom valve reached ${completedLabel} (${completedPosition}°).`,
+        status: "running",
+        message: `Moving Column bottom valve to ${targetLabel}…`,
         operationCommandId,
       });
-    } catch (error) {
-      setCommandState({
-        status: "failed",
-        message: error instanceof Error ? error.message : "Unknown backend error",
-        operationCommandId,
-      });
+
+      try {
+        const response = await fetch("/api/v1/service/column-bottom-valve/command", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phase_execution_id: phaseExecutionId,
+            operation_command_id: operationCommandId,
+            command,
+            ...(position === undefined ? {} : { position_degrees: position }),
+          }),
+        });
+        const payload = await response.json().catch(() => null) as {
+          detail?: string;
+          operation_command_id?: string;
+          state?: string;
+          error_code?: string | null;
+        } | null;
+
+        if (!response.ok) {
+          throw new Error(payload?.detail ?? `Backend returned HTTP ${response.status}`);
+        }
+        if (payload?.operation_command_id !== operationCommandId || payload.state !== "COMPLETED") {
+          const failure = payload?.error_code ? ` (${payload.error_code})` : "";
+          throw new Error(`Command ended in ${payload?.state ?? "an unknown state"}${failure}.`);
+        }
+
+        const completedPosition: ColumnBottomValvePosition = position ?? 0;
+        const completedLabel = completedPosition === 0 ? "HOME reference" : completedPosition === 4 ? "CLOSED" : "OPEN";
+        setConfirmedPosition(completedPosition);
+        setCommandState({
+          status: "completed",
+          message: `Column bottom valve controller completed target ${completedLabel} (${completedPosition}°).`,
+          operationCommandId,
+        });
+      } catch (error) {
+        setCommandState({
+          status: "failed",
+          message: error instanceof Error ? error.message : "Unknown backend error",
+          operationCommandId,
+        });
+      }
     } finally {
       releaseArduinoServiceCommand();
     }
   };
 
-  const confirmedLabel = confirmedPosition === null
-    ? "Not confirmed"
+  const completedTargetLabel = confirmedPosition === null
+    ? "Not completed"
     : confirmedPosition === 0
       ? "HOME reference · 0°"
       : confirmedPosition === 4
@@ -1448,7 +1454,7 @@ function ColumnBottomValveServiceControl() {
         </strong>
       </div>
       <div className="serviceStatusList">
-        <span>Last confirmed position<strong>{confirmedLabel}</strong></span>
+        <span>Last controller-completed target<strong>{completedTargetLabel}</strong></span>
         <span>Last command result<strong>{commandState.message}</strong></span>
         <span>Operation command ID<strong>{commandState.operationCommandId ?? "Not assigned"}</strong></span>
       </div>
@@ -1487,64 +1493,66 @@ function CarouselServiceControl() {
       return;
     }
 
-    const operationCommandId = crypto.randomUUID();
-    const phaseExecutionId = `service-carousel-${command.toLowerCase()}-${Date.now()}`;
-    setCommandState({
-      status: "running",
-      message: command === "SET_REFERENCE"
-        ? `Recording manual reference at tube ${parsedPosition}…`
-        : `Moving carousel forward to tube ${parsedPosition}…`,
-      operationCommandId,
-    });
-
     try {
-      const response = await fetch("/api/v1/service/carousel/command", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phase_execution_id: phaseExecutionId,
-          operation_command_id: operationCommandId,
-          command,
-          position: parsedPosition,
-          ...(command === "SET_REFERENCE"
-            ? { manual_alignment_confirmed: true }
-            : { column_bottom_valve_closed_confirmed: true }),
-        }),
-      });
-      const payload = await response.json().catch(() => null) as {
-        detail?: string;
-        operation_command_id?: string;
-        state?: string;
-        error_code?: string | null;
-      } | null;
-
-      if (!response.ok) {
-        throw new Error(payload?.detail ?? `Backend returned HTTP ${response.status}`);
-      }
-      if (payload?.operation_command_id !== operationCommandId || payload.state !== "COMPLETED") {
-        const failure = payload?.error_code ? ` (${payload.error_code})` : "";
-        throw new Error(`Command ended in ${payload?.state ?? "an unknown state"}${failure}.`);
-      }
-
-      setLastCompletedPosition(parsedPosition);
+      const operationCommandId = crypto.randomUUID();
+      const phaseExecutionId = `service-carousel-${command.toLowerCase()}-${Date.now()}`;
       setCommandState({
-        status: "completed",
+        status: "running",
         message: command === "SET_REFERENCE"
-          ? `Manual reference at tube ${parsedPosition} completed without carousel motion.`
-          : `Move to tube ${parsedPosition} completed.`,
+          ? `Recording manual reference at tube ${parsedPosition}…`
+          : `Moving carousel forward to tube ${parsedPosition}…`,
         operationCommandId,
       });
-      if (command === "SET_REFERENCE") {
-        setManualAlignmentConfirmed(false);
-      } else {
-        setColumnClosedConfirmed(false);
+
+      try {
+        const response = await fetch("/api/v1/service/carousel/command", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phase_execution_id: phaseExecutionId,
+            operation_command_id: operationCommandId,
+            command,
+            position: parsedPosition,
+            ...(command === "SET_REFERENCE"
+              ? { manual_alignment_confirmed: true }
+              : { column_bottom_valve_closed_confirmed: true }),
+          }),
+        });
+        const payload = await response.json().catch(() => null) as {
+          detail?: string;
+          operation_command_id?: string;
+          state?: string;
+          error_code?: string | null;
+        } | null;
+
+        if (!response.ok) {
+          throw new Error(payload?.detail ?? `Backend returned HTTP ${response.status}`);
+        }
+        if (payload?.operation_command_id !== operationCommandId || payload.state !== "COMPLETED") {
+          const failure = payload?.error_code ? ` (${payload.error_code})` : "";
+          throw new Error(`Command ended in ${payload?.state ?? "an unknown state"}${failure}.`);
+        }
+
+        setLastCompletedPosition(parsedPosition);
+        setCommandState({
+          status: "completed",
+          message: command === "SET_REFERENCE"
+            ? `Manual reference at tube ${parsedPosition} completed without carousel motion.`
+            : `Move to tube ${parsedPosition} completed.`,
+          operationCommandId,
+        });
+        if (command === "SET_REFERENCE") {
+          setManualAlignmentConfirmed(false);
+        } else {
+          setColumnClosedConfirmed(false);
+        }
+      } catch (error) {
+        setCommandState({
+          status: "failed",
+          message: error instanceof Error ? error.message : "Unknown backend error",
+          operationCommandId,
+        });
       }
-    } catch (error) {
-      setCommandState({
-        status: "failed",
-        message: error instanceof Error ? error.message : "Unknown backend error",
-        operationCommandId,
-      });
     } finally {
       releaseArduinoServiceCommand();
     }

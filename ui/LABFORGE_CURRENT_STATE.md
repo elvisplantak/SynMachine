@@ -25,6 +25,12 @@
   V1-V8, the Column bottom valve, and carousel controls while one Arduino
   request is active. Backend serialization remains the authoritative boundary.
   UI lint and the production build pass.
+- Independent-review follow-up makes every Arduino guard owner enter an
+  exception-safe `try/finally` immediately after successful acquisition, so
+  even synchronous command-ID or preparation failure releases the guard. V1-V8
+  and Column UI wording now reports only controller-completed targets rather
+  than independent physical position confirmation; HOME `0 degrees` remains
+  explicitly distinct from Column CLOSED `4 degrees`.
 - Carousel now has a dedicated Service section for operator-confirmed manual
   reference and logical-forward movement to tube positions `1..40`. Reference
   and movement use separate inline confirmations, fresh caller-owned command
@@ -38,13 +44,15 @@
   `HOME reference = 0 degrees` distinct from the confirmed operating positions
   `CLOSED = 4 degrees` and `OPEN = 94 degrees`, creates fresh caller-owned
   identities, locks controls while pending, never retries automatically, and
-  records a confirmed position only after terminal `COMPLETED`. UI lint and the
-  production build pass; no physical execution was performed in this phase.
+  records a controller-completed target only after terminal `COMPLETED`. UI
+  lint and the production build pass; no physical execution was performed in
+  this phase.
 - V1-V8 Service cards now call the durable Arduino backend command API for
   explicit `HOME` and canonical `SET_POSITION` actions at `0`, `90`, or `180`
   degrees. Each command creates fresh caller-owned phase/operation identities,
   locks its card while pending, never retries automatically, and records a
-  confirmed UI position only after the backend returns terminal `COMPLETED`.
+  controller-completed UI target only after the backend returns terminal
+  `COMPLETED`.
 - The UI maps the confirmed semantics as `0 degrees = closed`,
   `90 degrees = k1 <-> k3`, and `180 degrees = k1 <-> k2`. This software
   checkpoint has passed lint and the production build; no physical execution
