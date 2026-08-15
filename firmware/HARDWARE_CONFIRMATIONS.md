@@ -197,6 +197,28 @@ target for production positioning. The canonical Service/API command remains
 physical pulse target. Leak-tightness and liquid-route verification remain
 pending.
 
+### Production HOME diagnostic and safe parking — 2026-08-15
+
+Read-only production snapshots during a motionless HOME request at the
+physically pressed switch repeatedly reported
+`CONFIRMING_HOME`, `stage_steps=0`, and mostly D10 `HIGH` with intermittent D10
+`LOW` samples while motor power was on. No STEP pulses were emitted. After
+motor power was physically removed, D10 remained sufficiently stable HIGH for
+the same production command to return HTTP 200 / `COMPLETED`.
+
+This establishes that the pending HOME behavior is caused by an unstable D10
+signal under powered-machine conditions, not by HOME direction, step count,
+backend timeout, or attempted motor travel. The source of that instability and
+the appropriate electrical or bounded software filtering correction remain
+unresolved; the HOME interlock must not be bypassed.
+
+At session end, the tested no-motion-on-boot Column commissioning firmware was
+flash-verified, D10 read `HIGH` at HOME, and one explicitly armed DIR HIGH move
+of exactly 889 pulses completed. The user confirmed the physical CLOSED
+position was correct and D10 read `LOW`. Motor power was then physically
+switched off. The Mega is intentionally left on the commissioning firmware and
+must be restored to the production image before any Service-path test.
+
 ### Confirmed `SF_BOTTOM_VALVE` actuator and connection — 2026-08-04
 
 The user explicitly confirmed that `SF_BOTTOM_VALVE` is actuated by a
