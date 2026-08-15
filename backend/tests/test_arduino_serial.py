@@ -12,6 +12,8 @@ from app.hardware.arduino_serial import (
     ArduinoSerialClient,
     ArduinoSerialConfiguration,
     ArduinoUnavailableError,
+    COLUMN_BOTTOM_VALVE_HOME_MAXIMUM_NOMINAL_SECONDS,
+    DEFAULT_COMMAND_TIMEOUT_SECONDS,
 )
 
 NONCE = uuid.UUID("123e4567-e89b-12d3-a456-426614174000")
@@ -91,6 +93,16 @@ def client_for(incoming: bytes) -> tuple[ArduinoSerialClient, FakePort]:
         request_id_factory=lambda: REQUEST_ID,
     )
     return client, port
+
+
+def test_default_command_timeout_exceeds_column_home_execution_budget() -> None:
+    configuration = ArduinoSerialConfiguration(port="/dev/test")
+
+    assert configuration.command_timeout_seconds == DEFAULT_COMMAND_TIMEOUT_SECONDS
+    assert (
+        configuration.command_timeout_seconds
+        > COLUMN_BOTTOM_VALVE_HOME_MAXIMUM_NOMINAL_SECONDS
+    )
 
 
 def test_handshake_waits_for_mega_reset_before_sending_hello() -> None:

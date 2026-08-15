@@ -31,6 +31,12 @@ from app.protocol import (
 from app.protocol.models import ProtocolMessage
 
 
+# Firmware can spend up to 80 seconds in the Column Bottom Valve HOME search.
+# Keep host lifecycle waiting strictly above that physical execution budget.
+COLUMN_BOTTOM_VALVE_HOME_MAXIMUM_NOMINAL_SECONDS = 80.0
+DEFAULT_COMMAND_TIMEOUT_SECONDS = 90.0
+
+
 class ArduinoSerialError(RuntimeError):
     """Base error for the LABFORGE/1 Arduino transport."""
 
@@ -75,7 +81,7 @@ class ArduinoSerialConfiguration:
     baud_rate: int = 115200
     reset_settle_seconds: float = 2.5
     handshake_timeout_seconds: float = 2.0
-    command_timeout_seconds: float = 60.0
+    command_timeout_seconds: float = DEFAULT_COMMAND_TIMEOUT_SECONDS
     read_chunk_size: int = 64
 
     def __post_init__(self) -> None:
