@@ -912,6 +912,14 @@ This confirms that manual reference is an absolute operator assertion of the
 currently aligned logical tube, not an offset: an incorrect assertion shifts
 all later logical-to-physical tube labeling until reference is corrected.
 
+After the UI separated and locked the reference workflow, a second supervised
+production-path regression completed a no-motion reference at position 1 and
+the movement sequence `1 -> 2 -> 20 -> 40 -> 10 -> 1`. All six commands were
+durably recorded as `COMPLETED` with `execution_started=true` and no rejection,
+failure, or unknown outcome. The user physically confirmed that the complete
+test passed. The carousel finished at position 1 and motor power was switched
+off.
+
 ### Common DM542T driver DIP layout — 2026-08-08
 
 The user confirmed that all currently discussed stepper drivers are `DM542T`
