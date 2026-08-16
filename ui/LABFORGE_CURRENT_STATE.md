@@ -18,7 +18,9 @@
   follow-up makes enabled Service buttons visually distinct from disabled
   buttons. The production UI build passes. The supervised production-path test
   completed STOP -> START -> STOP, and the user physically confirmed rotation
-  and stopping.
+  and stopping. A final regression completed three additional Start -> Stop
+  cycles without an error; the user confirmed both physical behavior and the
+  corrected enabled/disabled button appearance.
 - Production Column integration is physically validated through the backend/UI
   Service path with the reassembled calibration (`CLOSED=889`, `OPEN=24,739`
   pulses from HOME). The supervised sequence CLOSED -> HOME -> CLOSED -> OPEN ->
