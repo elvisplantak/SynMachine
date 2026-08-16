@@ -1,7 +1,8 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-08-16
-- Development phase: P1, P2, V1-V8, and Column production Serial/Service paths physically validated in supervised dry tests
+- Development phase: P1, P2, V1-V8, Column, and carousel production
+  Serial/Service paths physically validated in supervised dry tests
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
@@ -68,8 +69,19 @@
   identities, pending-control locking, and no automatic retry. The UI reports
   only the last completed command rather than claiming durable trusted
   position, because controller session replacement invalidates the volatile
-  carousel reference. UI lint and the production build pass; no physical
-  execution was performed in this phase.
+  carousel reference. UI lint and the production build pass. A subsequent
+  supervised production-path test established a no-motion manual reference at
+  tube 1, then physically completed and aligned `1 -> 2 -> 10 -> 40 -> 1`.
+  Every accepted move returned HTTP 200 and was durably `COMPLETED`; the final
+  40-to-1 wrap moved one adjacent 250-pulse / 9-degree position as designed.
+  The carousel is parked at position 1 and motor power is physically off.
+- Carousel UI familiarization also exposed an operator-error case: setting a
+  new manual reference at 2 while the mechanism physically remained at 1 made
+  later move-to-2 requests correctly reject as `INVALID_FIELD` with
+  `execution_started=false`, because the controller considered logical 2
+  already reached. Correcting the no-motion reference to physical tube 1
+  restored the intended mapping. Manual reference is an absolute declaration
+  of the currently aligned tube, not a relative offset.
 - Column bottom valve Service card now calls the durable Arduino backend path
   for separate `HOME`, `CLOSED`, and `OPEN` actions. The UI truthfully keeps
   `HOME reference = 0 degrees` distinct from the confirmed operating positions
