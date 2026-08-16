@@ -971,6 +971,84 @@ body {
   overflow-wrap: anywhere;
 }
 
+.carouselControlGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.carouselControlBlock {
+  min-width: 0;
+  border: 1px solid rgba(89, 134, 197, 0.3);
+  border-radius: 12px;
+  padding: 18px;
+  background: rgba(7, 15, 28, 0.48);
+}
+
+.carouselReferenceBlock {
+  border-color: rgba(242, 190, 72, 0.42);
+  background: rgba(71, 47, 8, 0.16);
+}
+
+.carouselMovementBlock {
+  border-color: rgba(56, 189, 248, 0.38);
+}
+
+.carouselControlBlock h4 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: #e3f2ff;
+  font-size: 19px;
+}
+
+.carouselStepNumber {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  border-radius: 50%;
+  color: #bde8ff;
+  font-size: 14px;
+}
+
+.carouselReferenceBlock .carouselStepNumber {
+  border-color: rgba(242, 190, 72, 0.58);
+  color: #f2d28b;
+}
+
+.carouselControlExplanation {
+  min-height: 66px;
+  margin: 12px 0 0;
+  color: #aebed2;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.carouselReferenceSummary {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  border-top: 1px solid rgba(242, 190, 72, 0.25);
+  padding-top: 16px;
+  color: #b9cce3;
+}
+
+.carouselReferenceSummary strong {
+  color: #8fe8bd;
+  font-size: 20px;
+}
+
+.carouselMovementBlocked {
+  margin: 12px 0 0;
+  color: #f2d28b;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 .carouselPrimaryAction {
   min-height: 38px;
   margin-top: 10px;
@@ -996,6 +1074,40 @@ body {
   background: rgba(7, 15, 28, 0.55);
   cursor: not-allowed;
   opacity: 0.72;
+}
+
+.carouselSecondaryAction {
+  width: fit-content;
+  min-height: 36px;
+  border: 1px solid rgba(242, 190, 72, 0.5);
+  border-radius: 8px;
+  padding: 7px 11px;
+  color: #f2d28b;
+  background: rgba(71, 47, 8, 0.22);
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.carouselSecondaryAction:hover:not(:disabled),
+.carouselSecondaryAction:focus-visible:not(:disabled) {
+  border-color: #f2be48;
+  background: rgba(71, 47, 8, 0.38);
+}
+
+.carouselSecondaryAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (max-width: 760px) {
+  .carouselControlGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .carouselControlExplanation {
+    min-height: 0;
+  }
 }
 
 .pumpSummaryGrid .serviceStatusList span {

@@ -82,6 +82,15 @@
   already reached. Correcting the no-motion reference to physical tube 1
   restored the intended mapping. Manual reference is an absolute declaration
   of the currently aligned tube, not a relative offset.
+- The Carousel Service UI follow-up separates manual reference and movement
+  into numbered control blocks with independent reference and target inputs.
+  A completed reference locks its block and enables movement; changing it now
+  requires an explicit `Change manual reference` step followed by the existing
+  physical-alignment confirmation. Reference changes clear any previous Column
+  CLOSED checkbox, movement stays disabled until the new reference completes,
+  and the UI explains that an incorrect absolute declaration shifts all later
+  tube mapping. UI lint and the production build pass; this UI-only correction
+  issued no hardware command.
 - Column bottom valve Service card now calls the durable Arduino backend path
   for separate `HOME`, `CLOSED`, and `OPEN` actions. The UI truthfully keeps
   `HOME reference = 0 degrees` distinct from the confirmed operating positions

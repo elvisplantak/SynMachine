@@ -1469,17 +1469,24 @@ function ColumnBottomValveServiceControl() {
 }
 
 function CarouselServiceControl() {
-  const [position, setPosition] = useState("1");
+  const [referencePosition, setReferencePosition] = useState("1");
+  const [targetPosition, setTargetPosition] = useState("2");
   const [manualAlignmentConfirmed, setManualAlignmentConfirmed] = useState(false);
   const [columnClosedConfirmed, setColumnClosedConfirmed] = useState(false);
+  const [referenceLocked, setReferenceLocked] = useState(false);
+  const [lastReferencedPosition, setLastReferencedPosition] = useState<number | null>(null);
   const [commandState, setCommandState] = useState<PumpServiceState>(initialPumpServiceState);
   const [lastCompletedPosition, setLastCompletedPosition] = useState<number | null>(null);
   const running = commandState.status === "running";
   const arduinoBusy = useArduinoServiceCommandActive();
-  const parsedPosition = Number(position);
-  const positionValid = Number.isInteger(parsedPosition) && parsedPosition >= 1 && parsedPosition <= 40;
+  const parsedReferencePosition = Number(referencePosition);
+  const referencePositionValid = Number.isInteger(parsedReferencePosition) && parsedReferencePosition >= 1 && parsedReferencePosition <= 40;
+  const parsedTargetPosition = Number(targetPosition);
+  const targetPositionValid = Number.isInteger(parsedTargetPosition) && parsedTargetPosition >= 1 && parsedTargetPosition <= 40;
 
   const executeCommand = async (command: "SET_REFERENCE" | "MOVE_TO_POSITION") => {
+    const commandPosition = command === "SET_REFERENCE" ? parsedReferencePosition : parsedTargetPosition;
+    const positionValid = command === "SET_REFERENCE" ? referencePositionValid : targetPositionValid;
     const confirmed = command === "SET_REFERENCE" ? manualAlignmentConfirmed : columnClosedConfirmed;
     if (!positionValid || !confirmed) {
       return;
@@ -1499,8 +1506,8 @@ function CarouselServiceControl() {
       setCommandState({
         status: "running",
         message: command === "SET_REFERENCE"
-          ? `Recording manual reference at tube ${parsedPosition}…`
-          : `Moving carousel forward to tube ${parsedPosition}…`,
+          ? `Recording manual reference at tube ${commandPosition}…`
+          : `Moving carousel forward to tube ${commandPosition}…`,
         operationCommandId,
       });
 
@@ -1512,7 +1519,7 @@ function CarouselServiceControl() {
             phase_execution_id: phaseExecutionId,
             operation_command_id: operationCommandId,
             command,
-            position: parsedPosition,
+            position: commandPosition,
             ...(command === "SET_REFERENCE"
               ? { manual_alignment_confirmed: true }
               : { column_bottom_valve_closed_confirmed: true }),
@@ -1533,16 +1540,20 @@ function CarouselServiceControl() {
           throw new Error(`Command ended in ${payload?.state ?? "an unknown state"}${failure}.`);
         }
 
-        setLastCompletedPosition(parsedPosition);
+        setLastCompletedPosition(commandPosition);
         setCommandState({
           status: "completed",
           message: command === "SET_REFERENCE"
-            ? `Manual reference at tube ${parsedPosition} completed without carousel motion.`
-            : `Move to tube ${parsedPosition} completed.`,
+            ? `Manual reference at tube ${commandPosition} completed without carousel motion.`
+            : `Move to tube ${commandPosition} completed.`,
           operationCommandId,
         });
         if (command === "SET_REFERENCE") {
+          setLastReferencedPosition(commandPosition);
+          setReferenceLocked(true);
+          setTargetPosition(String(commandPosition === 40 ? 1 : commandPosition + 1));
           setManualAlignmentConfirmed(false);
+          setColumnClosedConfirmed(false);
         } else {
           setColumnClosedConfirmed(false);
         }
@@ -1574,39 +1585,84 @@ function CarouselServiceControl() {
         <span>Command result<strong>{commandState.message}</strong></span>
         <span>Operation command ID<strong>{commandState.operationCommandId ?? "Not assigned"}</strong></span>
       </div>
-      <label className="pumpTargetField">
-        Tube position
-        <input
-          type="number"
-          min="1"
-          max="40"
-          step="1"
-          value={position}
-          disabled={arduinoBusy}
-          onChange={(event) => setPosition(event.target.value)}
-        />
-      </label>
-      {!positionValid && <p className="commissioningValidation" role="alert">Position must be a whole number from 1 to 40.</p>}
-      <label className="safeRouteConfirmation">
-        <input
-          type="checkbox"
-          checked={manualAlignmentConfirmed}
-          disabled={arduinoBusy}
-          onChange={(event) => setManualAlignmentConfirmed(event.target.checked)}
-        />
-        I manually aligned the selected tube position. Setting the reference must not move the carousel.
-      </label>
-      <button className="carouselPrimaryAction" type="button" disabled={arduinoBusy || !positionValid || !manualAlignmentConfirmed} onClick={() => void executeCommand("SET_REFERENCE")}>Set manual reference</button>
-      <label className="safeRouteConfirmation">
-        <input
-          type="checkbox"
-          checked={columnClosedConfirmed}
-          disabled={arduinoBusy}
-          onChange={(event) => setColumnClosedConfirmed(event.target.checked)}
-        />
-        I confirmed the Column bottom valve was homed and moved to CLOSED · 4° in the current controller session.
-      </label>
-      <button className="carouselPrimaryAction" type="button" disabled={arduinoBusy || !positionValid || !columnClosedConfirmed} onClick={() => void executeCommand("MOVE_TO_POSITION")}>Move to selected tube</button>
+      <div className="carouselControlGrid">
+        <section className="carouselControlBlock carouselReferenceBlock" aria-labelledby="carousel-reference-heading">
+          <h4 id="carousel-reference-heading"><span className="carouselStepNumber">1</span>Manual reference</h4>
+          <p className="carouselControlExplanation">Declare which numbered tube is physically aligned now. This action does not move the carousel. A wrong number shifts all later tube mapping.</p>
+          {referenceLocked && lastReferencedPosition !== null ? (
+            <div className="carouselReferenceSummary">
+              <span>Reference locked in this UI session</span>
+              <strong>Tube {lastReferencedPosition}</strong>
+              <button
+                className="carouselSecondaryAction"
+                type="button"
+                disabled={arduinoBusy}
+                onClick={() => {
+                  setReferenceLocked(false);
+                  setManualAlignmentConfirmed(false);
+                  setColumnClosedConfirmed(false);
+                }}
+              >
+                Change manual reference
+              </button>
+            </div>
+          ) : (
+            <>
+              <label className="pumpTargetField">
+                Reference tube position
+                <input
+                  type="number"
+                  min="1"
+                  max="40"
+                  step="1"
+                  value={referencePosition}
+                  disabled={arduinoBusy}
+                  onChange={(event) => setReferencePosition(event.target.value)}
+                />
+              </label>
+              {!referencePositionValid && <p className="commissioningValidation" role="alert">Reference must be a whole number from 1 to 40.</p>}
+              <label className="safeRouteConfirmation">
+                <input
+                  type="checkbox"
+                  checked={manualAlignmentConfirmed}
+                  disabled={arduinoBusy}
+                  onChange={(event) => setManualAlignmentConfirmed(event.target.checked)}
+                />
+                I physically aligned tube {referencePosition || "—"}. Set this absolute reference without carousel motion.
+              </label>
+              <button className="carouselPrimaryAction" type="button" disabled={arduinoBusy || !referencePositionValid || !manualAlignmentConfirmed} onClick={() => void executeCommand("SET_REFERENCE")}>Set and lock manual reference</button>
+            </>
+          )}
+        </section>
+        <section className="carouselControlBlock carouselMovementBlock" aria-labelledby="carousel-movement-heading">
+          <h4 id="carousel-movement-heading"><span className="carouselStepNumber">2</span>Movement</h4>
+          <p className="carouselControlExplanation">Select the absolute destination tube. The target is interpreted from the declared reference; it is not added as an offset.</p>
+          <label className="pumpTargetField">
+            Target tube position
+            <input
+              type="number"
+              min="1"
+              max="40"
+              step="1"
+              value={targetPosition}
+              disabled={arduinoBusy || !referenceLocked}
+              onChange={(event) => setTargetPosition(event.target.value)}
+            />
+          </label>
+          {!targetPositionValid && <p className="commissioningValidation" role="alert">Target must be a whole number from 1 to 40.</p>}
+          {!referenceLocked && <p className="carouselMovementBlocked">Set and lock the manual reference before enabling movement.</p>}
+          <label className="safeRouteConfirmation">
+            <input
+              type="checkbox"
+              checked={columnClosedConfirmed}
+              disabled={arduinoBusy || !referenceLocked}
+              onChange={(event) => setColumnClosedConfirmed(event.target.checked)}
+            />
+            I confirmed the Column bottom valve was homed and moved to CLOSED · 4° in the current controller session.
+          </label>
+          <button className="carouselPrimaryAction" type="button" disabled={arduinoBusy || !referenceLocked || !targetPositionValid || !columnClosedConfirmed} onClick={() => void executeCommand("MOVE_TO_POSITION")}>Move to target tube</button>
+        </section>
+      </div>
       <p className="serviceControlNotice">The firmware independently requires a trusted manual reference and trusted CLOSED Column valve state. Session replacement invalidates the carousel reference.</p>
     </section>
   );
