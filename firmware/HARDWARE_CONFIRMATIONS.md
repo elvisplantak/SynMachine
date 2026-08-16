@@ -1020,6 +1020,62 @@ All six durable commands completed without an error, the final command was
 STOP, and the user confirmed that every physical start and stop worked
 correctly.
 
+## Supervised end-to-end dry-demo findings — 2026-08-16
+
+### P1 HOME activation at the full software search boundary
+
+A full-span dry-demo initialization commanded P1 HOME through the previously
+confirmed P1 Waste route. The command emitted the full 20,500-pulse search and
+returned terminal `PUMP_MOTION_TIMEOUT`; the user physically confirmed that P1
+had nevertheless arrived at and remained on HOME. A new, separately identified
+P1 HOME command then completed in approximately 0.14 seconds without visible
+motion, confirming that the HOME input was active and functional after the
+timeout.
+
+This exposed a controller ordering boundary: activation caused by the final
+allowed pulse could occur after the pre-pulse HOME read but before the immediate
+20,500-pulse timeout decision. Firmware commit `0443837` re-reads HOME at that
+boundary and permits only a motionless 30 ms confirmation. It emits no pulse
+beyond 20,500; a candidate that drops before confirmation still times out and
+leaves position untrusted. Warning-enabled native tests pass `195/195`, and the
+production Mega build uses 40,806 flash bytes and 3,140 bytes of static SRAM.
+The commit is uploaded and flash-verified. A physical full-span regression of
+the corrected boundary remains pending because the subsequent V8 fault stopped
+the end-to-end sequence before pump transfer execution.
+
+### New V8 HOME-direction physical fault
+
+During a later end-to-end dry-demo initialization on production firmware,
+V1-V7 homed normally. V8 then emitted its bounded 1,600-pulse HOME search but
+physically oscillated/made an abnormal sound instead of rotating normally and
+returned `VALVE_MOTION_TIMEOUT`. The user initially observed repeated physical
+lever contact during the failed fast attempt, then clarified that V8 remained
+away from HOME and produced the abnormal sound while STEP pulses were sent.
+
+A temporary V8-only diagnostic used the already confirmed STEP D34, DIR D35,
+HOME D2, active-HIGH input, and DIR HIGH toward HOME. It was explicitly armed
+before each bounded run and stopped after each result. Evidence was:
+
+- a 1,600-pulse HOME-direction run observed D2 LOW for the complete motion and
+  for the following 250 ms (`high_ms=0`, `transitions=0`);
+- after the user manually placed V8 at approximately 90 degrees, 20 pulses at a
+  slow 10 ms interval in DIR LOW, away from HOME, moved normally and sounded
+  normal;
+- a subsequent HOME attempt at the same slow 10 ms interval still only
+  oscillated, exhausted 1,600 pulses, and again observed D2 continuously LOW.
+
+This does not justify a polarity, pin, debounce, or software-position change.
+The evidence localizes the blocker to the physical V8 drive under the confirmed
+HOME direction/load: coupling or valve binding, a phase/connection fault that
+appears under that load, or another driver/mechanical issue remains possible.
+V8 must not be commanded again until that physical fault is resolved. Its final
+position is not trusted. Because the confirmed P2 Waste route requires V8 at 90
+degrees, P2 homing or parking must not be attempted from this state.
+
+The temporary diagnostic firmware was removed. Production firmware `0443837`
+was restored and flash-verified with motor power off. Backend and Serial monitor
+were left off, and motor power remained physically off.
+
 ### Recovered `Pump` API mismatch
 
 The recovered helper-method names appear semantically reversed for the confirmed P1 and P2 physical orientation:
