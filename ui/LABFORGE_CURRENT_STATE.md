@@ -1,7 +1,7 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-08-16
-- Development phase: P1, P2, V1-V8, Column, and carousel production
+- Development phase: P1, P2, V1-V8, Column, carousel, and SF mixer production
   Serial/Service paths physically validated in supervised dry tests
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
@@ -10,6 +10,15 @@
 
 ### UI
 
+- SF mixer Service control is implemented on branch
+  `codex/sf-mixer-service-integration` at commits `db7b607` and `f25ce04`.
+  The card exposes only fixed-profile Start/Stop, reports commanded rather than
+  sensed state, keeps Stop available after an uncertain UI session, and blocks
+  other Arduino Service controls while the mixer is known running. A CSS
+  follow-up makes enabled Service buttons visually distinct from disabled
+  buttons. The production UI build passes. The supervised production-path test
+  completed STOP -> START -> STOP, and the user physically confirmed rotation
+  and stopping.
 - Production Column integration is physically validated through the backend/UI
   Service path with the reassembled calibration (`CLOSED=889`, `OPEN=24,739`
   pulses from HOME). The supervised sequence CLOSED -> HOME -> CLOSED -> OPEN ->
@@ -177,6 +186,13 @@
 
 ### Backend
 
+- The strict `/api/v1/service/sf-mixer/command` endpoint is implemented on
+  branch `codex/sf-mixer-service-integration` at commit `c4a585e`. It maps only
+  literal `START` / `STOP` to the exact durable
+  `SF_MIXER_SET_STATE {"running":boolean}` contract, preserves identity and
+  transport failures, and never retries an ambiguous physical command. The
+  complete backend suite passes `1079/1079`. The supervised production-path
+  test durably completed STOP -> START -> STOP without an error.
 - The production Arduino command timeout is now `180 seconds`. A supervised
   assembled Column HOME reached and held the physical HOME switch but exceeded
   the intermediate `90-second` host deadline, producing `OUTCOME_UNKNOWN`.
@@ -268,6 +284,19 @@
 
 ### Firmware
 
+- SF mixer production control is implemented on branch
+  `codex/sf-mixer-service-integration` at commits `7de696f` and `da8f031`.
+  Confirmed pins are STEP D6 and DIR D7; fixed DIR low produces clockwise
+  rotation when viewed from the motor front. The sensorless demo profile is
+  500 pulses/s with 20 us STEP HIGH, no catch-up bursts, explicit Start/Stop,
+  and a firmware interlock against other Arduino actuator commands while
+  running. Session replacement does not silently alter mixer output. The
+  warning-clean native suite passes `193/193`; the Mega build uses
+  `40,768 / 253,952` flash bytes and `3,140 / 8,192` static SRAM. Production
+  firmware was uploaded and flash-verified, and the user physically confirmed
+  the UI-to-hardware STOP -> START -> STOP test. Final mixer state is commanded
+  stopped; RPM, mixing performance, and the required final impeller direction
+  remain uncalibrated.
 - Current V1-V8 software-integration checkpoint:
   - branch: `codex/v1-v8-production-runtime`
   - base reviewed commit: `e0644d5c2ec503ebb706723b04e0b7454a03a8ef`
@@ -607,29 +636,25 @@ physical integration/test authorization or a separately scoped software
 checkpoint for another actuator.
 
 The later supervised-demo checkpoints supersede that historical boundary:
-P1/P2, V1-V8, the column-bottom valve, the carousel, and the separate
+P1/P2, V1-V8, the column-bottom valve, the carousel, SF mixer, and the separate
 SF-bottom DYNAMIXEL path have production software checkpoints, with the
 physically executed confirmations recorded above and in firmware
-`HARDWARE_CONFIRMATIONS.md`. The immediate next software phase is to complete
-the remaining backend/UI integration around Arduino-managed valves, the column
-bottom valve, and carousel Service controls, then perform separately authorized
-supervised UI-to-hardware tests. Wet-route testing, pump volume calibration,
+`HARDWARE_CONFIRMATIONS.md`. The immediate next phase is the supervised dry
+demo sequence and its remaining orchestration/UI integration. Wet-route
+testing, precise pump-volume calibration, SF mixer RPM/performance calibration,
 and full Guided Demo orchestration remain later phases.
 
 ## Current limitations and unresolved physical decisions
 
-- Incoming production P1 `PUMP_HOME` and `PUMP_MOVE_ABSOLUTE_STEPS` handling,
-  Serial lifecycle dispatch, runtime cache population, and the Arduino P1
-  adapter are implemented in the Mega build. Other actuator runtimes remain
-  unintegrated.
+- P1/P2, V1-V8, Column bottom valve, carousel, and SF mixer are integrated in
+  the production Mega runtime. Reactor mixer is not connected or integrated.
+- SF mixer control has no speed input or rotation feedback. The fixed
+  500-pulse/s dry-demo profile and clockwise observed direction are not a
+  calibrated RPM or validated final mixing direction.
 - EEPROM fail-closed recovery/provisioning remains unresolved.
-- No firmware upload or physical execution is authorized by the current P1
-  software checkpoint.
 - Unconfirmed pin, polarity, direction, angle, step, calibration, homing, and
   safe-route decisions must be obtained from the user and canonical hardware
   documentation.
-- Firmware has not been uploaded, no Serial monitor has been opened against the
-  controller, and no physical test has been performed in the current phase.
 
 ## Governance alignment work
 
