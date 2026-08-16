@@ -1108,9 +1108,22 @@ const initialPumpServiceState: PumpServiceState = {
 };
 
 let arduinoServiceCommandActive = false;
+let sfMixerServiceCommandedRunning = false;
 const arduinoServiceCommandListeners = new Set<() => void>();
 
 function useArduinoServiceCommandActive(): boolean {
+  return useSyncExternalStore(
+    (listener) => {
+      arduinoServiceCommandListeners.add(listener);
+      return () => {
+        arduinoServiceCommandListeners.delete(listener);
+      };
+    },
+    () => arduinoServiceCommandActive || sfMixerServiceCommandedRunning,
+  );
+}
+
+function useArduinoServiceRequestActive(): boolean {
   return useSyncExternalStore(
     (listener) => {
       arduinoServiceCommandListeners.add(listener);
@@ -1126,13 +1139,18 @@ function notifyArduinoServiceCommandChange() {
   arduinoServiceCommandListeners.forEach((listener) => listener());
 }
 
-function acquireArduinoServiceCommand(): boolean {
-  if (arduinoServiceCommandActive) {
+function acquireArduinoServiceCommand(allowWhileSfMixerRuns = false): boolean {
+  if (arduinoServiceCommandActive || (sfMixerServiceCommandedRunning && !allowWhileSfMixerRuns)) {
     return false;
   }
   arduinoServiceCommandActive = true;
   notifyArduinoServiceCommandChange();
   return true;
+}
+
+function setSfMixerServiceCommandedRunning(running: boolean) {
+  sfMixerServiceCommandedRunning = running;
+  notifyArduinoServiceCommandChange();
 }
 
 function releaseArduinoServiceCommand() {
@@ -1668,6 +1686,108 @@ function CarouselServiceControl() {
   );
 }
 
+function SfMixerServiceControl() {
+  const [commandedRunning, setCommandedRunning] = useState<boolean | null>(null);
+  const [commandState, setCommandState] = useState<PumpServiceState>(initialPumpServiceState);
+  const requestActive = useArduinoServiceRequestActive();
+
+  const executeCommand = async (targetRunning: boolean) => {
+    if (!acquireArduinoServiceCommand(!targetRunning)) {
+      setCommandState({
+        status: "failed",
+        message: "Another Arduino Service command is already active.",
+        operationCommandId: null,
+      });
+      return;
+    }
+
+    const operationCommandId = crypto.randomUUID();
+    const action = targetRunning ? "START" : "STOP";
+    setCommandState({
+      status: "running",
+      message: targetRunning ? "Starting SF mixer…" : "Stopping SF mixer…",
+      operationCommandId,
+    });
+
+    try {
+      const response = await fetch("/api/v1/service/sf-mixer/command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phase_execution_id: `service-sf-mixer-${action.toLowerCase()}-${Date.now()}`,
+          operation_command_id: operationCommandId,
+          command: action,
+        }),
+      });
+      const payload = await response.json().catch(() => null) as {
+        detail?: string;
+        operation_command_id?: string;
+        state?: string;
+        error_code?: string | null;
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.detail ?? `Backend returned HTTP ${response.status}`);
+      }
+      if (payload?.operation_command_id !== operationCommandId || payload.state !== "COMPLETED") {
+        const failure = payload?.error_code ? ` (${payload.error_code})` : "";
+        throw new Error(`Command ended in ${payload?.state ?? "an unknown state"}${failure}.`);
+      }
+
+      setCommandedRunning(targetRunning);
+      setSfMixerServiceCommandedRunning(targetRunning);
+      setCommandState({
+        status: "completed",
+        message: targetRunning
+          ? "Controller applied SF mixer RUNNING output. Rotation is not sensor-confirmed."
+          : "Controller applied SF mixer STOPPED output.",
+        operationCommandId,
+      });
+    } catch (error) {
+      setCommandedRunning(null);
+      setSfMixerServiceCommandedRunning(true);
+      setCommandState({
+        status: "failed",
+        message: `${error instanceof Error ? error.message : "Unknown backend error"} Mixer state is unknown; issue Stop before other Arduino motion.`,
+        operationCommandId,
+      });
+    } finally {
+      releaseArduinoServiceCommand();
+    }
+  };
+
+  const displayedState = commandState.status === "running"
+    ? "Applying"
+    : commandedRunning === true
+      ? "RUNNING"
+      : commandedRunning === false
+        ? "STOPPED"
+        : "UNKNOWN";
+
+  return (
+    <section className="serviceGroup pumpServiceCard" aria-labelledby="sf-mixer-service-heading">
+      <div className="pumpServiceHeading">
+        <div>
+          <h3 id="sf-mixer-service-heading">SF mixer</h3>
+          <span>Arduino Mega · STEP D6 / DIR D7</span>
+        </div>
+        <strong className={`pumpServiceStatus ${commandState.status}`}>{displayedState}</strong>
+      </div>
+      <div className="serviceStatusList">
+        <span>Commanded output state<strong>{displayedState}</strong></span>
+        <span>Fixed demo pulse rate<strong>500 pulses/s · RPM not calibrated</strong></span>
+        <span>Last command result<strong>{commandState.message}</strong></span>
+        <span>Operation command ID<strong>{commandState.operationCommandId ?? "Not assigned"}</strong></span>
+      </div>
+      <div className="serviceActionRow">
+        <button type="button" disabled={requestActive || commandedRunning === true} onClick={() => void executeCommand(true)}>Start</button>
+        <button type="button" disabled={requestActive || commandedRunning === false} onClick={() => void executeCommand(false)}>Stop</button>
+      </div>
+      <p className="serviceControlNotice">COMPLETED confirms the commanded Arduino output, not sensed rotation. Firmware blocks other Arduino actuator commands while RUNNING. After a reload, use Stop if the state is uncertain.</p>
+    </section>
+  );
+}
+
 const emptyPumpCommissioningFields: PumpCommissioningFields = {
   workingFull: "",
   workingEmpty: "",
@@ -1871,8 +1991,8 @@ function ServiceSectionContent({ section }: { section: ServiceSection }) {
   if (section === "mixerTemperature") {
     return (
       <>
-        <div className="serviceSectionHeading"><span className="panelEyebrow">Reactor subsystem draft</span><h2>Mixer & temperature</h2><p>Backend safety rules remain active in Service mode.</p></div>
-        <div className="serviceTwoColumn"><section className="serviceGroup"><h3>Mixer</h3><div className="serviceStatusList"><span>Connection<strong>Not connected</strong></span><span>Commanded speed<strong>Not configured · unit TBD</strong></span></div><div className="serviceActionRow"><DisabledServiceButton>Start</DisabledServiceButton><DisabledServiceButton>Stop</DisabledServiceButton></div></section><section className="serviceGroup"><h3>Reactor temperature</h3><div className="serviceStatusList"><span>Target temperature<strong>Not configured</strong></span><span>Heater state<strong>Unknown</strong></span><span>Reported temperature<strong>Not connected</strong></span></div><div className="serviceActionRow"><DisabledServiceButton>Apply target</DisabledServiceButton></div></section></div>
+        <div className="serviceSectionHeading"><span className="panelEyebrow">Supervised hardware service</span><h2>Mixer & temperature</h2><p>The SF mixer uses the durable Arduino path at its fixed commissioning rate. Reactor hardware remains deferred.</p></div>
+        <div className="serviceTwoColumn"><SfMixerServiceControl /><section className="serviceGroup"><h3>Reactor subsystem</h3><div className="serviceStatusList"><span>Reactor mixer<strong>Not connected</strong></span><span>Temperature target<strong>Not configured</strong></span><span>Heater state<strong>Unknown</strong></span><span>Reported temperature<strong>Not connected</strong></span></div><div className="serviceActionRow"><DisabledServiceButton>Reactor mixer unavailable</DisabledServiceButton><DisabledServiceButton>Temperature unavailable</DisabledServiceButton></div></section></div>
       </>
     );
   }
