@@ -135,6 +135,13 @@
   automatically retry unknown or failed outcomes.
 - Volume, speed, relative-motion, calibration, and priming actions remain
   intentionally disabled pending their separate contracts and calibration.
+- The user subsequently accepted a demo-only linear P1/P2 nominal mapping of
+  raw `0 = 20 ml`, raw `20500 = 0 ml`, and `1025 steps/ml`. This preserves the
+  confirmed physical direction: aspiration moves toward lower raw positions
+  and dispense toward higher positions. Precise real-machine calibration,
+  measured-volume claims, dead-volume compensation, and production working
+  margins remain deferred. No volume command or hardware execution was added
+  by this documentation checkpoint.
 - The complete P1/P2 Service path was physically validated in a supervised dry
   test using the actual UI controls through backend intent handling,
   LABFORGE/1 Serial, production firmware, and Arduino GPIO: both pumps
