@@ -89,6 +89,8 @@ P1MotionResult P1MotionController::update(uint32_t nowUs) {
 
   if (state_ == P1MotionState::CONFIRMING_HOME_ACTIVE) {
     if (!io_.homeActive()) {
+      if (stageSteps_ >= kP1MaximumAbsoluteSteps)
+        return finish(P1MotionResult::MOTION_TIMEOUT);
       resumePulses(nowUs);
       state_ = P1MotionState::SEARCHING_HOME;
     } else if (timeReached(nowUs, homeStableSinceUs_ + kP1HomeStableUs)) {
@@ -177,8 +179,13 @@ P1MotionResult P1MotionController::update(uint32_t nowUs) {
       stageSteps_ >= kP1HomeReleaseMaximumSteps)
     return finish(P1MotionResult::HOME_SWITCH_STUCK);
   if (state_ == P1MotionState::SEARCHING_HOME &&
-      stageSteps_ >= kP1MaximumAbsoluteSteps)
+      stageSteps_ >= kP1MaximumAbsoluteSteps) {
+    if (io_.homeActive()) {
+      pauseForHomeStability(P1MotionState::CONFIRMING_HOME_ACTIVE, nowUs);
+      return P1MotionResult::NONE;
+    }
     return finish(P1MotionResult::MOTION_TIMEOUT);
+  }
   if (state_ == P1MotionState::MOVING) {
     if (releasingHomeDuringMove_ && positionSteps_ == targetSteps_) {
       trust_ = P1PositionTrust::UNTRUSTED;
