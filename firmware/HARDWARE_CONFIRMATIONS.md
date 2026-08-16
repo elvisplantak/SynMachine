@@ -261,6 +261,23 @@ motor power off. No additional motion was performed after that accounting-only
 safety correction. The valve remains physically at the confirmed CLOSED
 position and the user confirmed motor power off.
 
+### Final production Column regression after HOME-search accounting correction — 2026-08-16
+
+A subsequent supervised UI-to-hardware regression used the final production
+firmware in controller boot session `58`. Four `OPEN` requests made before a
+fresh HOME reference were rejected with `INVALID_FIELD` and
+`execution_started=false`; the motor did not move. This confirms that a new
+controller session fails closed and does not reuse the previous session's
+volatile Column position trust.
+
+The operator then completed `HOME -> OPEN -> CLOSED`. All three commands were
+durably recorded as `COMPLETED` with `execution_started=true`, and the user
+physically confirmed that the complete test passed. This supersedes the prior
+statement that no physical motion had been performed after the accounting-only
+correction: the final production firmware and its required HOME-first session
+behavior are now physically validated. The Column bottom valve finished at the
+confirmed CLOSED position.
+
 ### Confirmed `SF_BOTTOM_VALVE` actuator and connection — 2026-08-04
 
 The user explicitly confirmed that `SF_BOTTOM_VALVE` is actuated by a
