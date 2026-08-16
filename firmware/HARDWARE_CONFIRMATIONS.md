@@ -883,6 +883,35 @@ position as unknown after controller startup or any event that can lose step
 accounting until that explicit manual initialization occurs; it must not invent
 an absolute carousel position.
 
+### Confirmed carousel Service path — 2026-08-16
+
+With the Column bottom valve homed and parked at its trusted CLOSED position in
+controller boot session `58`, the operator physically aligned tube 1 and the
+production UI/backend/Serial path completed `CAROUSEL_SET_REFERENCE` at logical
+position 1 without carousel motion. The supervised movement sequence then
+completed:
+
+1. position 1 to position 2;
+2. position 2 to position 10;
+3. position 10 to position 40; and
+4. the one-position logical-forward wrap from position 40 to position 1.
+
+Every accepted movement was durably recorded as `COMPLETED` with
+`execution_started=true`. The user physically confirmed correct alignment at
+positions 2, 10, 40, and the returned position 1. The short 40-to-1 motion was
+the expected adjacent-position movement of 250 pulses / 9 degrees. The carousel
+finished at position 1 and the user confirmed motor power was switched off.
+
+During UI familiarization, the operator accidentally issued additional
+no-motion reference declarations, including declaring position 2 while the
+mechanism remained physically at position 1. Subsequent
+move-to-2 requests were rejected as `INVALID_FIELD` with
+`execution_started=false` because position 2 was already the controller's
+declared logical position. No physical movement or unknown outcome occurred.
+This confirms that manual reference is an absolute operator assertion of the
+currently aligned logical tube, not an offset: an incorrect assertion shifts
+all later logical-to-physical tube labeling until reference is corrected.
+
 ### Common DM542T driver DIP layout — 2026-08-08
 
 The user confirmed that all currently discussed stepper drivers are `DM542T`
