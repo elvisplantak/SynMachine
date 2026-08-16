@@ -1003,9 +1003,17 @@ mixer production pin pair is therefore confirmed as:
 - DIR D7.
 
 The discovery burst used a 20 microsecond STEP-high time with 2 milliseconds
-between pulses. This confirms that the bounded electrical pulse rate produced
-motion; it does not yet establish the intended production mixing speed or the
-physical CW/CCW meaning of DIR logic low.
+between pulses. Viewed from the front face of the motor, the user observed DIR
+logic low rotating the mixer clockwise. This is an observed direction only;
+the required direction for the final mixing element remains unconfirmed.
+
+The production firmware was subsequently uploaded and flash-verified. A
+supervised UI -> backend -> Arduino sequence commanded STOP -> START -> STOP at
+the same fixed 500-pulse/s profile. All three durable commands completed
+without an error, the user physically confirmed rotation between START and
+STOP, and the final commanded state was stopped. This validates the complete
+production control path, but it does not establish calibrated RPM, mixing
+performance, torque, or sensor-confirmed rotation.
 
 ### Recovered `Pump` API mismatch
 
