@@ -90,7 +90,11 @@
   CLOSED checkbox, movement stays disabled until the new reference completes,
   and the UI explains that an incorrect absolute declaration shifts all later
   tube mapping. UI lint and the production build pass; this UI-only correction
-  issued no hardware command.
+  initially issued no hardware command. A subsequent supervised regression
+  through the hardened UI completed the no-motion reference at 1 followed by
+  `1 -> 2 -> 20 -> 40 -> 10 -> 1`; every command returned HTTP 200 and was
+  durably `COMPLETED`, and the user physically confirmed the complete test
+  passed. The carousel is at position 1 and motor power is physically off.
 - Column bottom valve Service card now calls the durable Arduino backend path
   for separate `HOME`, `CLOSED`, and `OPEN` actions. The UI truthfully keeps
   `HOME reference = 0 degrees` distinct from the confirmed operating positions
