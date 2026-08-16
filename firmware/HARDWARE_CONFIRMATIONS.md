@@ -496,7 +496,8 @@ does not by itself verify liquid routing through the physical valve ports.
 - `COLUMN_BOTTOM_VALVE` basic actuation, homing, and functional OPEN/CLOSED
   positions are confirmed above; longer-duration thermal behavior and fluidic
   execution remain pending.
-- Pump volumetric calibration remains pending.
+- Precise pump volumetric calibration remains pending; the later accepted
+  demo-only nominal mapping does not replace it.
 - Safe execution interlocks and end-to-end hardware execution remain pending.
 - Automatic phase detection and automatic or actual liquid-phase separation are not confirmed.
 - Safe routes must be physically verified before pump homing or any liquid movement.
@@ -631,6 +632,26 @@ Pump speed was acceptable at `PUMP_STEP_INTERVAL_US = 1500`. A future UI
 setting may request pump speed, but firmware must own and validate the allowed
 range and reject unsupported values. No final UI control, protocol field, or
 validated speed range is established by this confirmation.
+
+### Accepted demo-only P1/P2 nominal volume mapping — 2026-08-16
+
+For the supervised colored-liquid demo, the user explicitly accepted the same
+linear nominal mapping for P1 and P2:
+
+- raw position `0` = nominally `20 ml` in the syringe chamber;
+- raw position `20500` = nominally `0 ml` in the syringe chamber; and
+- nominal conversion = `1025 steps/ml` across that full coordinate range.
+
+Therefore the nominal chamber-content display mapping is
+`volume_ml = (20500 - position_steps) / 1025`. Aspirating increases nominal
+chamber content by moving toward lower raw positions; dispensing decreases it
+by moving toward higher raw positions, preserving the confirmed physical
+orientation above.
+
+This is an explicitly accepted demo approximation for low-risk liquids, not a
+precision calibration, measured delivered-volume claim, dead-volume correction,
+repeatability result, or production working-margin decision. Precise P1/P2
+calibration remains deferred for the real machine.
 
 ### Accepted demo-only P1/P2 homing assumption — 2026-08-10
 
@@ -954,7 +975,8 @@ a manufacturer-limit validation.
 ### Confirmed limitations
 
 - `20500` remains a recovered software travel value and approximate endpoint, not a validated volume calibration.
-- `steps/ml` remains pending experimental calibration.
+- `1025 steps/ml` is accepted only as the nominal supervised-demo conversion;
+  precise experimental `steps/ml` calibration remains pending.
 - Working full and working empty margins remain pending experimental calibration.
 - No validated aspiration or dispense volume accuracy is documented yet.
 - No validated physical speed range exists yet.
