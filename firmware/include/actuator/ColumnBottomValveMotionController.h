@@ -13,6 +13,9 @@ constexpr uint32_t kColumnValveStepIntervalUs = 1000;
 constexpr uint16_t kColumnValveStepHighUs = 20;
 constexpr uint16_t kColumnValveDirectionSetupUs = 5;
 constexpr uint32_t kColumnValveHomeStableUs = 30000;
+constexpr uint8_t kColumnValveHomeInactiveEvidencePenalty = 3;
+constexpr uint32_t kColumnValveHomeEvidenceSampleCapUs = 2000;
+constexpr uint32_t kColumnValveHomeConfirmationTimeoutUs = 250000;
 
 enum class ColumnValvePositionTrust : uint8_t { UNTRUSTED, TRUSTED };
 enum class ColumnValvePrepareResult : uint8_t {
@@ -62,6 +65,7 @@ class ColumnBottomValveMotionController {
   void beginMotion(ColumnValveMotionState state, bool directionHigh,
                    uint32_t nowUs);
   void pauseForHome(uint32_t nowUs, ColumnValveMotionState state);
+  void sampleHomeActiveEvidence(uint32_t nowUs, bool homeActive);
   bool pulseDue(uint32_t nowUs) const;
   void emitPulse(uint32_t nowUs);
   ColumnValveMotionResult finish(ColumnValveMotionResult result);
@@ -72,8 +76,12 @@ class ColumnBottomValveMotionController {
   uint32_t positionSteps_ = 0;
   uint32_t targetSteps_ = 0;
   uint32_t stageSteps_ = 0;
+  uint32_t homeSearchSteps_ = 0;
   uint32_t nextPulseUs_ = 0;
   uint32_t homeStableSinceUs_ = 0;
+  uint32_t homeConfirmationStartedUs_ = 0;
+  uint32_t homeEvidenceSampleUs_ = 0;
+  uint32_t homeActiveEvidenceUs_ = 0;
   bool homeCandidateActive_ = false;
   bool directionHigh_ = false;
   bool releasingHome_ = false;

@@ -325,8 +325,22 @@ positioning command.
 
 The column controller uses confirmed D12 STEP, D13 DIR, D10 HOME, DIR LOW toward
 HOME, bounded 20 us STEP HIGH, 5 us DIR setup, and a confirmed 1,000 us minimum
-rising-edge interval. HOME stability is sampled for 30 ms with STEP inactive.
-Its 80,000-pulse search timeout bounds software execution but is not independent
+rising-edge interval. On first HOME activation, STEP remains inactive while the
+Column controller accumulates 30 ms of active evidence. Active samples add
+evidence, inactive samples remove it three times faster, and no individual
+sample may contribute more than 2 ms. A continuously inactive signal must still
+remain inactive for 30 ms before HOME search may resume. An unresolved mixed
+signal fails closed after 250 ms. Movement away from trusted HOME ignores raw
+HOME transitions only within the confirmed 889-pulse release zone and only in
+the direction away from HOME. At that bound STEP is held inactive and actual
+HOME release requires 30 ms continuously inactive; active evidence may reject
+brief false inactive samples, an unresolved mixed signal fails closed after
+250 ms, and no motion beyond the release zone is allowed without confirmation.
+This bounded handling tolerates powered D10 instability without bypassing the
+HOME interlock.
+Its 80,000-pulse search timeout is cumulative across the entire HOME command;
+false HOME candidates and resumed search stages never reset that count. The
+bound limits software execution but is not independent
 mechanical protection or a proven safe missing-HOME distance. This remains a
 supervised-demo assumption: HOME is treated as functional, the operator remains
 at the power switch, and unattended/production operation is out of scope.

@@ -43,6 +43,7 @@ ColumnBottomValveMotionController::prepareSetPosition(uint16_t targetDegrees) {
 
 bool ColumnBottomValveMotionController::start(uint32_t nowUs) {
   if (state_ == ColumnValveMotionState::PREPARED_HOME) {
+    homeSearchSteps_ = 0;
     if (trust_ == ColumnValvePositionTrust::TRUSTED && positionSteps_ == 0) {
       pauseForHome(nowUs, io_.homeActive()
                               ? ColumnValveMotionState::CONFIRMING_HOME
@@ -60,7 +61,7 @@ bool ColumnBottomValveMotionController::start(uint32_t nowUs) {
   }
   if (state_ != ColumnValveMotionState::PREPARED_MOVE) return false;
   const bool movingAway = targetSteps_ > positionSteps_;
-  releasingHome_ = movingAway && positionSteps_ == 0 && io_.homeActive();
+  releasingHome_ = movingAway && positionSteps_ == 0;
   beginMotion(ColumnValveMotionState::MOVING,
               movingAway ? !kDirectionTowardHomeHigh
                          : kDirectionTowardHomeHigh,
@@ -77,24 +78,32 @@ ColumnValveMotionResult ColumnBottomValveMotionController::update(
 
   if (state_ == ColumnValveMotionState::CONFIRMING_HOME) {
     const bool homeActive = io_.homeActive();
+    sampleHomeActiveEvidence(nowUs, homeActive);
+
     if (homeActive != homeCandidateActive_) {
       homeCandidateActive_ = homeActive;
       homeStableSinceUs_ = nowUs;
-      return ColumnValveMotionResult::NONE;
     }
-    if (!timeReached(nowUs, homeStableSinceUs_ + kColumnValveHomeStableUs))
-      return ColumnValveMotionResult::NONE;
-    if (homeActive) {
+    if (homeActive && homeActiveEvidenceUs_ >= kColumnValveHomeStableUs) {
       positionSteps_ = 0;
       trust_ = ColumnValvePositionTrust::TRUSTED;
       return finish(ColumnValveMotionResult::COMPLETED);
     }
-    if (trust_ == ColumnValvePositionTrust::TRUSTED && positionSteps_ == 0) {
+    if (!homeActive &&
+        timeReached(nowUs, homeStableSinceUs_ + kColumnValveHomeStableUs)) {
+      if (trust_ != ColumnValvePositionTrust::TRUSTED || positionSteps_ != 0) {
+        beginMotion(ColumnValveMotionState::SEARCHING_HOME,
+                    kDirectionTowardHomeHigh, nowUs);
+        return ColumnValveMotionResult::NONE;
+      }
       trust_ = ColumnValvePositionTrust::UNTRUSTED;
       return finish(ColumnValveMotionResult::HOME_SWITCH_UNEXPECTED);
     }
-    beginMotion(ColumnValveMotionState::SEARCHING_HOME,
-                kDirectionTowardHomeHigh, nowUs);
+    if (timeReached(nowUs, homeConfirmationStartedUs_ +
+                               kColumnValveHomeConfirmationTimeoutUs)) {
+      trust_ = ColumnValvePositionTrust::UNTRUSTED;
+      return finish(ColumnValveMotionResult::HOME_SWITCH_UNEXPECTED);
+    }
     return ColumnValveMotionResult::NONE;
   }
 
@@ -111,26 +120,29 @@ ColumnValveMotionResult ColumnBottomValveMotionController::update(
 
   if (state_ == ColumnValveMotionState::CONFIRMING_HOME_RELEASE) {
     const bool homeActive = io_.homeActive();
+    sampleHomeActiveEvidence(nowUs, homeActive);
     if (homeActive != homeCandidateActive_) {
       homeCandidateActive_ = homeActive;
       homeStableSinceUs_ = nowUs;
-      return ColumnValveMotionResult::NONE;
     }
-    if (!timeReached(nowUs, homeStableSinceUs_ + kColumnValveHomeStableUs))
-      return ColumnValveMotionResult::NONE;
-    if (!homeActive) {
+    if (!homeActive &&
+        timeReached(nowUs, homeStableSinceUs_ + kColumnValveHomeStableUs)) {
       releasingHome_ = false;
       releaseTravelExhausted_ = false;
       if (positionSteps_ == targetSteps_)
         return finish(ColumnValveMotionResult::COMPLETED);
       nextPulseUs_ = nowUs + kColumnValveStepIntervalUs;
       state_ = ColumnValveMotionState::MOVING;
-    } else if (releaseTravelExhausted_) {
+      return ColumnValveMotionResult::NONE;
+    }
+    if (homeActive && homeActiveEvidenceUs_ >= kColumnValveHomeStableUs) {
       trust_ = ColumnValvePositionTrust::UNTRUSTED;
       return finish(ColumnValveMotionResult::HOME_SWITCH_STUCK);
-    } else {
-      nextPulseUs_ = nowUs + kColumnValveStepIntervalUs;
-      state_ = ColumnValveMotionState::MOVING;
+    }
+    if (timeReached(nowUs, homeConfirmationStartedUs_ +
+                               kColumnValveHomeConfirmationTimeoutUs)) {
+      trust_ = ColumnValvePositionTrust::UNTRUSTED;
+      return finish(ColumnValveMotionResult::HOME_SWITCH_STUCK);
     }
     return ColumnValveMotionResult::NONE;
   }
@@ -153,15 +165,7 @@ ColumnValveMotionResult ColumnBottomValveMotionController::update(
   }
 
   if (state_ == ColumnValveMotionState::MOVING) {
-    if (releasingHome_) {
-      if (!io_.homeActive()) {
-        pauseForHome(nowUs, ColumnValveMotionState::CONFIRMING_HOME_RELEASE);
-        return ColumnValveMotionResult::NONE;
-      } else if (stageSteps_ >= kColumnValveClosedSteps) {
-        trust_ = ColumnValvePositionTrust::UNTRUSTED;
-        return finish(ColumnValveMotionResult::HOME_SWITCH_STUCK);
-      }
-    } else if (io_.homeActive()) {
+    if (!releasingHome_ && io_.homeActive()) {
       pauseForHome(nowUs,
                    ColumnValveMotionState::CONFIRMING_UNEXPECTED_HOME);
       return ColumnValveMotionResult::NONE;
@@ -171,7 +175,8 @@ ColumnValveMotionResult ColumnBottomValveMotionController::update(
   if (!pulseDue(nowUs)) return ColumnValveMotionResult::NONE;
   emitPulse(nowUs);
   if (state_ == ColumnValveMotionState::SEARCHING_HOME) {
-    if (stageSteps_ >= kColumnValveMaximumSearchSteps)
+    ++homeSearchSteps_;
+    if (homeSearchSteps_ >= kColumnValveMaximumSearchSteps)
       return finish(ColumnValveMotionResult::MOTION_TIMEOUT);
     return ColumnValveMotionResult::NONE;
   }
@@ -213,6 +218,9 @@ uint32_t ColumnBottomValveMotionController::positionSteps() const {
   return positionSteps_;
 }
 uint32_t ColumnBottomValveMotionController::stageSteps() const {
+  if (state_ == ColumnValveMotionState::SEARCHING_HOME ||
+      state_ == ColumnValveMotionState::CONFIRMING_HOME)
+    return homeSearchSteps_;
   return stageSteps_;
 }
 bool ColumnBottomValveMotionController::homeActive() const {
@@ -238,6 +246,35 @@ void ColumnBottomValveMotionController::pauseForHome(
   state_ = state;
   homeStableSinceUs_ = nowUs;
   homeCandidateActive_ = io_.homeActive();
+  if (state == ColumnValveMotionState::CONFIRMING_HOME ||
+      state == ColumnValveMotionState::CONFIRMING_HOME_RELEASE) {
+    homeConfirmationStartedUs_ = nowUs;
+    homeEvidenceSampleUs_ = nowUs;
+    homeActiveEvidenceUs_ = 0;
+  }
+}
+
+void ColumnBottomValveMotionController::sampleHomeActiveEvidence(
+    uint32_t nowUs, bool homeActive) {
+  uint32_t evidenceElapsedUs = nowUs - homeEvidenceSampleUs_;
+  if (evidenceElapsedUs > kColumnValveHomeEvidenceSampleCapUs)
+    evidenceElapsedUs = kColumnValveHomeEvidenceSampleCapUs;
+  homeEvidenceSampleUs_ = nowUs;
+
+  if (homeActive) {
+    const uint32_t remainingEvidenceUs =
+        kColumnValveHomeStableUs - homeActiveEvidenceUs_;
+    homeActiveEvidenceUs_ += evidenceElapsedUs < remainingEvidenceUs
+                                 ? evidenceElapsedUs
+                                 : remainingEvidenceUs;
+    return;
+  }
+
+  const uint32_t inactivePenaltyUs =
+      evidenceElapsedUs * kColumnValveHomeInactiveEvidencePenalty;
+  homeActiveEvidenceUs_ = inactivePenaltyUs < homeActiveEvidenceUs_
+                              ? homeActiveEvidenceUs_ - inactivePenaltyUs
+                              : 0;
 }
 
 bool ColumnBottomValveMotionController::pulseDue(uint32_t nowUs) const {

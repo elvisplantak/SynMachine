@@ -219,6 +219,48 @@ position was correct and D10 read `LOW`. Motor power was then physically
 switched off. The Mega is intentionally left on the commissioning firmware and
 must be restored to the production image before any Service-path test.
 
+### Production Column Service regression and D10 filtering — 2026-08-16
+
+After restoring production firmware, supervised Service-path testing confirmed
+that the powered D10 input remained noisy while the HOME lever was physically
+pressed. A bounded active-evidence filter allowed a motionless HOME request at
+the already pressed switch to complete with HTTP 200 without bypassing the HOME
+interlock. An initial release-filter revision still allowed D10 transitions to
+delay HOME-to-CLOSED movement by approximately 30 to 60 seconds, although that
+request eventually reached the correct CLOSED position and returned HTTP 200.
+
+The release path was then changed to use only the already confirmed mechanical
+facts: from trusted HOME it may move at most 889 pulses in DIR HIGH, away from
+HOME, without interpreting raw D10 transitions. At that CLOSED/release bound,
+STEP is held inactive and D10 must remain continuously LOW for 30 ms before
+positioning may complete or continue. A still-active or unresolved input fails
+closed without any motion beyond the 889-pulse bound.
+
+The flash-verified production build with that release behavior completed this
+supervised dry sequence through the backend/UI Service path:
+
+1. CLOSED to HOME, with correct travel and physical HOME-lever activation;
+2. HOME to CLOSED, starting immediately and reaching the confirmed position;
+3. CLOSED to the visually confirmed OPEN position;
+4. OPEN to HOME, stopping on physical HOME activation; and
+5. HOME to CLOSED, again starting immediately and parking correctly.
+
+Every command returned HTTP 200, UI controls were disabled only while its
+command was running, and the user reported normal direction, movement, stop,
+and final positions with no abnormal sound or impact.
+
+Read-only snapshots during the longer OPEN-to-HOME return also showed repeated
+false HOME candidates under motor power. The per-stage diagnostic counter reset
+after each rejected candidate, revealing that the nominal 80,000-pulse search
+limit was not cumulative. Firmware now keeps a separate whole-command HOME
+search counter, reports that cumulative value during HOME diagnostics, and
+times out exactly at 80,000 total pulses even across rejected candidates. The
+final build passed 183/183 warning-enabled native tests, used 39,394 bytes of
+flash and 3,079 bytes of static SRAM, and was uploaded and flash-verified with
+motor power off. No additional motion was performed after that accounting-only
+safety correction. The valve remains physically at the confirmed CLOSED
+position and the user confirmed motor power off.
+
 ### Confirmed `SF_BOTTOM_VALVE` actuator and connection — 2026-08-04
 
 The user explicitly confirmed that `SF_BOTTOM_VALVE` is actuated by a

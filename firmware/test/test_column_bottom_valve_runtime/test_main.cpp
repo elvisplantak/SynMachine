@@ -88,8 +88,13 @@ void test_home_waits_for_started_transport_and_completes_truthfully() {
   TEST_ASSERT_EQUAL_UINT32(0, ordinaryIo.directionWrites);
 
   columnIo.home = true;
-  runtime.update(101, cache);
-  runtime.update(101 + kColumnValveHomeStableUs, cache);
+  uint32_t now = 101;
+  runtime.update(now, cache);
+  for (uint32_t elapsedUs = 0; elapsedUs < kColumnValveHomeStableUs;
+       elapsedUs += 1000) {
+    now += 1000;
+    runtime.update(now, cache);
+  }
   const CommandStatusEntry* entry = cache.find(OPERATION);
   TEST_ASSERT_NOT_NULL(entry);
   TEST_ASSERT_EQUAL(CommandState::COMPLETED, entry->record.state);

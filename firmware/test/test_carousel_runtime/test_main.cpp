@@ -64,14 +64,20 @@ void closeColumn(ColumnBottomValveMotionController& column, ValveIo& io) {
   TEST_ASSERT_EQUAL(ColumnValvePrepareResult::READY, column.prepareHome());
   TEST_ASSERT_TRUE(column.start(0));
   io.home = true;
-  column.update(1);
-  TEST_ASSERT_EQUAL(ColumnValveMotionResult::COMPLETED,
-                    column.update(1 + kColumnValveHomeStableUs));
+  uint32_t now = 1;
+  column.update(now);
+  ColumnValveMotionResult result = ColumnValveMotionResult::NONE;
+  for (uint32_t elapsedUs = 0; elapsedUs < kColumnValveHomeStableUs;
+       elapsedUs += 1000) {
+    now += 1000;
+    result = column.update(now);
+  }
+  TEST_ASSERT_EQUAL(ColumnValveMotionResult::COMPLETED, result);
   TEST_ASSERT_EQUAL(ColumnValvePrepareResult::READY,
                     column.prepareSetPosition(4));
   TEST_ASSERT_TRUE(column.start(40000));
   io.home = false;
-  uint32_t now = 40000;
+  now = 40000;
   for (uint16_t i = 0; i < kColumnValveClosedSteps + 100 && column.busy(); ++i) {
     now += kColumnValveStepIntervalUs;
     column.update(now);
