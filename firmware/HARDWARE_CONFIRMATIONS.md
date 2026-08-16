@@ -1015,6 +1015,11 @@ STOP, and the final commanded state was stopped. This validates the complete
 production control path, but it does not establish calibrated RPM, mixing
 performance, torque, or sensor-confirmed rotation.
 
+A final UI regression then completed three consecutive START -> STOP cycles.
+All six durable commands completed without an error, the final command was
+STOP, and the user confirmed that every physical start and stop worked
+correctly.
+
 ### Recovered `Pump` API mismatch
 
 The recovered helper-method names appear semantically reversed for the confirmed P1 and P2 physical orientation:
