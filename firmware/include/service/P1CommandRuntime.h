@@ -6,6 +6,7 @@
 #include "actuator/P1MotionController.h"
 #include "actuator/CarouselMotionController.h"
 #include "actuator/ColumnBottomValveMotionController.h"
+#include "actuator/SfMixerMotionController.h"
 #include "actuator/ValveMotionController.h"
 #include "identity/BootIdentityStore.h"
 #include "protocol/CommandStatusCache.h"
@@ -35,6 +36,13 @@ class P1CommandRuntime {
                    uint8_t valveControllerCount,
                    ColumnBottomValveMotionController& columnValveController,
                    CarouselMotionController& carouselController);
+  P1CommandRuntime(P1MotionController& p1Controller,
+                   P1MotionController& p2Controller,
+                   ValveMotionController* const* valveControllers,
+                   uint8_t valveControllerCount,
+                   ColumnBottomValveMotionController& columnValveController,
+                   CarouselMotionController& carouselController,
+                   SfMixerMotionController& sfMixerController);
 
   DispatchResult dispatch(const uint8_t* payload, size_t length,
                           const BootIdentityResult& identity,
@@ -80,6 +88,7 @@ class P1CommandRuntime {
   void finishColumnValve(ColumnValveMotionResult result,
                          CommandStatusCache& cache);
   void finishCarousel(CarouselMotionResult result, CommandStatusCache& cache);
+  void finishSfMixer(SfMixerCommandResult result, CommandStatusCache& cache);
   void handleSessionReplacement(const char* newNonce);
   P1MotionController* controllerFor(PumpId pump);
   ValveMotionController* controllerFor(ValveId valve);
@@ -94,6 +103,8 @@ class P1CommandRuntime {
   ColumnBottomValveMotionController* activeColumnValveController_ = nullptr;
   CarouselMotionController* carouselController_ = nullptr;
   CarouselMotionController* activeCarouselController_ = nullptr;
+  SfMixerMotionController* sfMixerController_ = nullptr;
+  SfMixerMotionController* activeSfMixerController_ = nullptr;
   MessageParser parser_;
   NoMotionDispatcher protocolDispatcher_;
   RuntimeState runtimeState_ = RuntimeState::IDLE;

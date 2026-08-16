@@ -65,6 +65,7 @@ enum class CommandKind : uint8_t {
   COLUMN_BOTTOM_VALVE_SET_POSITION,
   CAROUSEL_SET_REFERENCE,
   CAROUSEL_MOVE_TO_POSITION,
+  SF_MIXER_SET_STATE,
 };
 enum class PumpId : uint8_t { NONE, P1, P2 };
 enum class ValveId : uint8_t { NONE, V1, V2, V3, V4, V5, V6, V7, V8 };
@@ -74,13 +75,14 @@ struct CommandSemanticIdentity {
       CommandKind commandValue = CommandKind::NONE,
       PumpId pumpValue = PumpId::NONE, uint16_t targetStepsValue = 0,
       ValveId valveValue = ValveId::NONE, uint16_t targetDegreesValue = 0,
-      uint8_t carouselPositionValue = 0)
+      uint8_t carouselPositionValue = 0, bool mixerRunningValue = false)
       : command(commandValue),
         pump(pumpValue),
         targetSteps(targetStepsValue),
         valve(valveValue),
         targetDegrees(targetDegreesValue),
-        carouselPosition(carouselPositionValue) {}
+        carouselPosition(carouselPositionValue),
+        mixerRunning(mixerRunningValue) {}
 
   CommandKind command;
   PumpId pump;
@@ -88,6 +90,7 @@ struct CommandSemanticIdentity {
   ValveId valve;
   uint16_t targetDegrees;
   uint8_t carouselPosition;
+  bool mixerRunning;
 };
 
 struct CommandStatusRecord {

@@ -8,6 +8,7 @@
 #include "protocol/ProtocolErrorWriter.h"
 #include "protocol/PumpHomeContract.h"
 #include "protocol/PumpMoveAbsoluteStepsContract.h"
+#include "protocol/SfMixerContract.h"
 #include "protocol/ValveHomeContract.h"
 #include "protocol/ValveSetPositionContract.h"
 
@@ -46,6 +47,12 @@ CommandErrorCode preflightError(ColumnValvePrepareResult result) {
 
 CommandErrorCode preflightError(CarouselPrepareResult result) {
   if (result == CarouselPrepareResult::BUSY)
+    return CommandErrorCode::CONTROLLER_BUSY;
+  return CommandErrorCode::INVALID_FIELD;
+}
+
+CommandErrorCode preflightError(SfMixerPrepareResult result) {
+  if (result == SfMixerPrepareResult::BUSY)
     return CommandErrorCode::CONTROLLER_BUSY;
   return CommandErrorCode::INVALID_FIELD;
 }
@@ -104,6 +111,22 @@ P1CommandRuntime::P1CommandRuntime(
       valveControllerCount_(valveControllerCount),
       columnValveController_(&columnValveController),
       carouselController_(&carouselController),
+      protocolDispatcher_(true, &columnValveController) {}
+
+P1CommandRuntime::P1CommandRuntime(
+    P1MotionController& p1Controller, P1MotionController& p2Controller,
+    ValveMotionController* const* valveControllers,
+    uint8_t valveControllerCount,
+    ColumnBottomValveMotionController& columnValveController,
+    CarouselMotionController& carouselController,
+    SfMixerMotionController& sfMixerController)
+    : p1Controller_(p1Controller),
+      p2Controller_(&p2Controller),
+      valveControllers_(valveControllers),
+      valveControllerCount_(valveControllerCount),
+      columnValveController_(&columnValveController),
+      carouselController_(&carouselController),
+      sfMixerController_(&sfMixerController),
       protocolDispatcher_(true, &columnValveController) {}
 
 P1CommandRuntime::P1CommandRuntime(
@@ -177,6 +200,8 @@ DispatchResult P1CommandRuntime::dispatchCommand(
   CarouselCommand carousel{};
   const CarouselContractStatus carouselStatus =
       parseCarousel(message, carousel);
+  SfMixerCommand sfMixer{};
+  const SfMixerContractStatus sfMixerStatus = parseSfMixer(message, sfMixer);
 
   CommandSemanticIdentity semantic{};
   P1PrepareResult prepared = P1PrepareResult::INVALID_TARGET;
@@ -192,6 +217,8 @@ DispatchResult P1CommandRuntime::dispatchCommand(
     semantic = semanticIdentity(columnValve);
   } else if (carouselStatus == CarouselContractStatus::VALID) {
     semantic = semanticIdentity(carousel);
+  } else if (sfMixerStatus == SfMixerContractStatus::VALID) {
+    semantic = semanticIdentity(sfMixer);
   } else {
     const bool supported =
         homeStatus != PumpHomeContractStatus::UNSUPPORTED_COMMAND ||
@@ -200,7 +227,8 @@ DispatchResult P1CommandRuntime::dispatchCommand(
         valvePositionStatus !=
             ValveSetPositionContractStatus::UNSUPPORTED_COMMAND ||
         columnValveStatus != ColumnValveContractStatus::UNSUPPORTED_COMMAND ||
-        carouselStatus != CarouselContractStatus::UNSUPPORTED_COMMAND;
+        carouselStatus != CarouselContractStatus::UNSUPPORTED_COMMAND ||
+        sfMixerStatus != SfMixerContractStatus::UNSUPPORTED_COMMAND;
     reject(message, identity, cache,
            supported ? CommandErrorCode::INVALID_FIELD
                      : CommandErrorCode::UNSUPPORTED_COMMAND,
@@ -234,10 +262,18 @@ DispatchResult P1CommandRuntime::dispatchCommand(
     return {ParseStatus::VALID_MESSAGE, outputLength};
   }
 
+  if (sfMixerController_ != nullptr && sfMixerController_->running() &&
+      semantic.command != CommandKind::SF_MIXER_SET_STATE) {
+    reject(message, identity, cache, CommandErrorCode::CONTROLLER_BUSY, output,
+           capacity, outputLength, &semantic);
+    return {ParseStatus::VALID_MESSAGE, outputLength};
+  }
+
   P1MotionController* selectedController = nullptr;
   ValveMotionController* selectedValveController = nullptr;
   ColumnBottomValveMotionController* selectedColumnValveController = nullptr;
   CarouselMotionController* selectedCarouselController = nullptr;
+  SfMixerMotionController* selectedSfMixerController = nullptr;
   if (semantic.command == CommandKind::PUMP_HOME ||
       semantic.command == CommandKind::PUMP_MOVE_ABSOLUTE_STEPS) {
     selectedController = controllerFor(semantic.pump);
@@ -292,7 +328,8 @@ DispatchResult P1CommandRuntime::dispatchCommand(
              capacity, outputLength, &semantic);
       return {ParseStatus::VALID_MESSAGE, outputLength};
     }
-  } else {
+  } else if (semantic.command == CommandKind::CAROUSEL_SET_REFERENCE ||
+             semantic.command == CommandKind::CAROUSEL_MOVE_TO_POSITION) {
     selectedCarouselController = carouselController_;
     if (selectedCarouselController == nullptr) {
       reject(message, identity, cache, CommandErrorCode::INVALID_FIELD, output,
@@ -320,6 +357,20 @@ DispatchResult P1CommandRuntime::dispatchCommand(
              capacity, outputLength, &semantic);
       return {ParseStatus::VALID_MESSAGE, outputLength};
     }
+  } else {
+    selectedSfMixerController = sfMixerController_;
+    if (selectedSfMixerController == nullptr) {
+      reject(message, identity, cache, CommandErrorCode::INVALID_FIELD, output,
+             capacity, outputLength, &semantic);
+      return {ParseStatus::VALID_MESSAGE, outputLength};
+    }
+    const SfMixerPrepareResult mixerPrepared =
+        selectedSfMixerController->prepareSetRunning(semantic.mixerRunning);
+    if (mixerPrepared != SfMixerPrepareResult::READY) {
+      reject(message, identity, cache, preflightError(mixerPrepared), output,
+             capacity, outputLength, &semantic);
+      return {ParseStatus::VALID_MESSAGE, outputLength};
+    }
   }
 
   if (!accept(message, semantic, identity, cache, output, capacity,
@@ -330,12 +381,15 @@ DispatchResult P1CommandRuntime::dispatchCommand(
       selectedColumnValveController->abort();
     if (selectedCarouselController != nullptr)
       selectedCarouselController->abort();
+    if (selectedSfMixerController != nullptr)
+      selectedSfMixerController->abort();
     outputLength = 0;
   } else {
     activeController_ = selectedController;
     activeValveController_ = selectedValveController;
     activeColumnValveController_ = selectedColumnValveController;
     activeCarouselController_ = selectedCarouselController;
+    activeSfMixerController_ = selectedSfMixerController;
   }
   return {ParseStatus::VALID_MESSAGE, outputLength};
 }
@@ -414,8 +468,10 @@ bool P1CommandRuntime::confirmStartedFrameWritten(uint32_t nowUs,
                                  ? activeValveController_->start(nowUs)
                                  : activeColumnValveController_ != nullptr
                                  ? activeColumnValveController_->start(nowUs)
-                                 : activeCarouselController_ != nullptr &&
-                                       activeCarouselController_->start(nowUs);
+                                 : activeCarouselController_ != nullptr
+                                 ? activeCarouselController_->start(nowUs)
+                                 : activeSfMixerController_ != nullptr &&
+                                       activeSfMixerController_->start(nowUs);
   if (!motionStarted)
     return false;
   runtimeState_ = RuntimeState::RUNNING;
@@ -429,6 +485,9 @@ bool P1CommandRuntime::startedFrameTransportFailed() {
 }
 
 void P1CommandRuntime::update(uint32_t nowUs, CommandStatusCache& cache) {
+  const SfMixerCommandResult mixerResult =
+      sfMixerController_ != nullptr ? sfMixerController_->update(nowUs)
+                                    : SfMixerCommandResult::NONE;
   if (runtimeState_ != RuntimeState::RUNNING) return;
   if (activeController_ != nullptr) {
     const P1MotionResult result = activeController_->update(nowUs);
@@ -445,7 +504,22 @@ void P1CommandRuntime::update(uint32_t nowUs, CommandStatusCache& cache) {
     const CarouselMotionResult result =
         activeCarouselController_->update(nowUs);
     if (result != CarouselMotionResult::NONE) finishCarousel(result, cache);
+  } else if (activeSfMixerController_ != nullptr &&
+             mixerResult != SfMixerCommandResult::NONE) {
+    finishSfMixer(mixerResult, cache);
   }
+}
+
+void P1CommandRuntime::finishSfMixer(SfMixerCommandResult result,
+                                     CommandStatusCache& cache) {
+  if (result != SfMixerCommandResult::COMPLETED) return;
+  activeRecord_.state = CommandState::COMPLETED;
+  if (cache.store(activeRecord_)) {
+    runtimeState_ = suppressUnsolicitedLifecycle_
+                        ? RuntimeState::IDLE
+                        : RuntimeState::EMIT_TERMINAL;
+  }
+  activeSfMixerController_ = nullptr;
 }
 
 void P1CommandRuntime::finishCarousel(CarouselMotionResult result,
@@ -539,8 +613,10 @@ bool P1CommandRuntime::abort(CommandStatusCache& cache) {
                            ? activeValveController_->abort()
                            : activeColumnValveController_ != nullptr
                            ? activeColumnValveController_->abort()
-                           : activeCarouselController_ != nullptr &&
-                                 activeCarouselController_->abort();
+                           : activeCarouselController_ != nullptr
+                           ? activeCarouselController_->abort()
+                           : activeSfMixerController_ != nullptr &&
+                                 activeSfMixerController_->abort();
   if (!aborted) return false;
   activeRecord_.state = CommandState::FAILED;
   activeRecord_.executionStarted = true;
@@ -553,6 +629,7 @@ bool P1CommandRuntime::abort(CommandStatusCache& cache) {
   activeValveController_ = nullptr;
   activeColumnValveController_ = nullptr;
   activeCarouselController_ = nullptr;
+  activeSfMixerController_ = nullptr;
   return true;
 }
 

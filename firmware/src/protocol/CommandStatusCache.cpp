@@ -64,39 +64,45 @@ bool validSemanticIdentity(const CommandSemanticIdentity& identity) {
   if (identity.command == CommandKind::PUMP_HOME)
     return (identity.pump == PumpId::P1 || identity.pump == PumpId::P2) &&
            identity.targetSteps == 0 && identity.valve == ValveId::NONE &&
-           identity.targetDegrees == 0 && identity.carouselPosition == 0;
+           identity.targetDegrees == 0 && identity.carouselPosition == 0 &&
+           !identity.mixerRunning;
   if (identity.command == CommandKind::PUMP_MOVE_ABSOLUTE_STEPS)
     return (identity.pump == PumpId::P1 || identity.pump == PumpId::P2) &&
            identity.targetSteps >= 1 &&
            identity.targetSteps <= kP1MaximumAbsoluteSteps &&
            identity.valve == ValveId::NONE && identity.targetDegrees == 0 &&
-           identity.carouselPosition == 0;
+           identity.carouselPosition == 0 && !identity.mixerRunning;
   const bool validValve = identity.valve >= ValveId::V1 &&
                           identity.valve <= ValveId::V8;
   if (identity.command == CommandKind::VALVE_HOME)
     return identity.pump == PumpId::NONE && identity.targetSteps == 0 &&
            validValve && identity.targetDegrees == 0 &&
-           identity.carouselPosition == 0;
+           identity.carouselPosition == 0 && !identity.mixerRunning;
   if (identity.command == CommandKind::VALVE_SET_POSITION)
     return identity.pump == PumpId::NONE && identity.targetSteps == 0 &&
            validValve && (identity.targetDegrees == 0 ||
                           identity.targetDegrees == 90 ||
                           identity.targetDegrees == 180) &&
-           identity.carouselPosition == 0;
+           identity.carouselPosition == 0 && !identity.mixerRunning;
   if (identity.command == CommandKind::COLUMN_BOTTOM_VALVE_HOME)
     return identity.pump == PumpId::NONE && identity.targetSteps == 0 &&
            identity.valve == ValveId::NONE && identity.targetDegrees == 0 &&
-           identity.carouselPosition == 0;
+           identity.carouselPosition == 0 && !identity.mixerRunning;
   if (identity.command == CommandKind::COLUMN_BOTTOM_VALVE_SET_POSITION)
     return identity.pump == PumpId::NONE && identity.targetSteps == 0 &&
            identity.valve == ValveId::NONE &&
            (identity.targetDegrees == 4 || identity.targetDegrees == 94) &&
+           identity.carouselPosition == 0 && !identity.mixerRunning;
+  if (identity.command == CommandKind::SF_MIXER_SET_STATE)
+    return identity.pump == PumpId::NONE && identity.targetSteps == 0 &&
+           identity.valve == ValveId::NONE && identity.targetDegrees == 0 &&
            identity.carouselPosition == 0;
   return (identity.command == CommandKind::CAROUSEL_SET_REFERENCE ||
           identity.command == CommandKind::CAROUSEL_MOVE_TO_POSITION) &&
          identity.pump == PumpId::NONE && identity.targetSteps == 0 &&
          identity.valve == ValveId::NONE && identity.targetDegrees == 0 &&
-         identity.carouselPosition >= 1 && identity.carouselPosition <= 40;
+         identity.carouselPosition >= 1 && identity.carouselPosition <= 40 &&
+         !identity.mixerRunning;
 }
 
 }  // namespace
@@ -131,7 +137,8 @@ bool commandSemanticIdentityEqual(const CommandSemanticIdentity& left,
   return left.command == right.command && left.pump == right.pump &&
          left.targetSteps == right.targetSteps && left.valve == right.valve &&
          left.targetDegrees == right.targetDegrees &&
-         left.carouselPosition == right.carouselPosition;
+         left.carouselPosition == right.carouselPosition &&
+         left.mixerRunning == right.mixerRunning;
 }
 
 bool commandLifecycleTransitionAllowed(CommandState from, CommandState to,

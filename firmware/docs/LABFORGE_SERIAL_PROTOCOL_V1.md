@@ -113,7 +113,7 @@ fields MUST be rejected in LABFORGE/1. Missing fields are protocol errors.
 | `command` | 1–32 uppercase ASCII bytes; only `A-Z`, `0-9`, `_` |
 | `error_code` | 1–40 uppercase ASCII bytes; only `A-Z`, `0-9`, `_` |
 | Human-readable `message` | Optional; at most 96 UTF-8 bytes |
-| Capability name | 1–32 uppercase ASCII bytes; at most 8 capabilities |
+| Capability name | 1–32 uppercase ASCII bytes; at most 9 capabilities |
 | `arguments` object | At most 8 members; keys are 1–24 ASCII bytes; scalar values only: string, signed 64-bit integer, or boolean; null and floating-point numbers are not allowed; strings at most 64 UTF-8 bytes; no nested object or array |
 | `result` object | Same structural bounds as `arguments`, except future command-specific schemas may explicitly permit selected null values |
 | Any other protocol collection | At most 8 entries unless its schema sets a smaller limit |
@@ -247,8 +247,9 @@ trusted production runtime emits its numeric boot ID, `controller_state`
 `"IDLE"` or `"BUSY"` according to the command cache,
 `software_state_trust:"TRUSTED"`, and capabilities
 `PUMP_HOME`, `PUMP_MOVE_ABSOLUTE_STEPS`, `VALVE_HOME`, and
-`VALVE_SET_POSITION`, the two column-bottom-valve commands, and
-`CAROUSEL_SET_REFERENCE` / `CAROUSEL_MOVE_TO_POSITION`. The protocol-only writer mode keeps
+`VALVE_SET_POSITION`, the two column-bottom-valve commands,
+`CAROUSEL_SET_REFERENCE` / `CAROUSEL_MOVE_TO_POSITION`, and
+`SF_MIXER_SET_STATE`. The protocol-only writer mode keeps
 the empty capability list used by its focused tests. An untrusted identity emits
 `controller_boot_id:null`,
 `controller_state:"IDENTITY_UNTRUSTED"`, and
@@ -358,6 +359,33 @@ Carousel movement is also rejected with
 state at the confirmed 4-degree CLOSED position. The backend still owns the
 close/move/reopen orchestration. Full timing and deferred hardware limitations
 are recorded in `docs/CAROUSEL_PRODUCTION_MOTION_DESIGN.md`.
+
+The approved SF mixer command is `SF_MIXER_SET_STATE`. Its `arguments` object
+contains exactly one boolean member, `running`. `true` commands the confirmed
+SF mixer STEP/DIR output to run; `false` commands it to stop. The command has no
+caller-supplied pin, direction, RPM, pulse rate, or duration.
+
+```json
+{"protocol":"LABFORGE/1","type":"COMMAND","backend_session_nonce":"123e4567-e89b-12d3-a456-426614174000","controller_boot_id":4294967295,"phase_execution_id":"phase-execution-1","operation_command_id":"323e4567-e89b-12d3-a456-426614174002","command":"SF_MIXER_SET_STATE","arguments":{"running":true}}
+```
+
+Boot initializes STEP inactive. The complete `STARTED` frame is handed to
+Serial before any mixer DIR or STEP side effect. Starting uses confirmed STEP
+D6, DIR D7, tested DIR logic low, 20 us STEP HIGH, 5 us direction setup, and a
+fixed 2,000 us rising-edge interval (500 pulses/s). `COMPLETED` means firmware
+applied the requested output state and, for a transition from stopped to
+running, emitted the first STEP pulse. It is not sensor evidence of rotation,
+RPM, torque, mixing, or fluid behavior. Repeating either requested state is a
+valid idempotent set-state command but remains a distinct physical command and
+must not be automatically retried after an ambiguous outcome.
+
+The fixed pulse rate is the bounded rate exercised during supervised pin
+commissioning; it is not a calibrated production mixing speed. While the mixer
+is commanded running, firmware rejects every other actuator command with
+`CONTROLLER_BUSY`, but accepts `SF_MIXER_SET_STATE` so an explicit Stop remains
+available. Session replacement follows the general LABFORGE/1 rule and does not
+alter mixer output. Controller reset/boot and explicit `running:false` leave
+STEP inactive.
 
 The second approved pump command schema is `PUMP_HOME`. Its `arguments` object
 contains exactly `pump:"P1"` or `pump:"P2"`; missing, additional, incorrectly
@@ -764,7 +792,7 @@ their mandatory minimal cached fields.
 | Message | Representative/worst-case bytes |
 |---|---:|
 | `HELLO` | 103 |
-| `HELLO_OK` | 225 |
+| `HELLO_OK` | 424 |
 | `COMMAND` with empty `arguments` | 329 |
 | `REJECTED` | 327 |
 | `ACCEPTED` | 288 |
@@ -815,7 +843,7 @@ The following remain unresolved and MUST NOT be inferred:
 - identity-recovery procedure after a fail-closed boot;
 - timeout durations and serial reconnect backoff;
 - backend safe-route orchestration before pump homing;
-- carousel position model and mixer command semantics;
+- SF mixer production speed/direction calibration and Reactor mixer semantics;
 - bottom-valve wiring and feedback;
 - emergency-stop hardware contract; and
 - whether physical sensors will be added.
@@ -876,6 +904,12 @@ the D8/D9 adapter, confirmed smooth 250-pulse-per-position controller profile,
 volatile manual-reference trust, and a trusted-CLOSED column interlock. Native
 verification is complete at this software checkpoint; firmware upload and
 physical execution through this production path remain separately gated.
+The dispatcher also includes the exact boolean `SF_MIXER_SET_STATE` contract,
+continuous non-catch-up D6/D7 stepping at the supervised commissioning rate,
+explicit Start/Stop lifecycle handling, and a firmware interlock that blocks
+other actuator commands while the SF mixer is commanded running. Native
+contract/controller/runtime verification is complete; production-path upload
+and physical execution remain separately gated.
 Fail-closed recovery and provisioning remain unresolved.
 No component is claimed to measure delivered volume or provide exactly-once
 physical execution.

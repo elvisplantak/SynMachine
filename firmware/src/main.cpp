@@ -6,6 +6,7 @@
 #include "arduino/ArduinoCarouselMotionIo.h"
 #include "arduino/ArduinoP1MotionIo.h"
 #include "arduino/ArduinoP2MotionIo.h"
+#include "arduino/ArduinoSfMixerMotionIo.h"
 #include "arduino/ArduinoValveMotionIo.h"
 #include "identity/ArduinoEepromStorage.h"
 #include "identity/BootIdentityStore.h"
@@ -54,9 +55,12 @@ labforge::ColumnBottomValveMotionController columnValveMotionController(
     columnValveMotionIo);
 labforge::ArduinoCarouselMotionIo carouselMotionIo;
 labforge::CarouselMotionController carouselMotionController(carouselMotionIo);
+labforge::ArduinoSfMixerMotionIo sfMixerMotionIo;
+labforge::SfMixerMotionController sfMixerMotionController(sfMixerMotionIo);
 labforge::P1CommandRuntime p1CommandRuntime(
     p1MotionController, p2MotionController, valveControllerPointers, 8,
-    columnValveMotionController, carouselMotionController);
+    columnValveMotionController, carouselMotionController,
+    sfMixerMotionController);
 uint8_t protocolOutputFrame[labforge::kCommandStatusFrameCapacity];
 labforge::CooperativeFrameTransport frameTransport;
 volatile labforge::ParseStatus lastParseStatus = labforge::ParseStatus::NO_FRAME;
@@ -99,6 +103,7 @@ void setup() {
   for (labforge::ArduinoValveMotionIo& io : valveMotionIo) io.begin();
   columnValveMotionIo.begin();
   carouselMotionIo.begin();
+  sfMixerMotionIo.begin();
   Serial.begin(labforge::kSerialBaud);
   bootIdentityResult = bootIdentityStore.initialize();
 }

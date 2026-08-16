@@ -449,7 +449,7 @@ void test_duplicate_identity_conflict_and_new_command_busy_are_rejected() {
   TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
 }
 
-void test_hello_advertises_integrated_pump_and_valve_capabilities() {
+void test_hello_advertises_all_integrated_actuator_capabilities() {
   FakeIo io;
   P1MotionController controller(io);
   P1CommandRuntime runtime(controller);
@@ -482,6 +482,8 @@ void test_hello_advertises_integrated_pump_and_valve_capabilities() {
                               "\"CAROUSEL_SET_REFERENCE\""));
   TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
                               "\"CAROUSEL_MOVE_TO_POSITION\""));
+  TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                              "\"SF_MIXER_SET_STATE\""));
 }
 
 void test_invalid_move_is_rejected_without_gpio_writes() {
@@ -608,7 +610,7 @@ int main(int, char**) {
   RUN_TEST(test_session_replacement_after_short_started_write_uses_new_nonce);
   RUN_TEST(test_running_command_reports_busy_and_abort_is_truthful);
   RUN_TEST(test_duplicate_identity_conflict_and_new_command_busy_are_rejected);
-  RUN_TEST(test_hello_advertises_integrated_pump_and_valve_capabilities);
+  RUN_TEST(test_hello_advertises_all_integrated_actuator_capabilities);
   RUN_TEST(test_invalid_move_is_rejected_without_gpio_writes);
   RUN_TEST(test_home_completion_is_cached_and_duplicate_only_replays);
   RUN_TEST(test_p2_command_selects_only_p2_controller);
