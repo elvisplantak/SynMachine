@@ -43,6 +43,13 @@
   V8 physical position is not trusted. The requested V1-V8 = 90 degrees and
   P1/P2 = 2,000-step parking was intentionally not performed because the P2
   Waste route depends on confirmed V8 = 90 degrees.
+- The user intentionally paused LabForge work until September 2026 and will
+  manually position any actuators needed for storage; no software parking is
+  pending. On resumption, keep V8 motion prohibited and first test its D2 HOME
+  signal without motor power by observing released `LOW` and manually pressed
+  `HIGH`. That test must precede any further V8 mechanical/driver diagnosis or
+  motion. No separate session handoff is required beyond this document,
+  firmware `HARDWARE_CONFIRMATIONS.md`, and the pushed repository history.
 
 ## Repository checkpoints
 
