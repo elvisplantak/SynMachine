@@ -6,11 +6,39 @@
 namespace labforge {
 namespace {
 
-constexpr PinDiscoveryPins kNoPins{0, 0};
-constexpr PinDiscoveryPins kPairAPins{34, 35};
-constexpr PinDiscoveryPins kPairBPins{36, 37};
+#ifndef LABFORGE_PIN_DISCOVERY_PAIR_A_STEP
+#define LABFORGE_PIN_DISCOVERY_PAIR_A_STEP 34
+#endif
 
-bool parsePulseCount(const char* command, uint8_t& count) {
+#ifndef LABFORGE_PIN_DISCOVERY_PAIR_A_DIRECTION
+#define LABFORGE_PIN_DISCOVERY_PAIR_A_DIRECTION 35
+#endif
+
+#ifndef LABFORGE_PIN_DISCOVERY_PAIR_B_STEP
+#define LABFORGE_PIN_DISCOVERY_PAIR_B_STEP 36
+#endif
+
+#ifndef LABFORGE_PIN_DISCOVERY_PAIR_B_DIRECTION
+#define LABFORGE_PIN_DISCOVERY_PAIR_B_DIRECTION 37
+#endif
+
+constexpr PinDiscoveryPins kNoPins{0, 0};
+constexpr PinDiscoveryPins kPairAPins{LABFORGE_PIN_DISCOVERY_PAIR_A_STEP,
+                                     LABFORGE_PIN_DISCOVERY_PAIR_A_DIRECTION};
+constexpr PinDiscoveryPins kPairBPins{LABFORGE_PIN_DISCOVERY_PAIR_B_STEP,
+                                     LABFORGE_PIN_DISCOVERY_PAIR_B_DIRECTION};
+
+static_assert(kPairAPins.step != kPairAPins.direction,
+              "Pair A STEP and DIR pins must differ");
+static_assert(kPairBPins.step != kPairBPins.direction,
+              "Pair B STEP and DIR pins must differ");
+static_assert(kPairAPins.step != kPairBPins.step &&
+                  kPairAPins.step != kPairBPins.direction &&
+                  kPairAPins.direction != kPairBPins.step &&
+                  kPairAPins.direction != kPairBPins.direction,
+              "Pin-discovery candidate pairs must not overlap");
+
+bool parsePulseCount(const char* command, uint16_t& count) {
   constexpr char prefix[] = "PULSE ";
   if (strncmp(command, prefix, sizeof(prefix) - 1) != 0) return false;
   const char* value = command + sizeof(prefix) - 1;
@@ -19,7 +47,7 @@ bool parsePulseCount(const char* command, uint8_t& count) {
   const long parsed = strtol(value, &end, 10);
   if (*end != '\0' || parsed < 1 || parsed > kPinDiscoveryMaximumPulses)
     return false;
-  count = static_cast<uint8_t>(parsed);
+  count = static_cast<uint16_t>(parsed);
   return true;
 }
 
@@ -79,7 +107,7 @@ PinDiscoveryResult PinDiscoveryController::process(const char* command) {
     return result(PinDiscoveryStatus::OK);
   }
 
-  uint8_t pulseCount = 0;
+  uint16_t pulseCount = 0;
   if (parsePulseCount(command, pulseCount)) {
     if (!armed_) return result(PinDiscoveryStatus::NOT_ARMED);
     const PinDiscoveryPins pins = pinsFor(selectedPair_);

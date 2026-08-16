@@ -4,7 +4,14 @@
 
 namespace labforge {
 
-constexpr uint8_t kPinDiscoveryMaximumPulses = 5;
+#ifndef LABFORGE_PIN_DISCOVERY_MAXIMUM_PULSES
+#define LABFORGE_PIN_DISCOVERY_MAXIMUM_PULSES 5
+#endif
+
+constexpr uint16_t kPinDiscoveryMaximumPulses =
+    LABFORGE_PIN_DISCOVERY_MAXIMUM_PULSES;
+static_assert(kPinDiscoveryMaximumPulses > 0,
+              "Pin discovery must allow at least one pulse");
 
 enum class PinDiscoveryPair : uint8_t { NONE, PAIR_A, PAIR_B };
 enum class PinDiscoveryDirection : uint8_t { UNSET, LOGIC_LOW, LOGIC_HIGH };
@@ -28,7 +35,7 @@ struct PinDiscoveryResult {
   PinDiscoveryAction action;
   PinDiscoveryPins pins;
   PinDiscoveryDirection direction;
-  uint8_t pulseCount;
+  uint16_t pulseCount;
 };
 
 class PinDiscoveryController {

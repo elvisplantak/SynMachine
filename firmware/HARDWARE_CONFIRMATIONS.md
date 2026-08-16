@@ -982,6 +982,31 @@ a manufacturer-limit validation.
 - No validated physical speed range exists yet.
 - No acceleration ramp or stall detection is currently confirmed.
 
+## Confirmed SF mixer STEP/DIR pair — 2026-08-16
+
+The user identified the connected SF mixer actuator as the same NEMA 17 motor
+type used for the valves and its driver as the same DM542T driver type. The
+Reactor mixer is not connected. The exact SF mixer motor model and driver
+current and microstep settings remain unconfirmed.
+
+The supervised discovery test exercised these candidates:
+
+- candidate A: STEP D4, DIR D5;
+- candidate B: STEP D6, DIR D7.
+
+Candidate A produced no physically observed motion during a 100-pulse burst.
+Candidate B, with DIR logic low, physically rotated the SF mixer during a
+500-pulse burst. The user directly confirmed the observed rotation. The SF
+mixer production pin pair is therefore confirmed as:
+
+- STEP D6;
+- DIR D7.
+
+The discovery burst used a 20 microsecond STEP-high time with 2 milliseconds
+between pulses. This confirms that the bounded electrical pulse rate produced
+motion; it does not yet establish the intended production mixing speed or the
+physical CW/CCW meaning of DIR logic low.
+
 ### Recovered `Pump` API mismatch
 
 The recovered helper-method names appear semantically reversed for the confirmed P1 and P2 physical orientation:

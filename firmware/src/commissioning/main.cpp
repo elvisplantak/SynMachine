@@ -9,8 +9,15 @@ namespace {
 constexpr unsigned long kSerialBaud = 115200;
 constexpr unsigned long kArmTimeoutMs = 10000;
 constexpr unsigned int kPulseHighUs = 20;
-constexpr unsigned long kPulseSpacingMs = 50;
+#ifndef LABFORGE_PIN_DISCOVERY_PULSE_SPACING_MS
+#define LABFORGE_PIN_DISCOVERY_PULSE_SPACING_MS 50
+#endif
+constexpr unsigned long kPulseSpacingMs =
+    LABFORGE_PIN_DISCOVERY_PULSE_SPACING_MS;
 constexpr size_t kInputCapacity = 24;
+
+static_assert(kPulseSpacingMs > 0,
+              "Pin-discovery pulse spacing must be nonzero");
 
 labforge::PinDiscoveryController controller;
 char input[kInputCapacity];
@@ -34,7 +41,7 @@ void emitPulses(const labforge::PinDiscoveryResult& result) {
   delay(5);
   pinMode(result.pins.step, OUTPUT);
   digitalWrite(result.pins.step, LOW);
-  for (uint8_t pulse = 0; pulse < result.pulseCount; ++pulse) {
+  for (uint16_t pulse = 0; pulse < result.pulseCount; ++pulse) {
     digitalWrite(result.pins.step, HIGH);
     delayMicroseconds(kPulseHighUs);
     digitalWrite(result.pins.step, LOW);
@@ -68,6 +75,17 @@ void printStatus(labforge::PinDiscoveryStatus status) {
   Serial.println(F("INTERNAL_ERROR"));
 }
 
+void printPair(const __FlashStringHelper* label,
+               labforge::PinDiscoveryPair pair) {
+  const labforge::PinDiscoveryPins pins =
+      labforge::PinDiscoveryController::pinsFor(pair);
+  Serial.print(label);
+  Serial.print(F(" STEP D"));
+  Serial.print(pins.step);
+  Serial.print(F(" DIR D"));
+  Serial.println(pins.direction);
+}
+
 void handleCommand() {
   input[inputLength] = '\0';
   const labforge::PinDiscoveryResult result = controller.process(input);
@@ -85,7 +103,11 @@ void handleCommand() {
 void setup() {
   Serial.begin(kSerialBaud);
   Serial.println(F("LABFORGE PIN DISCOVERY; OUTPUTS INACTIVE"));
-  Serial.println(F("SELECT A|B, DIR LOW|HIGH, ARM, PULSE 1..5, DISARM"));
+  printPair(F("PAIR A"), labforge::PinDiscoveryPair::PAIR_A);
+  printPair(F("PAIR B"), labforge::PinDiscoveryPair::PAIR_B);
+  Serial.print(F("SELECT A|B, DIR LOW|HIGH, ARM, PULSE 1.."));
+  Serial.print(labforge::kPinDiscoveryMaximumPulses);
+  Serial.println(F(", DISARM"));
 }
 
 void loop() {
