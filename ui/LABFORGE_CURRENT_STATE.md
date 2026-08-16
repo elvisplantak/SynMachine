@@ -16,6 +16,13 @@
   returned HTTP 200, UI controls were disabled only while commands ran, and the
   user reported normal direction, movement, stops, and sound. The valve is
   parked at confirmed CLOSED and motor power is physically off.
+- A final supervised regression on the production firmware after the cumulative
+  HOME-search accounting correction confirmed the restart boundary and motion
+  path. Four pre-HOME OPEN requests in controller boot session `58` failed
+  closed as `INVALID_FIELD` with `execution_started=false`; after HOME, the
+  `HOME -> OPEN -> CLOSED` sequence completed and the user physically confirmed
+  the test passed. The final production firmware is therefore physically
+  validated, including its mandatory fresh-HOME behavior after session change.
 - Powered D10 remains electrically noisy while the HOME lever is pressed. The
   Column-only bounded filter accumulates active evidence for HOME confirmation,
   fails unresolved mixed input after 250 ms, and never bypasses the interlock.
