@@ -1,10 +1,48 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-08-16
-- Development phase: P1, P2, V1-V8, Column, carousel, and SF mixer production
-  Serial/Service paths physically validated in supervised dry tests
+- Development phase: individual P1, P2, V1-V8, Column, carousel, Dynamixel,
+  and SF mixer production paths physically validated; end-to-end dry demo
+  currently blocked by a new V8 physical-drive fault
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
+
+## Immediate continuation checkpoint
+
+- Backend branch `codex/sf-mixer-service-integration` is at `668d7cd`. It now
+  consumes a correlated Column HOME diagnostic `STATUS` that arrives after the
+  command's `COMPLETED` lifecycle instead of leaving that response to poison
+  the following command. Ruff and the full backend suite pass (`1080/1080`). A
+  supervised production regression subsequently completed Column HOME followed
+  immediately by CLOSED at 4 degrees, confirming the observed race is fixed.
+- Firmware branch `codex/sf-mixer-service-integration` is at `0443837`. A pump
+  HOME search may now confirm an active HOME signal produced by the final
+  allowed 20,500th pulse without emitting a 20,501st pulse; a signal that drops
+  before the 30 ms stability interval still times out without overtravel. The
+  warning-enabled native suite passes `195/195`; the Mega build uses
+  `40,806 / 253,952` flash bytes and `3,140 / 8,192` static SRAM. This production
+  firmware is uploaded and flash-verified. The exact full-span physical
+  boundary regression remains pending because the later V8 fault stopped the
+  end-to-end run before pump transfers began.
+- Do not command V8 until its physical drive is diagnosed. During the latest
+  end-to-end attempt, V1-V7 homed normally, but V8 only oscillated/made an
+  abnormal sound in its confirmed HOME direction and timed out. A temporary
+  bounded diagnostic then observed D2 continuously LOW while HOME motion was
+  attempted. Twenty slow pulses in the direction away from HOME moved normally;
+  a five-times-slower HOME attempt still only oscillated and never reached the
+  switch. This is a physical V8 direction/load/coupling/phase fault, not evidence
+  that the backend retried a command. The temporary diagnostic firmware was
+  removed afterward.
+- Final safe state: production firmware `0443837` restored and flash-verified;
+  motor power physically off; backend and Serial monitor off. Firmware restart
+  makes all Arduino position trust volatile/untrusted. V1-V7 last had
+  controller-completed HOME targets, Column remained physically CLOSED at 4
+  degrees, P1 and P2 remained physically at HOME, carousel remained physically
+  aligned at tube 1, SF mixer remained stopped, and the Dynamixel SF bottom
+  valve remained CLOSED.
+  V8 physical position is not trusted. The requested V1-V8 = 90 degrees and
+  P1/P2 = 2,000-step parking was intentionally not performed because the P2
+  Waste route depends on confirmed V8 = 90 degrees.
 
 ## Repository checkpoints
 
