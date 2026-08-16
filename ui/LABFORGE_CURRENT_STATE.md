@@ -1,7 +1,7 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-08-15
-- Development phase: P1, P2, and V1-V8 production Serial/runtime paths physically validated in supervised dry tests
+- Checkpoint date: 2026-08-16
+- Development phase: P1, P2, V1-V8, and Column production Serial/Service paths physically validated in supervised dry tests
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
@@ -9,40 +9,28 @@
 
 ### UI
 
-- After installation of the replacement Column shaft/coupling pin, an isolated
-  backend-independent commissioning sequence physically reconfirmed D10 HIGH at
-  HOME with motor power off and on, the correct 889-pulse CLOSED position, and
-  smooth motion. Incremental bounded calibration established the visually
-  confirmed OPEN position at 23,850 pulses from CLOSED / 24,739 pulses from
-  HOME, superseding the old 20,889-pulse OPEN target. Production firmware
-  integration, full verification, restore/upload, and the final Service-path
-  HOME/CLOSED/OPEN regression remain in progress.
-- Production Column HOME diagnosis now has correlated read-only snapshots:
-  firmware `STATUS` reports raw D10, the Column motion state, and current-stage
-  pulse count, while the backend probes approximately every two seconds during
-  `COLUMN_BOTTOM_VALVE_HOME`, logs the snapshot, and continues waiting for the
-  original terminal lifecycle. The probes do not emit motion, alter trust, or
-  replace `COMPLETED`/`FAILED`. Firmware native tests pass `177/177`; the Mega
-  build uses `38,946 / 253,952` flash bytes and `3,063 / 8,192` static SRAM.
-  Backend tests pass `1075/1075` and Ruff is clean. Physical execution of this
-  instrumented build reached a motionless, physically pressed HOME but remained
-  pending; its snapshots were not visible because Uvicorn disabled the original
-  application logger. The request ended `OUTCOME_UNKNOWN` after the operator
-  physically removed motor power. A tested backend follow-up now routes each
-  snapshot and the last pre-failure snapshot through the enabled Uvicorn error
-  logger at warning level. The repeat result is recorded below.
-- The repeated instrumented production HOME test isolated the failure:
-  snapshots stayed at `CONFIRMING_HOME`, emitted `stage_steps=0`, and showed
-  mostly D10 HIGH with intermittent LOW samples while motor power was on. After
-  actual motor-power removal, the same request reached HTTP 200 / `COMPLETED`.
-  This rules out timeout and commanded travel as the cause and leaves D10
-  signal instability under powered conditions as the unresolved boundary.
-  The HOME interlock has not been bypassed. For safe session-end parking, the
-  flash-verified commissioning firmware moved exactly 889 DIR HIGH pulses from
-  HOME to physically confirmed CLOSED, ending with D10 LOW; the user then
-  physically switched motor power off. The Mega remains intentionally on the
-  commissioning image and production firmware restore/verification is the
-  mandatory first hardware step next session.
+- Production Column integration is physically validated through the backend/UI
+  Service path with the reassembled calibration (`CLOSED=889`, `OPEN=24,739`
+  pulses from HOME). The supervised sequence CLOSED -> HOME -> CLOSED -> OPEN ->
+  HOME -> CLOSED completed at the correct physical positions; every request
+  returned HTTP 200, UI controls were disabled only while commands ran, and the
+  user reported normal direction, movement, stops, and sound. The valve is
+  parked at confirmed CLOSED and motor power is physically off.
+- Powered D10 remains electrically noisy while the HOME lever is pressed. The
+  Column-only bounded filter accumulates active evidence for HOME confirmation,
+  fails unresolved mixed input after 250 ms, and never bypasses the interlock.
+  Movement away from trusted HOME ignores raw D10 transitions only for the
+  confirmed 889-pulse DIR HIGH release zone; STEP then remains inactive until
+  D10 is continuously LOW for 30 ms. This removed the observed 30-60 second
+  HOME-to-CLOSED delay while preserving a hard no-motion-beyond-CLOSED boundary
+  when release is not confirmed.
+- OPEN-to-HOME diagnostics exposed that rejected false HOME candidates reset the
+  former per-stage pulse counter. Firmware now maintains and reports a separate
+  cumulative HOME-search count, so the command times out at exactly 80,000 total
+  pulses across all candidate pauses. Warning-enabled native tests pass
+  `183/183`; the final Mega build uses `39,394 / 253,952` flash bytes and
+  `3,079 / 8,192` static SRAM and is uploaded and flash-verified. No physical
+  motion was performed after this accounting-only safety correction.
 - A supervised V1 regression smoke test after the host concurrency correction
   completed HOME and 90-degree positioning. A following Column HOME attempt is
   not a valid mechanical test because the shaft/coupling pin had been removed
