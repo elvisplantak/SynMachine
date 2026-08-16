@@ -810,8 +810,18 @@ body {
   opacity: 1;
 }
 
+.pumpServiceCard .serviceActionRow button:not(:disabled) {
+  color: #e3f2ff;
+  border-color: rgba(56, 189, 248, 0.55);
+  background: rgba(14, 116, 144, 0.22);
+  cursor: pointer;
+  opacity: 1;
+}
+
 .valveServiceCard .serviceActionRow button:not(:disabled):hover,
-.valveServiceCard .serviceActionRow button:not(:disabled):focus-visible {
+.valveServiceCard .serviceActionRow button:not(:disabled):focus-visible,
+.pumpServiceCard .serviceActionRow button:not(:disabled):hover,
+.pumpServiceCard .serviceActionRow button:not(:disabled):focus-visible {
   border-color: #38bdf8;
   background: rgba(14, 116, 144, 0.38);
 }
