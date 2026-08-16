@@ -248,6 +248,7 @@ class ArduinoSerialClient:
         )
         diagnostic_request_id: str | None = None
         last_column_diagnostic: Status | None = None
+        completed_command: ArduinoCommandResult | None = None
         while True:
             now = self._monotonic()
             remaining = deadline - now
@@ -304,6 +305,8 @@ class ArduinoSerialClient:
                 last_column_diagnostic = response
                 diagnostic_request_id = None
                 next_diagnostic_at = self._monotonic() + COLUMN_DIAGNOSTIC_INTERVAL_SECONDS
+                if completed_command is not None:
+                    return completed_command
                 continue
             if isinstance(response, ProtocolError):
                 raise ArduinoProtocolError(response.error_code)
@@ -335,9 +338,12 @@ class ArduinoSerialClient:
             if isinstance(response, Completed):
                 if not accepted or not started:
                     raise ArduinoProtocolError("COMPLETED arrived before STARTED")
-                return ArduinoCommandResult(
+                completed_command = ArduinoCommandResult(
                     result=dict(response.result), accepted=True, started=True
                 )
+                if diagnostic_request_id is None:
+                    return completed_command
+                continue
             if not accepted:
                 raise ArduinoProtocolError("FAILED arrived before ACCEPTED")
             if response.execution_started != started:

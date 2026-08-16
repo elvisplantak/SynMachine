@@ -173,6 +173,55 @@ def test_column_home_collects_read_only_diagnostics_while_waiting(
     ]
 
 
+def test_column_home_consumes_diagnostic_that_arrives_after_completion() -> None:
+    class LateDiagnosticPort(FakePort):
+        def write(self, data: bytes) -> int:
+            written = super().write(data)
+            if json.loads(data)["type"] == "QUERY_STATUS":
+                self.incoming.extend(
+                    lifecycle("COMPLETED", result={})
+                    + frame(
+                        type="STATUS",
+                        backend_session_nonce=str(NONCE),
+                        controller_boot_id=7,
+                        request_id=str(REQUEST_ID),
+                        controller_state="IDLE",
+                        software_state_trust="TRUSTED",
+                        active_operation_command_id=None,
+                        column_motion_state="IDLE",
+                        column_stage_steps=0,
+                        column_home_active=True,
+                    )
+                )
+            return written
+
+    port = LateDiagnosticPort(
+        hello_ok(capabilities=["COLUMN_BOTTOM_VALVE_HOME"])
+        + lifecycle("ACCEPTED")
+        + lifecycle("STARTED")
+    )
+    client = ArduinoSerialClient(
+        ArduinoSerialConfiguration(port="/dev/test", command_timeout_seconds=10.0),
+        port_factory=lambda _: port,
+        monotonic=Clock(step=0.1),
+        sleep=lambda _: None,
+        nonce_factory=lambda: NONCE,
+        request_id_factory=lambda: REQUEST_ID,
+    )
+    client.connect()
+
+    result = client.execute(
+        phase_execution_id="phase-1",
+        operation_command_id=OPERATION_ID,
+        command="COLUMN_BOTTOM_VALVE_HOME",
+        arguments={},
+    )
+
+    assert result.result == {}
+    assert not port.incoming
+    assert not client._pending_messages
+
+
 def test_handshake_waits_for_mega_reset_before_sending_hello() -> None:
     port = FakePort(hello_ok())
     sleeps: list[float] = []
