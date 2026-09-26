@@ -1,13 +1,56 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-08-16
-- Development phase: individual P1, P2, V1-V8, Column, carousel, Dynamixel,
-  and SF mixer production paths physically validated; end-to-end dry demo
-  currently blocked by a new V8 physical-drive fault
+- Checkpoint date: 2026-09-26
+- Development phase: offline backend command preparation implemented;
+  physical end-to-end demo remains blocked by damaged V8 motor wiring
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Immediate continuation checkpoint
+## Immediate continuation checkpoint — 2026-09-26
+
+- The user resumed development and authorized the backend bridge from existing
+  Guided Demo plans to Arduino commands, using tests without motors. No Serial
+  session, firmware upload, or physical test was performed or authorized.
+- Backend branch `codex/offline-command-planning`, commit
+  `0cc073b9e86e99767c81ab33c63c5649bf2a5e84` (base `668d7cd`), implements the
+  first offline command-preparation milestone in
+  `app/hardware/command_planning.py`. It translates existing P1/P2 transfer and
+  Column fraction-collection operations into immutable command specifications,
+  separate host SF actions, and Stop-aware collection waits. Protected required
+  closes and scheduler boundaries are preserved.
+- Preparation requires explicit positions/references, nominal calibration,
+  expected boot identity, and proposed route switching order. Route final targets
+  are derived from approved topology, not certified as physically safe. It rejects
+  unknown required state, mismatched pump/routes, fractional-step volumes,
+  out-of-range targets, and target zero; it never substitutes HOME for transfer.
+  It skips already-reached valve targets and maps carousel fractions from an
+  explicit tube reference, including 40-to-1 wrap.
+- Verification: 46 focused tests and 1126 complete backend tests pass; Ruff and
+  diff/whitespace checks pass. Only backend code and continuity documentation
+  changed; no UI build or firmware build was required.
+- Next software milestone: persist the whole immutable prepared plan, integrate
+  command/result execution under exclusive ownership, and test Stop, required
+  close failures, unknown outcomes, and restart handling before API activation.
+  Per-command IDs alone do not protect changed order/omissions; no actual runtime
+  adapter or API endpoint was enabled by this checkpoint. Full-span 20 ml transfer
+  and volume quantization require an explicit policy compatible with `1..20500`.
+- Independent review gate: inspect backend commit `0cc073b` against `668d7cd`,
+  focusing on route target derivation versus unverified switching order, pump
+  direction/endpoints, protected-action grouping, and identity/persistence
+  boundaries. Scope, approval, limitations, and evidence are in backend
+  `docs/OFFLINE_COMMAND_PLANNING.md`. Review is requested before runtime binding;
+  physical authorization is separate.
+- The user confirmed melted insulation at the V8 motor cable connection; repair
+  awaits replacement wiring. Heating/contact root cause is not proven. A reduced
+  current setting was recommended but neither application nor physical performance
+  is confirmed. Firmware documentation commit `01d2c11` on the matching branch
+  records this. V8 motion and P2 Waste-route homing remain blocked; the D2 manual
+  input test with motor power off remains pending.
+- Work is isolated in `/tmp/labforge-command-plan`,
+  `/tmp/labforge-ui-command-plan`, and `/tmp/labforge-firmware` worktrees. Original
+  checkouts and the two untracked backend runtime databases are preserved.
+
+## Previous physical checkpoint — 2026-08-16
 
 - Backend branch `codex/sf-mixer-service-integration` is at `668d7cd`. It now
   consumes a correlated Column HOME diagnostic `STATUS` that arrives after the
