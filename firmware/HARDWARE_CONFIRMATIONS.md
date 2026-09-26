@@ -1,5 +1,29 @@
 # Hardware confirmations
 
+## V8 damaged motor connection reported on resumption — 2026-09-26
+
+The user located melted insulation at the V8 motor cable connection and supplied
+photographs of that connection. The user confirmed it belongs to V8 and needs
+replacement wiring, which is not yet available. The failure is at the connection;
+its exact electrical/thermal cause has not been established. The user suspects
+an earlier period exceeding one hour with motor power on, but elapsed powered
+time alone is not a confirmed root cause. An intermittent/open motor-phase
+connection is consistent with the earlier oscillation, not proof of the entire
+fault mechanism or of an undamaged motor/driver.
+
+The user supplied a DM542T driver label and identified the motor using the
+17HS19-2004S1 product specification (2 A per phase). A lower setting of
+2.37 A peak / 1.69 A RMS (SW1 OFF, SW2 OFF, SW3 ON), retaining SW4 OFF,
+was recommended for that motor/driver pair only. Applying the setting has NOT
+been confirmed, and torque/temperature at that setting have NOT been tested.
+Do not propagate it to other actuators, the geared Column, or the carousel.
+
+V8 remains unavailable pending connection repair and supervised diagnosis/retest.
+The existing D2 manual HOME-input check with motor power off remains pending.
+The P2 Waste route remains unavailable while V8 position/operation is untrusted.
+The user authorized offline backend software development while awaiting wiring;
+no hardware command, firmware upload, or physical test is authorized by it.
+
 ## Confirmed present physical tubing topology — 2026-07-21
 
 The user explicitly confirmed that the physical tubing was connected according to the approved LabForge v1 target topology. This confirms the tubing connections only; it is not permission for hardware execution and does not confirm leak-tightness, valve actuation, liquid routing, calibration, firmware execution, or safety interlocks.
