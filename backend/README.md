@@ -54,3 +54,11 @@ uvicorn app.main:app --reload
 ```
 
 `GET /health` reports only backend application availability. It does not indicate hardware readiness.
+
+## Offline command preparation
+
+The backend can now lower existing transfer and fraction-collection operation
+plans into immutable Arduino command specifications and separate SF-valve/timer
+actions, without accessing hardware. See
+[the scope, assumptions, tests, and remaining runtime boundary](docs/OFFLINE_COMMAND_PLANNING.md).
+This is not connected to the application runtime or an execution endpoint.
