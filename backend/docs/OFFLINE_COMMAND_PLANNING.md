@@ -58,20 +58,31 @@ do not renumber the IDs of other valve actions.
 This is NOT durable exactly-once execution. Before connecting this output to the
 real executor, the next milestone must:
 
-1. Persist the complete immutable plan and assumptions before any physical action,
-   and reject reusing a phase identity with changed order, omissions, or input.
+1. Persist the validated source plan/envelope together with the prepared plan
+   and assumptions before any physical action (or a canonical identity covering
+   all three). Lowering loses source metadata, including cycle/fraction counts,
+   source phase, and topology: distinct source inputs can produce identical
+   prepared output. Reject reused phase identities with any changed source,
+   order, omissions, parameters, or assumptions; regression-test those cases.
 2. Establish/validate current references, physical readiness, route switching
    policy, and boot/session identity. Never promote these offline assumptions to
    trusted machine state or re-plan from projected positions after failure.
+   Runtime route switching must use backend-owned reviewed/approved sequences,
+   never arbitrary UI/API-supplied order. UI/last-known positions cannot establish
+   current boot/session reference trust, including for no-op skipping.
 3. Exclude interleaving Service/other actuator commands for the whole sequence,
-   including the independently connected SF Dynamixel valve.
+   including the independently connected SF Dynamixel valve, required follow-up,
+   Stop handling, and recovery/query of ambiguous Arduino outcomes.
 4. Persist each low-level intent before transmission and advance only after its
    correlated terminal COMPLETED result. Unknown outcomes must not be retried.
 5. Preserve required-follow-up and Stop semantics, including failure/unknown
    during a required close. A host SF action ID alone is not a durable Dynamixel
    journal; that integration remains required.
 6. Integrate the runner with the existing phase coordinator and API. This module
-   is deliberately not plugged into either one yet.
+   is deliberately not plugged into either one yet. Test definitive and unknown
+   primary/CLOSE failures, Stop during collection, restart between OPEN and CLOSE,
+   and carousel failure/unknown invalidating position and blocking the next
+   fraction. Validate generated firmware command semantics as well as framing.
 
 Physical V8 repair and retest, route validation, pump HOME boundary regression,
 wet calibration, Reactor mixer commissioning, and live UI integration remain
@@ -92,3 +103,24 @@ LABFORGE/1 parser acceptance including the maximum-length phase ID.
 Review this boundary before runtime integration, focusing on topology-derived
 final targets versus unverified switching order, pump endpoint/quantization
 rejection, protected-operation structure, and identity/whole-plan persistence.
+
+## Independent review follow-up — 2026-09-27
+
+Review of `0cc073b9e86e99767c81ab33c63c5649bf2a5e84` accepted the offline
+architecture and all eight nominal route target sets. The requested boot-ID
+restriction is adopted as a conservative planner policy: `1..UINT32_MAX-1`.
+Regression coverage rejects `UINT32_MAX`, still rejects zero and bool, and uses
+`UINT32_MAX-1` in the maximum-width frame test (still ten decimal digits).
+Verification: 47 focused tests and 1127 complete backend tests pass; Ruff and
+`git diff --check` pass. No UI, firmware, wire-contract, or runtime changes.
+
+Independent inspection found a nuance in the review rationale: firmware
+`BootIdentityStore::initialize()` rejects an already stored newest `UINT32_MAX`,
+but advancing a stored `UINT32_MAX-1` can return trusted `UINT32_MAX` for that
+boot after write/read-back verification. Protocol section 6 describes the
+exhausted newest record; section 8 also contains trusted MAX-valued examples.
+Thus the planner restriction is deliberately stricter than the current firmware
+output range, not a change to the wire contract or proof that firmware never
+issues MAX. Clarification of that boundary is deferred; firmware and protocol
+remain unchanged. The next-milestone requirements above incorporate the review's
+source-provenance, route-policy, and sequence-ownership findings.

@@ -110,7 +110,8 @@ class PumpPlanningState(PlanningModel):
 
 class CommandPlanningContext(PlanningModel):
     phase_execution_id: PhaseExecutionId
-    controller_boot_id: Annotated[StrictInt, Field(ge=1, le=UINT32_MAX)]
+    # Conservative planning boundary: exclude the boot-counter exhaustion value.
+    controller_boot_id: Annotated[StrictInt, Field(ge=1, le=UINT32_MAX - 1)]
     pumps: tuple[PumpPlanningState, ...] = ()
     valve_positions: tuple[ValveTarget, ...] = ()
     route_sequences: tuple[RouteSequence, ...] = ()

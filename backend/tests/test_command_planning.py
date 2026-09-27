@@ -42,6 +42,7 @@ from app.hardware.arduino_command_journal import (
     SQLiteArduinoCommandJournal,
 )
 from app.protocol import NdjsonStreamParser, ParseSuccess
+from app.protocol.models import UINT32_MAX
 from tests.test_p1_solvent_operation_plan import configuration
 
 # Explicit hypothetical switching order for unit tests; no production defaults.
@@ -347,6 +348,7 @@ def test_bad_sequence_does_not_invent_missing_operations():
     [
         {"controller_boot_id": 0},
         {"controller_boot_id": True},
+        {"controller_boot_id": UINT32_MAX},
         {"phase_execution_id": "bad/id"},
         {"carousel_position": 0},
         {"carousel_position": 41},
@@ -409,7 +411,7 @@ def test_prepared_actions_are_immutable():
 
 
 def test_all_generated_arduino_frames_pass_existing_protocol_parser():
-    ctx = context(phase_execution_id="x" * 64, controller_boot_id=2**32 - 1)
+    ctx = context(phase_execution_id="x" * 64, controller_boot_id=UINT32_MAX - 1)
     plans = [
         prepare_command_plan(transfer_plan(kind, ctx).operations, ctx)
         for kind in ("solvent", "first", "second", "reactor", "sf")
