@@ -28,6 +28,7 @@ from app.demo.operation_models import (
     SelectRouteOperation,
     SymbolicRouteId,
 )
+from app.hardware.provenance import reject_lost_keys
 from app.protocol.models import PhaseExecutionId, UINT32_MAX
 
 
@@ -40,6 +41,13 @@ ValveId = Literal["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8"]
 
 class PlanningModel(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def preserve_input_keys(cls, value, handler):
+        validated = handler(value)
+        reject_lost_keys(value, validated)
+        return validated
 
 
 class ValveTarget(PlanningModel):

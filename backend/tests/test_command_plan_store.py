@@ -423,3 +423,41 @@ def test_single_store_serializes_cross_thread_writers(tmp_path):
             results = list(pool.map(lambda _: store.persist(source(), context()), range(2)))
         assert sorted(result.created for result in results) == [False, True]
         assert results[0].plan == results[1].plan
+
+
+@pytest.mark.parametrize("location", ["plan", "operation", "calibration"])
+@pytest.mark.parametrize("json_input", [False, True])
+def test_raw_unknown_provenance_rejected_before_insert(tmp_path, location, json_input):
+    from app.hardware.command_planning import CommandPlanningContext
+
+    raw_source = source().model_dump(mode="json")
+    raw_context = context().model_dump(mode="json")
+    target = {
+        "plan": raw_source["plan"],
+        "operation": raw_source["plan"]["operations"][0],
+        "calibration": raw_context["pumps"][0]["calibration"],
+    }[location]
+    target["untracked_parameter"] = 42
+    with SQLiteCommandPlanStore(tmp_path / "plans.db") as store:
+        with pytest.raises(ValueError, match="lost information"):
+            if json_input:
+                src = PlanSource.model_validate_json(json.dumps(raw_source))
+                ctx = CommandPlanningContext.model_validate_json(json.dumps(raw_context))
+            else:
+                src = PlanSource(**raw_source)
+                ctx = CommandPlanningContext(**raw_context)
+            store.persist(src, ctx)
+        assert store.load("test-phase-1") is None
+
+
+def test_incompatible_table_rejected_without_repair(tmp_path):
+    path = tmp_path / "plans.db"
+    with sqlite3.connect(path) as db:
+        db.execute("CREATE TABLE prepared_command_plans (phase_execution_id TEXT PRIMARY KEY)")
+        db.execute("INSERT INTO prepared_command_plans VALUES ('existing')")
+    before = path.read_bytes()
+    with pytest.raises(PlanIntegrityError, match="schema"):
+        SQLiteCommandPlanStore(path)
+    assert path.read_bytes() == before
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT * FROM prepared_command_plans").fetchall() == [("existing",)]

@@ -59,8 +59,8 @@ plan remains a preparation artifact even if a different process loads it.
 
 ## Verification
 
-- 40 new store tests; 87 combined store/planner tests pass.
-- Complete backend suite: 1167 tests pass; Ruff and diff/whitespace checks pass.
+- 47 store tests; 94 combined store/planner tests pass.
+- Complete backend suite: 1174 tests pass; Ruff and diff/whitespace checks pass.
 - All transfer-source variants and Column collection round-trip across reopen.
 - A fresh subprocess loads the committed plan without opening Serial or changing
   the database. Another subprocess exits with an uncommitted transaction; its
@@ -94,3 +94,40 @@ Independent review focus: complete source provenance despite lossy lowering,
 canonical identity comparison and raw-value validation, SQLite atomicity/races,
 load-time corruption/compatibility rejection, and the separation between loaded
 preparations and permission to execute. No UI/firmware code changed.
+
+
+## Independent-review follow-up — 2026-09-27
+
+Review base: `92b5dc8712a19b5c032500e8361aacc7a93c7f0a`.
+Both findings were reproduced/confirmed from the implementation and accepted.
+
+- `PlanSource` and the offline `PlanningModel` boundary now use wrap validators
+  to compare recursively the incoming mapping/model keys with validated fields.
+  Unknown keys discarded by nested domain models raise validation errors during
+  ordinary construction or JSON validation, before persistence. The helper in
+  `app/hardware/provenance.py` is limited to these boundaries; unrelated domain
+  model behavior is unchanged. Existing model-copy revalidation remains active.
+- Raw external provenance must enter these boundaries before any lossy domain
+  conversion. No validator can recover fields already discarded by a caller's
+  earlier independent domain-model construction. Internally generated typed
+  domain plans remain supported.
+- Store opening validates the ordered table columns, declared types, NOT NULL,
+  and primary-key flags, rejecting incompatible layouts with `PlanIntegrityError`.
+  Missing row-column errors also normalize to that error. No migration or repair
+  is attempted. This is a layout check, not authentication of arbitrary SQLite
+  schema objects or protection against an external writer changing the database.
+- Six regression cases cover unknown plan/operation/calibration fields using
+  normal raw mappings and JSON. A seventh verifies incompatible table rejection
+  with existing rows and byte-for-byte unchanged database contents.
+
+Future runtime gates additionally include distinguishing absent plans from a
+wrong/missing database path or a newly created empty database. Recovery must not
+silently create an empty store and interpret it as evidence that no work exists.
+Required-follow-up tests must explicitly cover primary definitive failure and
+unknown outcome, Stop during CollectionWait, CLOSE failure and unknown outcome,
+restart between OPEN/CLOSE, and carousel failure/unknown with lost position trust.
+These are documented requirements only; no runtime integration is introduced.
+
+Focused review questions: does the raw envelope reject discarded nested keys
+for both mappings and JSON without broad domain changes, and does incompatible
+schema rejection leave existing storage untouched?

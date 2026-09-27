@@ -31,6 +31,7 @@ from app.hardware.command_planning import (
     PreparedCommandPlan,
     prepare_command_plan,
 )
+from app.hardware.provenance import reject_lost_keys
 from app.protocol.models import PhaseExecutionId
 
 SourcePlan = (
@@ -52,6 +53,13 @@ class PlanIntegrityError(RuntimeError):
 
 class PlanSource(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def preserve_input_keys(cls, value, handler):
+        validated = handler(value)
+        reject_lost_keys(value, validated)
+        return validated
 
     run_id: Annotated[StrictStr, Field(min_length=1, pattern=r"\S")]
     run_event_sequence: Annotated[StrictInt, Field(ge=0)]
@@ -184,6 +192,18 @@ class SQLiteCommandPlanStore:
         try:
             self._connection.execute("PRAGMA synchronous = FULL")
             self._connection.execute(_SCHEMA)
+            columns = self._connection.execute(
+                "PRAGMA table_info(prepared_command_plans)"
+            ).fetchall()
+            actual = [(c["name"], c["type"], c["notnull"], c["pk"]) for c in columns]
+            expected = [
+                ("phase_execution_id", "TEXT", 1, 1),
+                ("schema_version", "INTEGER", 1, 0),
+                ("payload_json", "TEXT", 1, 0),
+                ("payload_sha256", "TEXT", 1, 0),
+            ]
+            if actual != expected:
+                raise PlanIntegrityError("incompatible prepared command plan table schema")
         except Exception:
             self._connection.close()
             raise
@@ -266,5 +286,5 @@ class SQLiteCommandPlanStore:
             if plan.phase_execution_id != row["phase_execution_id"]:
                 raise ValueError("stored phase identity mismatch")
             return plan
-        except (ValueError, TypeError, KeyError) as error:
+        except (ValueError, TypeError, KeyError, IndexError) as error:
             raise PlanIntegrityError("stored command plan cannot be trusted") from error
