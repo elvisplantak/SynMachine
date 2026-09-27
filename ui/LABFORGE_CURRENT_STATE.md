@@ -1,12 +1,51 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-09-26
-- Development phase: offline backend command preparation implemented;
+- Checkpoint date: 2026-09-27
+- Development phase: offline command preparation and durable plan storage implemented;
   physical end-to-end demo remains blocked by damaged V8 motor wiring
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Immediate continuation checkpoint — 2026-09-26
+## Immediate continuation checkpoint — 2026-09-27
+
+- The user approved durable offline plan storage after the command-planner
+  review. Backend branch `codex/durable-command-plans` is at
+  `92b5dc8712a19b5c032500e8361aacc7a93c7f0a`, based on
+  `0ff0e3368ea93b046fea156765c0b93c35227944`. That base includes the independently
+  evaluated reviewer follow-up: the planner conservatively rejects the maximum
+  boot ID without claiming that current firmware cannot emit it.
+- `app/hardware/command_plan_store.py` stores the complete source plan, run/event
+  identity, prepared actions, and planning assumptions in an explicitly selected
+  SQLite database. Atomic insert-or-compare accepts an identical repeat and
+  rejects changed content under the same phase identity. It preserves source
+  metadata even when different sources compile to identical commands.
+- Loading validates schema, checksum, full source content, and compatibility
+  with the pure compiler. Corrupt or incompatible records fail closed, without
+  replacement or automatic execution. Persisted assumptions are historical
+  input, not renewed physical-position trust or permission to execute.
+- Verification: 40 new store tests, 87 combined store/compiler tests, and all
+  1167 backend tests pass. Ruff and diff/whitespace checks pass. Tests cover
+  independent-process restart, interrupted transaction rollback, concurrent
+  writers, source/assumption conflicts, malformed data, and compiler drift.
+- No API/startup integration, command dispatch, runtime ownership, physical
+  operation, or migration of existing runtime databases was introduced. UI and
+  firmware code are unchanged; no builds of those applications were required.
+- Next software milestone: a separately scoped runner with exclusive ownership
+  across Arduino, SF, and Service operations; durable per-command intent/results;
+  current-session validation; Stop and required-close handling; and explicit
+  unknown-outcome/restart tests using fake transports before API activation.
+  Bind the stored run/event identity to the actual lifecycle at that boundary.
+- This is an independent-review checkpoint for durable identity and restart
+  semantics. Review backend `92b5dc8` against `0ff0e33`; focused scope, approval,
+  verification, limitations, and questions are in `docs/DURABLE_COMMAND_PLANS.md`.
+- V8 wiring repair and the motor-off D2 input test remain pending. V8 movement
+  and P2 Waste-route homing remain blocked. No physical authorization is implied.
+- Active worktrees: backend `/tmp/labforge-review-20260927` and documentation
+  `/tmp/labforge-ui-durable-20260927`, both on `codex/durable-command-plans`.
+  Original checkouts and their untracked runtime databases are preserved.
+  Older worktree paths below are historical and may no longer exist.
+
+## Previous offline checkpoint — 2026-09-26
 
 - The user resumed development and authorized the backend bridge from existing
   Guided Demo plans to Arduino commands, using tests without motors. No Serial
