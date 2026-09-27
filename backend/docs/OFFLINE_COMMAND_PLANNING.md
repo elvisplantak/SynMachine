@@ -124,3 +124,11 @@ output range, not a change to the wire contract or proof that firmware never
 issues MAX. Clarification of that boundary is deferred; firmware and protocol
 remain unchanged. The next-milestone requirements above incorporate the review's
 source-provenance, route-policy, and sequence-ownership findings.
+
+## Durable preparation follow-up — 2026-09-27
+
+The separate `command_plan_store.py` milestone now persists validated source
+provenance, prepared output, and assumptions atomically without runtime activation.
+See [Durable offline command plans](DURABLE_COMMAND_PLANS.md) for the implemented
+identity/restart guarantees and the remaining execution boundary. The runtime
+requirements above continue to apply; saving a plan does not authorize execution.
