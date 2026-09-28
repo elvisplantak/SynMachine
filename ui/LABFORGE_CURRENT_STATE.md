@@ -1,7 +1,7 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-09-28
-- Development phase: stored P1 solvent phase execution verified in isolated simulation;
+- Development phase: stored P1 solvent and reagent phase execution verified in isolated simulation;
   physical end-to-end demo remains blocked by damaged V8 motor wiring
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
@@ -11,12 +11,12 @@
 - The user approved one P1 transfer phase through simulated devices, including
   durable command intents/results and interruption tests. Backend branch
   `codex/simulated-p1-execution` is at
-  `d0f39f4a4ce34a413ffc4bca6953699f7b4086f3`, based on
+  `2495d1fdfde4f306407cd4723a174acc39be36af`, based on
   `7ee5000f08238e7e7def2a681545b7a96eff88c7`. The prior persistence milestone
   and its two focused corrections were accepted by the independent reviewer
   with no remaining findings.
-- `app/hardware/simulated_p1_runner.py` executes only a complete stored P1
-  solvent-to-Reactor phase, using the existing durable Arduino command executor
+- `app/hardware/simulated_p1_runner.py` executes complete stored P1
+  solvent/B1/B2-to-Reactor phases, using the existing durable Arduino command executor
   with an explicitly simulated device. It preserves prepared identities/order,
   journals intent before send, and stops at operation boundaries.
 - Durable simulation ownership prevents interleaving or replay. Every incomplete
@@ -28,21 +28,24 @@
   attempt. Boot identity is checked before and after commands. No stored plan
   becomes real hardware trust. Caller run/event matching is not yet integrated
   with the actual application lifecycle.
-- Verification: 28 new tests; 134 combined runner/store/planner/durable-command
-  tests; all 1202 backend tests pass. Ruff and diff/whitespace checks pass.
+- Verification: 40 simulation tests; 146 combined runner/store/planner/durable-command
+  tests; all 1214 backend tests pass. Ruff and diff/whitespace checks pass.
   Fault coverage includes command rejection/failure/ambiguity, intent/result
   write failure, independent runners, abrupt subprocess exit, and session change
-  during the final command as well as earlier commands.
+  during the final command as well as earlier commands. Additional tests inject
+  failure/ambiguity at every P1 action slot and Stop during aspiration/dispense.
 - Important boundary: ownership currently covers this isolated simulation only.
   Production Service, SF, recovery and API paths are unchanged and not connected
-  to this runner. Required follow-ups, P2, reagent and collection phases are
+  to this runner. Required follow-ups, P2 and collection phases are
   rejected; no Serial session, upload or physical test occurred.
-- Next: review the sequence/restart boundary, then expand simulated execution
-  and bind actual lifecycle/shared ownership before any live activation. P2/SF
+- Next: continue simulated execution and bind actual lifecycle/shared ownership
+  before any live activation. Review will be consolidated after larger progress,
+  per the user's 2026-09-28 instruction; provide a copy-paste handoff then. P2/SF
   and collection require protected CLOSE, Stop and ambiguous-outcome tests.
   Approved runtime route order and fresh hardware trust remain prerequisites.
 - Reviewer scope/approval/evidence and concrete questions are in backend
-  `docs/SIMULATED_P1_EXECUTION.md`; compare `d0f39f4` against `7ee5000`.
+  `docs/SIMULATED_P1_EXECUTION.md`; current cumulative base is `7ee5000`, HEAD `2495d1f`.
+  No additional reviewer request is made for this P1 reagent extension.
 - Worktrees: `/tmp/labforge-p1-execution` (backend) and
   `/tmp/labforge-ui-p1-execution` (documentation), both on the new branch.
   Original checkouts and runtime databases are preserved. V8 wiring repair,

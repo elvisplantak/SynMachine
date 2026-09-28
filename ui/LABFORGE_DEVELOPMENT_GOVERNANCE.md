@@ -26,6 +26,14 @@ Codex may autonomously complete all safe, non-blocked software milestones
 inside that approved phase. It should not stop for review or approval after
 every file edit, test, correction, commit, or other mechanical step.
 
+User clarification on 2026-09-28: maximize independent progress and ask for
+permission only when necessary under the actual approval boundaries below.
+Codex decides whether to continue or request independent review; consolidate
+review after substantial cohesive progress instead of reviewing each small
+milestone. When review is warranted, provide the user a copy-paste handoff in
+the conversation, not only a link to a document. This does not authorize physical
+execution or other explicitly gated actions.
+
 Before entering a materially different or riskier phase, Codex recommends the
 next phase and obtains concise user approval. In particular, completing
 no-motion protocol foundations does not authorize actuator implementation,
