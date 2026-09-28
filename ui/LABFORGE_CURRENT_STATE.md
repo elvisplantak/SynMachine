@@ -1,12 +1,48 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-09-28
-- Development phase: stored P1 solvent and reagent phase execution verified in isolated simulation;
+- Development phase: P1/P2 and protected SF transfer execution verified in isolated simulation;
   physical end-to-end demo remains blocked by damaged V8 motor wiring
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Immediate continuation checkpoint — 2026-09-28
+## Immediate continuation checkpoint — 2026-09-28 (P2/SF)
+
+- Backend `codex/simulated-p1-execution` is at
+  `eca8fbd4a9d8a9a7d165b35109234522beca8ae1`; immediate base `2495d1f`,
+  consolidated review base `7ee5000` (accepted durable-plan checkpoint).
+- The user authorized continued offline work with fewer consolidated reviews.
+  All P1 variants plus P2 Reactor-to-SF and SF-to-Column now execute through the
+  explicit simulated device. Historical P1 class names remain compatible;
+  `SimulatedTransferRunner`/`SimulatedTransferDevice` aliases expose the broader
+  scope in `app/hardware/simulated_p1_runner.py`.
+- SF commands have their own durable intent/outcome table and independently
+  checked simulated session. Arduino and SF share the simulation sequence owner.
+  Required CLOSE runs after ordinary primary failure, preserves both errors when
+  both fail, and never turns an unknown primary outcome into success. Stop waits
+  until the protected operation ends. No later route/dispense begins after error.
+- Restart after process death between OPEN and CLOSE neither resumes nor sends
+  automatic CLOSE. The durable owner remains blocked. Missing/wrong database
+  identity is not treated as an absent plan. Old simulation databases without
+  the new SF table are rejected without migration; use a new explicit test store.
+- Verification: 59 simulation cases (21 new SF/P2 cases), 165 combined focused
+  tests, 1233 complete backend tests; Ruff and diff/whitespace checks pass.
+  Fault coverage includes all nine primary/CLOSE result combinations, SF write
+  failures, OPEN failure, initial SF failure with required Column CLOSE, session
+  changes, competing runner during CLOSE, and subprocess death after OPEN.
+- This is the consolidated independent-review gate after P1 and P2/SF work.
+  Provide a copy-paste handoff; focus and boundaries are in backend
+  `docs/SIMULATED_TRANSFER_EXECUTION.md`. Review `7ee5000..eca8fbd`.
+- Next: simulated Column collection wait/Stop/CLOSE and carousel trust-loss
+  handling, followed by actual lifecycle and shared production ownership binding.
+  The current owner covers only simulation, not production Service/SF/API paths.
+  Collection is still rejected. No physical safety or route approval is inferred.
+- Worktrees remain `/tmp/labforge-p1-execution` and `/tmp/labforge-ui-p1-execution`.
+  Original databases/checkouts are preserved. No Serial/Dynamixel session,
+  firmware upload or physical test occurred. V8 repair, motor-off D2 test and
+  P2 Waste-route restrictions remain pending.
+
+## Previous P1 checkpoint — 2026-09-28
 
 - The user approved one P1 transfer phase through simulated devices, including
   durable command intents/results and interruption tests. Backend branch
