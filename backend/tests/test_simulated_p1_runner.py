@@ -147,7 +147,7 @@ def test_stop_before_first_operation_sends_nothing(tmp_path):
         runner.close()
 
 
-@pytest.mark.parametrize("kind", ["reactor", "sf", "column"])
+@pytest.mark.parametrize("kind", ["column"])
 def test_other_phases_rejected_before_claim(tmp_path, kind):
     path, identity, _, device = setup(tmp_path, kind)
     runner = SimulatedP1Runner(path, identity, device)

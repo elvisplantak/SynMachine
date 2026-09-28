@@ -1,4 +1,4 @@
-"""Offline-only P1 sequence harness. Never constructed by application startup."""
+"""Offline-only P1/P2 transfer harness. Never constructed by application startup."""
 
 from collections.abc import Callable
 from pathlib import Path
@@ -6,6 +6,10 @@ import sqlite3
 from threading import RLock
 from uuid import uuid4
 
+from app.demo.p2_reactor_to_sf_operation_plan import P2ReactorToSfOperationPlan
+from app.demo.p2_sf_to_column_operation_plan import P2SfToColumnOperationPlan
+from app.demo.operation_executor import ProtectedOperationError, _execute_with_required_followup
+from app.demo.hardware_contract import BottomValveState
 from app.demo.p1_reagent_operation_plan import P1ReagentToReactorOperationPlan
 from app.demo.p1_solvent_operation_plan import P1SolventToReactorOperationPlan
 from app.hardware.arduino_command_journal import (
@@ -19,7 +23,7 @@ from app.hardware.arduino_serial import (
     ArduinoUnavailableError,
 )
 from app.hardware.command_plan_store import SQLiteCommandPlanStore
-from app.hardware.command_planning import ArduinoAction, CommandPlanningContext
+from app.hardware.command_planning import ArduinoAction, CommandPlanningContext, SfBottomValveAction
 from app.hardware.durable_arduino import DurableArduinoCommandExecutor
 
 
@@ -40,17 +44,29 @@ class SimulatedP1Device:
         self.calls: list[dict] = []
         self.before_send: Callable[[dict], None] = lambda _: None
         self.used = False
+        self.sf_session_id = str(uuid4())
+        self.sf_calls: list[dict] = []
+        self.before_sf_send: Callable[[dict], None] = lambda _: None
 
     def execute(self, **values) -> ArduinoCommandResult:
         self.before_send(values)
         self.calls.append(values)
         return ArduinoCommandResult(result={}, accepted=True, started=True)
 
+    def execute_sf(self, **values) -> None:
+        self.before_sf_send(values)
+        self.sf_calls.append(values)
+
 
 _SCHEMA = """
 CREATE TABLE simulation_identity (id TEXT NOT NULL);
 CREATE TABLE simulation_owner (slot INTEGER PRIMARY KEY CHECK(slot=1), phase_id TEXT);
 INSERT INTO simulation_owner VALUES (1, NULL);
+CREATE TABLE simulation_sf_actions (
+ action_id TEXT PRIMARY KEY, phase_id TEXT NOT NULL, session_id TEXT NOT NULL,
+ target TEXT NOT NULL CHECK(target IN ('OPEN', 'CLOSED')),
+ state TEXT NOT NULL, error TEXT
+);
 CREATE TABLE simulation_phases (
  phase_id TEXT PRIMARY KEY, state TEXT NOT NULL,
  completed_operations INTEGER NOT NULL DEFAULT 0
@@ -83,6 +99,7 @@ class SimulatedP1Runner:
             raise TypeError("only the explicit simulated device is supported")
         self._lock = RLock()
         self.device = device
+        self._sf_session = device.sf_session_id
         self._db = sqlite3.connect(
             database.resolve().as_uri() + "?mode=rw",
             uri=True,
@@ -101,6 +118,7 @@ class SimulatedP1Runner:
                 not {
                     "simulation_owner",
                     "simulation_phases",
+                    "simulation_sf_actions",
                     "prepared_command_plans",
                     "arduino_command_journal",
                 }
@@ -143,6 +161,10 @@ class SimulatedP1Runner:
                 (phase_id,),
             ).fetchone():
                 raise SimulationBlocked("existing command intent requires investigation")
+            if self._db.execute(
+                "SELECT 1 FROM simulation_sf_actions WHERE phase_id=? LIMIT 1", (phase_id,)
+            ).fetchone():
+                raise SimulationBlocked("existing SF intent requires investigation")
             self._db.execute("INSERT INTO simulation_phases VALUES (?, 'RUNNING', 0)", (phase_id,))
             self._db.execute("UPDATE simulation_owner SET phase_id=? WHERE slot=1", (phase_id,))
             self._db.execute("COMMIT")
@@ -165,6 +187,63 @@ class SimulatedP1Runner:
             self._db.execute("ROLLBACK")
             raise
 
+    def _execute_sf(self, phase_id: str, action: SfBottomValveAction):
+        if self.device.sf_session_id != self._sf_session:
+            raise ArduinoUnavailableError("simulated SF session changed")
+        # An existing identity is never reissued, even if it previously completed.
+        self._db.execute(
+            "INSERT INTO simulation_sf_actions VALUES (?, ?, ?, ?, 'INTENT_PERSISTED', NULL)",
+            (action.operation_command_id, phase_id, self._sf_session, action.state.value),
+        )
+        try:
+            self.device.execute_sf(
+                phase_execution_id=phase_id,
+                operation_command_id=action.operation_command_id,
+                state=action.state.value,
+            )
+            if self.device.sf_session_id != self._sf_session:
+                raise ArduinoUnavailableError("simulated SF session changed during command")
+        except Exception as error:
+            state = (
+                "FAILED"
+                if isinstance(error, (ArduinoCommandFailedError, ArduinoCommandRejectedError))
+                else "OUTCOME_UNKNOWN"
+            )
+            self._db.execute(
+                "UPDATE simulation_sf_actions SET state=?, error=? WHERE action_id=?",
+                (state, str(error), action.operation_command_id),
+            )
+            raise
+        self._db.execute(
+            "UPDATE simulation_sf_actions SET state='COMPLETED' WHERE action_id=?",
+            (action.operation_command_id,),
+        )
+
+    def _execute_action(self, phase_id, action, expected_boot):
+        if isinstance(action, SfBottomValveAction):
+            self._execute_sf(phase_id, action)
+            return
+        if self.device.controller_boot_id != expected_boot:
+            raise ArduinoUnavailableError("controller session changed")
+        result = self._executor.execute(
+            phase_execution_id=phase_id,
+            operation_command_id=action.operation_command_id,
+            command=action.command,
+            arguments=dict(action.arguments),
+        )
+        if self.device.controller_boot_id != expected_boot:
+            raise ArduinoUnavailableError("controller session changed during command")
+        if result.state is not ArduinoCommandJournalState.COMPLETED:
+            raise SimulationBlocked("command did not complete")
+
+    @staticmethod
+    def _definitive(error):
+        if isinstance(error, ProtectedOperationError):
+            return SimulatedP1Runner._definitive(
+                error.primary_error
+            ) and SimulatedP1Runner._definitive(error.followup_error)
+        return isinstance(error, (ArduinoCommandFailedError, ArduinoCommandRejectedError))
+
     def run(
         self,
         phase_id: str,
@@ -180,15 +259,23 @@ class SimulatedP1Runner:
             if type(plan.source.plan) not in (
                 P1SolventToReactorOperationPlan,
                 P1ReagentToReactorOperationPlan,
+                P2ReactorToSfOperationPlan,
+                P2SfToColumnOperationPlan,
             ):
-                raise SimulationBlocked("only P1 transfer phases are supported")
+                raise SimulationBlocked("only P1/P2 transfer phases are supported")
             if plan.source.run_id != run_id or plan.source.run_event_sequence != run_event_sequence:
                 raise SimulationBlocked("source lifecycle identity mismatch")
             if self.device.used or self.device.current != plan.prepared.assumptions:
                 raise SimulationBlocked("independent simulation state does not match assumptions")
             for operation in plan.prepared.operations:
-                if operation.required_followup or any(
-                    type(a) is not ArduinoAction for a in operation.actions
+                if any(
+                    type(a) not in (ArduinoAction, SfBottomValveAction)
+                    for a in (*operation.actions, *operation.required_followup)
+                ):
+                    raise SimulationBlocked("unsupported operation or follow-up")
+                if any(
+                    isinstance(a, SfBottomValveAction) and a.state is not BottomValveState.CLOSED
+                    for a in operation.required_followup
                 ):
                     raise SimulationBlocked("unsupported operation or follow-up")
             if self.device.controller_boot_id != plan.prepared.assumptions.controller_boot_id:
@@ -202,38 +289,34 @@ class SimulatedP1Runner:
                     if stop_requested():
                         state = "STOPPED"
                         break
-                    for action in operation.actions:
-                        if (
-                            self.device.controller_boot_id
-                            != plan.prepared.assumptions.controller_boot_id
-                        ):
-                            raise ArduinoUnavailableError("controller session changed")
-                        result = self._executor.execute(
-                            phase_execution_id=phase_id,
-                            operation_command_id=action.operation_command_id,
-                            command=action.command,
-                            arguments=dict(action.arguments),
-                        )
-                        if (
-                            self.device.controller_boot_id
-                            != plan.prepared.assumptions.controller_boot_id
-                        ):
-                            raise ArduinoUnavailableError(
-                                "controller session changed during command"
+
+                    def primary():
+                        for action in operation.actions:
+                            self._execute_action(
+                                phase_id, action, plan.prepared.assumptions.controller_boot_id
                             )
-                        if result.state is not ArduinoCommandJournalState.COMPLETED:
-                            raise SimulationBlocked("command did not complete")
+
+                    def followup():
+                        for action in operation.required_followup:
+                            self._execute_action(
+                                phase_id, action, plan.prepared.assumptions.controller_boot_id
+                            )
+
+                    _execute_with_required_followup(primary, followup)
                     completed += 1
                     self._db.execute(
                         "UPDATE simulation_phases SET completed_operations=? WHERE phase_id=?",
                         (completed, phase_id),
                     )
-            except (ArduinoCommandFailedError, ArduinoCommandRejectedError):
-                self._finish(phase_id, "FAILED", completed)
-                raise
-            except BaseException:
-                # Includes failure between send and result persistence. Never resume.
-                self._finish(phase_id, "OUTCOME_UNKNOWN", completed)
+            except BaseException as error:
+                # Successful CLOSE never resolves an uncertain primary action.
+                outcome = "FAILED" if self._definitive(error) else "OUTCOME_UNKNOWN"
+                self._finish(phase_id, outcome, completed)
                 raise
             self._finish(phase_id, state, completed)
             return state, completed
+
+
+# Historical P1 names remain compatible for existing offline callers.
+SimulatedTransferDevice = SimulatedP1Device
+SimulatedTransferRunner = SimulatedP1Runner

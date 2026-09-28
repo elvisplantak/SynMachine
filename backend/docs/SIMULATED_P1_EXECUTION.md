@@ -1,5 +1,8 @@
 # Simulated P1 sequence execution
 
+Historical P1 checkpoint. The current P2/SF continuation and cumulative review
+scope are in [SIMULATED_TRANSFER_EXECUTION.md](SIMULATED_TRANSFER_EXECUTION.md).
+
 Approved on 2026-09-28: execute one stored P1 solvent-to-Reactor phase through
 simulated devices, with exclusive sequence ownership, durable per-command intent
 and outcomes, Stop boundaries, and interruption tests. Base:
