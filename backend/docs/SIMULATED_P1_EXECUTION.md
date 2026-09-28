@@ -12,7 +12,7 @@ That persistence checkpoint was independently accepted with no remaining finding
 only `SimulatedP1Device`, not a live transport or Serial client. Nothing constructs
 it at application startup, and no API, Service, firmware or hardware path changes.
 It loads the whole validated stored plan and accepts only
-`P1SolventToReactorOperationPlan`; reagent, P2, SF, collection and required-followup
+`P1SolventToReactorOperationPlan` and `P1ReagentToReactorOperationPlan`; P2, SF, collection and required-followup
 operations are rejected before acquiring ownership. No implicit HOME is added.
 
 The harness uses the existing `DurableArduinoCommandExecutor` and
@@ -65,8 +65,8 @@ phase outcome cannot be persisted, the durable RUNNING owner still blocks replay
 
 ## Verification and remaining gates
 
-- 28 new simulation tests; 134 combined runner/store/planner/durable-command tests.
-- Full backend suite: 1202 tests pass; Ruff and whitespace checks pass.
+- 40 simulation tests; 146 combined runner/store/planner/durable-command tests.
+- Full backend suite: 1214 tests pass; Ruff and whitespace checks pass.
 - Tests assert exact command order/arguments and committed intent visibility from
   another connection before sending, normal completion, no replay after completion,
   Stop before first action and after an atomic multi-action route, rejection/failure,
@@ -94,3 +94,22 @@ phase cannot resend or continue, independent runners cannot interleave, Stop
 respects operation boundaries, and invalid database identity cannot become an
 empty-history recovery decision. Also check that simulation guarantees are not
 mistaken for production-wide ownership or hardware readiness.
+
+
+## P1 reagent extension and review cadence — 2026-09-28
+
+The user requested continued autonomous software work and less frequent,
+consolidated independent reviews. The P1 harness now accepts the existing B1/B2
+reagent plans as well as solvent, without changing calibration, route targets,
+command identities or the execution/journaling algorithm. All three P1 source
+variants pass exact-order and durable-intent tests. A fault matrix exercises
+both definitive failure and ambiguous outcome at every action slot, verifying
+the completed-operation prefix, absence of later intents, and no resend on reopen.
+Stop tests cover aspiration and dispense for all three variants; a Stop arriving
+in the final operation yields a fully completed phase after that operation ends.
+
+This is a continuation of the same simulated P1 boundary, not a new independent
+review request. Consolidate review with a larger sequence/follow-up milestone.
+When review is warranted, supply the user a copy-paste handoff with pinned base
+and HEAD. Production lifecycle/shared ownership and SF/required-close integration
+remain unimplemented gates, as described above.

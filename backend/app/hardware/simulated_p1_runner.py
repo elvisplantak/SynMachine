@@ -6,6 +6,7 @@ import sqlite3
 from threading import RLock
 from uuid import uuid4
 
+from app.demo.p1_reagent_operation_plan import P1ReagentToReactorOperationPlan
 from app.demo.p1_solvent_operation_plan import P1SolventToReactorOperationPlan
 from app.hardware.arduino_command_journal import (
     ArduinoCommandJournalState,
@@ -176,8 +177,11 @@ class SimulatedP1Runner:
             plan = self._plans.load(phase_id)
             if plan is None:
                 raise SimulationBlocked("stored plan is absent in the verified database")
-            if type(plan.source.plan) is not P1SolventToReactorOperationPlan:
-                raise SimulationBlocked("only P1 solvent transfer is supported")
+            if type(plan.source.plan) not in (
+                P1SolventToReactorOperationPlan,
+                P1ReagentToReactorOperationPlan,
+            ):
+                raise SimulationBlocked("only P1 transfer phases are supported")
             if plan.source.run_id != run_id or plan.source.run_event_sequence != run_event_sequence:
                 raise SimulationBlocked("source lifecycle identity mismatch")
             if self.device.used or self.device.current != plan.prepared.assumptions:

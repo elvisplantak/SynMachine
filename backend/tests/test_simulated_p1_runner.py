@@ -41,11 +41,12 @@ def run(runner, **changes):
     return runner.run("test-phase-1", **values)
 
 
-def test_whole_phase_order_and_intents_before_send(tmp_path, monkeypatch):
+@pytest.mark.parametrize("kind", ["solvent", "first", "second"])
+def test_whole_phase_order_and_intents_before_send(tmp_path, monkeypatch, kind):
     import serial
 
     monkeypatch.setattr(serial, "Serial", lambda *a, **k: pytest.fail("Serial opened"))
-    path, identity, plan, device = setup(tmp_path)
+    path, identity, plan, device = setup(tmp_path, kind)
     runner = SimulatedP1Runner(path, identity, device)
 
     def verify(values):
@@ -63,6 +64,13 @@ def test_whole_phase_order_and_intents_before_send(tmp_path, monkeypatch):
             a.operation_command_id for a in expected
         ]
         assert [c["arguments"] for c in device.calls] == [dict(a.arguments) for a in expected]
+        if kind in ("first", "second"):
+            v4_targets = [
+                call["arguments"]["position_degrees"]
+                for call in device.calls
+                if call["arguments"].get("valve") == "V4"
+            ]
+            assert v4_targets == ([180] if kind == "first" else [90])
         with SQLiteArduinoCommandJournal(path) as journal:
             assert all(
                 journal.load(a.operation_command_id).state is ArduinoCommandJournalState.COMPLETED
@@ -139,7 +147,7 @@ def test_stop_before_first_operation_sends_nothing(tmp_path):
         runner.close()
 
 
-@pytest.mark.parametrize("kind", ["first", "second", "reactor", "sf", "column"])
+@pytest.mark.parametrize("kind", ["reactor", "sf", "column"])
 def test_other_phases_rejected_before_claim(tmp_path, kind):
     path, identity, _, device = setup(tmp_path, kind)
     runner = SimulatedP1Runner(path, identity, device)
@@ -332,5 +340,89 @@ def test_absent_plan_is_distinct_from_invalid_database(tmp_path):
         with pytest.raises(SimulationBlocked, match="plan is absent"):
             run(runner)
         assert runner.status("test-phase-1") is None
+    finally:
+        runner.close()
+
+
+@pytest.mark.parametrize("kind", ["solvent", "first", "second"])
+@pytest.mark.parametrize("ambiguous", [False, True])
+def test_failure_at_every_action_stops_and_preserves_completed_prefix(tmp_path, kind, ambiguous):
+    # Exercise valve switches and both pump directions, including later cycles.
+    template = source(kind)
+    from app.hardware.command_planning import prepare_command_plan
+
+    operations = prepare_command_plan(template.plan.operations, context()).operations
+    flattened = [(index, action) for index, op in enumerate(operations) for action in op.actions]
+    for failure_index, (operation_index, _) in enumerate(flattened):
+        folder = tmp_path / str(failure_index)
+        folder.mkdir()
+        path, identity, plan, device = setup(folder, kind)
+        runner = SimulatedP1Runner(path, identity, device)
+
+        def inject(_):
+            if len(device.calls) == failure_index:
+                if ambiguous:
+                    raise ArduinoUnavailableError("simulated lost outcome")
+                raise ArduinoCommandFailedError("SIMULATED_FAILURE", True)
+
+        device.before_send = inject
+        try:
+            with pytest.raises((ArduinoUnavailableError, ArduinoCommandFailedError)):
+                run(runner)
+            expected_state = "OUTCOME_UNKNOWN" if ambiguous else "FAILED"
+            assert runner.status(plan.phase_execution_id) == (expected_state, operation_index)
+            assert len(device.calls) == failure_index
+            with SQLiteArduinoCommandJournal(path) as journal:
+                for index, (_, action) in enumerate(flattened):
+                    entry = journal.load(action.operation_command_id)
+                    if index < failure_index:
+                        assert entry.state is ArduinoCommandJournalState.COMPLETED
+                    elif index == failure_index:
+                        assert entry.state == expected_state
+                    else:
+                        assert entry is None
+        finally:
+            runner.close()
+        reopened = SimulatedP1Runner(path, identity, SimulatedP1Device(context()))
+        try:
+            with pytest.raises(SimulationBlocked):
+                run(reopened)
+            assert not reopened.device.calls
+        finally:
+            reopened.close()
+
+
+@pytest.mark.parametrize("kind", ["solvent", "first", "second"])
+@pytest.mark.parametrize("pump_action_index", [0, 1])
+def test_stop_during_aspiration_or_dispense_finishes_current_operation(
+    tmp_path, kind, pump_action_index
+):
+    path, identity, plan, device = setup(tmp_path, kind)
+    pump_operations = [
+        (index, op)
+        for index, op in enumerate(plan.prepared.operations)
+        if any(a.command == "PUMP_MOVE_ABSOLUTE_STEPS" for a in op.actions)
+    ]
+    op_index, operation = pump_operations[pump_action_index]
+    target_id = operation.actions[0].operation_command_id
+    stopped = False
+
+    def request_stop(values):
+        nonlocal stopped
+        if values["operation_command_id"] == target_id:
+            stopped = True
+
+    device.before_send = request_stop
+    runner = SimulatedP1Runner(path, identity, device)
+    try:
+        # Stop after the last operation is naturally a completed phase.
+        expected_state = "COMPLETED" if op_index + 1 == len(plan.prepared.operations) else "STOPPED"
+        assert run(runner, stop_requested=lambda: stopped) == (expected_state, op_index + 1)
+        expected = [
+            a.operation_command_id
+            for op in plan.prepared.operations[: op_index + 1]
+            for a in op.actions
+        ]
+        assert [c["operation_command_id"] for c in device.calls] == expected
     finally:
         runner.close()
