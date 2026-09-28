@@ -1,12 +1,54 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-09-27
-- Development phase: offline command preparation and durable plan storage implemented;
+- Checkpoint date: 2026-09-28
+- Development phase: stored P1 solvent phase execution verified in isolated simulation;
   physical end-to-end demo remains blocked by damaged V8 motor wiring
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Immediate continuation checkpoint — 2026-09-27
+## Immediate continuation checkpoint — 2026-09-28
+
+- The user approved one P1 transfer phase through simulated devices, including
+  durable command intents/results and interruption tests. Backend branch
+  `codex/simulated-p1-execution` is at
+  `d0f39f4a4ce34a413ffc4bca6953699f7b4086f3`, based on
+  `7ee5000f08238e7e7def2a681545b7a96eff88c7`. The prior persistence milestone
+  and its two focused corrections were accepted by the independent reviewer
+  with no remaining findings.
+- `app/hardware/simulated_p1_runner.py` executes only a complete stored P1
+  solvent-to-Reactor phase, using the existing durable Arduino command executor
+  with an explicitly simulated device. It preserves prepared identities/order,
+  journals intent before send, and stops at operation boundaries.
+- Durable simulation ownership prevents interleaving or replay. Every incomplete
+  attempt retains ownership, including Stop and process exit. Restart only
+  inspects state; it never resumes or resends. Opening requires an existing,
+  explicitly provisioned simulation database with matching independently held
+  UUID, distinguishing an absent plan from a wrong/missing/empty database.
+- Current simulation assumptions are supplied separately and consumed by one
+  attempt. Boot identity is checked before and after commands. No stored plan
+  becomes real hardware trust. Caller run/event matching is not yet integrated
+  with the actual application lifecycle.
+- Verification: 28 new tests; 134 combined runner/store/planner/durable-command
+  tests; all 1202 backend tests pass. Ruff and diff/whitespace checks pass.
+  Fault coverage includes command rejection/failure/ambiguity, intent/result
+  write failure, independent runners, abrupt subprocess exit, and session change
+  during the final command as well as earlier commands.
+- Important boundary: ownership currently covers this isolated simulation only.
+  Production Service, SF, recovery and API paths are unchanged and not connected
+  to this runner. Required follow-ups, P2, reagent and collection phases are
+  rejected; no Serial session, upload or physical test occurred.
+- Next: review the sequence/restart boundary, then expand simulated execution
+  and bind actual lifecycle/shared ownership before any live activation. P2/SF
+  and collection require protected CLOSE, Stop and ambiguous-outcome tests.
+  Approved runtime route order and fresh hardware trust remain prerequisites.
+- Reviewer scope/approval/evidence and concrete questions are in backend
+  `docs/SIMULATED_P1_EXECUTION.md`; compare `d0f39f4` against `7ee5000`.
+- Worktrees: `/tmp/labforge-p1-execution` (backend) and
+  `/tmp/labforge-ui-p1-execution` (documentation), both on the new branch.
+  Original checkouts and runtime databases are preserved. V8 wiring repair,
+  motor-off D2 testing and P2 Waste-route restrictions remain unchanged.
+
+## Previous persistence checkpoint — 2026-09-27
 
 - The user approved durable offline plan storage after the command-planner
   review. Backend branch `codex/durable-command-plans` is at
