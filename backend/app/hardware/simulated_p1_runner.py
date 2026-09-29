@@ -2,10 +2,13 @@
 
 from collections.abc import Callable
 from pathlib import Path
+from decimal import Decimal
 import sqlite3
 from threading import RLock
 from uuid import uuid4
 
+from app.demo.column_fraction_collection_operation_plan import ColumnFractionCollectionOperationPlan
+from app.demo.operation_executor import CollectionTimerOutcome
 from app.demo.p2_reactor_to_sf_operation_plan import P2ReactorToSfOperationPlan
 from app.demo.p2_sf_to_column_operation_plan import P2SfToColumnOperationPlan
 from app.demo.operation_executor import ProtectedOperationError, _execute_with_required_followup
@@ -23,7 +26,12 @@ from app.hardware.arduino_serial import (
     ArduinoUnavailableError,
 )
 from app.hardware.command_plan_store import SQLiteCommandPlanStore
-from app.hardware.command_planning import ArduinoAction, CommandPlanningContext, SfBottomValveAction
+from app.hardware.command_planning import (
+    ArduinoAction,
+    CommandPlanningContext,
+    SfBottomValveAction,
+    CollectionWait,
+)
 from app.hardware.durable_arduino import DurableArduinoCommandExecutor
 
 
@@ -44,6 +52,9 @@ class SimulatedP1Device:
         self.calls: list[dict] = []
         self.before_send: Callable[[dict], None] = lambda _: None
         self.used = False
+        self.carousel_position = current.carousel_position
+        self.waits: list[Decimal] = []
+        self.during_wait: Callable[[Decimal], None] = lambda _: None
         self.sf_session_id = str(uuid4())
         self.sf_calls: list[dict] = []
         self.before_sf_send: Callable[[dict], None] = lambda _: None
@@ -52,6 +63,18 @@ class SimulatedP1Device:
         self.before_send(values)
         self.calls.append(values)
         return ArduinoCommandResult(result={}, accepted=True, started=True)
+
+    def wait(self, duration: Decimal, stop_requested: Callable[[], bool]) -> CollectionTimerOutcome:
+        # Virtual time only: the hook injects a mid-wait Stop/fault without sleep.
+        self.waits.append(duration)
+        if stop_requested():
+            return CollectionTimerOutcome.STOP_REQUESTED
+        self.during_wait(duration)
+        return (
+            CollectionTimerOutcome.STOP_REQUESTED
+            if stop_requested()
+            else CollectionTimerOutcome.COMPLETED
+        )
 
     def execute_sf(self, **values) -> None:
         self.before_sf_send(values)
@@ -62,6 +85,12 @@ _SCHEMA = """
 CREATE TABLE simulation_identity (id TEXT NOT NULL);
 CREATE TABLE simulation_owner (slot INTEGER PRIMARY KEY CHECK(slot=1), phase_id TEXT);
 INSERT INTO simulation_owner VALUES (1, NULL);
+CREATE TABLE simulation_waits (
+ phase_id TEXT NOT NULL, operation_number INTEGER NOT NULL,
+ duration_seconds TEXT NOT NULL, state TEXT NOT NULL,
+ PRIMARY KEY (phase_id, operation_number)
+);
+CREATE TABLE simulation_carousel_projection (phase_id TEXT PRIMARY KEY, position INTEGER);
 CREATE TABLE simulation_sf_actions (
  action_id TEXT PRIMARY KEY, phase_id TEXT NOT NULL, session_id TEXT NOT NULL,
  target TEXT NOT NULL CHECK(target IN ('OPEN', 'CLOSED')),
@@ -119,6 +148,8 @@ class SimulatedP1Runner:
                     "simulation_owner",
                     "simulation_phases",
                     "simulation_sf_actions",
+                    "simulation_waits",
+                    "simulation_carousel_projection",
                     "prepared_command_plans",
                     "arduino_command_journal",
                 }
@@ -165,6 +196,11 @@ class SimulatedP1Runner:
                 "SELECT 1 FROM simulation_sf_actions WHERE phase_id=? LIMIT 1", (phase_id,)
             ).fetchone():
                 raise SimulationBlocked("existing SF intent requires investigation")
+            for table in ("simulation_waits", "simulation_carousel_projection"):
+                if self._db.execute(
+                    f"SELECT 1 FROM {table} WHERE phase_id=? LIMIT 1", (phase_id,)
+                ).fetchone():
+                    raise SimulationBlocked("existing collection evidence requires investigation")
             self._db.execute("INSERT INTO simulation_phases VALUES (?, 'RUNNING', 0)", (phase_id,))
             self._db.execute("UPDATE simulation_owner SET phase_id=? WHERE slot=1", (phase_id,))
             self._db.execute("COMMIT")
@@ -219,12 +255,22 @@ class SimulatedP1Runner:
             (action.operation_command_id,),
         )
 
+    def _invalidate_carousel(self, phase_id):
+        self.device.carousel_position = None
+        self._db.execute(
+            "UPDATE simulation_carousel_projection SET position=NULL WHERE phase_id=?", (phase_id,)
+        )
+
     def _execute_action(self, phase_id, action, expected_boot):
         if isinstance(action, SfBottomValveAction):
             self._execute_sf(phase_id, action)
             return
         if self.device.controller_boot_id != expected_boot:
+            self._invalidate_carousel(phase_id)
             raise ArduinoUnavailableError("controller session changed")
+        carousel_move = action.command == "CAROUSEL_MOVE_TO_POSITION"
+        if carousel_move:
+            self._invalidate_carousel(phase_id)
         result = self._executor.execute(
             phase_execution_id=phase_id,
             operation_command_id=action.operation_command_id,
@@ -232,9 +278,38 @@ class SimulatedP1Runner:
             arguments=dict(action.arguments),
         )
         if self.device.controller_boot_id != expected_boot:
+            self._invalidate_carousel(phase_id)
             raise ArduinoUnavailableError("controller session changed during command")
         if result.state is not ArduinoCommandJournalState.COMPLETED:
             raise SimulationBlocked("command did not complete")
+        if carousel_move:
+            position = dict(action.arguments)["position"]
+            self._db.execute(
+                "UPDATE simulation_carousel_projection SET position=? WHERE phase_id=?",
+                (position, phase_id),
+            )
+            self.device.carousel_position = position
+
+    def _wait(self, phase_id, operation_number, action, stop_requested):
+        self._db.execute(
+            "INSERT INTO simulation_waits VALUES (?, ?, ?, 'INTENT_PERSISTED')",
+            (phase_id, operation_number, str(action.duration_seconds)),
+        )
+        try:
+            outcome = self.device.wait(action.duration_seconds, stop_requested)
+            if type(outcome) is not CollectionTimerOutcome:
+                raise ValueError("invalid simulated timer outcome")
+        except Exception:
+            self._db.execute(
+                "UPDATE simulation_waits SET state='OUTCOME_UNKNOWN' WHERE phase_id=? AND operation_number=?",
+                (phase_id, operation_number),
+            )
+            raise
+        self._db.execute(
+            "UPDATE simulation_waits SET state=? WHERE phase_id=? AND operation_number=?",
+            (outcome.value, phase_id, operation_number),
+        )
+        return outcome
 
     @staticmethod
     def _definitive(error):
@@ -261,18 +336,21 @@ class SimulatedP1Runner:
                 P1ReagentToReactorOperationPlan,
                 P2ReactorToSfOperationPlan,
                 P2SfToColumnOperationPlan,
+                ColumnFractionCollectionOperationPlan,
             ):
-                raise SimulationBlocked("only P1/P2 transfer phases are supported")
+                raise SimulationBlocked("unsupported source plan")
             if plan.source.run_id != run_id or plan.source.run_event_sequence != run_event_sequence:
                 raise SimulationBlocked("source lifecycle identity mismatch")
             if self.device.used or self.device.current != plan.prepared.assumptions:
                 raise SimulationBlocked("independent simulation state does not match assumptions")
             for operation in plan.prepared.operations:
                 if any(
-                    type(a) not in (ArduinoAction, SfBottomValveAction)
+                    type(a) not in (ArduinoAction, SfBottomValveAction, CollectionWait)
                     for a in (*operation.actions, *operation.required_followup)
                 ):
                     raise SimulationBlocked("unsupported operation or follow-up")
+                if any(isinstance(a, CollectionWait) for a in operation.required_followup):
+                    raise SimulationBlocked("a required follow-up cannot be a wait")
                 if any(
                     isinstance(a, SfBottomValveAction) and a.state is not BottomValveState.CLOSED
                     for a in operation.required_followup
@@ -285,6 +363,11 @@ class SimulatedP1Runner:
             completed = 0
             state = "COMPLETED"
             try:
+                if isinstance(plan.source.plan, ColumnFractionCollectionOperationPlan):
+                    self._db.execute(
+                        "INSERT INTO simulation_carousel_projection VALUES (?, ?)",
+                        (phase_id, self.device.carousel_position),
+                    )
                 for operation in plan.prepared.operations:
                     if stop_requested():
                         state = "STOPPED"
@@ -292,6 +375,13 @@ class SimulatedP1Runner:
 
                     def primary():
                         for action in operation.actions:
+                            if isinstance(action, CollectionWait):
+                                outcome = self._wait(
+                                    phase_id, operation.operation_number, action, stop_requested
+                                )
+                                if outcome is CollectionTimerOutcome.STOP_REQUESTED:
+                                    return outcome
+                                continue
                             self._execute_action(
                                 phase_id, action, plan.prepared.assumptions.controller_boot_id
                             )
@@ -302,7 +392,10 @@ class SimulatedP1Runner:
                                 phase_id, action, plan.prepared.assumptions.controller_boot_id
                             )
 
-                    _execute_with_required_followup(primary, followup)
+                    outcome = _execute_with_required_followup(primary, followup)
+                    if outcome is CollectionTimerOutcome.STOP_REQUESTED:
+                        state = "COLLECTION_STOP_REQUESTED"
+                        break
                     completed += 1
                     self._db.execute(
                         "UPDATE simulation_phases SET completed_operations=? WHERE phase_id=?",

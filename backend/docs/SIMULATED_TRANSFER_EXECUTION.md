@@ -1,5 +1,8 @@
 # Simulated P1/P2 and protected SF transfers
 
+For the subsequent Column collection milestone, see
+[SIMULATED_COLLECTION_EXECUTION.md](SIMULATED_COLLECTION_EXECUTION.md).
+
 User-approved offline continuation, 2026-09-28. Immediate base:
 `2495d1fdfde4f306407cd4723a174acc39be36af`. Consolidated independent-review base:
 `7ee5000f08238e7e7def2a681545b7a96eff88c7` (accepted durable-plan milestone).

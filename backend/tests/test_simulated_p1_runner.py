@@ -147,19 +147,6 @@ def test_stop_before_first_operation_sends_nothing(tmp_path):
         runner.close()
 
 
-@pytest.mark.parametrize("kind", ["column"])
-def test_other_phases_rejected_before_claim(tmp_path, kind):
-    path, identity, _, device = setup(tmp_path, kind)
-    runner = SimulatedP1Runner(path, identity, device)
-    try:
-        with pytest.raises(SimulationBlocked):
-            run(runner)
-        assert runner.status("test-phase-1") is None
-        assert not device.calls
-    finally:
-        runner.close()
-
-
 @pytest.mark.parametrize("change", ["run", "event", "assumptions", "boot"])
 def test_preflight_requires_independent_matching_state(tmp_path, change):
     path, identity, _, device = setup(tmp_path)
