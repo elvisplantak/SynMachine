@@ -1,7 +1,7 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-09-29
-- Development phase: stored-plan simulation bound to durable run lifecycle; consolidated review pending;
+- Development phase: stored-plan simulation bound to durable run lifecycle; consolidated independent review accepted;
   V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
@@ -26,10 +26,15 @@
 - Verification: 31 new lifecycle tests, 186 focused tests and 1299 full backend
   tests pass. Ruff and diff checks pass. Includes actual subprocess death,
   competing coordinator, claim/start/result/release failures and Stop races.
-- Review now consolidates prior simulated collection plus lifecycle binding.
-  Read backend `docs/SIMULATED_COLLECTION_EXECUTION.md` and
-  `docs/SIMULATED_LIFECYCLE_BINDING.md`; provide user a copy-paste review handoff.
-- Next after review: production-wide Arduino/SF/Service sequence ownership and
+- Independent review accepted the combined simulated Column collection and offline
+  lifecycle checkpoint at HEAD `9eed35297066ffbe47a4c4bd01a9ff586ed0991b`: Critical 0,
+  High 0, Medium 0, Low 0. No corrections requested; remote HEAD confirmed.
+  The reviewer confirmed ownership, durable intents, Stop/required CLOSE, database
+  identity, partial collection accounting and conservative cross-database recovery.
+  Review grants no main merge or hardware activation. Technical boundaries remain
+  in backend `docs/SIMULATED_COLLECTION_EXECUTION.md` and
+  `docs/SIMULATED_LIFECYCLE_BINDING.md`.
+- Next: production-wide Arduino/SF/Service sequence ownership and
   deliberate failure/recovery binding, under fake transport first. Approved live
   route switching, fresh hardware trust, live SF OPEN/Stop semantics, timers and
   API activation remain separate gates. No physical action occurred in this
