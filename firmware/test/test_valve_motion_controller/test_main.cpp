@@ -54,6 +54,31 @@ void test_home_uses_configured_direction_and_stable_high() {
   TEST_ASSERT_EQUAL_UINT16(kValveStepHighUs, io.lastHighUs);
 }
 
+void test_low_direction_home_stops_at_switch_and_move_away_uses_high() {
+  FakeIo io;
+  io.direction = true;
+  ValveMotionController controller(io, false);
+  uint32_t now = 100;
+  TEST_ASSERT_EQUAL(ValvePrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(now));
+  TEST_ASSERT_FALSE(io.direction);
+  now += kValveDirectionSetupUs;
+  controller.update(now);
+  TEST_ASSERT_EQUAL_UINT16(1, io.pulses);
+  io.home = true;
+  controller.update(++now);
+  now += kValveHomeStableUs;
+  TEST_ASSERT_EQUAL(ValveMotionResult::COMPLETED, controller.update(now));
+  TEST_ASSERT_EQUAL_UINT16(1, io.pulses);
+  TEST_ASSERT_FALSE(io.step);
+  TEST_ASSERT_EQUAL(ValvePositionTrust::TRUSTED, controller.positionTrust());
+  TEST_ASSERT_EQUAL(ValvePrepareResult::READY, controller.prepareSetPosition(90));
+  TEST_ASSERT_TRUE(controller.start(++now));
+  TEST_ASSERT_TRUE(io.direction);
+  controller.abort();
+  TEST_ASSERT_FALSE(io.step);
+}
+
 void test_home_candidate_bounce_holds_step_until_stable_resolution() {
   FakeIo io;
   ValveMotionController controller(io, true);
@@ -280,6 +305,7 @@ void tearDown() {}
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_home_uses_configured_direction_and_stable_high);
+  RUN_TEST(test_low_direction_home_stops_at_switch_and_move_away_uses_high);
   RUN_TEST(test_home_candidate_bounce_holds_step_until_stable_resolution);
   RUN_TEST(test_stable_low_after_home_candidate_may_resume_search);
   RUN_TEST(test_move_home_to_90_releases_switch_and_emits_400_pulses);

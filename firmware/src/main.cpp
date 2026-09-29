@@ -36,13 +36,13 @@ labforge::ArduinoP2MotionIo p2MotionIo;
 labforge::P1MotionController p2MotionController(p2MotionIo);
 labforge::ArduinoValveMotionIo valveMotionIo[] = {
     {22, 23, 39}, {24, 25, 38}, {26, 27, 43}, {28, 29, 40},
-    {30, 31, 41}, {32, 33, 42}, {36, 37, 3},  {34, 35, 2},
+    {30, 31, 41}, {32, 33, 42}, {34, 35, 3},  {36, 37, 2},
 };
 labforge::ValveMotionController valveMotionControllers[] = {
     {valveMotionIo[0], true}, {valveMotionIo[1], false},
     {valveMotionIo[2], true}, {valveMotionIo[3], true},
     {valveMotionIo[4], true}, {valveMotionIo[5], false},
-    {valveMotionIo[6], true}, {valveMotionIo[7], true},
+    {valveMotionIo[6], false}, {valveMotionIo[7], false},
 };
 labforge::ValveMotionController* valveControllerPointers[] = {
     &valveMotionControllers[0], &valveMotionControllers[1],

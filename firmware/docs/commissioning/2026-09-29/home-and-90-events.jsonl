@@ -1,0 +1,13 @@
+{"time": "2026-09-29T14:16:00.514852+00:00", "kind": "HELLO", "value": {"protocol": "LABFORGE/1", "backend_session_nonce": "d542a1a0-b86a-45da-9df0-d52a6b2aba27", "controller_boot_id": 71, "controller_state": "IDLE", "software_state_trust": "TRUSTED", "type": "HELLO_OK", "capabilities": ["PUMP_HOME", "PUMP_MOVE_ABSOLUTE_STEPS", "VALVE_HOME", "VALVE_SET_POSITION", "COLUMN_BOTTOM_VALVE_HOME", "COLUMN_BOTTOM_VALVE_SET_POSITION", "CAROUSEL_SET_REFERENCE", "CAROUSEL_MOVE_TO_POSITION", "SF_MIXER_SET_STATE"], "reset_cause": null}}
+{"time": "2026-09-29T14:16:00.617235+00:00", "kind": "STATUS", "value": {"protocol": "LABFORGE/1", "backend_session_nonce": "d542a1a0-b86a-45da-9df0-d52a6b2aba27", "controller_boot_id": 71, "controller_state": "IDLE", "software_state_trust": "TRUSTED", "type": "STATUS", "request_id": "1b282e0f-2ce8-4930-86f1-d7569e36ff1f", "active_operation_command_id": null, "column_motion_state": "IDLE", "column_stage_steps": 0, "column_home_active": false}}
+{"time": "2026-09-29T14:16:52.186806+00:00", "kind": "REQUEST", "value": {"command": "VALVE_HOME", "arguments": {"valve": "V7"}, "operation": "46c2ec8f-7a3e-4674-90c6-61ba31c771c7"}}
+{"time": "2026-09-29T14:16:53.181365+00:00", "kind": "RESULT", "value": {"state": "COMPLETED", "result": {}}}
+{"time": "2026-09-29T14:16:53.181524+00:00", "kind": "REQUEST", "value": {"command": "VALVE_SET_POSITION", "arguments": {"valve": "V7", "position_degrees": 90}, "operation": "bca54297-8c86-4064-aa9d-3e934174bc5e"}}
+{"time": "2026-09-29T14:16:54.176730+00:00", "kind": "RESULT", "value": {"state": "COMPLETED", "result": {}}}
+{"time": "2026-09-29T14:16:54.176873+00:00", "kind": "PAUSE_START", "value": {"seconds": 10}}
+{"time": "2026-09-29T14:17:04.176991+00:00", "kind": "PAUSE_END", "value": {"seconds": 10}}
+{"time": "2026-09-29T14:17:04.177208+00:00", "kind": "REQUEST", "value": {"command": "VALVE_HOME", "arguments": {"valve": "V8"}, "operation": "b30cf7d8-b0ef-44e3-8e46-2b63f53899bb"}}
+{"time": "2026-09-29T14:17:05.464850+00:00", "kind": "RESULT", "value": {"state": "COMPLETED", "result": {}}}
+{"time": "2026-09-29T14:17:05.465003+00:00", "kind": "REQUEST", "value": {"command": "VALVE_SET_POSITION", "arguments": {"valve": "V8", "position_degrees": 90}, "operation": "7ae4e77f-aad4-4cdf-89c2-68696de6bf64"}}
+{"time": "2026-09-29T14:17:06.460084+00:00", "kind": "RESULT", "value": {"state": "COMPLETED", "result": {}}}
+{"time": "2026-09-29T14:17:06.460275+00:00", "kind": "TEST_COMPLETE", "value": "V7 HOME then 90, 10s pause, V8 HOME then 90; physical observation required"}

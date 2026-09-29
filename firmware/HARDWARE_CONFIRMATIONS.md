@@ -18,21 +18,24 @@ historical software names for the diagnostic channels:
 | Physical identity | Diagnostic channel | STEP | DIR | Latest physical evidence |
 |---|---|---|---|---|
 | Old V7 | A | D34 | D35 | 266 pulses at DIR LOW moved approximately 60 degrees toward HOME; explicitly confirmed |
-| Old V8 | B | D36 | D37 | 133 pulses at DIR LOW moved this motor; user accepted the test and declared repair complete |
+| Old V8 | B | D36 | D37 | 133 pulses at DIR LOW moved this motor toward HOME; identity and direction explicitly confirmed |
 
-The old V8 response confirmed identity and accepted the test, but did not separately
-state "toward HOME". DIR LOW is the candidate HOME direction for old V8; obtain an
-explicit directional confirmation before production homing. Earlier contradictory
-observations must not override the single-valve tests. No tubing identity or route
-has been changed by these tests.
+The user subsequently explicitly confirmed that old V8 moved toward HOME at
+DIR LOW. Both individual-valve identities and HOME directions are now confirmed.
+Earlier contradictory observations must not override these single-valve tests.
+No tubing identity or route has been changed by these tests.
 
-Production source still assigns V7 to D36/D37 with HOME D3, and V8 to D34/D35
-with HOME D2, with DIR HIGH toward HOME. No production pin or direction correction
-has been made or uploaded. The new STEP/DIR observations do not identify HOME input
-wiring. Verify D2/D3 against each physical switch with motor power off before
-binding the changed motor mapping to production HOME inputs.
+Manual HOME-switch tests with motor supply OFF now confirm:
 
-Currently installed: bounded pin-discovery diagnostic, maximum 133 pulses per
+- physical old V7: D3 LOW -> HIGH for about 2.5 s -> LOW; D2 stayed LOW;
+- physical old V8: D2 LOW -> HIGH for about 1.9 s -> LOW; D3 stayed LOW.
+
+The recorded transitions are in `docs/commissioning/2026-09-29/home-switch-transitions.jsonl`.
+Both inputs remain INPUT_PULLUP, active HIGH. Production source is now corrected
+to V7 D34/D35/HOME D3 and V8 D36/D37/HOME D2, both DIR LOW toward HOME.
+Other actuator bindings, timing, limits, protocol and EEPROM logic are unchanged.
+
+Previously installed for the movement tests: bounded pin-discovery diagnostic, maximum 133 pulses per
 burst, 10 ms pulse spacing, 20 us STEP high, no automatic startup movement.
 The Mega build/upload verification passed (5680 flash bytes, 278 static SRAM
 bytes); six focused native tests passed. The 60-degree test used two separately
@@ -45,17 +48,33 @@ Successful powered single-valve test logs are retained in
 physical identity/direction comes from the operator. Attempts later reported to
 have motor power off are excluded from physical evidence.
 
-Final session: diagnostic DISARM acknowledged, host Serial connection closed,
-no further commands queued. DISARM prevents diagnostic pulses; it does not remove
-motor holding current. Motor supply was last confirmed on; power-off has not been
-confirmed. Position trust and production P2 Waste-route readiness remain unset.
-Before another physical test, explicitly ask the user to turn on motor power and
-wait for a NEW readiness confirmation for that test; never reuse an earlier one.
+Current session: corrected production firmware is installed and flash-verified
+(40806 flash bytes, 3140 SRAM bytes), replacing the read-only probe. Verification:
+12/12 focused valve tests and 196/196 warning-enabled native tests passed; Mega
+build passed. Added regression checks LOW-direction HOME switch stop and HIGH
+direction for departure. Probe source remains in `tools/home_input_probe`.
 
-Next physical gates: confirm old V8 direction, identify both HOME inputs without
-motor power, update and verify production configuration, then obtain fresh approval
-for upload and supervised HOME/position tests. Repair closure is not production
-recommissioning closure.
+The supervised production-path regression completed in controller boot 71:
+V7 HOME -> V7 90 degrees -> 10-second pause -> V8 HOME -> V8 90 degrees.
+All four durable commands reached COMPLETED without retry. The user explicitly
+confirmed both valves stopped at their HOME switches, returned correctly to
+90 degrees, and the tests passed. V7/V8 repair and dry recommissioning are closed.
+Evidence: `docs/commissioning/2026-09-29/home-and-90-events.jsonl` and the associated
+SQLite journal SQL export. These include software outcomes; physical success is
+the operator confirmation recorded here.
+
+Final state: both valves last physically confirmed at 90 degrees; host Serial
+connection closed; no queued motion. Motor power was last confirmed ON and
+power-off was requested but not yet confirmed. A later Arduino reset invalidates
+volatile position trust; stored logs do not re-establish current position trust.
+Other route valves and pumps were not exercised, so this is not full P2 route,
+wet operation, or end-to-end demo validation.
+
+Before EVERY powered physical test, explicitly ask the user to enable motor
+power and wait for a NEW readiness confirmation; never reuse an earlier one.
+Next software work remains backend lifecycle/shared ownership integration under
+fake transport. A future end-to-end dry test needs a fresh hardware session and
+independently verified route readiness.
 
 ## Confirmed present physical tubing topology — 2026-07-21
 
