@@ -1,12 +1,61 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-09-28
-- Development phase: P1/P2 and protected SF transfer execution verified in isolated simulation;
-  physical end-to-end demo remains blocked by damaged V8 motor wiring
+- Checkpoint date: 2026-09-29
+- Development phase: P1/P2/SF and Column collection verified in isolated simulation;
+  physical end-to-end demo remains blocked by an unresolved V8 drive fault
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Immediate continuation checkpoint — 2026-09-28 (P2/SF)
+## Immediate continuation checkpoint — 2026-09-29
+
+- Backend `codex/simulated-p1-execution` is at
+  `76fca333e2a9807a6b9dafff71ad21fa3e4d1fa2`, based on accepted review HEAD
+  `f87a6c4f7612b7621e18ba1f3a5bc4aec68fcb00`. The CLOSE persistence test gap
+  was independently closed with zero remaining findings before this continuation.
+- Simulated Column collection now executes OPEN, virtual wait, required CLOSE,
+  then carousel movement. Stop during wait gives COLLECTION_STOP_REQUESTED and
+  does not count the partial operation as complete. CLOSE still runs; its failure
+  prevents normal Stop success. No later movement occurs after either failure.
+- Wait intent/outcome and historical carousel projections are durable. Position
+  projection is invalidated before carousel send and restored after durable
+  success only. Failure/unknown/reboot blocks continuation. Restart never resumes,
+  resends or automatically closes. Old test databases are rejected without migration.
+- Verification: 30 new collection tests, 94 simulation cases, 200 combined focused
+  tests and all 1268 backend tests pass; Ruff and whitespace checks pass.
+- Next: actual lifecycle/shared production ownership binding under fake transport
+  tests, while retaining route approval and fresh hardware trust gates. Virtual
+  waits are not a live timer. Consolidate the next independent review after a
+  larger integration step; provide the user a copy-paste report then.
+- Software evidence and limitations: backend `docs/SIMULATED_COLLECTION_EXECUTION.md`.
+  Worktrees: `/tmp/labforge-p1-execution`, `/tmp/labforge-ui-p1-execution`.
+
+### Current physical-session state (do not infer readiness)
+
+- The user repaired/reconnected V8 wires and authorized dry tests on 2026-09-29.
+  The initially installed Arduino program was an unexpected V8 diagnostic that
+  triggered 400 pulses on any serial input. A read/HELLO probe triggered it while
+  the user-confirmed motor supply was off. It was replaced with the production
+  build (40806 flash bytes, 3140 SRAM bytes), uploaded and flash-verified.
+- The authorized V8 HOME attempt then failed with VALVE_MOTION_TIMEOUT; the
+  conditional 90-degree command was not sent. The user observed no motion or
+  vibration. V8 driver showed green; ENA is not connected, per the user.
+- User resistance measurements identified red/blue and green/black as low-resistance
+  pairs, with infinite resistance between pairs. The supplied connection photo
+  shows B- black, B+ green, A- red, A+ blue. Direction after this wiring is unverified.
+- CURRENTLY INSTALLED: bounded pin-discovery diagnostic, not production firmware.
+  Build config `/tmp/labforge-v8-direction.ini`; firmware uses 5680 flash and
+  278 SRAM bytes. Six focused native tests passed and upload was flash-verified.
+  Pair A is confirmed V8 STEP D34/DIR D35; bursts are capped at 20 pulses with
+  10 ms spacing and require SELECT/DIR/ARM/PULSE. No automatic startup motion.
+- A single authorized DIR LOW, 20-pulse V8 burst reported STATUS OK, but the user
+  again observed no movement/vibration. This does not establish working direction.
+- User is handling hardware repair and will report resolution. Motor power-off
+  was requested; final power state is not confirmed. No further motion is queued.
+  Restore and verify production firmware before future production commands.
+  V8 and the dependent P2 Waste route remain untrusted. No other motor test or
+  fluidic operation was performed during this session.
+
+## Previous P2/SF checkpoint — 2026-09-28
 
 - Backend `codex/simulated-p1-execution` is at
   `eca8fbd4a9d8a9a7d165b35109234522beca8ae1`; immediate base `2495d1f`,
