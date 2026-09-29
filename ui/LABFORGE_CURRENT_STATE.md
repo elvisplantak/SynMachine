@@ -2,7 +2,7 @@
 
 - Checkpoint date: 2026-09-29
 - Development phase: P1/P2/SF and Column collection verified in isolated simulation;
-  motor connection fault resolved by the user; V7/V8 production recommissioning pending
+  V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
@@ -29,7 +29,7 @@
 - Software evidence and limitations: backend `docs/SIMULATED_COLLECTION_EXECUTION.md`.
   Worktrees: `/tmp/labforge-p1-execution`, `/tmp/labforge-ui-p1-execution`.
 
-### Current physical-session state — repair resolved, recommissioning pending
+### Current physical-session state — V7/V8 dry recommissioning passed
 
 - On 2026-09-29 the user identified an unconnected driver after repairing the
   damaged connection, reconnected it, observed successful motion, and declared
@@ -37,30 +37,32 @@
 - Powered individual tests identify physical "old V7" as channel A STEP D34 /
   DIR D35: 266 pulses at DIR LOW moved approximately 60 degrees toward HOME,
   explicitly confirmed. Physical "old V8" is channel B STEP D36 / DIR D37:
-  133 pulses at DIR LOW moved this motor; the user accepted the result. Obtain
-  a separate explicit V8 HOME-direction confirmation before production homing.
-- These channel identities differ from the historical production mapping.
-  Production code has NOT been corrected or uploaded: it still pairs software
-  V7 with D36/D37/HOME D3 and V8 with D34/D35/HOME D2, HOME direction HIGH.
-  Motor mapping does not prove HOME-switch mapping. Verify D2/D3 manually with
-  motor power off before changing production configuration. Tubing is unchanged.
-- CURRENTLY INSTALLED: bounded pin-discovery diagnostic, not production firmware;
-  max 133 pulses/burst, 10 ms spacing, 20 us STEP high. Build/upload verified,
-  5680 flash bytes / 278 SRAM bytes; six focused native tests passed. No startup
-  motion. Nominal angle conversion remains 400 pulses per 90 degrees.
-- Last test ended DISARM acknowledged / Serial closed; no commands queued.
-  Motor power was last confirmed ON; subsequent power-off is not confirmed.
-  Diagnostic DISARM does not disable holding current. Positions and the P2 Waste
-  route remain untrusted. No liquid test or full HOME test was completed.
+  133 pulses at DIR LOW moved this motor. The user subsequently explicitly
+  confirmed that this was toward HOME. Both motor directions are now confirmed.
+- Manual switch tests confirmed V7 HOME D3 (HIGH for about 2.5 s), V8 HOME D2
+  (HIGH for about 1.9 s), both released LOW. Transition evidence is saved in firmware
+  `docs/commissioning/2026-09-29/home-switch-transitions.jsonl`.
+- CURRENTLY INSTALLED: corrected production firmware, V7 D34/D35/HOME D3 and
+  V8 D36/D37/HOME D2, both HOME direction LOW. Build/upload flash-verified:
+  40806 flash bytes / 3140 SRAM bytes. Focused tests passed 12/12; full native
+  warning-enabled suite passed 196/196. Other actuator bindings are unchanged.
+- Boot 71: V7 HOME -> V7 90 degrees -> 10-second pause -> V8 HOME -> V8 90
+  degrees completed through the durable production command path. All four results
+  are COMPLETED, without retries. The user confirmed correct HOME stops, returns
+  to 90 degrees, and successful tests. Repair and V7/V8 dry recommissioning are closed.
+- Host Serial connection closed, no queued commands. Both valves were physically
+  confirmed at 90 degrees. Motor supply was last ON; power-off requested but not
+  confirmed. Reset loses volatile trust. Other route components were not exercised;
+  full P2 route readiness and end-to-end/wet demo remain separate confirmations.
 - For EVERY next physical test, tell the user to enable motor power and wait for
   a fresh explicit readiness confirmation. Two repeat attempts were mistakenly
   sent while power was off; exclude them from physical evidence.
 - Canonical repair evidence and remaining gates: firmware
   `HARDWARE_CONFIRMATIONS.md`, current 2026-09-29 section. Successful powered
   single-valve logs: firmware `docs/commissioning/2026-09-29/`.
-- Next: old V8 direction and both HOME inputs, verified production configuration,
-  separately authorized upload and supervised HOME/position regression. Offline
-  backend work can continue independently; no production activation is implied.
+- Production regression events and durable journal SQL export are saved in firmware
+  `docs/commissioning/2026-09-29/`. Next: backend lifecycle/shared ownership work
+  under fake transport; later dry demo requires fresh hardware and route readiness.
 
 ## Previous P2/SF checkpoint — 2026-09-28
 
