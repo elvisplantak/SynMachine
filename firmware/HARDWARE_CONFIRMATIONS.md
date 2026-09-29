@@ -1,5 +1,62 @@
 # Hardware confirmations
 
+## Current V7/V8 repair and commissioning checkpoint — 2026-09-29
+
+This checkpoint supersedes the historical V7/V8 drive-fault status and STEP/DIR
+mapping below for the current wiring. Historical production-test records remain
+historical evidence, not a declaration that their configuration is still installed.
+
+The user repaired the damaged motor connection, then discovered that a driver
+had remained disconnected while a different driver was being wired. After reconnecting
+it, the user observed motor operation and explicitly declared the fault resolved.
+Earlier no-motion tests do not establish a failed motor or driver. The exact original
+cause of the melted connection and long-term thermal performance are not established.
+
+Physical identities below use the user's labels "old V7" and "old V8", not the
+historical software names for the diagnostic channels:
+
+| Physical identity | Diagnostic channel | STEP | DIR | Latest physical evidence |
+|---|---|---|---|---|
+| Old V7 | A | D34 | D35 | 266 pulses at DIR LOW moved approximately 60 degrees toward HOME; explicitly confirmed |
+| Old V8 | B | D36 | D37 | 133 pulses at DIR LOW moved this motor; user accepted the test and declared repair complete |
+
+The old V8 response confirmed identity and accepted the test, but did not separately
+state "toward HOME". DIR LOW is the candidate HOME direction for old V8; obtain an
+explicit directional confirmation before production homing. Earlier contradictory
+observations must not override the single-valve tests. No tubing identity or route
+has been changed by these tests.
+
+Production source still assigns V7 to D36/D37 with HOME D3, and V8 to D34/D35
+with HOME D2, with DIR HIGH toward HOME. No production pin or direction correction
+has been made or uploaded. The new STEP/DIR observations do not identify HOME input
+wiring. Verify D2/D3 against each physical switch with motor power off before
+binding the changed motor mapping to production HOME inputs.
+
+Currently installed: bounded pin-discovery diagnostic, maximum 133 pulses per
+burst, 10 ms pulse spacing, 20 us STEP high, no automatic startup movement.
+The Mega build/upload verification passed (5680 flash bytes, 278 static SRAM
+bytes); six focused native tests passed. The 60-degree test used two separately
+armed 133-pulse bursts on A. With the previously confirmed 400 pulses per 90
+degrees and unchanged microstep settings, totals are nominally 29.925 and 59.85
+degrees. These are relative moves, not HOME searches or position calibration.
+
+Successful powered single-valve test logs are retained in
+`docs/commissioning/2026-09-29/`. STATUS OK confirms diagnostic command execution;
+physical identity/direction comes from the operator. Attempts later reported to
+have motor power off are excluded from physical evidence.
+
+Final session: diagnostic DISARM acknowledged, host Serial connection closed,
+no further commands queued. DISARM prevents diagnostic pulses; it does not remove
+motor holding current. Motor supply was last confirmed on; power-off has not been
+confirmed. Position trust and production P2 Waste-route readiness remain unset.
+Before another physical test, explicitly ask the user to turn on motor power and
+wait for a NEW readiness confirmation for that test; never reuse an earlier one.
+
+Next physical gates: confirm old V8 direction, identify both HOME inputs without
+motor power, update and verify production configuration, then obtain fresh approval
+for upload and supervised HOME/position tests. Repair closure is not production
+recommissioning closure.
+
 ## Confirmed present physical tubing topology — 2026-07-21
 
 The user explicitly confirmed that the physical tubing was connected according to the approved LabForge v1 target topology. This confirms the tubing connections only; it is not permission for hardware execution and does not confirm leak-tightness, valve actuation, liquid routing, calibration, firmware execution, or safety interlocks.
