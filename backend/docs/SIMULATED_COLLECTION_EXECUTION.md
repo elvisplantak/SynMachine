@@ -61,9 +61,11 @@ of this software milestone.
 
 ## Remaining integration boundary
 
-The simulator still does not bind the real application lifecycle, production-wide
-Service/SF ownership, an approved live route-switching order, live Stop semantics
-or independently established hardware/session trust. Virtual waits are not a live
+The subsequent offline lifecycle binding is documented in
+`SIMULATED_LIFECYCLE_BINDING.md`. It exercises real lifecycle transitions with
+fixture databases and simulated devices. Production-wide Service/SF ownership,
+approved live route-switching order, live Stop semantics and independently
+established hardware/session trust remain unimplemented. Virtual waits are not a live
 timer implementation. Those remain prerequisites before API activation.
 
 Consolidate the next independent review around collection plus the next substantial

@@ -25,7 +25,7 @@ from app.hardware.arduino_serial import (
     ArduinoCommandResult,
     ArduinoUnavailableError,
 )
-from app.hardware.command_plan_store import SQLiteCommandPlanStore
+from app.hardware.command_plan_store import SQLiteCommandPlanStore, StoredCommandPlan
 from app.hardware.command_planning import (
     ArduinoAction,
     CommandPlanningContext,
@@ -128,6 +128,7 @@ class SimulatedP1Runner:
             raise TypeError("only the explicit simulated device is supported")
         self._lock = RLock()
         self.device = device
+        self.database_id = database_id
         self._sf_session = device.sf_session_id
         self._db = sqlite3.connect(
             database.resolve().as_uri() + "?mode=rw",
@@ -179,6 +180,9 @@ class SimulatedP1Runner:
                 (phase_id,),
             ).fetchone()
 
+    def load_plan(self, phase_id: str) -> StoredCommandPlan | None:
+        return self._plans.load(phase_id)
+
     def _claim(self, phase_id: str):
         self._db.execute("BEGIN IMMEDIATE")
         try:
@@ -208,7 +212,7 @@ class SimulatedP1Runner:
             self._db.execute("ROLLBACK")
             raise
 
-    def _finish(self, phase_id: str, state: str, completed: int):
+    def _finish(self, phase_id: str, state: str, completed: int, *, release_owner: bool = True):
         self._db.execute("BEGIN IMMEDIATE")
         try:
             self._db.execute(
@@ -216,7 +220,7 @@ class SimulatedP1Runner:
                 (state, completed, phase_id),
             )
             # Every incomplete attempt retains ownership, including normal Stop.
-            if state == "COMPLETED":
+            if state == "COMPLETED" and release_owner:
                 self._db.execute("UPDATE simulation_owner SET phase_id=NULL WHERE slot=1")
             self._db.execute("COMMIT")
         except BaseException:
@@ -326,6 +330,8 @@ class SimulatedP1Runner:
         run_id: str,
         run_event_sequence: int,
         stop_requested: Callable[[], bool] = lambda: False,
+        before_execute: Callable[[], None] = lambda: None,
+        before_finish: Callable[[str, int], bool] = lambda state, count: True,
     ) -> tuple[str, int]:
         with self._lock:
             plan = self._plans.load(phase_id)
@@ -363,6 +369,7 @@ class SimulatedP1Runner:
             completed = 0
             state = "COMPLETED"
             try:
+                before_execute()
                 if isinstance(plan.source.plan, ColumnFractionCollectionOperationPlan):
                     self._db.execute(
                         "INSERT INTO simulation_carousel_projection VALUES (?, ?)",
@@ -406,7 +413,10 @@ class SimulatedP1Runner:
                 outcome = "FAILED" if self._definitive(error) else "OUTCOME_UNKNOWN"
                 self._finish(phase_id, outcome, completed)
                 raise
-            self._finish(phase_id, state, completed)
+            # Keep ownership until lifecycle result persistence succeeds. A callback
+            # failure leaves RUNNING evidence and never releases the owner.
+            release_owner = before_finish(state, completed)
+            self._finish(phase_id, state, completed, release_owner=release_owner is True)
             return state, completed
 
 
