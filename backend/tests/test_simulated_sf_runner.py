@@ -299,3 +299,96 @@ def test_initial_sf_failure_still_closes_column(tmp_path):
         assert runner.status("test-phase-1") == ("OUTCOME_UNKNOWN", 0)
     finally:
         runner.close()
+
+
+@pytest.mark.parametrize("stage", ["intent", "result"])
+@pytest.mark.parametrize("primary", ["ok", "failed", "unknown"])
+def test_required_close_persistence_fault_blocks_restart_and_preserves_primary(
+    tmp_path, stage, primary
+):
+    path, identity, plan, device = setup(tmp_path, "sf")
+    operation_index, operation = protected(plan)
+    close_id = operation.required_followup[0].operation_command_id
+    pump_id = next(
+        a.operation_command_id for a in operation.actions if isinstance(a, ArduinoAction)
+    )
+    primary_error = (
+        ArduinoCommandFailedError("PRIMARY_FAILED", True)
+        if primary == "failed"
+        else ArduinoUnavailableError("primary response lost")
+    )
+
+    def send(values):
+        if values["operation_command_id"] == pump_id and primary != "ok":
+            raise primary_error
+
+    device.before_send = send
+    # Target the protected CLOSE identity, not the initial preparation CLOSE.
+    target = f"NEW.action_id=CAST(X'{close_id.encode().hex()}' AS TEXT)"
+    trigger = (
+        f"BEFORE INSERT ON simulation_sf_actions WHEN {target}"
+        if stage == "intent"
+        else f"BEFORE UPDATE ON simulation_sf_actions WHEN {target} AND NEW.state='COMPLETED'"
+    )
+    with sqlite3.connect(path) as db:
+        db.execute(
+            f"CREATE TRIGGER close_write_fault {trigger} "
+            "BEGIN SELECT RAISE(ABORT, 'required CLOSE persistence failure'); END"
+        )
+    runner = SimulatedTransferRunner(path, identity, device)
+    try:
+        with pytest.raises((sqlite3.Error, ProtectedOperationError)) as caught:
+            run(runner)
+        if primary != "ok":
+            assert isinstance(caught.value, ProtectedOperationError)
+            assert caught.value.primary_error is primary_error
+            assert isinstance(caught.value.followup_error, sqlite3.Error)
+            assert "required CLOSE persistence failure" in str(caught.value.followup_error)
+        else:
+            assert isinstance(caught.value, sqlite3.Error)
+        closes = [v for v in device.sf_calls if v["operation_command_id"] == close_id]
+        assert len(closes) == (0 if stage == "intent" else 1)
+        rows = [r for r in sf_rows(path) if r[0] == close_id]
+        assert rows == ([] if stage == "intent" else [(close_id, "CLOSED", "INTENT_PERSISTED")])
+        assert runner.status(plan.phase_execution_id) == ("OUTCOME_UNKNOWN", operation_index)
+        with sqlite3.connect(path) as db:
+            assert db.execute("SELECT phase_id FROM simulation_owner WHERE slot=1").fetchone() == (
+                plan.phase_execution_id,
+            )
+            expected_primary = {
+                "ok": "COMPLETED",
+                "failed": "FAILED",
+                "unknown": "OUTCOME_UNKNOWN",
+            }[primary]
+            assert db.execute(
+                "SELECT state FROM arduino_command_journal WHERE operation_command_id=?", (pump_id,)
+            ).fetchone() == (expected_primary,)
+            if primary == "failed":
+                assert db.execute(
+                    "SELECT error_code FROM arduino_command_journal WHERE operation_command_id=?",
+                    (pump_id,),
+                ).fetchone() == ("PRIMARY_FAILED",)
+            persisted_ids = {
+                r[0]
+                for r in db.execute(
+                    "SELECT operation_command_id FROM arduino_command_journal UNION SELECT action_id FROM simulation_sf_actions"
+                )
+            }
+        later_ids = {
+            a.operation_command_id
+            for op in plan.prepared.operations[operation_index + 1 :]
+            for a in (*op.actions, *op.required_followup)
+        }
+        assert not later_ids.intersection(persisted_ids)
+    finally:
+        runner.close()
+    before = path.read_bytes()
+    fresh = SimulatedTransferRunner(path, identity, SimulatedTransferDevice(context()))
+    try:
+        with pytest.raises(SimulationBlocked):
+            run(fresh)
+        assert fresh.status(plan.phase_execution_id) == ("OUTCOME_UNKNOWN", operation_index)
+        assert not fresh.device.calls and not fresh.device.sf_calls
+    finally:
+        fresh.close()
+    assert path.read_bytes() == before

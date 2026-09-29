@@ -65,9 +65,9 @@ production-wide locking across existing Service and SF entry points.
 
 ## Verification
 
-- 21 new P2/SF cases, with 38 remaining P1/core cases: 59 simulation tests total.
-- 165 combined simulation/store/planner/durable-Arduino tests pass.
-- All 1233 backend tests pass; Ruff and diff/whitespace checks pass.
+- 27 P2/SF cases, with 38 remaining P1/core cases: 65 simulation tests total.
+- 171 combined simulation/store/planner/durable-Arduino tests pass.
+- All 1239 backend tests pass; Ruff and diff/whitespace checks pass.
 - Exact cross-device ordering and independently visible SF intent before send.
 - All nine combinations of primary and required-close success/failure/unknown.
 - OPEN failure/unknown skips the pump and attempts CLOSE; Stop during OPEN waits
@@ -94,3 +94,24 @@ Next software work: Column collection wait/Stop and required Column CLOSE,
 carousel failure/unknown trust loss, then actual lifecycle and shared production
 ownership integration tested with fake transports before any API activation.
 No main merge, physical test, firmware upload or real recovery is authorized.
+
+
+## Accepted review and CLOSE persistence coverage follow-up — 2026-09-29
+
+The independent reviewer accepted `eca8fbd4a9d8a9a7d165b35109234522beca8ae1`
+with no implementation defects and one low-priority test-coverage gap. Six new
+regression cases target the exact required SF CLOSE identity (not preparation
+CLOSE): intent INSERT failure before send and result UPDATE failure after send,
+each with a successful, definitively failed, or unknown primary aspiration.
+
+Tests assert no false completion, phase OUTCOME_UNKNOWN, retained owner,
+no later action intents, preserved primary journal state/error code, both error
+objects in ProtectedOperationError, and no send/resume or database modification
+on reopen. SQLite triggers inject actual persistence failures. No implementation,
+UI, firmware, runtime integration or physical behavior changed.
+
+Before production integration, additionally define live Stop behavior when the
+request arrives after SF OPEN but before aspiration begins. The current simulated
+operation-boundary Stop policy is not approval of that physical behavior.
+Production-wide ownership, approved route order and independently re-established
+current hardware/session trust remain mandatory gates.
