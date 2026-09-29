@@ -2,7 +2,7 @@
 
 - Checkpoint date: 2026-09-29
 - Development phase: P1/P2/SF and Column collection verified in isolated simulation;
-  physical end-to-end demo remains blocked by an unresolved V8 drive fault
+  motor connection fault resolved by the user; V7/V8 production recommissioning pending
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
@@ -29,31 +29,38 @@
 - Software evidence and limitations: backend `docs/SIMULATED_COLLECTION_EXECUTION.md`.
   Worktrees: `/tmp/labforge-p1-execution`, `/tmp/labforge-ui-p1-execution`.
 
-### Current physical-session state (do not infer readiness)
+### Current physical-session state — repair resolved, recommissioning pending
 
-- The user repaired/reconnected V8 wires and authorized dry tests on 2026-09-29.
-  The initially installed Arduino program was an unexpected V8 diagnostic that
-  triggered 400 pulses on any serial input. A read/HELLO probe triggered it while
-  the user-confirmed motor supply was off. It was replaced with the production
-  build (40806 flash bytes, 3140 SRAM bytes), uploaded and flash-verified.
-- The authorized V8 HOME attempt then failed with VALVE_MOTION_TIMEOUT; the
-  conditional 90-degree command was not sent. The user observed no motion or
-  vibration. V8 driver showed green; ENA is not connected, per the user.
-- User resistance measurements identified red/blue and green/black as low-resistance
-  pairs, with infinite resistance between pairs. The supplied connection photo
-  shows B- black, B+ green, A- red, A+ blue. Direction after this wiring is unverified.
-- CURRENTLY INSTALLED: bounded pin-discovery diagnostic, not production firmware.
-  Build config `/tmp/labforge-v8-direction.ini`; firmware uses 5680 flash and
-  278 SRAM bytes. Six focused native tests passed and upload was flash-verified.
-  Pair A is confirmed V8 STEP D34/DIR D35; bursts are capped at 20 pulses with
-  10 ms spacing and require SELECT/DIR/ARM/PULSE. No automatic startup motion.
-- A single authorized DIR LOW, 20-pulse V8 burst reported STATUS OK, but the user
-  again observed no movement/vibration. This does not establish working direction.
-- User is handling hardware repair and will report resolution. Motor power-off
-  was requested; final power state is not confirmed. No further motion is queued.
-  Restore and verify production firmware before future production commands.
-  V8 and the dependent P2 Waste route remain untrusted. No other motor test or
-  fluidic operation was performed during this session.
+- On 2026-09-29 the user identified an unconnected driver after repairing the
+  damaged connection, reconnected it, observed successful motion, and declared
+  the fault resolved. Prior no-motion attempts are not proof of a failed motor.
+- Powered individual tests identify physical "old V7" as channel A STEP D34 /
+  DIR D35: 266 pulses at DIR LOW moved approximately 60 degrees toward HOME,
+  explicitly confirmed. Physical "old V8" is channel B STEP D36 / DIR D37:
+  133 pulses at DIR LOW moved this motor; the user accepted the result. Obtain
+  a separate explicit V8 HOME-direction confirmation before production homing.
+- These channel identities differ from the historical production mapping.
+  Production code has NOT been corrected or uploaded: it still pairs software
+  V7 with D36/D37/HOME D3 and V8 with D34/D35/HOME D2, HOME direction HIGH.
+  Motor mapping does not prove HOME-switch mapping. Verify D2/D3 manually with
+  motor power off before changing production configuration. Tubing is unchanged.
+- CURRENTLY INSTALLED: bounded pin-discovery diagnostic, not production firmware;
+  max 133 pulses/burst, 10 ms spacing, 20 us STEP high. Build/upload verified,
+  5680 flash bytes / 278 SRAM bytes; six focused native tests passed. No startup
+  motion. Nominal angle conversion remains 400 pulses per 90 degrees.
+- Last test ended DISARM acknowledged / Serial closed; no commands queued.
+  Motor power was last confirmed ON; subsequent power-off is not confirmed.
+  Diagnostic DISARM does not disable holding current. Positions and the P2 Waste
+  route remain untrusted. No liquid test or full HOME test was completed.
+- For EVERY next physical test, tell the user to enable motor power and wait for
+  a fresh explicit readiness confirmation. Two repeat attempts were mistakenly
+  sent while power was off; exclude them from physical evidence.
+- Canonical repair evidence and remaining gates: firmware
+  `HARDWARE_CONFIRMATIONS.md`, current 2026-09-29 section. Successful powered
+  single-valve logs: firmware `docs/commissioning/2026-09-29/`.
+- Next: old V8 direction and both HOME inputs, verified production configuration,
+  separately authorized upload and supervised HOME/position regression. Offline
+  backend work can continue independently; no production activation is implied.
 
 ## Previous P2/SF checkpoint — 2026-09-28
 
