@@ -1,33 +1,40 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-09-29
-- Development phase: P1/P2/SF and Column collection verified in isolated simulation;
+- Development phase: stored-plan simulation bound to durable run lifecycle; consolidated review pending;
   V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
 ## Immediate continuation checkpoint — 2026-09-29
 
-- Backend `codex/simulated-p1-execution` is at
-  `76fca333e2a9807a6b9dafff71ad21fa3e4d1fa2`, based on accepted review HEAD
-  `f87a6c4f7612b7621e18ba1f3a5bc4aec68fcb00`. The CLOSE persistence test gap
-  was independently closed with zero remaining findings before this continuation.
-- Simulated Column collection now executes OPEN, virtual wait, required CLOSE,
-  then carousel movement. Stop during wait gives COLLECTION_STOP_REQUESTED and
-  does not count the partial operation as complete. CLOSE still runs; its failure
-  prevents normal Stop success. No later movement occurs after either failure.
-- Wait intent/outcome and historical carousel projections are durable. Position
-  projection is invalidated before carousel send and restored after durable
-  success only. Failure/unknown/reboot blocks continuation. Restart never resumes,
-  resends or automatically closes. Old test databases are rejected without migration.
-- Verification: 30 new collection tests, 94 simulation cases, 200 combined focused
-  tests and all 1268 backend tests pass; Ruff and whitespace checks pass.
-- Next: actual lifecycle/shared production ownership binding under fake transport
-  tests, while retaining route approval and fresh hardware trust gates. Virtual
-  waits are not a live timer. Consolidate the next independent review after a
-  larger integration step; provide the user a copy-paste report then.
-- Software evidence and limitations: backend `docs/SIMULATED_COLLECTION_EXECUTION.md`.
-  Worktrees: `/tmp/labforge-p1-execution`, `/tmp/labforge-ui-p1-execution`.
+- Backend `codex/simulated-p1-execution` HEAD:
+  `9eed35297066ffbe47a4c4bd01a9ff586ed0991b`. Immediate base: collection milestone
+  `76fca333e2a9807a6b9dafff71ad21fa3e4d1fa2`.
+  Consolidated independent-review base: `f87a6c4f7612b7621e18ba1f3a5bc4aec68fcb00`.
+- New offline coordinator binds stored plans to real SQLiteStore claim/start/Stop/
+  result transitions for all six P1/P2/SF/Column source phases. It compares current
+  run identity/sequence/phase, calibration and regenerated source operations before
+  claiming. Explicit offline lifecycle database UUID also binds to simulation UUID.
+  Missing/empty/wrong/incompatible files fail without provisioning or migration.
+- Durable simulation ownership precedes lifecycle claim and remains held until
+  result persistence succeeds. Stop racing with final resolution retains ownership.
+  Cross-database commits are intentionally not claimed atomic: write failures or
+  crashes can retain an active intent or an advanced run with a blocked owner.
+  Exceptions propagate unchanged; no automatic resume, resend, CLOSE, repair or
+  ownership release. Existing explicit startup reconciliation requires recovery.
+- Verification: 31 new lifecycle tests, 186 focused tests and 1299 full backend
+  tests pass. Ruff and diff checks pass. Includes actual subprocess death,
+  competing coordinator, claim/start/result/release failures and Stop races.
+- Review now consolidates prior simulated collection plus lifecycle binding.
+  Read backend `docs/SIMULATED_COLLECTION_EXECUTION.md` and
+  `docs/SIMULATED_LIFECYCLE_BINDING.md`; provide user a copy-paste review handoff.
+- Next after review: production-wide Arduino/SF/Service sequence ownership and
+  deliberate failure/recovery binding, under fake transport first. Approved live
+  route switching, fresh hardware trust, live SF OPEN/Stop semantics, timers and
+  API activation remain separate gates. No physical action occurred in this
+  software milestone; production runtime configuration is unchanged.
+- Worktrees: `/tmp/labforge-p1-execution`, `/tmp/labforge-ui-p1-execution`.
 
 ### Current physical-session state — V7/V8 dry recommissioning passed
 
