@@ -56,6 +56,7 @@ class HardwareOwnership:
     """
 
     def __init__(self, database: Path, expected_identity: str):
+        self.database_id = expected_identity
         self._gate = Lock()
         self._db_lock = RLock()
         self._leases: dict[str, SequenceLease] = {}

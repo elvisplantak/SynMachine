@@ -16,10 +16,11 @@ T = TypeVar("T")
 class _OperationCommands:
     """Ephemeral access, confined to one executing callback and thread."""
 
-    def __init__(self, arduino, sf, lease):
+    def __init__(self, arduino, sf, lease, journaled_sf=False):
         self._arduino = arduino
         self._sf = sf
         self._lease = lease
+        self._journaled_sf = journaled_sf
         self._thread = get_ident()
         self._active = True
         self._error = None
@@ -47,7 +48,25 @@ class _OperationCommands:
         return self._call(send)
 
     def set_state(self, state: BottomValveState):
+        if self._journaled_sf:
+            return self.execute_sf(
+                phase_execution_id=self._lease.phase_execution_id,
+                operation_command_id=str(uuid4()),
+                state=state,
+            )
         return self._call(lambda: self._sf.set_state(state))
+
+    def execute_sf(self, *, phase_execution_id, operation_command_id, state):
+        def send():
+            if phase_execution_id != self._lease.phase_execution_id:
+                raise OwnershipBlocked("SF phase identity does not match sequence owner")
+            return self._sf.execute(
+                phase_execution_id=phase_execution_id,
+                operation_command_id=operation_command_id,
+                state=state,
+            )
+
+        return self._call(send)
 
 
 class OwnedHardware:
@@ -57,8 +76,9 @@ class OwnedHardware:
     unwrapped application construction is intentionally unchanged in this stage.
     """
 
-    def __init__(self, ownership: HardwareOwnership, arduino, sf):
+    def __init__(self, ownership: HardwareOwnership, arduino, sf, *, journaled_sf=False):
         self.ownership = ownership
+        self._journaled_sf = journaled_sf
         self._arduino = arduino
         self._sf = sf
         self.arduino_service = _ArduinoService(self)
@@ -72,7 +92,7 @@ class OwnedHardware:
         required_followup: Callable[[_OperationCommands], None] | None = None,
     ) -> T:
         def call(callback):
-            scope = _OperationCommands(self._arduino, self._sf, lease)
+            scope = _OperationCommands(self._arduino, self._sf, lease, self._journaled_sf)
             try:
                 result = callback(scope)
                 if scope._error is not None:

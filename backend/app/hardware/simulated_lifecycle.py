@@ -17,6 +17,7 @@ from app.demo.phase_result_resolution import PhaseExecutionResolution
 from app.demo.run_models import RunStatus
 from app.hardware.simulated_p1_runner import SimulatedP1Runner, SimulationBlocked
 from app.persistence.sqlite_store import SCHEMA_VERSION, SQLiteStore
+from app.hardware.owned_transfer_runner import OwnedTransferRunner
 
 
 def provision_lifecycle(database: Path, simulation_id: str) -> str:
@@ -66,8 +67,8 @@ class SimulationLifecycleStore(SQLiteStore):
         return [name for name in super()._user_tables() if name != "offline_lifecycle_identity"]
 
 
-class SimulatedLifecycleCoordinator:
-    """Bind a validated stored plan to claim/start/Stop/result using fake devices only.
+class PlanLifecycleCoordinator:
+    """Shared plan validation and lifecycle binding for both offline execution paths.
 
     Failure/unknown intentionally leaves lifecycle execution unresolved for the
     existing startup reconciliation path. No automatic resend/resume or cleanup.
@@ -76,12 +77,17 @@ class SimulatedLifecycleCoordinator:
     def __init__(
         self,
         store: SimulationLifecycleStore,
-        runner: SimulatedP1Runner,
+        runner: SimulatedP1Runner | OwnedTransferRunner,
         *,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ):
-        if type(store) is not SimulationLifecycleStore or type(runner) is not SimulatedP1Runner:
-            raise TypeError("only explicit offline lifecycle and simulation runner supported")
+        if type(store) is not SimulationLifecycleStore or type(runner) not in (
+            SimulatedP1Runner,
+            OwnedTransferRunner,
+        ):
+            raise TypeError(
+                "only explicit offline lifecycle and approved offline runners supported"
+            )
         if store.simulation_id != runner.database_id:
             raise SimulationBlocked("lifecycle and runner database identities differ")
         self.store = store
@@ -192,3 +198,8 @@ class SimulatedLifecycleCoordinator:
         )
         assert resolution is not None
         return resolution
+
+
+# Historical name retained for existing offline callers. Both runners share the
+# same lifecycle validation and commit path; the candidate uses shared ownership.
+SimulatedLifecycleCoordinator = PlanLifecycleCoordinator
