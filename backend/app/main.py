@@ -30,6 +30,7 @@ from app.hardware.arduino_command_journal import (
 )
 from app.hardware.arduino_serial import ArduinoSerialError
 from app.hardware.sf_bottom_valve import SfBottomValveControl
+from app.hardware.owned_hardware import OwnedHardware
 from app.persistence.sqlite_store import PersistenceConflictError, SQLiteStore
 from app.startup_bootstrap import bootstrap_process_startup
 
@@ -226,7 +227,13 @@ def create_app(
     sf_bottom_valve: SfBottomValveControl | None = None,
     arduino_commands: ArduinoCommandExecutor | None = None,
     arduino_runtime: ArduinoRuntime | None = None,
+    owned_hardware: OwnedHardware | None = None,
 ) -> FastAPI:
+    if owned_hardware is not None:
+        if any(value is not None for value in (sf_bottom_valve, arduino_commands, arduino_runtime)):
+            raise ValueError("owned hardware cannot be mixed with unguarded hardware arguments")
+        sf_bottom_valve = owned_hardware.sf_service
+        arduino_commands = owned_hardware.arduino_service
     configured_database_path = _configured_database_path(database_path)
 
     @asynccontextmanager
