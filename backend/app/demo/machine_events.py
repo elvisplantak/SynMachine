@@ -11,7 +11,7 @@ from app.demo.machine_models import (
     RuntimeHardwareFaultReason,
     StartupRecoveryReason,
 )
-from app.demo.phases import HARDWARE_EXECUTION_PHASES, RunPhase
+from app.demo.phases import EXECUTION_INTENT_PHASES, RunPhase
 
 
 class MachineEventType(StrEnum):
@@ -76,7 +76,7 @@ class MachineEvent(BaseModel):
                 )
             if self.execution_phase is None:
                 raise ValueError("PHASE_EXECUTION_CLAIMED requires execution_phase")
-            if self.execution_phase not in HARDWARE_EXECUTION_PHASES:
+            if self.execution_phase not in EXECUTION_INTENT_PHASES:
                 raise ValueError(
                     "execution_phase does not support hardware execution"
                 )
@@ -109,7 +109,7 @@ class MachineEvent(BaseModel):
                 self.machine_state is not MachineState.BUSY
                 or self.run_id is None
                 or self.execution_id is None
-                or self.execution_phase not in HARDWARE_EXECUTION_PHASES
+                or self.execution_phase not in EXECUTION_INTENT_PHASES
                 or self.execution_claimed_at is None
             ):
                 raise ValueError(
@@ -146,7 +146,7 @@ class MachineEvent(BaseModel):
                 raise ValueError(
                     "PHASE_EXECUTION_RESOLVED requires non-empty execution_id"
                 )
-            if self.execution_phase not in HARDWARE_EXECUTION_PHASES:
+            if self.execution_phase not in EXECUTION_INTENT_PHASES:
                 raise ValueError(
                     "PHASE_EXECUTION_RESOLVED requires hardware execution_phase"
                 )
@@ -183,7 +183,7 @@ class MachineEvent(BaseModel):
                 or not self.run_id.strip()
                 or self.execution_id is None
                 or not self.execution_id.strip()
-                or self.execution_phase not in HARDWARE_EXECUTION_PHASES
+                or self.execution_phase not in EXECUTION_INTENT_PHASES
                 or self.execution_claimed_at is None
                 or self.startup_interruption_kind is None
             ):

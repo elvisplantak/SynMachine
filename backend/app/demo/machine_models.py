@@ -4,7 +4,7 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.demo.phases import HARDWARE_EXECUTION_PHASES, RunPhase
+from app.demo.phases import EXECUTION_INTENT_PHASES, RunPhase
 
 
 class MachineState(StrEnum):
@@ -155,7 +155,7 @@ class PhaseExecutionIntent(BaseModel):
     @field_validator("phase")
     @classmethod
     def validate_phase(cls, value: RunPhase) -> RunPhase:
-        if value not in HARDWARE_EXECUTION_PHASES:
+        if value not in EXECUTION_INTENT_PHASES:
             raise ValueError("phase does not support hardware execution")
         return value
 

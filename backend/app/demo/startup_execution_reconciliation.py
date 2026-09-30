@@ -11,7 +11,7 @@ from app.demo.machine_models import (
     PhaseExecutionStartupInterruptionKind,
     StartupRecoveryReason,
 )
-from app.demo.phases import HARDWARE_EXECUTION_PHASES, RunPhase
+from app.demo.phases import EXECUTION_INTENT_PHASES, RunPhase
 from app.demo.run_models import DemoRun, RunStatus
 
 
@@ -48,7 +48,7 @@ def reconcile_interrupted_phase_execution_at_startup(
         run.run_id != machine.active_run_id
         or run.run_id != intent.run_id
         or run.phase != intent.phase
-        or run.phase not in HARDWARE_EXECUTION_PHASES
+        or run.phase not in EXECUTION_INTENT_PHASES
         or run.status not in {RunStatus.RUNNING, RunStatus.ABORTING}
     ):
         raise StartupExecutionReconciliationError(

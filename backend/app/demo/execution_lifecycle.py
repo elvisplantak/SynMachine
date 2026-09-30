@@ -10,7 +10,7 @@ from app.demo.machine_models import (
     MachineState,
     PhaseExecutionIntent,
 )
-from app.demo.phases import HARDWARE_EXECUTION_PHASES, RunPhase
+from app.demo.phases import EXECUTION_INTENT_PHASES, RunPhase
 from app.demo.run_models import DemoRun, RunStatus
 
 
@@ -51,7 +51,7 @@ def claim_phase_execution(
         raise PhaseExecutionClaimError(
             f"phase execution claim requires RUNNING status, got {run.status.value}"
         )
-    if run.phase not in HARDWARE_EXECUTION_PHASES:
+    if run.phase not in EXECUTION_INTENT_PHASES:
         raise PhaseExecutionClaimError(
             f"phase {run.phase.value} does not support hardware execution"
         )

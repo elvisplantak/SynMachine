@@ -14,7 +14,7 @@ from app.demo.machine_models import (
     PhaseExecutionOutcome,
     PhaseExecutionResult,
 )
-from app.demo.phases import HARDWARE_EXECUTION_PHASES
+from app.demo.phases import EXECUTION_INTENT_PHASES
 from app.demo.run_models import DemoRun, RunStatus
 
 
@@ -62,7 +62,7 @@ def resolve_phase_execution(
         or machine.active_run_id != run.run_id
         or intent.run_id != run.run_id
         or intent.phase != run.phase
-        or intent.phase not in HARDWARE_EXECUTION_PHASES
+        or intent.phase not in EXECUTION_INTENT_PHASES
     ):
         raise InvalidExecutionResultError(
             "INVALID_EXECUTION_RESULT: inconsistent active aggregate"

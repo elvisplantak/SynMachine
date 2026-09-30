@@ -57,6 +57,7 @@ class SimulatedP1Device:
         self.during_wait: Callable[[Decimal], None] = lambda _: None
         self.sf_session_id = str(uuid4())
         self.sf_calls: list[dict] = []
+        self.sf_mixer_running: bool | None = None
         self.before_sf_send: Callable[[dict], None] = lambda _: None
 
     def execute(self, **values) -> ArduinoCommandResult:

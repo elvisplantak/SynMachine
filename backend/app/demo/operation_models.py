@@ -33,6 +33,8 @@ class SymbolicRouteId(StrEnum):
 
 
 class OperationKind(StrEnum):
+    TIMED_SF_MIXING = "TIMED_SF_MIXING"
+    SF_SETTLING_WAIT = "SF_SETTLING_WAIT"
     SELECT_ROUTE = "SELECT_ROUTE"
     ASPIRATE = "ASPIRATE"
     DISPENSE = "DISPENSE"
@@ -300,6 +302,25 @@ class DispenseOperation(BaseModel):
         return self
 
 
+class TimedSfOperation(BaseModel):
+    """Timed fixed-profile mixing with required STOP, or passive SF settling."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    operation_kind: Literal[OperationKind.TIMED_SF_MIXING, OperationKind.SF_SETTLING_WAIT]
+    operation_number: Literal[1]
+    duration_seconds: Decimal
+
+    @model_validator(mode="after")
+    def validate_duration(self) -> Self:
+        duration = self.duration_seconds
+        if not duration.is_finite() or duration < 0:
+            raise ValueError("SF duration must be finite and non-negative")
+        if self.operation_kind is OperationKind.TIMED_SF_MIXING and duration == 0:
+            raise ValueError("SF mixing duration must be positive")
+        return self
+
+
 PlannedOperation = Annotated[
     SelectRouteOperation
     | AspirateOperation
@@ -308,7 +329,8 @@ PlannedOperation = Annotated[
     | AspirateFromSfOperation
     | PrepareColumnFractionCollectionOperation
     | CollectColumnFractionOperation
-    | MoveCarouselToNextFractionOperation,
+    | MoveCarouselToNextFractionOperation
+    | TimedSfOperation,
     Field(discriminator="operation_kind"),
 ]
 

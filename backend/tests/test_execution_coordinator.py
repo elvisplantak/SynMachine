@@ -179,11 +179,11 @@ class InconsistentPostClaimStore(SQLiteStore):
         return machine
 
 
-def _started_service(store: SQLiteStore) -> GuidedDemoApplicationService:
+def _started_service(store: SQLiteStore, settings=SETTINGS) -> GuidedDemoApplicationService:
     service = GuidedDemoApplicationService(store)
     service.initialize_machine(NOW)
     service.complete_startup(NOW + timedelta(seconds=1))
-    service.create_run("run-1", CONFIGURATION, SETTINGS, NOW)
+    service.create_run("run-1", CONFIGURATION, settings, NOW)
     service.start_run("run-1", NOW + timedelta(seconds=2))
     return service
 

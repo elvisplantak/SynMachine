@@ -18,6 +18,7 @@ from app.demo.run_models import RunStatus
 from app.hardware.simulated_p1_runner import SimulatedP1Runner, SimulationBlocked
 from app.persistence.sqlite_store import SCHEMA_VERSION, SQLiteStore
 from app.hardware.owned_transfer_runner import OwnedTransferRunner
+from app.demo.timed_sf_operation_plan import TimedSfOperationPlan, plan_timed_sf_operations
 
 
 def provision_lifecycle(database: Path, simulation_id: str) -> str:
@@ -118,9 +119,16 @@ class PlanLifecycleCoordinator:
             for p in plan.prepared.assumptions.pumps
         ):
             raise SimulationBlocked("current calibration does not match prepared assumptions")
-        operations = GuidedDemoPhaseExecutor._build_current_phase_operations(
-            run, calibrations, column_readiness=column_readiness
-        )
+        if isinstance(plan.source.plan, TimedSfOperationPlan):
+            # Full source equality prevents changes to duration/phase metadata.
+            current_source = plan_timed_sf_operations(run)
+            if current_source != plan.source.plan:
+                raise SimulationBlocked("stored timed SF plan differs from current run")
+            operations = current_source.operations
+        else:
+            operations = GuidedDemoPhaseExecutor._build_current_phase_operations(
+                run, calibrations, column_readiness=column_readiness
+            )
         if operations != plan.source.plan.operations:
             raise SimulationBlocked("stored operations do not match current run preparation")
         intent = None

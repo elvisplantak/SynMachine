@@ -28,7 +28,7 @@ from app.demo.phase_result_resolution import (
     PhaseExecutionResolution,
     resolve_phase_execution as resolve_phase_execution_transition,
 )
-from app.demo.phases import HARDWARE_EXECUTION_PHASES, RunPhase
+from app.demo.phases import EXECUTION_INTENT_PHASES, RunPhase
 from app.demo.run_models import DemoRun
 from app.demo.startup_execution_reconciliation import (
     StartupExecutionReconciliationError,
@@ -575,7 +575,7 @@ class SQLiteStore:
             if (
                 run.run_id != intent.run_id
                 or run.phase != intent.phase
-                or run.phase not in HARDWARE_EXECUTION_PHASES
+                or run.phase not in EXECUTION_INTENT_PHASES
             ):
                 raise StartupExecutionReconciliationConflictError(
                     "startup execution reconciliation requires matching "

@@ -26,6 +26,7 @@ from app.demo.operation_models import (
     PrepareColumnFractionCollectionOperation,
     PrepareSfToColumnTransferOperation,
     SelectRouteOperation,
+    TimedSfOperation,
     SymbolicRouteId,
 )
 from app.hardware.provenance import reject_lost_keys
@@ -319,7 +320,16 @@ class _Planner:
             self.operation_number = number
             actions: tuple[Action, ...]
             followup: tuple[Action, ...] = ()
-            if isinstance(operation, SelectRouteOperation):
+            if isinstance(operation, TimedSfOperation):
+                if self.sf is not BottomValveState.CLOSED:
+                    raise CommandPlanningError("timed SF phases require SF bottom valve CLOSED")
+                wait = CollectionWait(operation.duration_seconds)
+                if operation.operation_kind is OperationKind.TIMED_SF_MIXING:
+                    actions = (self._arduino("mixer-start", "SF_MIXER_SET_STATE", running=True), wait)
+                    followup = (self._arduino("mixer-stop", "SF_MIXER_SET_STATE", running=False),)
+                else:
+                    actions = (wait,)
+            elif isinstance(operation, SelectRouteOperation):
                 actions = self._route(operation.route_id)
             elif isinstance(operation, (AspirateOperation, DispenseOperation)):
                 if self.active_route is SymbolicRouteId.SF_BOTTOM_TO_P2:

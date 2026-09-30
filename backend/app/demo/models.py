@@ -22,9 +22,19 @@ class DemoExecutionSettings(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    # None preserves existing run snapshots without inventing a mixing duration.
+    # Automatic SF mixing requires explicit configuration before run creation.
+    sf_mixing_duration_seconds: Decimal | None = None
     sf_settling_duration_seconds: Decimal
     fraction_count: int = Field(ge=1)
     fraction_duration_seconds: Decimal
+
+    @field_validator("sf_mixing_duration_seconds")
+    @classmethod
+    def validate_mixing_duration(cls, value: Decimal | None) -> Decimal | None:
+        if value is not None and (not value.is_finite() or value <= 0):
+            raise ValueError("SF mixing duration must be finite and positive")
+        return value
 
     @field_validator("sf_settling_duration_seconds", "fraction_duration_seconds")
     @classmethod

@@ -26,3 +26,10 @@ HARDWARE_EXECUTION_PHASES = frozenset(
         RunPhase.COLUMN_FRACTION_COLLECTION,
     }
 )
+
+
+# Lifecycle intent support is broader than legacy phase-executor support.
+# Adding an intent does not activate a command API or the legacy executor.
+EXECUTION_INTENT_PHASES = HARDWARE_EXECUTION_PHASES | frozenset(
+    {RunPhase.SF_MIXING, RunPhase.SF_SETTLING}
+)

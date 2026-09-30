@@ -32,6 +32,7 @@ from app.hardware.command_planning import (
     prepare_command_plan,
 )
 from app.hardware.provenance import reject_lost_keys
+from app.demo.timed_sf_operation_plan import TimedSfOperationPlan
 from app.protocol.models import PhaseExecutionId
 
 SourcePlan = (
@@ -40,6 +41,7 @@ SourcePlan = (
     | P2ReactorToSfOperationPlan
     | P2SfToColumnOperationPlan
     | ColumnFractionCollectionOperationPlan
+    | TimedSfOperationPlan
 )
 
 
@@ -121,7 +123,7 @@ class StoredCommandPlan(BaseModel):
     def validate_derivation(self) -> Self:
         plan = self.source.plan
         context = self.prepared.assumptions
-        if not isinstance(plan, ColumnFractionCollectionOperationPlan):
+        if not isinstance(plan, (ColumnFractionCollectionOperationPlan, TimedSfOperationPlan)):
             cycle_plan = plan.transfer_cycle_plan
             pump = next(
                 (p for p in context.pumps if p.calibration.pump_id == cycle_plan.pump_id), None

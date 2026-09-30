@@ -5,7 +5,16 @@ import sqlite3
 import pytest
 
 from app.demo.calibration_models import PumpCalibrationSet
-from app.demo.guided_demo_phase_executor import GuidedDemoPhaseExecutor
+from app.demo.guided_demo_phase_executor import (
+    GuidedDemoPhaseExecutor,
+    ColumnFractionCollectionReadiness,
+)
+from app.demo.phases import RunPhase
+from app.demo.timed_sf_operation_plan import plan_timed_sf_operations
+from app.demo.column_fraction_collection_operation_plan import (
+    ColumnFractionCollectionConfiguration,
+    plan_column_fraction_collection_operations,
+)
 from app.demo.hardware_contract import BottomValveState
 from app.demo.operation_executor import ProtectedOperationError
 from app.demo.run_models import RunStatus
@@ -35,7 +44,11 @@ class Case:
     calibrations: object
 
     def execute(self):
-        return self.coordinator.execute("test-phase-1", self.calibrations)
+        return self.coordinator.execute(
+            "test-phase-1",
+            self.calibrations,
+            column_readiness=ColumnFractionCollectionReadiness(True, True),
+        )
 
     def stop(self):
         self.service.request_stop_demo("run-1", datetime.now(UTC))
@@ -54,7 +67,7 @@ class Case:
 def case(tmp_path):
     resources = []
 
-    def create(phase=PHASES[0]):
+    def create(phase=PHASES[0], *, settings=None, timer=None, mixer_running=None):
         directory = tmp_path / str(len(resources))
         directory.mkdir()
         paths = tuple(directory / name for name in ("owner.db", "execution.db", "life.db"))
@@ -64,7 +77,7 @@ def case(tmp_path):
         owner = HardwareOwnership(paths[0], oid)
         store = SimulationLifecycleStore(paths[2], lid, eid)
         resources.extend([owner, store])
-        service = _started_service(store)
+        service = _started_service(store) if settings is None else _started_service(store, settings)
         _advance_to_phase(service, store, phase)
         run = store.load_demo_run("run-1")
         ctx = context()
@@ -81,17 +94,30 @@ def case(tmp_path):
             source = plan_p1_reagent_to_reactor_operations(phase, run.fluid_plan, cals)
         elif phase == PHASES[3]:
             source = plan_p2_reactor_to_sf_operations(run.fluid_plan, cals)
-        else:
+        elif phase == PHASES[4]:
             source = plan_p2_sf_to_column_operations(run.fluid_plan, cals)
-        assert source.operations == GuidedDemoPhaseExecutor._build_current_phase_operations(
-            run, cals, column_readiness=None
-        )
+        elif phase is RunPhase.COLUMN_FRACTION_COLLECTION:
+            source = plan_column_fraction_collection_operations(
+                ColumnFractionCollectionConfiguration.from_execution_settings(
+                    run.execution_settings,
+                    carousel_ready_confirmed=True,
+                    column_bottom_valve_referenced_confirmed=True,
+                )
+            )
+        else:
+            source = plan_timed_sf_operations(run)
+        if phase in PHASES:
+            assert source.operations == GuidedDemoPhaseExecutor._build_current_phase_operations(
+                run, cals, column_readiness=ColumnFractionCollectionReadiness(True, True)
+            )
         with SQLiteCommandPlanStore(paths[1]) as plans:
             plans.persist(
                 PlanSource(run_id=run.run_id, run_event_sequence=run.event_sequence, plan=source),
                 ctx,
             )
-        runner = OwnedTransferRunner(paths[1], eid, owner, SimulatedP1Device(ctx))
+        device = SimulatedP1Device(ctx)
+        device.sf_mixer_running = mixer_running
+        runner = OwnedTransferRunner(paths[1], eid, owner, device, timer=timer)
         resources.append(runner)
         return Case(
             PlanLifecycleCoordinator(store, runner),
@@ -113,9 +139,14 @@ def assert_restart_blocked(c):
     owner = HardwareOwnership(c.paths[0], c.identities[0])
     store = SimulationLifecycleStore(c.paths[2], c.identities[2], c.identities[1])
     runner = OwnedTransferRunner(c.paths[1], c.identities[1], owner, SimulatedP1Device(context()))
+    runner.device.sf_mixer_running = False
     try:
         with pytest.raises((SimulationBlocked, OwnershipBlocked)):
-            PlanLifecycleCoordinator(store, runner).execute("test-phase-1", c.calibrations)
+            PlanLifecycleCoordinator(store, runner).execute(
+                "test-phase-1",
+                c.calibrations,
+                column_readiness=ColumnFractionCollectionReadiness(True, True),
+            )
         with pytest.raises(OwnershipBlocked):
             runner.hardware.sf_service.set_state(BottomValveState.CLOSED)
         assert not runner.device.calls and not runner.device.sf_calls

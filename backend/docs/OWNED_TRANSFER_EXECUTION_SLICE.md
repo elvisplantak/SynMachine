@@ -1,9 +1,12 @@
 # Owned transfer execution slice — 2026-09-30
 
+This historical checkpoint is accepted with zero independent-review findings.
+The next extension is documented in [OWNED_TIMED_EXECUTION.md](OWNED_TIMED_EXECUTION.md).
+
 Accepted base: `620e3fb4c9e741461f091df019e2743d9ca96481`.
 Branch: `codex/owned-execution-slice`.
 The previous shared-ownership checkpoint was independently accepted with zero
-findings. This document describes new, not-yet-reviewed integration work.
+findings. This document records the accepted transfer-only integration checkpoint.
 
 ## Concrete result
 
