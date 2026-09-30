@@ -1,12 +1,42 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-09-29
-- Development phase: stored-plan simulation bound to durable run lifecycle; consolidated independent review accepted;
+- Checkpoint date: 2026-09-30
+- Development phase: shared durable Arduino/SF/Service ownership implemented in explicit composition; review pending;
   V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Immediate continuation checkpoint — 2026-09-29
+## Immediate continuation checkpoint — 2026-09-30
+
+- Backend `codex/simulated-p1-execution` HEAD:
+  `620e3fb4c9e741461f091df019e2743d9ca96481`.
+  Accepted base: `9eed35297066ffbe47a4c4bd01a9ff586ed0991b` (zero findings).
+- HardwareOwnership supplies a durable sequence owner across Arduino/SF and
+  Service paths wired through OwnedHardware. Explicit new-file provisioning,
+  existing-file/UUID/schema/history validation, process-local non-resumable leases,
+  non-waiting operation gate and SQLite cross-process claim exclusion.
+- Ownership remains across gaps and required CLOSE. Errors, unknown outcomes,
+  Stop and crashes retain the owner. Failed retention writes preserve the primary
+  exception and poison the local lease. Explicit completion releases only after
+  caller-owned successful lifecycle resolution; no automatic recovery/release.
+- create_app(owned_hardware=...) binds both Service paths and rejects mixing raw
+  runtime/adapters. This injection is tested with fakes; environment startup is
+  NOT changed, and legacy unwrapped paths are NOT claimed protected. The new
+  Service wrapper rejects standalone continuous mixer START before send, pending
+  retained START/STOP lifecycle integration. Existing unwrapped behavior unchanged.
+- 38 new tests, 99 focused tests, 1337 full backend tests pass; Ruff and diff checks
+  pass. Tests cover every Service endpoint, concurrency, required CLOSE, scoped
+  access, process death, wrong databases and claim/block/release write failures.
+- Independent review checkpoint: docs/SHARED_HARDWARE_OWNERSHIP.md in backend.
+  User receives a copy-paste handoff. No main merge or hardware activation.
+- Next: connect accepted lifecycle execution to the shared composition and SF
+  durable action journal; retain ownership across mixer START/STOP; deliberate
+  recovery. Live routes, current trust, SF OPEN/Stop semantics, timers and actual
+  startup activation remain gated. No motor/Serial/Dynamixel action in this work.
+- /tmp worktrees were removed across restart and restored from committed branches;
+  backend /tmp/labforge-p1-execution and UI /tmp/labforge-ui-p1-execution are current.
+
+## Accepted lifecycle checkpoint — 2026-09-29
 
 - Backend `codex/simulated-p1-execution` HEAD:
   `9eed35297066ffbe47a4c4bd01a9ff586ed0991b`. Immediate base: collection milestone
