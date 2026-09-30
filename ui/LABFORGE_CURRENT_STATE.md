@@ -1,12 +1,55 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-09-30
-- Development phase: integrated transfer lifecycle/shared ownership/Arduino-SF journals under fake transport; review pending;
+- Development phase: owned collection, monotonic timers and SF mixing/settling integrated under fake transport; review pending;
   V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Immediate continuation checkpoint — integrated transfer slice
+## Immediate continuation checkpoint — owned timed execution
+
+- Backend branch `codex/owned-execution-slice`, HEAD
+  `d3ad800f22642d0246db70cae6093ac9fae836f1`; accepted base
+  `771ad703d70fef9cde94e9fb2c00bea57c811665` (independent review: all severities zero).
+- The same owned runner/coordinator now executes Column collection with protected
+  CLOSE, carousel moves, timed SF START/wait/required STOP, and passive SF settling.
+  No alternate dispatch path. Default startup and fake-only assembly remain unchanged.
+- User chose SF mixing duration in seconds, configured before starting a run.
+  Added optional positive `sf_mixing_duration_seconds` to execution settings;
+  missing duration blocks automatic mixing before claim, with no invented default.
+  UI input is not added yet. Mixer uses only the existing fixed-profile boolean
+  command; no percentage-to-speed conversion or speed calibration is claimed.
+- Monotonic nanosecond timer with bounded cooperative polling is explicitly
+  injectable; default fixture waits remain virtual. Wait intent precedes waiting,
+  and operation completion is recorded only after successful required cleanup.
+  Interrupted fractions are not counted complete. Ownership covers the entire
+  wait and lifecycle resolution; Service commands stay blocked.
+- Runtime carousel projection is invalidated before movement and restored only
+  after completed command/persistence. Boot change invalidates fixture trust.
+  SF mixing/settling require independently stopped mixer fixture state.
+- Stop, unknown, persistence fault and process death retain ownership. Required
+  STOP/CLOSE does not erase primary errors. Restart never resumes timers or sends
+  START/STOP/CLOSE. Existing explicit startup reconciliation recognizes timed SF
+  intents but does not release the shared owner. Full recovery remains deferred.
+- Execution database gains wait/carousel evidence tables; previous schema is
+  rejected without migration or repair. No original project database was changed.
+  Lifecycle/ownership schemas remain unchanged. The broader intent-phase set does
+  not activate new phases in the legacy executor or bypass active-intent guards.
+- Verification: 87 new regressions, 194 focused and 1462 full backend tests pass;
+  Ruff and diff checks pass. Includes actual process death, a real short timer,
+  separate-connection Stop, and all six primary/cleanup journal-fault combinations
+  for both Column CLOSE and mixer STOP.
+- Consolidated review document: backend `docs/OWNED_TIMED_EXECUTION.md`.
+  No main merge, new execution API activation, Serial/Dynamixel connection,
+  firmware change, UI behavior change or physical test occurred.
+- Next: evaluate this combined checkpoint, then address fresh multi-phase state
+  and deliberate cross-database recovery. Delay/reaction-hold Pause/Resume timers,
+  live route approval, live SF OPEN/Stop semantics and production startup remain
+  gates. Hardware trust must be independently re-established before live tests.
+- Worktrees: `/tmp/labforge-p1-execution`, `/tmp/labforge-ui-p1-execution`, both on
+  `codex/owned-execution-slice`. Prior physical checkpoint below is unchanged.
+
+## Accepted integrated transfer checkpoint — 2026-09-30
 
 - Backend branch `codex/owned-execution-slice`, HEAD
   `771ad703d70fef9cde94e9fb2c00bea57c811665`; accepted base
@@ -27,8 +70,10 @@
 - Verification: 38 new integration tests; 107 focused and 1375 full backend tests
   pass; Ruff and diff checks pass. Includes all six required SF CLOSE persistence
   fault combinations and actual subprocess death during Arduino/SF sends.
-- Documentation: backend `docs/OWNED_TRANSFER_EXECUTION_SLICE.md`. This is a
-  meaningful combined review gate, not separate reviews for individual edits.
+- Independent review accepted this HEAD with Critical/High/Medium/Low all zero.
+  No corrections requested. Documentation: backend
+  `docs/OWNED_TRANSFER_EXECUTION_SLICE.md`. Remaining gates were not accepted as
+  completed, and review did not authorize hardware activation or main merge.
 - Limits: fake-only construction and independent per-attempt fixture context;
   no generalized live trust or complete multi-phase demo. Collection/timers and
   continuous mixer ownership are not integrated in this new path. Live route

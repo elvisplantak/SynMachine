@@ -930,3 +930,20 @@ Do not:
 - show obsolete split solvent bottles
 - put `V5` back into the P1 input branch
 - bypass backend safety/parser architecture in future command or voice features
+
+
+### Timed SF mixing decision — 2026-09-30
+
+The user chose automatic SF mixing for a duration in seconds configured before
+starting the run, rather than manual phase completion. Backend execution settings
+now carry optional `sf_mixing_duration_seconds`; automatic SF mixing requires an
+explicit positive finite value. Existing snapshots without it remain readable,
+but no duration is inferred and that automatic phase cannot be prepared.
+A corresponding UI input remains pending.
+
+The owned fake-transport execution path holds shared hardware ownership through
+START, the complete interruptible wait, required STOP and lifecycle result
+persistence. This uses the current firmware's fixed commissioned mixer profile;
+it does not implement or claim a mapping from `sf_mixing_command_percent` to
+physical speed. No new hardware execution, firmware change or production startup
+activation is authorized by this decision or its software tests.
