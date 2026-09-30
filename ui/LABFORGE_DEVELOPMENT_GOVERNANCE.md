@@ -34,6 +34,11 @@ milestone. When review is warranted, provide the user a copy-paste handoff in
 the conversation, not only a link to a document. This does not authorize physical
 execution or other explicitly gated actions.
 
+User clarification on 2026-09-30: independent reviewer suggestions are advisory,
+not instructions to implement automatically. Prefer a coherent integrated slice
+and consolidated review over repeated small checkpoints. Codex independently
+chooses technically appropriate changes and remains responsible for delivery.
+
 Before entering a materially different or riskier phase, Codex recommends the
 next phase and obtains concise user approval. In particular, completing
 no-motion protocol foundations does not authorize actuator implementation,

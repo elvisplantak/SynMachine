@@ -1,12 +1,47 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-09-30
-- Development phase: shared durable Arduino/SF/Service ownership implemented in explicit composition; review pending;
+- Development phase: integrated transfer lifecycle/shared ownership/Arduino-SF journals under fake transport; review pending;
   V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Immediate continuation checkpoint — 2026-09-30
+## Immediate continuation checkpoint — integrated transfer slice
+
+- Backend branch `codex/owned-execution-slice`, HEAD
+  `771ad703d70fef9cde94e9fb2c00bea57c811665`; accepted base
+  `620e3fb4c9e741461f091df019e2743d9ca96481`. New branch, no main merge.
+- One path now connects stored plans, the accepted lifecycle coordinator,
+  shared ownership, durable Arduino/SF intent/results and fake transports for
+  all five P1/P2 transfer phases. Service adapters share the same composition.
+  There is no direct legacy send/fallback inside this candidate composition;
+  historical simulator tests and default application startup remain unchanged.
+- Execution database holds plans and both journals; ownership and lifecycle
+  retain their accepted separate stores. No added simulation owner/phase ledger.
+  UUID bindings and exact execution-schema validation reject wrong/missing/empty
+  files without automatic creation, migration or repair on reopen.
+- Ownership precedes lifecycle claim/start and remains through result persistence.
+  Required CLOSE shares the gate and preserves primary/cleanup errors. Stop,
+  unknown, crash and write failures retain the owner. Restart cannot resume,
+  resend, auto-close or release. SF Service intent identifies its owning sequence.
+- Verification: 38 new integration tests; 107 focused and 1375 full backend tests
+  pass; Ruff and diff checks pass. Includes all six required SF CLOSE persistence
+  fault combinations and actual subprocess death during Arduino/SF sends.
+- Documentation: backend `docs/OWNED_TRANSFER_EXECUTION_SLICE.md`. This is a
+  meaningful combined review gate, not separate reviews for individual edits.
+- Limits: fake-only construction and independent per-attempt fixture context;
+  no generalized live trust or complete multi-phase demo. Collection/timers and
+  continuous mixer ownership are not integrated in this new path. Live route
+  switching, SF OPEN/Stop policy, current trust, deliberate recovery and actual
+  production startup/API/transport activation remain gated. No physical action,
+  firmware change or UI behavior change occurred.
+- Next: evaluate consolidated review, then extend the same path to collection/
+  timers and mixer ownership without parallel command execution paths. Establish
+  fresh-state transitions and deliberate recovery before any live activation.
+- Worktrees remain `/tmp/labforge-p1-execution` and
+  `/tmp/labforge-ui-p1-execution`, now on `codex/owned-execution-slice`.
+
+## Accepted shared ownership checkpoint — 2026-09-30
 
 - Backend `codex/simulated-p1-execution` HEAD:
   `620e3fb4c9e741461f091df019e2743d9ca96481`.
@@ -27,8 +62,9 @@
 - 38 new tests, 99 focused tests, 1337 full backend tests pass; Ruff and diff checks
   pass. Tests cover every Service endpoint, concurrency, required CLOSE, scoped
   access, process death, wrong databases and claim/block/release write failures.
-- Independent review checkpoint: docs/SHARED_HARDWARE_OWNERSHIP.md in backend.
-  User receives a copy-paste handoff. No main merge or hardware activation.
+- Independent review accepted HEAD `620e3fb4c9e741461f091df019e2743d9ca96481`
+  with Critical/High/Medium/Low all zero; no corrections. Remaining production
+  gates were explicitly not completed by that commit. No main merge or activation.
 - Next: connect accepted lifecycle execution to the shared composition and SF
   durable action journal; retain ownership across mixer START/STOP; deliberate
   recovery. Live routes, current trust, SF OPEN/Stop semantics, timers and actual
