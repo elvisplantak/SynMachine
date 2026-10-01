@@ -1,12 +1,58 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-10-01
-- Development phase: command-confirmed multi-phase continuity integrated under fake transport; independently accepted;
+- Development phase: complete fake demo with owned Pause/Resume waits; consolidated review pending;
   V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Immediate continuation checkpoint — owned multiphase session
+## Immediate continuation checkpoint — full fake demo with pausable waits
+
+- Backend branch `codex/owned-pausable-demo`, HEAD
+  `3d9fab24f325f3a2da59d69215465e110acd3c33`; accepted base
+  `dc9412bbf463ed95b71d16bd63e6bab94586d3f5` (independent review: all severities zero).
+- All ten active phases now execute through one `OwnedPhaseSession`, including
+  `DELAY_BETWEEN_ADDITIONS` and `REACTION_HOLD`. Full connected tests cover both
+  reagent orders and Pause/Resume in both waits without fixture resets.
+- New strict source plans compile to passive wait actions. Durations come from
+  the run configuration; no heater, temperature feedback or reactor mixer control
+  is implied. Runtime duration editing and UI controls remain unintegrated.
+- An explicit monotonic timer is required for these phases. Intent is persisted
+  before waiting. Pause/Resume uses durable domain events under a matching started
+  wait intent; ownership remains held throughout pauses and blocks Service work.
+- Control reads validate a consistent run/intent/event snapshot, replaying only
+  valid Pause/Resume/Stop events. Monotonic accounting excludes paused time, read
+  overhead and intervals containing control transitions, including a short complete
+  Pause/Resume pair between polls. It may conservatively extend a wait; no exact
+  real-time or chemical timing claim is made.
+- Pause racing with lifecycle completion is deferred atomically without resolving
+  the intent or releasing ownership. The same execution waits for Resume or Stop;
+  no commands/intent are resent. Token and timestamp validation remain enforced.
+  Stop during a pause or at the timer deadline aborts and retains ownership.
+- Process death during a wait/pause cannot reconstruct or resume execution. Unknown,
+  persistence or connection errors block continuity. Existing cross-database failure
+  boundaries remain non-atomic and require deliberate reconciliation.
+- The legacy execution coordinator explicitly rejects these new phases before
+  preparation/claim. Broadening lifecycle intent support does not activate the
+  legacy executor or any production API. No database schema or migration is added.
+- Verification: 45 new regressions, 466 focused tests and all 1552 backend tests
+  pass; Ruff and diff checks pass. Includes actual subprocess death while paused,
+  another lifecycle connection issuing Pause/Resume, finalization races, zero
+  durations, wrong-token deferral and injected persistence failures.
+- Review document: backend `docs/OWNED_PAUSABLE_DEMO.md`. Consolidated review of
+  full fake execution and paused completion races is warranted before the next
+  integration milestone. No Serial/Dynamixel, physical test, firmware/UI behavior
+  change, production activation or main merge occurred.
+- Next: deliberate recovery/reconciliation of retained ownership and separate
+  lifecycle/execution databases. Then approved live routes, current physical/session
+  trust and commissioning, explicit live SF OPEN/Stop policy, and production
+  transport/startup/API/UI composition. Full fake execution is not physical readiness.
+- Persistent worktrees, now on `codex/owned-pausable-demo`:
+  `/home/elvis/Documents/labforge-backend-multiphase` and
+  `/home/elvis/Documents/labforge-ui-multiphase`.
+  Both interrupted sessions preserved work after moving out of `/tmp`.
+
+## Accepted owned multiphase session — 2026-10-01
 
 - Backend branch `codex/multiphase-session`, HEAD
   `dc9412bbf463ed95b71d16bd63e6bab94586d3f5`; accepted base
@@ -38,7 +84,7 @@
 - Verification: 45 new regressions; 239 focused tests and all 1507 backend tests
   pass; Ruff and diff checks pass. Includes actual subprocess death, Service from
   another process, race before claim, concurrent entry and result-persistence faults.
-- Review document: backend `docs/OWNED_MULTIPHASE_SESSION.md`. This checkpoint
+- Review document: backend `docs/OWNED_MULTIPHASE_SESSION.md`.
   Independent review accepted HEAD `dc9412bbf463ed95b71d16bd63e6bab94586d3f5`
   with Critical/High/Medium/Low all zero; no correction requested. Reviewer confirmed
   remote HEAD but did not independently rerun tests through the GitHub connector;
