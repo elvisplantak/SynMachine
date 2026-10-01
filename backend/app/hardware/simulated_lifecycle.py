@@ -48,10 +48,13 @@ class SimulationLifecycleStore(SQLiteStore):
     application startup. No absent/empty/wrong database is provisioned or repaired.
     """
 
-    def __init__(self, database: Path, identity: str, simulation_id: str):
+    def __init__(
+        self, database: Path, identity: str, simulation_id: str, *, read_only: bool = False
+    ):
         self.simulation_id = simulation_id
         self._connection = sqlite3.connect(
-            database.resolve().as_uri() + "?mode=rw", uri=True, isolation_level=None
+            database.resolve().as_uri() + ("?mode=ro" if read_only else "?mode=rw"),
+            uri=True, isolation_level=None
         )
         try:
             actual = self._connection.execute(
