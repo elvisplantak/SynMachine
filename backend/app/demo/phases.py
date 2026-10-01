@@ -28,8 +28,13 @@ HARDWARE_EXECUTION_PHASES = frozenset(
 )
 
 
+PAUSABLE_EXECUTION_PHASES = frozenset({RunPhase.DELAY_BETWEEN_ADDITIONS, RunPhase.REACTION_HOLD})
+
+
 # Lifecycle intent support is broader than legacy phase-executor support.
 # Adding an intent does not activate a command API or the legacy executor.
-EXECUTION_INTENT_PHASES = HARDWARE_EXECUTION_PHASES | frozenset(
-    {RunPhase.SF_MIXING, RunPhase.SF_SETTLING}
+EXECUTION_INTENT_PHASES = (
+    PAUSABLE_EXECUTION_PHASES
+    | HARDWARE_EXECUTION_PHASES
+    | frozenset({RunPhase.SF_MIXING, RunPhase.SF_SETTLING})
 )

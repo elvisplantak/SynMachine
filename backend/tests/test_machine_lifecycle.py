@@ -450,7 +450,7 @@ def test_execution_intent_rejects_unsupported_phase() -> None:
         PhaseExecutionIntent(
             execution_id="execution-1",
             run_id="run-1",
-            phase=RunPhase.REACTION_HOLD,
+            phase=RunPhase.READY,
             claimed_at=NOW,
         )
 
@@ -508,7 +508,7 @@ def test_valid_execution_claim_event_is_accepted() -> None:
         ({"execution_id": "   "}, "non-empty execution_id"),
         ({"execution_phase": None}, "requires execution_phase"),
         (
-            {"execution_phase": RunPhase.REACTION_HOLD},
+            {"execution_phase": RunPhase.READY},
             "execution_phase does not support",
         ),
         (

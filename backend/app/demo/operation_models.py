@@ -33,6 +33,7 @@ class SymbolicRouteId(StrEnum):
 
 
 class OperationKind(StrEnum):
+    PAUSABLE_RUN_WAIT = "PAUSABLE_RUN_WAIT"
     TIMED_SF_MIXING = "TIMED_SF_MIXING"
     SF_SETTLING_WAIT = "SF_SETTLING_WAIT"
     SELECT_ROUTE = "SELECT_ROUTE"
@@ -321,6 +322,19 @@ class TimedSfOperation(BaseModel):
         return self
 
 
+class PausableWaitOperation(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    operation_kind: Literal[OperationKind.PAUSABLE_RUN_WAIT]
+    operation_number: Literal[1]
+    duration_seconds: Decimal
+
+    @model_validator(mode="after")
+    def validate_duration(self) -> Self:
+        if not self.duration_seconds.is_finite() or self.duration_seconds < 0:
+            raise ValueError("wait duration must be finite and non-negative")
+        return self
+
+
 PlannedOperation = Annotated[
     SelectRouteOperation
     | AspirateOperation
@@ -330,7 +344,8 @@ PlannedOperation = Annotated[
     | PrepareColumnFractionCollectionOperation
     | CollectColumnFractionOperation
     | MoveCarouselToNextFractionOperation
-    | TimedSfOperation,
+    | TimedSfOperation
+    | PausableWaitOperation,
     Field(discriminator="operation_kind"),
 ]
 

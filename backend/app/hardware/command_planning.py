@@ -27,6 +27,7 @@ from app.demo.operation_models import (
     PrepareSfToColumnTransferOperation,
     SelectRouteOperation,
     TimedSfOperation,
+    PausableWaitOperation,
     SymbolicRouteId,
 )
 from app.hardware.provenance import reject_lost_keys
@@ -163,7 +164,13 @@ class CollectionWait:
     stop_interruptible: Literal[True] = True
 
 
-Action = ArduinoAction | SfBottomValveAction | CollectionWait
+@dataclass(frozen=True)
+class PausableWait:
+    duration_seconds: Decimal
+    pause_supported: Literal[True] = True
+
+
+Action = ArduinoAction | SfBottomValveAction | CollectionWait | PausableWait
 
 
 @dataclass(frozen=True)
@@ -320,12 +327,17 @@ class _Planner:
             self.operation_number = number
             actions: tuple[Action, ...]
             followup: tuple[Action, ...] = ()
-            if isinstance(operation, TimedSfOperation):
+            if isinstance(operation, PausableWaitOperation):
+                actions = (PausableWait(operation.duration_seconds),)
+            elif isinstance(operation, TimedSfOperation):
                 if self.sf is not BottomValveState.CLOSED:
                     raise CommandPlanningError("timed SF phases require SF bottom valve CLOSED")
                 wait = CollectionWait(operation.duration_seconds)
                 if operation.operation_kind is OperationKind.TIMED_SF_MIXING:
-                    actions = (self._arduino("mixer-start", "SF_MIXER_SET_STATE", running=True), wait)
+                    actions = (
+                        self._arduino("mixer-start", "SF_MIXER_SET_STATE", running=True),
+                        wait,
+                    )
                     followup = (self._arduino("mixer-stop", "SF_MIXER_SET_STATE", running=False),)
                 else:
                     actions = (wait,)

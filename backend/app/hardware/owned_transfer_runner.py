@@ -20,6 +20,8 @@ from app.hardware.arduino_command_journal import (
 from app.hardware.command_plan_store import SQLiteCommandPlanStore, _SCHEMA as PLAN_SCHEMA
 from app.hardware.command_planning import ArduinoAction, SfBottomValveAction, CollectionWait
 from app.hardware.execution_timer import MonotonicExecutionTimer
+from app.hardware.command_planning import PausableWait
+from app.demo.pausable_wait_plan import PausableWaitPlan
 from app.hardware.durable_arduino import DurableArduinoCommandExecutor
 from app.hardware.owned_hardware import OwnedHardware
 from app.hardware.sequence_ownership import HardwareOwnership, OwnershipBlocked
@@ -209,9 +211,16 @@ class OwnedTransferRunner:
         if isinstance(plan.source.plan, TimedSfOperationPlan):
             if self.device.sf_mixer_running is not False:
                 raise SimulationBlocked("timed SF phases require independently stopped mixer")
+        if isinstance(plan.source.plan, PausableWaitPlan) and self._timer is None:
+            raise SimulationBlocked("pausable phases require an explicit monotonic timer")
         for operation in plan.prepared.operations:
             for action in (*operation.actions, *operation.required_followup):
-                if type(action) not in (ArduinoAction, SfBottomValveAction, CollectionWait):
+                if type(action) not in (
+                    ArduinoAction,
+                    SfBottomValveAction,
+                    CollectionWait,
+                    PausableWait,
+                ):
                     raise SimulationBlocked("unsupported prepared action")
                 if isinstance(action, ArduinoAction) and action.command not in (
                     "VALVE_SET_POSITION",
@@ -264,15 +273,20 @@ class OwnedTransferRunner:
                 self._invalidate_carousel(self._active_phase)
             raise SimulationBlocked("current controller session differs from prepared session")
 
-    def _wait(self, phase_id, operation_number, action, stop_requested):
+    def _wait(self, phase_id, operation_number, action, stop_requested, wait_control=None):
         self._db.execute(
             "INSERT INTO execution_waits (phase_id, operation_number, duration_seconds, state) "
             "VALUES (?, ?, ?, 'INTENT_PERSISTED')",
             (phase_id, operation_number, str(action.duration_seconds)),
         )
         try:
-            wait = self.device.wait if self._timer is None else self._timer.wait
-            outcome = wait(action.duration_seconds, stop_requested)
+            if isinstance(action, PausableWait):
+                if self._timer is None or wait_control is None:
+                    raise SimulationBlocked("pausable wait requires bound lifecycle control")
+                outcome = self._timer.wait_pausable(action.duration_seconds, wait_control)
+            else:
+                wait = self.device.wait if self._timer is None else self._timer.wait
+                outcome = wait(action.duration_seconds, stop_requested)
             if type(outcome) is not CollectionTimerOutcome:
                 raise ValueError("invalid timer outcome")
         except BaseException as error:
@@ -298,7 +312,15 @@ class OwnedTransferRunner:
         )
 
     def run(
-        self, phase_id, *, run_id, run_event_sequence, stop_requested, before_execute, before_finish
+        self,
+        phase_id,
+        *,
+        run_id,
+        run_event_sequence,
+        stop_requested,
+        before_execute,
+        before_finish,
+        wait_control=None,
     ):
         with self._lock:
             plan = self._validate(phase_id, run_id, run_event_sequence)
@@ -341,9 +363,13 @@ class OwnedTransferRunner:
                             if self._session is not None and not followup:
                                 self._check_boot(plan.prepared.assumptions.controller_boot_id)
                                 self._session.check_connections()
-                            if isinstance(action, CollectionWait):
+                            if isinstance(action, (CollectionWait, PausableWait)):
                                 outcome = self._wait(
-                                    phase_id, operation.operation_number, action, checked_stop
+                                    phase_id,
+                                    operation.operation_number,
+                                    action,
+                                    checked_stop,
+                                    wait_control,
                                 )
                                 if outcome is CollectionTimerOutcome.STOP_REQUESTED:
                                     return outcome

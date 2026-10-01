@@ -2,10 +2,15 @@
 
 from collections.abc import Callable
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 import sqlite3
 from uuid import uuid4
 
+from app.demo import lifecycle
+from app.demo.events import DomainEventType
+from app.demo.phases import PAUSABLE_EXECUTION_PHASES
+from app.demo.pausable_wait_plan import PausableWaitPlan, plan_pausable_wait
 from app.demo.calibration_models import PumpCalibrationSet, PumpId
 from app.demo.execution_lifecycle import PhaseExecutionStartCommitOutcome
 from app.demo.guided_demo_phase_executor import (
@@ -67,6 +72,77 @@ class SimulationLifecycleStore(SQLiteStore):
     def _user_tables(self) -> list[str]:
         return [name for name in super()._user_tables() if name != "offline_lifecycle_identity"]
 
+    def set_wait_paused(self, execution_id: str, *, paused: bool, occurred_at: datetime):
+        """Explicit offline control on a started wait; no API or hardware dispatch."""
+        if type(paused) is not bool:
+            raise ValueError("paused must be boolean")
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            machine = self.load_machine_snapshot()
+            intent = machine.active_execution if machine is not None else None
+            if (
+                machine is None
+                or machine.state is not MachineState.BUSY
+                or intent is None
+                or intent.execution_id != execution_id
+                or intent.phase not in PAUSABLE_EXECUTION_PHASES
+                or intent.start_committed_at is None
+                or machine.active_run_id != intent.run_id
+            ):
+                raise SimulationBlocked("Pause/Resume requires the current started wait intent")
+            run = self.load_demo_run(intent.run_id)
+            if run is None or run.phase != intent.phase:
+                raise SimulationBlocked("wait phase differs from current run")
+            transition = (lifecycle.pause_run if paused else lifecycle.resume_run)(run, occurred_at)
+            self._validate_run_transition(transition.run, transition.events)
+            self._write_transition(
+                "RUN", run.run_id, transition.run, self._normalize_events(transition.events)
+            )
+            self._connection.execute("COMMIT")
+            return transition.run
+        except BaseException:
+            self._connection.execute("ROLLBACK")
+            raise
+
+    def read_wait_control(self, initial_run, intent):
+        """Read one snapshot and accept only replayable Pause/Resume/Stop events."""
+        self._connection.execute("BEGIN")
+        try:
+            current = self.load_demo_run(initial_run.run_id)
+            machine = self.load_machine_snapshot()
+            if (
+                current is None
+                or machine is None
+                or machine.state is not MachineState.BUSY
+                or machine.active_execution != intent
+                or machine.active_run_id != initial_run.run_id
+                or initial_run.phase not in PAUSABLE_EXECUTION_PHASES
+            ):
+                raise SimulationBlocked("wait lifecycle identity changed")
+            replay = initial_run
+            transitions = {
+                DomainEventType.RUN_PAUSED: lifecycle.pause_run,
+                DomainEventType.RUN_RESUMED: lifecycle.resume_run,
+                DomainEventType.ABORT_REQUESTED: lifecycle.request_abort,
+            }
+            for event in self.load_events("RUN", initial_run.run_id):
+                if event.sequence_number <= initial_run.event_sequence:
+                    continue
+                transition = transitions.get(event.event_type)
+                if transition is None:
+                    raise SimulationBlocked("unexpected lifecycle event during wait")
+                expected = transition(replay, event.occurred_at)
+                if expected.events != (event,):
+                    raise SimulationBlocked("wait event differs from valid lifecycle transition")
+                replay = expected.run
+            if replay != current:
+                raise SimulationBlocked("wait snapshot differs from validated control history")
+            self._connection.execute("COMMIT")
+            return current.status, current.event_sequence
+        except BaseException:
+            self._connection.execute("ROLLBACK")
+            raise
+
 
 class PlanLifecycleCoordinator:
     """Shared plan validation and lifecycle binding for both offline execution paths.
@@ -119,7 +195,15 @@ class PlanLifecycleCoordinator:
             for p in plan.prepared.assumptions.pumps
         ):
             raise SimulationBlocked("current calibration does not match prepared assumptions")
-        if isinstance(plan.source.plan, TimedSfOperationPlan):
+        pausable = isinstance(plan.source.plan, PausableWaitPlan)
+        if pausable:
+            if type(self.runner) is not OwnedTransferRunner:
+                raise SimulationBlocked("pausable waits require the owned runner")
+            current_source = plan_pausable_wait(run)
+            if current_source != plan.source.plan:
+                raise SimulationBlocked("stored wait plan differs from current run")
+            operations = current_source.operations
+        elif isinstance(plan.source.plan, TimedSfOperationPlan):
             # Full source equality prevents changes to duration/phase metadata.
             current_source = plan_timed_sf_operations(run)
             if current_source != plan.source.plan:
@@ -156,7 +240,16 @@ class PlanLifecycleCoordinator:
             ):
                 raise SimulationBlocked("execution start was not committed")
 
+        def wait_control():
+            self.runner._check_boot(plan.prepared.assumptions.controller_boot_id)
+            self.runner._sf._session_check()
+            if self.runner._session is not None:
+                self.runner._session.validate_completion()
+            return self.store.read_wait_control(run, intent)
+
         def stopped():
+            if pausable:
+                return wait_control()[0] is RunStatus.ABORTING
             current = self.store.load_demo_run(run.run_id)
             machine = self.store.load_machine_snapshot()
             if (
@@ -186,13 +279,18 @@ class PlanLifecycleCoordinator:
                 if state == "COMPLETED"
                 else PhaseExecutionOutcome.STOPPED_AT_SAFE_BOUNDARY
             )
-            resolution = self.store.resolve_phase_execution(
-                PhaseExecutionResult(
-                    execution_id=phase_id,
-                    outcome=outcome,
-                    reported_at=self.clock(),
+            while True:
+                resolution = self.store.resolve_phase_execution(
+                    PhaseExecutionResult(
+                        execution_id=phase_id, outcome=outcome, reported_at=self.clock()
+                    ),
+                    **({"defer_paused_wait": True} if pausable else {}),
                 )
-            )
+                if resolution is not None:
+                    break
+                # Pause won the lifecycle commit race after the duration elapsed.
+                # Keep the same intent/owner; wait for Resume or Stop, never resend.
+                self.runner._timer.wait_pausable(Decimal(0), wait_control)
             # Stop may win inside result persistence, even after all actions completed.
             return resolution.run.status is not RunStatus.ABORTED
 
@@ -203,6 +301,7 @@ class PlanLifecycleCoordinator:
             stop_requested=stopped,
             before_execute=start,
             before_finish=finish,
+            **({"wait_control": wait_control} if pausable else {}),
         )
         assert resolution is not None
         return resolution

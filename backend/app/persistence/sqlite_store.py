@@ -19,6 +19,7 @@ from app.demo.machine_models import (
     MachineSnapshot,
     MachineState,
     PhaseExecutionIntent,
+    PhaseExecutionOutcome,
     PhaseExecutionResult,
     PhaseExecutionStartupInterruptionKind,
 )
@@ -28,8 +29,8 @@ from app.demo.phase_result_resolution import (
     PhaseExecutionResolution,
     resolve_phase_execution as resolve_phase_execution_transition,
 )
-from app.demo.phases import EXECUTION_INTENT_PHASES, RunPhase
-from app.demo.run_models import DemoRun
+from app.demo.phases import EXECUTION_INTENT_PHASES, PAUSABLE_EXECUTION_PHASES, RunPhase
+from app.demo.run_models import DemoRun, RunStatus
 from app.demo.startup_execution_reconciliation import (
     StartupExecutionReconciliationError,
     StartupExecutionReconciliationResult,
@@ -411,7 +412,9 @@ class SQLiteStore:
     def resolve_phase_execution(
         self,
         result: PhaseExecutionResult,
-    ) -> PhaseExecutionResolution:
+        *,
+        defer_paused_wait: bool = False,
+    ) -> PhaseExecutionResolution | None:
         self._connection.execute("BEGIN IMMEDIATE")
         try:
             machine = self.load_machine_snapshot()
@@ -453,6 +456,19 @@ class SQLiteStore:
                 raise PersistenceConflictError(
                     f"Guided Demo run {run_id!r} was not found"
                 )
+            if (
+                defer_paused_wait
+                and run.status is RunStatus.PAUSED
+                and run.phase in PAUSABLE_EXECUTION_PHASES
+                and result.outcome is PhaseExecutionOutcome.COMPLETED
+            ):
+                # Validate the token, timestamps, start evidence and aggregate using
+                # the existing resolver, without persisting any hypothetical result.
+                resolve_phase_execution_transition(
+                    run.model_copy(update={"status": RunStatus.RUNNING}), machine, result
+                )
+                self._connection.execute("COMMIT")
+                return None  # The caller retains ownership until Resume or Stop.
             resolution = resolve_phase_execution_transition(run, machine, result)
             self._validate_phase_execution_resolution(
                 resolution,

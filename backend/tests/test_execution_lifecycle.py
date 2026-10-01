@@ -274,8 +274,8 @@ def test_claim_rejects_aborting_run() -> None:
         )
 
 
-def test_claim_rejects_unsupported_timed_phase() -> None:
-    timed = running_run().model_copy(update={"phase": RunPhase.REACTION_HOLD})
+def test_claim_rejects_unsupported_ready_phase() -> None:
+    timed = running_run().model_copy(update={"phase": RunPhase.READY})
 
     with pytest.raises(PhaseExecutionClaimError, match="does not support"):
         claim_phase_execution(

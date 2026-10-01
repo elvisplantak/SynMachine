@@ -18,7 +18,8 @@ from app.demo.p1_reagent_operation_plan import plan_p1_reagent_to_reactor_operat
 from app.demo.p1_solvent_operation_plan import plan_p1_solvent_to_reactor_operations
 from app.demo.p2_reactor_to_sf_operation_plan import plan_p2_reactor_to_sf_operations
 from app.demo.p2_sf_to_column_operation_plan import plan_p2_sf_to_column_operations
-from app.demo.phases import EXECUTION_INTENT_PHASES, RunPhase
+from app.demo.phases import EXECUTION_INTENT_PHASES, PAUSABLE_EXECUTION_PHASES, RunPhase
+from app.demo.pausable_wait_plan import plan_pausable_wait
 from app.demo.run_models import RunStatus
 from app.demo.timed_sf_operation_plan import plan_timed_sf_operations
 from app.hardware.command_plan_store import PlanSource
@@ -30,6 +31,8 @@ from app.hardware.simulated_p1_runner import SimulationBlocked
 
 def source_for_run(run, calibrations, column_readiness):
     """Use the existing phase builders without skipping unsupported phases."""
+    if run.phase in PAUSABLE_EXECUTION_PHASES:
+        return plan_pausable_wait(run)
     if run.phase is RunPhase.P1_TRANSFER_S_TO_REACTOR:
         return plan_p1_solvent_to_reactor_operations(run.fluid_plan, calibrations)
     if run.phase in (
@@ -238,7 +241,9 @@ class OwnedPhaseSession:
             if self._expected_run.status is not RunStatus.RUNNING:
                 raise SimulationBlocked("run is no longer running")
             if self._expected_run.phase not in EXECUTION_INTENT_PHASES:
-                return None  # Do not invent completion of delay/reaction-hold.
+                return None  # Never invent completion of an unsupported phase.
+            if self._expected_run.phase in PAUSABLE_EXECUTION_PHASES and self.runner._timer is None:
+                raise SimulationBlocked("pausable phases require an explicit monotonic timer")
             self._phase_id = str(uuid4())
             source = source_for_run(self._expected_run, self._calibrations, self._column_readiness)
             context = self._state.model_copy(update={"phase_execution_id": self._phase_id})

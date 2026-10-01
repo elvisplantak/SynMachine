@@ -43,7 +43,7 @@ READINESS = ColumnFractionCollectionReadiness(True, True)
 def session_case(tmp_path):
     resources = []
 
-    def create(phase=LATE_PHASES[0], *, bind=True):
+    def create(phase=LATE_PHASES[0], *, bind=True, timer=None):
         directory = tmp_path / str(len(resources))
         directory.mkdir()
         paths = tuple(directory / name for name in ("owner.db", "execution.db", "life.db"))
@@ -60,7 +60,7 @@ def session_case(tmp_path):
         cals = PumpCalibrationSet(p1=ctx.pumps[0].calibration, p2=ctx.pumps[1].calibration)
         device = SimulatedP1Device(ctx)
         device.sf_mixer_running = False
-        runner = OwnedTransferRunner(paths[1], eid, owner, device)
+        runner = OwnedTransferRunner(paths[1], eid, owner, device, timer=timer)
         resources.append(runner)
         c = Case(
             PlanLifecycleCoordinator(store, runner),
@@ -152,12 +152,13 @@ def test_five_contiguous_phases_use_command_confirmed_state(session_case):
     restart_rejected(c)
 
 
-def test_p1_chain_stops_at_unimplemented_delay_without_skipping(session_case):
+def test_p1_chain_requires_explicit_timer_before_delay(session_case):
     c, session = session_case(RunPhase.P1_TRANSFER_S_TO_REACTOR)
     session.execute_next()
     assert session.execute_next().run.phase is RunPhase.DELAY_BETWEEN_ADDITIONS
     before = [p.read_bytes() for p in c.paths]
-    assert session.execute_next() is None
+    with pytest.raises(SimulationBlocked, match="explicit monotonic timer"):
+        session.execute_next()
     assert before == [p.read_bytes() for p in c.paths]
     assert session.generation == 2
 

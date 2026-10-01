@@ -9,7 +9,8 @@ from app.demo.guided_demo_phase_executor import (
     GuidedDemoPhaseExecutionResult,
     GuidedDemoPhaseExecutor,
 )
-from app.demo.execution_lifecycle import PhaseExecutionStartCommitOutcome
+from app.demo.execution_lifecycle import PhaseExecutionStartCommitOutcome, PhaseExecutionClaimError
+from app.demo.phases import PAUSABLE_EXECUTION_PHASES
 from app.demo.machine_models import (
     PhaseExecutionIntent,
     PhaseExecutionOutcome,
@@ -71,6 +72,8 @@ class GuidedDemoExecutionCoordinator:
             raise GuidedDemoExecutionConsistencyError(
                 f"Guided Demo run {run_id!r} was not found before preparation"
             )
+        if run.phase in PAUSABLE_EXECUTION_PHASES:
+            raise PhaseExecutionClaimError("legacy coordinator does not support owned pausable waits")
         prepared = self._phase_executor.prepare_current_phase(
             run,
             calibrations,
