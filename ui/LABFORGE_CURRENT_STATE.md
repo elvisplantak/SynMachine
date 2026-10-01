@@ -1,12 +1,40 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-10-01
-- Development phase: complete fake demo with owned Pause/Resume waits accepted; exclusive offline execution and explicit interruption reconciliation implemented;
+- Development phase: complete fake demo with owned Pause/Resume waits accepted; fresh non-actuating hardware observations implemented; exclusive offline reconciliation retained;
   V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Immediate continuation — exclusive offline interruption reconciliation
+## Immediate continuation — fresh hardware observations
+
+- Active backend/UI worktrees: `labforge-backend-multiphase` and
+  `labforge-ui-multiphase`, branch `codex/fresh-hardware-observations`.
+  Backend HEAD `d3274ef`, based on `d5d1843`.
+- Verification: 34 new tests, 72 focused adapter tests, all 1642 backend tests pass;
+  Ruff and diff checks pass.
+- Added explicit observation through existing Arduino/SF adapters: fresh correlated
+  trusted-IDLE Arduino status before and after a read-only SF sample, explicit
+  capability requirements and a local connection generation to reject reconnects
+  even if boot ID/nonce repeat. No Arduino auto-connect/reconnect is introduced.
+- SF reads share its command lock, validate the device and configured endpoints,
+  report position/torque without register writes, and close the temporary session.
+  Ambiguous endpoint tolerance remains unknown; read/close faults prevent success.
+- Results never authorize owner release. IDLE/TRUSTED is controller software
+  evidence, not physical position, fluidic readiness or command reconciliation.
+  SF's temporary connection does not establish persistent session trust.
+- Caller-held production-wide ownership is still required before activation;
+  probes are not connected to startup/API/runtime. Tests inject fake ports/sessions.
+  No physical ports were opened, no actuator moved, no schema or firmware changed.
+- Detail: backend `docs/FRESH_HARDWARE_OBSERVATIONS.md`, including remaining
+  reference/calibration/route/recovery/flush/release requirements.
+- Next: connect fresh observations and independently established references to a
+  reviewed production composition, with durable recovery/release policy and live
+  Stop handling. Do not treat this diagnostic result as permission to clear a block.
+- Continue consolidated review at a substantial integration boundary; no new
+  reviewer handoff requested for this diagnostic step.
+
+## Previous checkpoint — exclusive offline interruption reconciliation
 
 - Active backend/UI worktrees remain `labforge-backend-multiphase` and
   `labforge-ui-multiphase`, branch `codex/owned-startup-reconciliation`.
