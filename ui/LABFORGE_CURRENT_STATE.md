@@ -1,25 +1,43 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-10-01
-- Development phase: complete fake demo with owned Pause/Resume waits accepted; offline startup inspection implemented;
+- Development phase: complete fake demo with owned Pause/Resume waits accepted; exclusive offline execution and explicit interruption reconciliation implemented;
   V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Immediate continuation — offline startup inspection
+## Immediate continuation — exclusive offline interruption reconciliation
 
-- Backend worktree `/home/elvis/Documents/labforge-backend-multiphase`, branch
-  `codex/owned-startup-reconciliation`, HEAD `0ee2b83`, based on accepted `3d9fab24`.
-- Verification: 26 new tests, all 1578 backend tests pass; Ruff and diff checks pass.
-- Added a read-only diagnostic view of explicitly identified ownership, execution
-  and lifecycle databases, including retained owners, paused runs, unfinished
-  command evidence and incomplete wait operations. No transport or database writes.
-- Database observations are individually transactional, not cross-database atomic;
-  they cannot authorize execution or owner release. Full reconciliation, interrupted
-  PAUSED policy and exclusion of an existing live executor remain next work.
-- Detail and CLI: backend `docs/OWNED_STARTUP_INSPECTION.md`.
-- User requests substantially less frequent review; consolidate this substep with
-  the larger reconciliation milestone. No new review requested now.
+- Active backend/UI worktrees remain `labforge-backend-multiphase` and
+  `labforge-ui-multiphase`, branch `codex/owned-startup-reconciliation`.
+  Backend HEAD: `d5d1843` (accepted base `3d9fab24`, diagnostic step `0ee2b83`).
+- `OwnedOfflineRuntime` composes the same accepted fake execution path with
+  exclusive advisory locks on all three existing database files. It runs all ten
+  phases from a fresh bundle and rejects adoption of a persisted run after restart.
+- Explicit reconciliation commits retained ownership before transactional lifecycle
+  changes. Existing owners remain unchanged; interrupted gaps gain a BLOCKED
+  reservation. No lease reconstruction, resend, timer Resume, cleanup or release.
+- A supported PAUSED wait with durable start is marked FAULTED/RECOVERY_REQUIRED;
+  time is not reconstructed. Legacy default reconciliation remains unchanged.
+- Crash/write-failure tests cover both sides of the separate ownership/lifecycle
+  commits and actual process death during paused execution. Repeated metadata
+  reconciliation does not append events or mutate command evidence.
+- Read-only inspection from `0ee2b83` remains diagnostic, not an authorization gate.
+  The new advisory locks coordinate only the explicit offline composition, not
+  legacy direct assemblies, arbitrary database writers or live hardware.
+- Details: backend `docs/OWNED_OFFLINE_RECONCILIATION.md` and
+  `docs/OWNED_STARTUP_INSPECTION.md`. No database migration, production activation,
+  firmware/UI behavior change, physical execution or main merge occurred.
+- The credit interruption preserved all changes. The previously started full suite
+  completed with 1606 passing tests; two additional process-death regressions were
+  then added and verified. Final result: 30 new tests, all 1608 backend tests
+  passing; Ruff and diff checks pass.
+- Next: prepare fresh hardware/session trust and the deliberate physical
+  reconciliation/release boundary, then production transport/startup/API/UI
+  composition. Software fault marking is not physical recovery or readiness.
+- User requests substantially less frequent independent review. No new review
+  requested for the interruption audit; consolidate the next review before moving
+  from this offline composition toward production activation.
 
 ## Accepted full fake demo with pausable waits
 
