@@ -39,6 +39,10 @@ not instructions to implement automatically. Prefer a coherent integrated slice
 and consolidated review over repeated small checkpoints. Codex independently
 chooses technically appropriate changes and remains responsible for delivery.
 
+User clarification on 2026-10-01: use the independent reviewer much less often.
+Continue safe implementation across small substeps and consolidate review at a
+substantial integration or safety boundary, rather than after each checkpoint.
+
 Before entering a materially different or riskier phase, Codex recommends the
 next phase and obtains concise user approval. In particular, completing
 no-motion protocol foundations does not authorize actuator implementation,

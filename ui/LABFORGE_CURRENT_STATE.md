@@ -1,12 +1,27 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-10-01
-- Development phase: complete fake demo with owned Pause/Resume waits; consolidated review pending;
+- Development phase: complete fake demo with owned Pause/Resume waits accepted; offline startup inspection implemented;
   V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Immediate continuation checkpoint — full fake demo with pausable waits
+## Immediate continuation — offline startup inspection
+
+- Backend worktree `/home/elvis/Documents/labforge-backend-multiphase`, branch
+  `codex/owned-startup-reconciliation`, HEAD `0ee2b83`, based on accepted `3d9fab24`.
+- Verification: 26 new tests, all 1578 backend tests pass; Ruff and diff checks pass.
+- Added a read-only diagnostic view of explicitly identified ownership, execution
+  and lifecycle databases, including retained owners, paused runs, unfinished
+  command evidence and incomplete wait operations. No transport or database writes.
+- Database observations are individually transactional, not cross-database atomic;
+  they cannot authorize execution or owner release. Full reconciliation, interrupted
+  PAUSED policy and exclusion of an existing live executor remain next work.
+- Detail and CLI: backend `docs/OWNED_STARTUP_INSPECTION.md`.
+- User requests substantially less frequent review; consolidate this substep with
+  the larger reconciliation milestone. No new review requested now.
+
+## Accepted full fake demo with pausable waits
 
 - Backend branch `codex/owned-pausable-demo`, HEAD
   `3d9fab24f325f3a2da59d69215465e110acd3c33`; accepted base
@@ -39,9 +54,9 @@
   pass; Ruff and diff checks pass. Includes actual subprocess death while paused,
   another lifecycle connection issuing Pause/Resume, finalization races, zero
   durations, wrong-token deferral and injected persistence failures.
-- Review document: backend `docs/OWNED_PAUSABLE_DEMO.md`. Consolidated review of
-  full fake execution and paused completion races is warranted before the next
-  integration milestone. No Serial/Dynamixel, physical test, firmware/UI behavior
+- Review document: backend `docs/OWNED_PAUSABLE_DEMO.md`. Independent review
+  accepted `3d9fab24f325f3a2da59d69215465e110acd3c33` with all severities zero;
+  no correction requested. Reviewer did not independently rerun the test suites. No Serial/Dynamixel, physical test, firmware/UI behavior
   change, production activation or main merge occurred.
 - Next: deliberate recovery/reconciliation of retained ownership and separate
   lifecycle/execution databases. Then approved live routes, current physical/session
