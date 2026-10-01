@@ -1,12 +1,38 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-10-01
-- Development phase: complete fake demo with owned Pause/Resume waits accepted; fresh non-actuating hardware observations implemented; exclusive offline reconciliation retained;
+- Development phase: complete fake demo with owned Pause/Resume waits accepted; session-bound recovery reference checks implemented; exclusive offline reconciliation retained;
   V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Immediate continuation — fresh hardware observations
+## Immediate continuation — scoped recovery reference checks
+
+- Backend/UI worktrees remain `labforge-backend-multiphase` and
+  `labforge-ui-multiphase`, branch `codex/recovery-reference-checks`.
+  Backend HEAD `9245e9e`, based on `d3274ef`.
+- Verification: 26 new tests, 90 focused connected tests, all 1668 backend tests
+  pass; Ruff and diff checks pass.
+- Offline runtime now connects explicit interruption reconciliation and retained
+  ownership to fresh Arduino/SF observations and process-local operator attestations.
+  Entry requires RECOVERING/RECOVERY_REQUIRED, an interrupted run and no active intent.
+- Checks have a new challenge bound to run, owner, boot, nonce and connection epoch.
+  Each reference confirmation and report samples again under the runtime operation
+  gate; restart, a new round, foreign/copied challenge, session/context changes and
+  observation errors prevent reuse. Individual missing actuator/reference items remain visible.
+- Snapshot comparisons plus SQLite data_version/total_changes detect relevant
+  durable context changes, including journal detail changes with unchanged summaries.
+- These are attributed operator statements, not sensor evidence or authenticated
+  identities. No values are copied from stored plans, and no homing is performed.
+  Even all recorded items do not release ownership or authorize a physical run.
+- Detail: backend `docs/RECOVERY_REFERENCE_CHECKS.md`. Run/owner/journal data remain
+  unchanged, no schema/API/UI/firmware activation or physical test occurs.
+- Next: durable physical recovery/flush execution and release policy, approved
+  routes, fresh usable references and production composition. Current software
+  collects scoped evidence; it does not yet implement physical recovery.
+- Keep reviews consolidated; no new handoff requested for this software substep.
+
+## Previous checkpoint — fresh hardware observations
 
 - Active backend/UI worktrees: `labforge-backend-multiphase` and
   `labforge-ui-multiphase`, branch `codex/fresh-hardware-observations`.
