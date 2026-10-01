@@ -140,6 +140,7 @@ class ArduinoSerialClient:
         self._session_nonce: str | None = None
         self._controller_boot_id: int | None = None
         self._capabilities: frozenset[str] = frozenset()
+        self._connection_epoch = 0
 
     @staticmethod
     def _open_port(configuration: ArduinoSerialConfiguration) -> SerialPort:
@@ -158,6 +159,15 @@ class ArduinoSerialClient:
     @property
     def connected(self) -> bool:
         return self._port is not None and self._controller_boot_id is not None
+
+    @property
+    def connection_epoch(self) -> int:
+        """Process-local connection generation, not a controller or physical identity.
+
+        Every close/reconnect invalidates observations, even if a test transport
+        reuses the nonce and boot ID. This value is never persisted as trust.
+        """
+        return self._connection_epoch
 
     @property
     def capabilities(self) -> frozenset[str]:
@@ -204,6 +214,7 @@ class ArduinoSerialClient:
         return response
 
     def close(self) -> None:
+        self._connection_epoch += 1
         port, self._port = self._port, None
         self._session_nonce = None
         self._controller_boot_id = None

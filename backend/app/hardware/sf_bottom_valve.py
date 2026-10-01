@@ -140,6 +140,15 @@ class DynamixelSdkSession:
             raise HardwareCommandError(self._packet.getRxPacketError(device_error))
 
 
+@dataclass(frozen=True)
+class SfValveObservation:
+    """One read-only register sample, not durable position or fluidic trust."""
+
+    present_position: int
+    torque_enabled: bool
+    observed_state: BottomValveState | None
+
+
 class SfBottomValveActuator:
     """Synchronous XL430 OPEN/CLOSED adapter for the supervised demo runtime."""
 
@@ -156,6 +165,57 @@ class SfBottomValveActuator:
         self._clock = clock
         self._sleep = sleep
         self._command_lock = Lock()
+
+    def inspect_state(self) -> SfValveObservation:
+        """Read the configured actuator without enabling torque or setting targets.
+
+        Shares the actuator command lock. The short-lived connection is closed
+        before returning, so this does not establish ongoing SF session trust.
+        """
+        if not self._command_lock.acquire(blocking=False):
+            raise HardwareCommandError("SF bottom valve command already active")
+        session = None
+        primary_error = None
+        try:
+            session = self._session_factory(self._configuration)
+            # Validate both configured endpoints; no new calibration is inferred.
+            self._validate_device(session, self._configuration.closed_position)
+            self._validate_device(session, self._configuration.open_position)
+            device_id = self._configuration.device_id
+            torque = session.read(device_id, REGISTERS["torque_enable"])
+            position = session.read(device_id, REGISTERS["present_position"])
+            if type(torque) is not int or torque not in (0, 1) or type(position) is not int:
+                raise HardwareCommandError("invalid SF observation register value")
+            minimum = session.read(device_id, REGISTERS["min_position_limit"])
+            maximum = session.read(device_id, REGISTERS["max_position_limit"])
+            if not minimum <= position <= maximum:
+                raise HardwareCommandError("SF observed position outside configured limits")
+            if session.read(device_id, REGISTERS["hardware_error_status"]) != 0:
+                raise HardwareCommandError("SF hardware error during observation")
+            candidates = [
+                state for state, target in (
+                    (BottomValveState.CLOSED, self._configuration.closed_position),
+                    (BottomValveState.OPEN, self._configuration.open_position),
+                )
+                if abs(position - target) <= self._configuration.position_tolerance
+            ]
+            return SfValveObservation(
+                position, bool(torque), candidates[0] if len(candidates) == 1 else None
+            )
+        except BaseException as error:
+            primary_error = error
+            raise
+        finally:
+            try:
+                if session is not None:
+                    try:
+                        session.close()
+                    except Exception as error:
+                        if primary_error is None:
+                            raise HardwareCommandError("SF observation close failed") from error
+                        primary_error.add_note(f"SF observation close also failed: {error}")
+            finally:
+                self._command_lock.release()
 
     def set_state(self, state: BottomValveState) -> None:
         if not isinstance(state, BottomValveState):
