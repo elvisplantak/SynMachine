@@ -158,3 +158,25 @@ class OwnedOfflineRuntime:
             return result.machine
         finally:
             self._gate.release()
+
+    def begin_reference_checks(self, arduino, sf_valve, *, required_commands):
+        """Explicit candidate assessment; no production activation or owner release.
+
+        Adapters are caller-supplied; tests inject fake transports. This method
+        sends status queries/reads only and never establishes physical readiness.
+        """
+        from app.hardware.recovery_reference_checks import RecoveryReferenceChecks
+
+        self._check()
+        if not self._gate.acquire(blocking=False):
+            raise SimulationBlocked("runtime operation already active")
+        try:
+            previous = getattr(self, "_reference_checks", None)
+            if previous is not None:
+                previous._valid = False
+                previous._confirmations.clear()
+            checks = RecoveryReferenceChecks(self, arduino, sf_valve, required_commands)
+            self._reference_checks = checks
+            return checks
+        finally:
+            self._gate.release()
