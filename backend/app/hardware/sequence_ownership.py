@@ -126,6 +126,33 @@ class HardwareOwnership:
                 self._db.execute("ROLLBACK")
                 raise
 
+    def retain_for_reconciliation(self) -> str:
+        """Retain exclusion before lifecycle reconciliation, never release an owner.
+
+        Caller MUST hold the offline runtime's exclusive process guard. This
+        method alone cannot prove another process is dead. No lease is returned.
+        Existing unresolved ownership is left byte-for-byte unchanged.
+        """
+        with self._db_lock:
+            if self._closed or self._leases:
+                raise OwnershipBlocked("reconciliation requires a fresh ownership handle")
+            self._db.execute("BEGIN IMMEDIATE")
+            try:
+                current = self._validate_owner()
+                if current is None:
+                    current = "reconciliation-" + str(uuid4())
+                    self._db.execute(
+                        "INSERT INTO hardware_sequences VALUES (?, 'BLOCKED')", (current,)
+                    )
+                    self._db.execute(
+                        "UPDATE hardware_owner SET sequence_id=? WHERE slot=1", (current,)
+                    )
+                self._db.execute("COMMIT")
+                return current
+            except BaseException:
+                self._db.execute("ROLLBACK")
+                raise
+
     def claim(
         self,
         sequence_id: str,

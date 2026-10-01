@@ -11,7 +11,7 @@ from app.demo.machine_models import (
     PhaseExecutionStartupInterruptionKind,
     StartupRecoveryReason,
 )
-from app.demo.phases import EXECUTION_INTENT_PHASES, RunPhase
+from app.demo.phases import EXECUTION_INTENT_PHASES, PAUSABLE_EXECUTION_PHASES, RunPhase
 from app.demo.run_models import DemoRun, RunStatus
 
 
@@ -33,6 +33,8 @@ def reconcile_interrupted_phase_execution_at_startup(
     run: DemoRun,
     machine: MachineSnapshot,
     occurred_at: datetime,
+    *,
+    allow_paused_wait: bool = False,
 ) -> StartupExecutionReconciliationResult:
     intent = machine.active_execution
     if (
@@ -49,7 +51,15 @@ def reconcile_interrupted_phase_execution_at_startup(
         or run.run_id != intent.run_id
         or run.phase != intent.phase
         or run.phase not in EXECUTION_INTENT_PHASES
-        or run.status not in {RunStatus.RUNNING, RunStatus.ABORTING}
+        or (
+            run.status not in {RunStatus.RUNNING, RunStatus.ABORTING}
+            and not (
+                allow_paused_wait
+                and run.status is RunStatus.PAUSED
+                and run.phase in PAUSABLE_EXECUTION_PHASES
+                and intent.start_committed_at is not None
+            )
+        )
     ):
         raise StartupExecutionReconciliationError(
             "startup execution reconciliation requires matching active aggregates"

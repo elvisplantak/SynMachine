@@ -554,6 +554,8 @@ class SQLiteStore:
     def reconcile_interrupted_phase_execution_at_startup(
         self,
         occurred_at: datetime,
+        *,
+        allow_paused_wait: bool = False,
     ) -> StartupExecutionReconciliationResult:
         self._connection.execute("BEGIN IMMEDIATE")
         try:
@@ -599,7 +601,7 @@ class SQLiteStore:
                 )
             try:
                 reconciliation = reconcile_startup_transition(
-                    run, machine, occurred_at
+                    run, machine, occurred_at, allow_paused_wait=allow_paused_wait
                 )
             except StartupExecutionReconciliationError as error:
                 raise StartupExecutionReconciliationConflictError(

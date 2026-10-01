@@ -49,10 +49,10 @@ The full fake demo and its runtime remain unchanged. No UI, API, firmware, live
 transport or production startup activation is included. There is no new schema.
 Interrupted PAUSED runs are reported intact, not converted to success or resumed.
 
-Next is an explicitly composed reconciliation operation with exclusion of a live
-executor, cross-database failure handling and an explicit interrupted-pause policy.
-It must retain durable exclusion before any lifecycle mutation and must never
-reconstruct a lost lease. Physical recovery, fresh references, safe routes, flush
+The next software step is now implemented in `OwnedOfflineRuntime`; see
+`OWNED_OFFLINE_RECONCILIATION.md` for its explicit composition, advisory-lock
+boundary, cross-database failure handling and interrupted-pause policy. It retains
+durable exclusion before lifecycle mutation and never reconstructs a lost lease. Physical recovery, fresh references, safe routes, flush
 and permission for subsequent real execution remain separate work.
 
 Verification covers full successful fake execution, inter-phase gaps, owner claim
