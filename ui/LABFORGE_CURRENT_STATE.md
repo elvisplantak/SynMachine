@@ -1,12 +1,60 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-09-30
-- Development phase: owned collection, monotonic timers and SF mixing/settling integrated under fake transport; review pending;
+- Checkpoint date: 2026-10-01
+- Development phase: command-confirmed multi-phase continuity integrated under fake transport; consolidated review pending;
   V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Immediate continuation checkpoint — owned timed execution
+## Immediate continuation checkpoint — owned multiphase session
+
+- Backend branch `codex/multiphase-session`, HEAD
+  `dc9412bbf463ed95b71d16bd63e6bab94586d3f5`; accepted base
+  `d3ad800f22642d0246db70cae6093ac9fae836f1` (independent review: all severities zero).
+- `OwnedPhaseSession` connects existing source builders, stored plans, lifecycle,
+  shared ownership and durable Arduino/SF execution through the same fake-only
+  runner. No new database, schema or parallel transport path.
+- The contiguous test executes Reactor → SF → mixing → settling → Column →
+  fraction collection without resetting device state between phases. Initial
+  entry at Reactor → SF is a test fixture, not proof of preceding physical work.
+  P1 solvent → first reagent is also connected; execution stops at the unsupported
+  inter-addition delay. Full end-to-end demo still requires pause-capable
+  delay/reaction-hold timers in this composition.
+- Initial positions/calibrations are independently supplied. Later state derives
+  only from successful commands with persisted results, never optimistic plan
+  projections. Handoff requires lifecycle resolution and owner release. Calibration
+  mismatch is rejected before plan persistence. Source/run/session are rechecked.
+- Existing ownership history supplies an interference generation, checked atomically
+  during claim. Even completed Service work in another process invalidates the
+  next phase. Same controller boot with a different fake connection nonce also
+  invalidates continuity. These are fake-session observations, not live trust.
+- Normal commands require both valid connections. Required STOP/CLOSE can use its
+  surviving transport after the other connection fails. Cleanup never restores
+  continuity. A final session check runs after lifecycle resolution before release.
+- Stop, unknown, persistence faults and detected external changes block continuation.
+  Restart cannot reconstruct this session, including death between successful
+  phases. No resend, resume, automatic cleanup, owner release or database repair.
+  Reconciliation, flush/new-run setup and physical reference recovery remain pending.
+- Verification: 45 new regressions; 239 focused tests and all 1507 backend tests
+  pass; Ruff and diff checks pass. Includes actual subprocess death, Service from
+  another process, race before claim, concurrent entry and result-persistence faults.
+- Review document: backend `docs/OWNED_MULTIPHASE_SESSION.md`. This checkpoint
+  warrants consolidated review of the new state handoff and interference gate.
+  No production API/startup activation, Serial/Dynamixel connection, firmware/UI
+  behavior change, physical execution or main merge occurred.
+- Next: integrate pause-capable delay/reaction-hold timers for one complete fake
+  demo, then deliberate cross-database reconciliation. Backend-owned approved live
+  routes, independently established physical/session trust and explicit live
+  SF OPEN/Stop behavior remain gates before production activation.
+- Persistent worktrees on `codex/multiphase-session`:
+  `/home/elvis/Documents/labforge-backend-multiphase` and
+  `/home/elvis/Documents/labforge-ui-multiphase`.
+  After the interrupted session, former `/tmp` worktrees/logs were absent.
+  Committed base/branches were intact; uncommitted work was reconstructed and
+  verified again. Original checkouts and local databases were preserved.
+  Historical `/tmp` paths below are no longer active workspaces.
+
+## Accepted owned timed execution — 2026-09-30
 
 - Backend branch `codex/owned-execution-slice`, HEAD
   `d3ad800f22642d0246db70cae6093ac9fae836f1`; accepted base
@@ -42,7 +90,9 @@
 - Consolidated review document: backend `docs/OWNED_TIMED_EXECUTION.md`.
   No main merge, new execution API activation, Serial/Dynamixel connection,
   firmware change, UI behavior change or physical test occurred.
-- Next: evaluate this combined checkpoint, then address fresh multi-phase state
+- Independent review accepted `d3ad800f22642d0246db70cae6093ac9fae836f1` with
+  Critical/High/Medium/Low all zero; no correction requested.
+- Next at that checkpoint: address fresh multi-phase state
   and deliberate cross-database recovery. Delay/reaction-hold Pause/Resume timers,
   live route approval, live SF OPEN/Stop semantics and production startup remain
   gates. Hardware trust must be independently re-established before live tests.
