@@ -104,9 +104,41 @@ class HardwareOwnership:
             raise OwnershipBlocked("ownership history is inconsistent")
         return current
 
-    def claim(self, sequence_id: str, *, phase_execution_id: str | None = None) -> SequenceLease:
+    def idle_generation(self) -> int:
+        """Read a coherent idle checkpoint of append-only claim history.
+
+        This detects interference; it never establishes physical state or resumes
+        ownership. History is append-only through this API, not tamper-proof.
+        """
+        with self._db_lock:
+            if self._closed:
+                raise OwnershipBlocked("ownership connection is closed")
+            self._db.execute("BEGIN")
+            try:
+                if self._validate_owner() is not None:
+                    raise OwnershipBlocked("hardware sequence already owned or unresolved")
+                generation = self._db.execute("SELECT COUNT(*) FROM hardware_sequences").fetchone()[
+                    0
+                ]
+                self._db.execute("COMMIT")
+                return generation
+            except BaseException:
+                self._db.execute("ROLLBACK")
+                raise
+
+    def claim(
+        self,
+        sequence_id: str,
+        *,
+        phase_execution_id: str | None = None,
+        expected_generation: int | None = None,
+    ) -> SequenceLease:
         if type(sequence_id) is not str or not sequence_id.strip():
             raise ValueError("sequence ID must be a non-empty string")
+        if expected_generation is not None and (
+            type(expected_generation) is not int or expected_generation < 0
+        ):
+            raise ValueError("expected generation must be a non-negative integer")
         phase_execution_id = sequence_id if phase_execution_id is None else phase_execution_id
         if type(phase_execution_id) is not str or not phase_execution_id.strip():
             raise ValueError("phase ID must be a non-empty string")
@@ -117,6 +149,12 @@ class HardwareOwnership:
             try:
                 if self._validate_owner() is not None:
                     raise OwnershipBlocked("hardware sequence already owned or unresolved")
+                if (
+                    expected_generation is not None
+                    and self._db.execute("SELECT COUNT(*) FROM hardware_sequences").fetchone()[0]
+                    != expected_generation
+                ):
+                    raise OwnershipBlocked("hardware claim history changed since state validation")
                 if self._db.execute(
                     "SELECT 1 FROM hardware_sequences WHERE sequence_id=?", (sequence_id,)
                 ).fetchone():

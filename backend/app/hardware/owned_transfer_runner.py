@@ -129,6 +129,7 @@ class OwnedTransferRunner:
             raise TypeError("only the bounded monotonic timer or default virtual wait is supported")
         self._timer = timer
         self._active_phase = None
+        self._session = None
         self.database_id = database_id
         self.device = device
         self._lock = RLock()
@@ -191,7 +192,9 @@ class OwnedTransferRunner:
             raise SimulationBlocked("stored plan is absent in the verified database")
         if (plan.source.run_id, plan.source.run_event_sequence) != (run_id, run_event_sequence):
             raise SimulationBlocked("source lifecycle identity mismatch")
-        if (
+        if self._session is not None:
+            self._session.validate_plan(plan)
+        elif (
             self.device.used
             or self.device.calls
             or self.device.sf_calls
@@ -247,6 +250,13 @@ class OwnedTransferRunner:
         return plan
 
     def _check_boot(self, expected):
+        if self._session is not None:
+            try:
+                self._session.check_arduino()
+            except SimulationBlocked:
+                if self._active_phase is not None:
+                    self._invalidate_carousel(self._active_phase)
+                raise
         if self.device.controller_boot_id != expected:
             self.device.carousel_position = None
             self.device.sf_mixer_running = None
@@ -293,7 +303,11 @@ class OwnedTransferRunner:
         with self._lock:
             plan = self._validate(phase_id, run_id, run_event_sequence)
             owner = self.hardware.ownership
-            lease = owner.claim(phase_id)
+            lease = (
+                owner.claim(phase_id, expected_generation=self._session.generation)
+                if self._session is not None
+                else owner.claim(phase_id)
+            )
             completed = 0
             state = "COMPLETED"
             try:
@@ -311,6 +325,8 @@ class OwnedTransferRunner:
 
                 def checked_stop():
                     self._check_boot(plan.prepared.assumptions.controller_boot_id)
+                    if self._session is not None:
+                        self._session.check_connections()
                     if isinstance(plan.source.plan, TimedSfOperationPlan):
                         self._sf._session_check()
                     return stop_requested()
@@ -320,8 +336,11 @@ class OwnedTransferRunner:
                         state = "STOPPED"
                         break
 
-                    def send(commands, actions):
+                    def send(commands, actions, *, followup=False):
                         for action in actions:
+                            if self._session is not None and not followup:
+                                self._check_boot(plan.prepared.assumptions.controller_boot_id)
+                                self._session.check_connections()
                             if isinstance(action, CollectionWait):
                                 outcome = self._wait(
                                     phase_id, operation.operation_number, action, checked_stop
@@ -329,11 +348,16 @@ class OwnedTransferRunner:
                                 if outcome is CollectionTimerOutcome.STOP_REQUESTED:
                                     return outcome
                             elif isinstance(action, SfBottomValveAction):
+                                if self._session is not None:
+                                    self._session.check_sf()
                                 commands.execute_sf(
                                     phase_execution_id=phase_id,
                                     operation_command_id=action.operation_command_id,
                                     state=action.state,
                                 )
+                                if self._session is not None:
+                                    self._session.check_sf()
+                                    self._session.observe(action)
                             else:
                                 self._check_boot(plan.prepared.assumptions.controller_boot_id)
                                 mixer_action = action.command == "SF_MIXER_SET_STATE"
@@ -358,12 +382,18 @@ class OwnedTransferRunner:
                                         (position, phase_id),
                                     )
                                     self.device.carousel_position = position
+                                if self._session is not None:
+                                    self._session.observe(action)
 
                     outcome = self.hardware.run_operation(
                         lease,
                         lambda commands: send(commands, operation.actions),
                         required_followup=(
-                            (lambda commands: send(commands, operation.required_followup))
+                            (
+                                lambda commands: send(
+                                    commands, operation.required_followup, followup=True
+                                )
+                            )
                             if operation.required_followup
                             else None
                         ),
@@ -379,8 +409,12 @@ class OwnedTransferRunner:
                         (phase_id, operation.operation_number),
                     )
                     completed += 1
+                if self._session is not None:
+                    self._session.check_connections()
                 release = owner.invoke(lease, lambda: before_finish(state, completed))
                 if state == "COMPLETED" and release is True:
+                    if self._session is not None:
+                        owner.invoke(lease, self._session.validate_completion)
                     owner.complete(lease)
                 else:
                     owner.block(lease)

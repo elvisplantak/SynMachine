@@ -55,6 +55,7 @@ class SimulatedP1Device:
         self.carousel_position = current.carousel_position
         self.waits: list[Decimal] = []
         self.during_wait: Callable[[Decimal], None] = lambda _: None
+        self.arduino_session_id = str(uuid4())
         self.sf_session_id = str(uuid4())
         self.sf_calls: list[dict] = []
         self.sf_mixer_running: bool | None = None
