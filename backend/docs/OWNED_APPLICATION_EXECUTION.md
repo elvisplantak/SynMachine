@@ -9,9 +9,12 @@ device connection and physical execution remain separate approval gates.
 
 ## One application owner
 
-The application constructs the device, timer, `OwnedOfflineRuntime` and writable
-SQLite handles on one dedicated worker. Its existing advisory locks exclude a
-second candidate runtime over the same bundle. Guided Demo, recovery, flushing,
+The application constructs the timer, `OwnedOfflineRuntime`, writable SQLite
+handles and then its deferred device on one dedicated worker. All bundle locks
+and schema/identity checks precede invoking the device factory. A factory may
+return an existing caller-owned fixture or a context manager owning its connection
+lifetime. Its existing advisory locks exclude a second candidate runtime before
+that runtime can invoke its factory. Guided Demo, recovery, flushing,
 Arduino Service and SF Service all use that runtime's `HardwareOwnership`, command
 runner and journals. Mixed owned/unguarded injected adapters are rejected.
 
@@ -44,9 +47,11 @@ including maintenance with no run. Pause/Resume are limited to started
 DELAY_BETWEEN_ADDITIONS and REACTION_HOLD wait intents; they use existing persisted
 wait controls and are not a physical emergency stop.
 
-Startup performs only existing interruption reconciliation plus metadata-only
-reconciliation of retained Service ownership with no active run. No startup
-queries, actuator commands or historical command rewrites are performed. An
+Startup reconciliation performs only existing interruption reconciliation plus
+metadata-only reconciliation of retained Service ownership with no active run.
+It sends no query or actuator command and rewrites no historical command. The
+explicit adapter resource factory described below first establishes a Serial
+handshake; default startup does not enable that composition. An
 interrupted maintenance attempt returns to RECOVERING. A successful recovery
 retains exclusion and requires explicit flushing. Only fully validated flush
 completion commits READY and releases the owner.
@@ -95,6 +100,40 @@ Default domain-only API behavior remains available without this composition;
 execution/recovery/wait-control endpoints then return 503. The connected UI requires
 the execution contract and does not fall back to domain-only phase completion.
 
+## Explicit adapter resource composition
+
+`build_adapter_application_execution` in `app/hardware/adapter_application.py`
+prepares `OwnedApplicationExecution` with the existing Serial and SF adapter classes
+and existing monotonic timer. Creating this object opens nothing and reads no
+environment. Explicit application startup locks/validates the existing bundle
+before opening Serial and sending HELLO. No SF connection, actuator command,
+automatic retry, recovery or flushing is part of resource startup.
+
+The caller supplies both transport configurations, pump calibrations, an explicit
+SF mixer state (or unknown), optional readiness/plans and an independent
+`context_factory(connected_boot_id)`. This callback runs on the worker after the
+handshake and supplies current `CommandPlanningContext`; it is not given the
+unwrapped adapter. The boot argument is connection correlation, not position
+evidence. Context/calibration disagreement, an unexpected boot or invalid/unavailable
+context fails startup and closes the connection. The factory must independently
+establish current physical context; relabeling historical references to a new boot
+is not supported. No concrete live-context provider or physical defaults are added.
+
+Startup failures close acquired resources and release runtime locks. On normal
+shutdown the existing application first requests orderly Stop and joins execution;
+the runner closes, the resource scope invalidates the binding/closes Serial on the
+worker, then lifecycle/owner handles and bundle locks close. Teardown does not send
+an implicit actuator/torque command or release unresolved hardware ownership. SF
+sessions retain the existing actuator's short-lived cleanup semantics. Context
+manager cleanup also applies when runner construction fails after connection.
+
+The adapter factory uses the existing transport/clock injection interfaces. Tests
+cover no access during construction, lock/identity checks before transport creation,
+only HELLO during startup, complete HTTP execution, recovery/flush/new run, failed
+handshake/context/timer setup and shutdown during an active command. Every test
+uses fake Serial/DYNAMIXEL transports. Existing preconnected caller-owned fixtures
+remain supported; their external connection lifetime remains the caller's duty.
+
 ## Inputs, verification and limits
 
 Calibrations, switching sequences, maintenance plans, independently established
@@ -110,7 +149,7 @@ failures, shutdown, startup without replay, standalone flushing, and recovery/
 mandatory flushing with zero DemoRuns. UI API tests check acknowledgement identity,
 unavailable executors, null maintenance scope, invalid responses and no retries.
 
-This does not supply production startup wiring, authenticate operator statements,
+This does not activate environment/production startup, authenticate operator statements,
 prove cleaning/volume/movement, or commission routes and working margins. SF host
 scope remains correlation rather than persistent physical trust. Cross-database
 commits remain non-atomic, and advisory locks do not govern unwrapped adapters or

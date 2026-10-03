@@ -31,8 +31,12 @@ class OwnedOfflineRuntime:
     successful flush/completion and independently supplied or retained current state.
     """
 
-    def __init__(self, bundle, device, *, timer=None):
-        if type(device) not in (SimulatedP1Device, PreparedAdapterDevice):
+    def __init__(self, bundle, device=None, *, timer=None, device_factory=None):
+        if (device is None) == (device_factory is None):
+            raise TypeError("supply exactly one device or deferred device factory")
+        if device_factory is not None and not callable(device_factory):
+            raise TypeError("deferred device factory must be callable")
+        if device is not None and type(device) not in (SimulatedP1Device, PreparedAdapterDevice):
             raise TypeError("only the explicit fake or prepared adapter device is supported")
         self._resources = ExitStack()
         self._closed = False
@@ -60,6 +64,14 @@ class OwnedOfflineRuntime:
             self._store = self._resources.enter_context(SimulationLifecycleStore(
                 bundle.lifecycle_path, bundle.lifecycle_id, bundle.execution_id
             ))
+            if device_factory is not None:
+                supplied = device_factory()
+                # A resource context owns connection teardown; plain existing
+                # fixtures keep their historical caller-owned lifetime.
+                device = (supplied if type(supplied) in (SimulatedP1Device, PreparedAdapterDevice)
+                    else self._resources.enter_context(supplied))
+                if type(device) not in (SimulatedP1Device, PreparedAdapterDevice):
+                    raise TypeError("factory must supply an explicit fake or prepared adapter device")
             self._runner = self._resources.enter_context(closing(OwnedTransferRunner(
                 bundle.execution_path, bundle.execution_id, self._owner, device, timer=timer
             )))

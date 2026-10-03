@@ -1,8 +1,9 @@
 """Explicit application binding to the existing owned executor.
 
 One worker owns the runtime/SQLite handles. Read/control requests use separately
-validated lifecycle handles; Stop/Pause never queue behind physical work. No
-environment factory, port connection, database provisioning or automatic recovery.
+validated lifecycle handles; Stop/Pause never queue behind physical work. Deferred
+device resources open only after bundle validation/locking, on the worker. No
+environment activation, database provisioning or automatic recovery.
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -108,7 +109,7 @@ class OwnedApplicationExecution:
         runtime = None
         try:
             runtime = OwnedOfflineRuntime(
-                self.bundle, self._device_factory(), timer=self._timer_factory()
+                self.bundle, device_factory=self._device_factory, timer=self._timer_factory()
             )
             runtime.reconcile_maintenance_interruption(occurred_at)
             runtime.reconcile_interruption(occurred_at)
