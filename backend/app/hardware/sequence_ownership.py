@@ -200,6 +200,38 @@ class HardwareOwnership:
             self._leases[sequence_id] = lease
             return lease
 
+    def begin_maintenance(self, expected_owner: str, phase_id: str) -> SequenceLease:
+        """Deliberate replacement of an unresolved lease under exclusive bundle locks.
+
+        This is never startup adoption. Caller must validate terminal lifecycle,
+        fresh transport/reference policy and a newly persisted maintenance plan.
+        The same durable owner is retained until a successful mandatory flush.
+        """
+        if not expected_owner or not phase_id:
+            raise ValueError("maintenance owner and phase must be explicit")
+        if not self._gate.acquire(blocking=False):
+            raise OwnershipBlocked("another hardware operation is active")
+        try:
+            with self._db_lock:
+                if self._closed or any(k not in self._poisoned for k in self._leases):
+                    raise OwnershipBlocked("maintenance cannot adopt a live lease")
+                self._db.execute("BEGIN IMMEDIATE")
+                try:
+                    if self._validate_owner() != expected_owner:
+                        raise OwnershipBlocked("maintenance owner changed")
+                    self._db.execute("UPDATE hardware_sequences SET state='ACTIVE' WHERE sequence_id=?", (expected_owner,))
+                    self._db.execute("COMMIT")
+                except BaseException:
+                    self._db.execute("ROLLBACK")
+                    raise
+                lease = SequenceLease(expected_owner, phase_id)
+                self._leases.clear()
+                self._poisoned.discard(expected_owner)
+                self._leases[expected_owner] = lease
+                return lease
+        finally:
+            self._gate.release()
+
     def _check(self, lease: SequenceLease):
         if (
             self._closed

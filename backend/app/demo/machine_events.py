@@ -12,9 +12,13 @@ from app.demo.machine_models import (
     StartupRecoveryReason,
 )
 from app.demo.phases import EXECUTION_INTENT_PHASES, RunPhase
+from app.demo.maintenance_plan import MaintenanceIntent, MaintenanceKind
 
 
 class MachineEventType(StrEnum):
+    MAINTENANCE_STARTED = "MAINTENANCE_STARTED"
+    MAINTENANCE_COMPLETED = "MAINTENANCE_COMPLETED"
+    MAINTENANCE_INTERRUPTED = "MAINTENANCE_INTERRUPTED"
     MACHINE_CREATED = "MACHINE_CREATED"
     STARTUP_COMPLETED = "STARTUP_COMPLETED"
     RUN_STARTED = "RUN_STARTED"
@@ -58,9 +62,31 @@ class MachineEvent(BaseModel):
     failure_reason: str | None = None
     cleanup_failure_reason: str | None = None
     primary_failure_reason: str | None = None
+    maintenance_intent: MaintenanceIntent | None = None
 
     @model_validator(mode="after")
     def validate_execution_metadata(self) -> "MachineEvent":
+        maintenance_events = {
+            MachineEventType.MAINTENANCE_STARTED, MachineEventType.MAINTENANCE_COMPLETED,
+            MachineEventType.MAINTENANCE_INTERRUPTED,
+        }
+        if (self.event_type in maintenance_events) != (self.maintenance_intent is not None):
+            raise ValueError("maintenance event requires matching intent metadata")
+        if self.maintenance_intent is not None and (
+            self.run_id != self.maintenance_intent.run_id
+            or self.occurred_at < self.maintenance_intent.started_at
+        ):
+            raise ValueError("maintenance event identity or timestamp differs from intent")
+        if self.maintenance_intent is not None:
+            kind = self.maintenance_intent.kind
+            if self.event_type is MachineEventType.MAINTENANCE_INTERRUPTED:
+                expected_state = MachineState.RECOVERING
+            elif self.event_type is MachineEventType.MAINTENANCE_STARTED:
+                expected_state = MachineState.RECOVERING if kind is MaintenanceKind.RECOVERY else MachineState.FLUSHING
+            else:
+                expected_state = MachineState.FLUSH_REQUIRED if kind is MaintenanceKind.RECOVERY else MachineState.READY
+            if self.machine_state is not expected_state:
+                raise ValueError("maintenance event requires its matching machine state")
         if self.event_type is MachineEventType.PHASE_EXECUTION_CLAIMED:
             if self.machine_state is not MachineState.BUSY:
                 raise ValueError(

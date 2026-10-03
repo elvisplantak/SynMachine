@@ -35,9 +35,12 @@ from app.hardware.provenance import reject_lost_keys
 from app.demo.pausable_wait_plan import PausableWaitPlan
 from app.demo.timed_sf_operation_plan import TimedSfOperationPlan
 from app.protocol.models import PhaseExecutionId
+from app.demo.maintenance_plan import MaintenancePlan
+from app.demo.calibration_models import PumpId
 
 SourcePlan = (
-    P1SolventToReactorOperationPlan
+    MaintenancePlan
+    | P1SolventToReactorOperationPlan
     | P1ReagentToReactorOperationPlan
     | P2ReactorToSfOperationPlan
     | P2SfToColumnOperationPlan
@@ -126,7 +129,7 @@ class StoredCommandPlan(BaseModel):
         plan = self.source.plan
         context = self.prepared.assumptions
         if not isinstance(
-            plan, (ColumnFractionCollectionOperationPlan, TimedSfOperationPlan, PausableWaitPlan)
+            plan, (MaintenancePlan, ColumnFractionCollectionOperationPlan, TimedSfOperationPlan, PausableWaitPlan)
         ):
             cycle_plan = plan.transfer_cycle_plan
             pump = next(
@@ -134,6 +137,12 @@ class StoredCommandPlan(BaseModel):
             )
             if pump is None or pump.calibration.working_volume_ml != cycle_plan.working_volume_ml:
                 raise ValueError("source cycle capacity does not match planning calibration")
+        if isinstance(plan, MaintenancePlan):
+            supplied = {PumpId.P1: plan.calibrations.p1, PumpId.P2: plan.calibrations.p2}
+            if {p.calibration.pump_id for p in context.pumps} != set(supplied) or any(
+                p.calibration != supplied[p.calibration.pump_id] for p in context.pumps
+            ):
+                raise ValueError("maintenance calibrations must match the independent context")
         expected = prepare_command_plan(plan.operations, context)
         if _canonical(_prepared_json(expected)) != _canonical(_prepared_json(self.prepared)):
             raise ValueError("prepared commands do not match the validated source and assumptions")

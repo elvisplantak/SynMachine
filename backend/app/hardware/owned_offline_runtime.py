@@ -1,4 +1,4 @@
-"""Exclusive fake-only execution and explicit interruption reconciliation.
+"""Exclusive candidate execution and explicit interruption reconciliation.
 
 The advisory file locks cover callers of this composition, not historical direct
 assemblies, arbitrary SQLite writers or production startup. Never replace/unlink
@@ -19,19 +19,21 @@ from app.hardware.owned_transfer_runner import OwnedTransferRunner
 from app.hardware.sequence_ownership import HardwareOwnership
 from app.hardware.simulated_lifecycle import SimulationLifecycleStore, PlanLifecycleCoordinator
 from app.hardware.simulated_p1_runner import SimulatedP1Device, SimulationBlocked
+from app.hardware.prepared_adapter_device import PreparedAdapterDevice
 
 
 class OwnedOfflineRuntime:
-    """One process owns the bundle until close or death; execution remains fake.
+    """One process owns the bundle until close or death; no startup/API activation.
 
     Opening validates only. Reconciliation is an explicit method, cannot run in
     an executing session and never performs cleanup or grants further execution.
-    A fresh run can only be created in a bundle that was pristine at open.
+    First-run entry requires a pristine bundle; new-run entry requires deliberate
+    successful flush/completion and independently supplied or retained current state.
     """
 
     def __init__(self, bundle, device, *, timer=None):
-        if type(device) is not SimulatedP1Device:
-            raise TypeError("only the exact fake device is supported")
+        if type(device) not in (SimulatedP1Device, PreparedAdapterDevice):
+            raise TypeError("only the explicit fake or prepared adapter device is supported")
         self._resources = ExitStack()
         self._closed = False
         self._thread = get_ident()
@@ -178,5 +180,83 @@ class OwnedOfflineRuntime:
             checks = RecoveryReferenceChecks(self, arduino, sf_valve, required_commands)
             self._reference_checks = checks
             return checks
+        finally:
+            self._gate.release()
+
+    def execute_maintenance(self, run_id, plan, readiness, *, occurred_at, stop_requested=lambda: False):
+        """Explicit fake recovery/flush, using the same command runner and owner."""
+        from app.hardware.owned_maintenance import execute_maintenance
+
+        self._check()
+        if occurred_at.tzinfo is None or occurred_at.utcoffset() is None:
+            raise ValueError("maintenance timestamp must be timezone-aware")
+        if not self._gate.acquire(blocking=False):
+            raise SimulationBlocked("runtime operation already active")
+        try:
+            previous = getattr(self, "_reference_checks", None)
+            if previous is not None:
+                previous._valid = False
+            self._used = True
+            return execute_maintenance(self, run_id, plan, readiness, occurred_at, stop_requested)
+        finally:
+            self._gate.release()
+
+    def reconcile_maintenance_interruption(self, occurred_at):
+        """Metadata only. Never replay maintenance or release the retained owner."""
+        from app.hardware.owned_maintenance import transition
+        from app.demo.machine_events import MachineEventType
+
+        self._check()
+        if occurred_at.tzinfo is None or occurred_at.utcoffset() is None:
+            raise ValueError("maintenance reconciliation timestamp must be timezone-aware")
+        if not self._gate.acquire(blocking=False):
+            raise SimulationBlocked("runtime operation already active")
+        try:
+            if self._used or self._session is not None:
+                raise SimulationBlocked("close the original runtime before reconciling")
+            machine = self._store.load_machine_snapshot()
+            if machine is None or machine.active_maintenance is None:
+                return machine
+            self._owner.retain_for_reconciliation()
+            return transition(self._store, machine, machine.active_maintenance,
+                MachineState.RECOVERING, MachineEventType.MAINTENANCE_INTERRUPTED,
+                occurred_at, active=False)
+        finally:
+            self._gate.release()
+
+    def start_new_run(self, run_id, configuration, settings, calibrations, *, occurred_at, column_readiness=None):
+        """New identity after successful flush/completion; never adopt an old run."""
+        self._check()
+        if not self._gate.acquire(blocking=False):
+            raise SimulationBlocked("runtime operation already active")
+        try:
+            generation = self._owner.idle_generation()
+            machine = self._store.load_machine_snapshot()
+            if (machine is None or machine.state is not MachineState.READY
+                or machine.active_execution is not None or machine.active_maintenance is not None
+                or self._store.load_demo_run(run_id) is not None):
+                raise SimulationBlocked("new run needs READY, no execution and a new identity")
+            previous = getattr(self, "_maintenance", None) or self._session
+            if previous is not None:
+                previous.validate_completion()
+                if previous.generation != generation:
+                    raise SimulationBlocked("hardware ownership changed since final command state")
+                state = previous._state
+            else:
+                device = self._runner.device
+                if generation != self.initial_inspection.ownership_generation:
+                    raise SimulationBlocked("hardware ownership changed since fresh input was supplied")
+                if device.used or device.calls or device.sf_calls:
+                    raise SimulationBlocked("new run needs an independently supplied unused fixture")
+                state = device.current
+            self._used = True
+            service = GuidedDemoApplicationService(self._store)
+            service.create_run(run_id, configuration, settings, occurred_at)
+            service.start_run(run_id, occurred_at)
+            self._runner._new_run_binding = (run_id, generation, state)
+            self._runner._session = None
+            self._session = OwnedPhaseSession(self._coordinator, run_id, calibrations,
+                column_readiness=column_readiness)
+            self._maintenance = None
         finally:
             self._gate.release()

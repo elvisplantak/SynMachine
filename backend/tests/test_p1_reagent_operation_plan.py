@@ -91,6 +91,8 @@ def test_shared_operation_models_and_routes_have_expected_ownership() -> None:
     assert AspirateOperation.__module__ == "app.demo.operation_models"
     assert DispenseOperation.__module__ == "app.demo.operation_models"
     assert set(SymbolicRouteId) == {
+        SymbolicRouteId.P1_TO_WASTE,
+        SymbolicRouteId.P2_TO_WASTE,
         SymbolicRouteId.S_TO_P1,
         SymbolicRouteId.B1_TO_P1,
         SymbolicRouteId.B2_TO_P1,

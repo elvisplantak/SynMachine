@@ -297,6 +297,8 @@ def detect_interrupted_startup(
 def complete_recovery(
     machine: MachineSnapshot, occurred_at: datetime
 ) -> MachineTransitionResult:
+    if machine.active_maintenance is not None:
+        raise _reject("complete recovery", machine, "owned recovery requires command-result resolution")
     if machine.state is not MachineState.RECOVERING:
         raise _reject("complete recovery", machine, "recovery completion requires RECOVERING")
 
@@ -349,6 +351,8 @@ def start_flush(
 def complete_flush(
     machine: MachineSnapshot, occurred_at: datetime
 ) -> MachineTransitionResult:
+    if machine.active_maintenance is not None:
+        raise _reject("complete flush", machine, "owned flush requires command-result resolution")
     if machine.state is not MachineState.FLUSHING:
         raise _reject("complete flush", machine, "flush completion requires FLUSHING")
 

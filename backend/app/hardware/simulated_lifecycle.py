@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from app.demo import lifecycle
 from app.demo.events import DomainEventType
+from app.demo.machine_events import MachineEventType
 from app.demo.phases import PAUSABLE_EXECUTION_PHASES
 from app.demo.pausable_wait_plan import PausableWaitPlan, plan_pausable_wait
 from app.demo.calibration_models import PumpCalibrationSet, PumpId
@@ -74,6 +75,26 @@ class SimulationLifecycleStore(SQLiteStore):
 
     def _user_tables(self) -> list[str]:
         return [name for name in super()._user_tables() if name != "offline_lifecycle_identity"]
+
+    def persist_maintenance_transition(self, expected, machine, event):
+        """Compare the complete current snapshot inside the lifecycle transaction."""
+        from app.persistence.sqlite_store import MACHINE_AGGREGATE, MACHINE_AGGREGATE_ID
+
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            if self.load_machine_snapshot() != expected:
+                raise SimulationBlocked("maintenance lifecycle changed")
+            if event.event_type is MachineEventType.MAINTENANCE_STARTED:
+                if machine.active_maintenance != event.maintenance_intent:
+                    raise SimulationBlocked("maintenance start event differs from current intent")
+            elif machine.active_maintenance is not None:
+                raise SimulationBlocked("maintenance resolution must clear the active intent")
+            self._validate_machine_transition(machine, (event,))
+            self._write_transition(MACHINE_AGGREGATE, MACHINE_AGGREGATE_ID, machine, (event,))
+            self._connection.execute("COMMIT")
+        except BaseException:
+            self._connection.execute("ROLLBACK")
+            raise
 
     def set_wait_paused(self, execution_id: str, *, paused: bool, occurred_at: datetime):
         """Explicit offline control on a started wait; no API or hardware dispatch."""
@@ -184,6 +205,9 @@ class PlanLifecycleCoordinator:
         plan = self.runner.load_plan(phase_id)
         if plan is None:
             raise SimulationBlocked("stored plan is absent in the verified database")
+        from app.demo.maintenance_plan import MaintenancePlan
+        if isinstance(plan.source.plan, MaintenancePlan):
+            raise SimulationBlocked("maintenance plans require the owned maintenance lifecycle")
         run = self.store.load_demo_run(plan.source.run_id)
         if (
             run is None

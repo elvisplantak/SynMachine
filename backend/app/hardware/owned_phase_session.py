@@ -91,13 +91,15 @@ class OwnedPhaseSession:
         self._column_readiness = column_readiness
         self._owner = self.runner.hardware.ownership
         self.generation = self._owner.idle_generation()
-        if self.generation != 0:
+        binding = getattr(self.runner, "_new_run_binding", None)
+        self.runner._new_run_binding = None
+        if binding is not None and binding[:2] != (run_id, self.generation):
+            raise SimulationBlocked("new-run binding differs from current ownership")
+        if self.generation != 0 and binding is None:
             raise SimulationBlocked("a new session cannot adopt existing ownership history")
         if (
             self.runner._session is not None
-            or self._device.used
-            or self._device.calls
-            or self._device.sf_calls
+            or binding is None and (self._device.used or self._device.calls or self._device.sf_calls)
         ):
             raise SimulationBlocked("session needs an unused runner and independent fixture")
         for table in (
@@ -107,7 +109,7 @@ class OwnedPhaseSession:
             "execution_waits",
             "execution_carousel_projection",
         ):
-            if self.runner._db.execute(f"SELECT 1 FROM {table} LIMIT 1").fetchone():
+            if binding is None and self.runner._db.execute(f"SELECT 1 FROM {table} LIMIT 1").fetchone():
                 raise SimulationBlocked("a new session cannot adopt previous execution evidence")
         self._expected_run = coordinator.store.load_demo_run(run_id)
         machine = coordinator.store.load_machine_snapshot()
@@ -122,7 +124,7 @@ class OwnedPhaseSession:
         if self._device.sf_mixer_running is not False:
             raise SimulationBlocked("initial mixer state must be independently stopped")
         self._initial_context = self._device.current
-        self._state = self._initial_context
+        self._state = self._initial_context if binding is None else binding[2]
         supplied = {PumpId.P1: calibrations.p1, PumpId.P2: calibrations.p2}
         if any(p.calibration != supplied[p.calibration.pump_id] for p in self._state.pumps):
             raise SimulationBlocked("calibration differs from independent fixture")
@@ -130,7 +132,7 @@ class OwnedPhaseSession:
         self._boot = self._device.controller_boot_id
         self._arduino_session = self._device.arduino_session_id
         self._sf_session = self._device.sf_session_id
-        self._counts = (0, 0)
+        self._counts = (len(self._device.calls), len(self._device.sf_calls))
         self.check_connections()
         if (
             self._boot != self._state.controller_boot_id
@@ -260,6 +262,11 @@ class OwnedPhaseSession:
                 self._phase_id, self._calibrations, column_readiness=self._column_readiness
             )
             if result.run.status not in (RunStatus.RUNNING, RunStatus.COMPLETED):
+                if result.run.status is RunStatus.ABORTED:
+                    self.check_connections()
+                    self._check_fixture()
+                    self._stopped_cleanly = True
+                    self._stopped_owner = self._phase_id
                 self._valid = False
                 return result
             self.check_connections()

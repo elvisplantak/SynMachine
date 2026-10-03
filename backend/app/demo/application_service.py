@@ -78,6 +78,8 @@ class GuidedDemoApplicationService:
     def complete_flush(
         self, occurred_at: datetime
     ) -> GuidedDemoMachineApplicationResult:
+        if self._load_machine().active_maintenance is not None:
+            raise GuidedDemoApplicationError("owned flush must complete through command-result resolution")
         result = machine_lifecycle.complete_flush(self._load_machine(), occurred_at)
         self._store.persist_machine_transition(result.machine, result.events)
         return GuidedDemoMachineApplicationResult(

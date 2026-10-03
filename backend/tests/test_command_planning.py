@@ -47,6 +47,8 @@ from tests.test_p1_solvent_operation_plan import configuration
 
 # Explicit hypothetical switching order for unit tests; no production defaults.
 ROUTES = {
+    SymbolicRouteId.P1_TO_WASTE: (("V2", 180), ("V1", 180)),
+    SymbolicRouteId.P2_TO_WASTE: (("V5", 180), ("V8", 90), ("V7", 90), ("V3", 180)),
     SymbolicRouteId.S_TO_P1: (("V6", 180), ("V1", 90)),
     SymbolicRouteId.B1_TO_P1: (("V4", 180), ("V6", 90), ("V1", 90)),
     SymbolicRouteId.B2_TO_P1: (("V4", 90), ("V6", 90), ("V1", 90)),

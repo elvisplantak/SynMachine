@@ -22,6 +22,8 @@ class TopologyId(StrEnum):
 
 
 class SymbolicRouteId(StrEnum):
+    P1_TO_WASTE = "P1_TO_WASTE"
+    P2_TO_WASTE = "P2_TO_WASTE"
     S_TO_P1 = "S_TO_P1"
     B1_TO_P1 = "B1_TO_P1"
     B2_TO_P1 = "B2_TO_P1"
@@ -33,6 +35,8 @@ class SymbolicRouteId(StrEnum):
 
 
 class OperationKind(StrEnum):
+    RECOVER_REFERENCES = "RECOVER_REFERENCES"
+    PREPARE_REQUIRED_FLUSH = "PREPARE_REQUIRED_FLUSH"
     PAUSABLE_RUN_WAIT = "PAUSABLE_RUN_WAIT"
     TIMED_SF_MIXING = "TIMED_SF_MIXING"
     SF_SETTLING_WAIT = "SF_SETTLING_WAIT"

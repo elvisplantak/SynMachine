@@ -177,6 +177,11 @@ class ArduinoSerialClient:
     def controller_boot_id(self) -> int | None:
         return self._controller_boot_id
 
+    @property
+    def backend_session_nonce(self) -> str | None:
+        """Current correlation identity; never physical-position evidence."""
+        return self._session_nonce
+
     def connect(self) -> HelloOk:
         self.close()
         try:

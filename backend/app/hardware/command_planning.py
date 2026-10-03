@@ -32,6 +32,7 @@ from app.demo.operation_models import (
 )
 from app.hardware.provenance import reject_lost_keys
 from app.protocol.models import PhaseExecutionId, UINT32_MAX
+from app.demo.maintenance_plan import RecoveryOperation, FlushPreparationOperation
 
 
 class CommandPlanningError(ValueError):
@@ -67,6 +68,8 @@ class ValveTarget(PlanningModel):
 # These are final target sets ONLY, not verified fluid routes or safe switching
 # sequences. There is deliberately no default switching order.
 _ROUTE_TARGETS = {
+    SymbolicRouteId.P1_TO_WASTE: {"V1": 180, "V2": 180},
+    SymbolicRouteId.P2_TO_WASTE: {"V3": 180, "V7": 90, "V8": 90, "V5": 180},
     SymbolicRouteId.S_TO_P1: {"V6": 180, "V1": 90},
     SymbolicRouteId.B1_TO_P1: {"V4": 180, "V6": 90, "V1": 90},
     SymbolicRouteId.B2_TO_P1: {"V4": 90, "V6": 90, "V1": 90},
@@ -78,6 +81,8 @@ _ROUTE_TARGETS = {
 }
 
 _ASPIRATION_ROUTES = {
+    SymbolicRouteId.P1_TO_WASTE: PumpId.P1,
+    SymbolicRouteId.P2_TO_WASTE: PumpId.P2,
     SymbolicRouteId.S_TO_P1: PumpId.P1,
     SymbolicRouteId.B1_TO_P1: PumpId.P1,
     SymbolicRouteId.B2_TO_P1: PumpId.P1,
@@ -85,6 +90,8 @@ _ASPIRATION_ROUTES = {
     SymbolicRouteId.SF_BOTTOM_TO_P2: PumpId.P2,
 }
 _DISPENSE_ROUTES = {
+    SymbolicRouteId.P1_TO_WASTE: PumpId.P1,
+    SymbolicRouteId.P2_TO_WASTE: PumpId.P2,
     SymbolicRouteId.P1_TO_REACTOR: PumpId.P1,
     SymbolicRouteId.P2_TO_SF_TOP: PumpId.P2,
     SymbolicRouteId.P2_TO_COLUMN: PumpId.P2,
@@ -258,6 +265,7 @@ class _Planner:
                 SymbolicRouteId.P2_TO_SF_TOP,
                 SymbolicRouteId.SF_BOTTOM_TO_P2,
                 SymbolicRouteId.P2_TO_COLUMN,
+                SymbolicRouteId.P2_TO_WASTE,
             }
             and self.sf is not BottomValveState.CLOSED
         ):
@@ -327,7 +335,68 @@ class _Planner:
             self.operation_number = number
             actions: tuple[Action, ...]
             followup: tuple[Action, ...] = ()
-            if isinstance(operation, PausableWaitOperation):
+            if isinstance(operation, FlushPreparationOperation):
+                safety = (self._arduino("mixer-stop", "SF_MIXER_SET_STATE", running=False),
+                          self._sf(BottomValveState.CLOSED, "sf-close"))
+                close = self._column(BottomValveState.CLOSED, "column-close")
+                prepared.append(PreparedOperation(len(prepared) + 1, operation.operation_kind, safety, close))
+                flush_actions = []
+                for pump_id, waste in ((PumpId.P1, SymbolicRouteId.P1_TO_WASTE),
+                                       (PumpId.P2, SymbolicRouteId.P2_TO_WASTE)):
+                    if pump_id not in self.pumps:
+                        raise CommandPlanningError("flush needs both explicit pump references")
+                    flush_actions.extend(self._route(waste))
+                    empty = self.pumps[pump_id].calibration.working_empty_chamber_position_steps
+                    if self.positions[pump_id] != empty:
+                        flush_actions.append(self._arduino(f"empty:{pump_id}", "PUMP_MOVE_ABSOLUTE_STEPS",
+                            pump=pump_id.value, target_steps=empty))
+                        self.positions[pump_id] = empty
+                flush_actions.append(self._arduino("rinse-reference", "CAROUSEL_SET_REFERENCE",
+                    position=operation.carousel_position))
+                self.carousel = operation.carousel_position
+                for action in flush_actions:
+                    prepared.append(PreparedOperation(len(prepared) + 1, operation.operation_kind, (action,)))
+                continue
+            elif isinstance(operation, RecoveryOperation):
+                if set(self.pumps) != {PumpId.P1, PumpId.P2}:
+                    raise CommandPlanningError("recovery needs both explicit pump calibrations")
+                recovery_actions = [
+                    self._arduino("mixer-stop", "SF_MIXER_SET_STATE", running=False),
+                    self._sf(BottomValveState.CLOSED, "sf-close"),
+                    self._arduino("column-home", "COLUMN_BOTTOM_VALVE_HOME"),
+                    self._arduino("column-close", "COLUMN_BOTTOM_VALVE_SET_POSITION", position_degrees=4),
+                ]
+                self.column = 4
+                for valve in operation.valve_home_order:
+                    recovery_actions.append(self._arduino(f"home:{valve}", "VALVE_HOME", valve=valve))
+                    self.valves[valve] = 0
+                for pump_id, waste in ((PumpId.P1, SymbolicRouteId.P1_TO_WASTE),
+                                       (PumpId.P2, SymbolicRouteId.P2_TO_WASTE)):
+                    recovery_actions.extend(self._route(waste))
+                    recovery_actions.append(self._arduino(f"home:{pump_id}", "PUMP_HOME", pump=pump_id.value))
+                    empty = self.pumps[pump_id].calibration.working_empty_chamber_position_steps
+                    if not 1 <= empty <= 20500:
+                        raise CommandPlanningError("recovery empty target must be explicit and in 1..20500")
+                    recovery_actions.append(self._arduino(
+                        f"empty:{pump_id}", "PUMP_MOVE_ABSOLUTE_STEPS", pump=pump_id.value, target_steps=empty))
+                    self.positions[pump_id] = empty
+                recovery_actions.append(self._arduino(
+                    "carousel-reference", "CAROUSEL_SET_REFERENCE", position=operation.carousel_position))
+                self.carousel = operation.carousel_position
+                # Recovery has normal boundaries between commands; a successful
+                # Column HOME must still park CLOSED before observing Stop.
+                index = 0
+                while index < len(recovery_actions):
+                    action = recovery_actions[index]
+                    close = ()
+                    if isinstance(action, ArduinoAction) and action.command == "COLUMN_BOTTOM_VALVE_HOME":
+                        close = (recovery_actions[index + 1],)
+                        index += 1
+                    prepared.append(PreparedOperation(len(prepared) + 1, operation.operation_kind,
+                        (action,), close))
+                    index += 1
+                continue
+            elif isinstance(operation, PausableWaitOperation):
                 actions = (PausableWait(operation.duration_seconds),)
             elif isinstance(operation, TimedSfOperation):
                 if self.sf is not BottomValveState.CLOSED:
@@ -407,7 +476,7 @@ class _Planner:
                 )
             else:
                 raise CommandPlanningError(f"unsupported operation {type(operation).__name__}")
-            prepared.append(PreparedOperation(number, operation.operation_kind, actions, followup))
+            prepared.append(PreparedOperation(len(prepared) + 1, operation.operation_kind, actions, followup))
         return PreparedCommandPlan(
             self.context, tuple(prepared), tuple(sorted(self.positions.items())), self.carousel
         )

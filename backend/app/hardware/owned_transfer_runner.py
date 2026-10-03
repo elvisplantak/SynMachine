@@ -1,4 +1,4 @@
-"""Candidate phase execution through shared ownership; fake assembly only.
+"""Candidate phase execution through shared ownership and injected transports.
 
 No API, environment startup, live route approval or hardware trust is added here.
 The lifecycle coordinator uses this runner instead of the historical simulator.
@@ -22,6 +22,8 @@ from app.hardware.command_planning import ArduinoAction, SfBottomValveAction, Co
 from app.hardware.execution_timer import MonotonicExecutionTimer
 from app.hardware.command_planning import PausableWait
 from app.demo.pausable_wait_plan import PausableWaitPlan
+from app.demo.maintenance_plan import MaintenancePlan, MaintenanceKind
+from app.hardware.prepared_adapter_device import PreparedAdapterDevice
 from app.hardware.durable_arduino import DurableArduinoCommandExecutor
 from app.hardware.owned_hardware import OwnedHardware
 from app.hardware.sequence_ownership import HardwareOwnership, OwnershipBlocked
@@ -125,8 +127,10 @@ class OwnedTransferRunner:
     """
 
     def __init__(self, database, database_id, ownership, device, *, timer=None):
-        if type(device) is not SimulatedP1Device or type(ownership) is not HardwareOwnership:
-            raise TypeError("this checkpoint permits explicit fake transport assembly only")
+        if type(device) not in (SimulatedP1Device, PreparedAdapterDevice) or type(ownership) is not HardwareOwnership:
+            raise TypeError("explicit owned fake or prepared adapter assembly is required")
+        if type(device) is PreparedAdapterDevice and timer is None:
+            raise TypeError("adapter preparation requires an explicit monotonic timer")
         if timer is not None and type(timer) is not MonotonicExecutionTimer:
             raise TypeError("only the bounded monotonic timer or default virtual wait is supported")
         self._timer = timer
@@ -228,6 +232,8 @@ class OwnedTransferRunner:
                     "COLUMN_BOTTOM_VALVE_SET_POSITION",
                     "CAROUSEL_MOVE_TO_POSITION",
                     "SF_MIXER_SET_STATE",
+                    *( ("VALVE_HOME", "PUMP_HOME", "COLUMN_BOTTOM_VALVE_HOME", "CAROUSEL_SET_REFERENCE")
+                       if isinstance(plan.source.plan, MaintenancePlan) else () ),
                 ):
                     raise SimulationBlocked("unsupported Arduino command in owned plan")
             if any(
@@ -321,11 +327,19 @@ class OwnedTransferRunner:
         before_execute,
         before_finish,
         wait_control=None,
+        maintenance_lease=None,
     ):
         with self._lock:
             plan = self._validate(phase_id, run_id, run_event_sequence)
             owner = self.hardware.ownership
-            lease = (
+            if maintenance_lease is not None and (
+                not isinstance(plan.source.plan, MaintenancePlan)
+                or maintenance_lease.phase_execution_id != phase_id
+            ):
+                raise SimulationBlocked("maintenance lease requires its matching stored plan")
+            if isinstance(plan.source.plan, MaintenancePlan) and maintenance_lease is None:
+                raise SimulationBlocked("maintenance requires deliberate retained ownership")
+            lease = maintenance_lease or (
                 owner.claim(phase_id, expected_generation=self._session.generation)
                 if self._session is not None
                 else owner.claim(phase_id)
@@ -338,6 +352,19 @@ class OwnedTransferRunner:
                 owner.invoke(lease, lambda: self._validate(phase_id, run_id, run_event_sequence))
                 self.device.used = True
                 self._active_phase = phase_id
+                if type(self.device) is PreparedAdapterDevice:
+                    required = frozenset(action.command for operation in plan.prepared.operations
+                        for action in (*operation.actions, *operation.required_followup)
+                        if isinstance(action, ArduinoAction))
+                    observation = owner.invoke(lease, lambda: self.device.observe_before_execution(required))
+                    recovery = isinstance(plan.source.plan, MaintenancePlan) and plan.source.plan.kind is MaintenanceKind.RECOVERY
+                    expected_sf = (self._session._state.sf_bottom_valve if self._session is not None
+                                   else plan.prepared.assumptions.sf_bottom_valve)
+                    if not recovery and (
+                        observation.sf_valve.observed_state is not expected_sf
+                        or observation.sf_valve.torque_enabled
+                    ):
+                        raise SimulationBlocked("fresh SF observation differs from current command state")
                 owner.invoke(lease, before_execute)
                 if isinstance(plan.source.plan, ColumnFractionCollectionOperationPlan):
                     self._db.execute(
@@ -389,7 +416,7 @@ class OwnedTransferRunner:
                                 mixer_action = action.command == "SF_MIXER_SET_STATE"
                                 if mixer_action:
                                     self.device.sf_mixer_running = None
-                                carousel_move = action.command == "CAROUSEL_MOVE_TO_POSITION"
+                                carousel_move = action.command in ("CAROUSEL_MOVE_TO_POSITION", "CAROUSEL_SET_REFERENCE")
                                 if carousel_move:
                                     self._invalidate_carousel(phase_id)
                                 commands.execute(
@@ -403,10 +430,16 @@ class OwnedTransferRunner:
                                     self.device.sf_mixer_running = dict(action.arguments)["running"]
                                 if carousel_move:
                                     position = dict(action.arguments)["position"]
-                                    self._db.execute(
-                                        "UPDATE execution_carousel_projection SET position=? WHERE phase_id=?",
-                                        (position, phase_id),
-                                    )
+                                    if action.command == "CAROUSEL_SET_REFERENCE":
+                                        self._db.execute(
+                                            "INSERT INTO execution_carousel_projection VALUES (?, ?) ON CONFLICT(phase_id) DO UPDATE SET position=excluded.position",
+                                            (phase_id, position),
+                                        )
+                                    else:
+                                        self._db.execute(
+                                            "UPDATE execution_carousel_projection SET position=? WHERE phase_id=?",
+                                            (position, phase_id),
+                                        )
                                     self.device.carousel_position = position
                                 if self._session is not None:
                                     self._session.observe(action)

@@ -5,6 +5,7 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.demo.phases import EXECUTION_INTENT_PHASES, RunPhase
+from app.demo.maintenance_plan import MaintenanceIntent, MaintenanceKind
 
 
 class MachineState(StrEnum):
@@ -201,6 +202,7 @@ class MachineSnapshot(BaseModel):
     hardware_outcome_unknown: bool = False
     carousel_position_untrusted: bool = False
     active_execution: PhaseExecutionIntent | None = None
+    active_maintenance: MaintenanceIntent | None = None
 
     @field_validator("active_run_id", "interrupted_run_id")
     @classmethod
@@ -211,6 +213,13 @@ class MachineSnapshot(BaseModel):
 
     @model_validator(mode="after")
     def validate_state_invariants(self) -> Self:
+        if self.active_maintenance is not None:
+            intent = self.active_maintenance
+            required = MachineState.RECOVERING if intent.kind is MaintenanceKind.RECOVERY else MachineState.FLUSHING
+            if self.state is not required or self.active_execution is not None:
+                raise ValueError("maintenance requires its matching machine state and no run execution")
+            if self.interrupted_run_id != intent.run_id:
+                raise ValueError("maintenance requires its matching terminal run")
         if self.active_run_id is not None and self.interrupted_run_id is not None:
             raise ValueError("active_run_id and interrupted_run_id cannot both be set")
         if self.state is MachineState.BUSY:
