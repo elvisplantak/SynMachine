@@ -1,12 +1,51 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-10-01
+- Checkpoint date: 2026-10-03
 - Development phase: complete fake demo with owned Pause/Resume waits accepted; session-bound recovery reference checks implemented; exclusive offline reconciliation retained;
   V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Immediate continuation — scoped recovery reference checks
+## Session handoff — 2026-10-03
+
+- User requested a minimal clean stopping point, consolidated reviewer handoff and
+  continuation in a new session. Do not start another implementation milestone
+  while closing this session. Reviewer suggestions remain advisory; prefer fewer,
+  substantial reviews and autonomous safe progress.
+- Backend code is unchanged at `9245e9e3f66716eb5dde17aaa3bd3b432f058e99` on
+  `codex/recovery-reference-checks`, confirmed equal to remote HEAD. Working tree
+  was clean after the credit interruption; no implementation was lost.
+- Last independently accepted base remains
+  `3d9fab24f325f3a2da59d69215465e110acd3c33`. The four later checkpoints are now
+  submitted together for review; do not describe them as independently accepted.
+- Review handoff: `docs/reviews/2026-10-03-backend-handoff.md` in this UI worktree.
+- Fresh verification on 2026-10-03: all 1668 backend tests passed (59.47 s),
+  116 focused new tests passed (7.09 s), Ruff and diff checks passed. Backend
+  code was not modified for the session handoff.
+- Active persistent worktrees:
+  `/home/elvis/Documents/labforge-backend-multiphase` and
+  `/home/elvis/Documents/labforge-ui-multiphase`.
+  Use these, not the older original checkout branches or historical `/tmp` worktrees.
+- The last approved implementation task was **not implemented yet**: connect
+  recovery, mandatory flush and durable owner release/new-run permission through
+  the existing execution path; prepare real adapters using fake transports first.
+  Only preliminary reads of application_service.py, machine_lifecycle.py and
+  owned_hardware.py occurred before the interruption. There is no partial code
+  requiring reconstruction and no new recovery/flush executor or release method.
+- Next session: read the reviewer response if supplied and assess it independently,
+  then continue that approved cohesive task. Reuse current lifecycle/ownership/
+  durable command paths; do not create another separate diagnostic layer.
+- Respect existing domain policy: interrupted run does not resume; recovery leads
+  to FLUSH_REQUIRED, operator starts Flush system, and successful required flush
+  precedes a new run. Reconcile older context with current HARDWARE_CONFIRMATIONS
+  before selecting physical details. Unconfirmed safe routes/calibration must not
+  be invented; no real execution/startup activation/main merge is authorized.
+- Python tools: `/home/elvis/Documents/labforge-backend/.venv/bin/pytest` and
+  `ruff`, working directory the persistent backend worktree. Prior `/tmp` test
+  logs are ephemeral and are not the continuity source. Canonical documents,
+  committed code and this handoff preserve state.
+
+## Current implemented checkpoint — scoped recovery reference checks
 
 - Backend/UI worktrees remain `labforge-backend-multiphase` and
   `labforge-ui-multiphase`, branch `codex/recovery-reference-checks`.
