@@ -8,13 +8,15 @@ migrations, firmware changes, main merges or firmware recovery artifacts.
 ## Pinned scope
 
 - Backend repository: `elvisplantak/labforge-backend`, branch
-  `codex/owned-application-execution`, commit
-  `37d5b1611ae148c8ec52a5a66ecf7ffb266fc231`, base
+  `codex/adapter-application-composition`, commit
+  `3d4298ff684788ce79cc9354be60f475baa94151`, base
   `e84ea97e177ff23be8d043e9b79be27a7a75e3a5`.
-- UI repository: `elvisplantak/labforge-ui`, same branch. Review the implementation
-  commit containing this file; it is based on
+- UI repository: `elvisplantak/labforge-ui`, same branch. UI implementation commit
+  `904154eda2da8977a81f983b7aa74d8daa7a6deb`; this checkpoint adds documentation
+  only. The connected UI implementation is based on
   `e72db554f427a67ff9e0d77665863051ca3526ac`. Use the full UI HEAD supplied with the
-  checkpoint report, rather than an unrelated default branch.
+  checkpoint report, rather than an unrelated default branch. Adapter-resource
+  backend delta is `37d5b16..3d4298f`; the full review above includes both slices.
 - Last independently accepted backend base remains `3d9fab24`. Prior integration
   and targeted STATUS freshness correction are not newly marked accepted here.
   Prior packets are `2026-10-03-owned-recovery-flush-handoff.md` and
@@ -28,6 +30,14 @@ One worker owns execution and writable handles. Service calls share the same
 hardware exclusion. Run/maintenance acceptance is asynchronous. Separate validated
 read-only handles provide snapshots/events. No new diagnostic or transport layer
 is introduced; default environment startup remains unactivated for this candidate.
+
+The subsequent explicit `build_adapter_application_execution` composes adapter
+resource lifetime. Construction opens nothing. Deferred factory invocation follows
+bundle lock/schema/identity checks, so a second runtime cannot open its transport.
+Explicit startup establishes only a Serial handshake before obtaining independent
+current-context input. Failure and shutdown close the connection on the worker;
+shutdown requests Stop and waits before adapter teardown. No implicit actuator
+command or release occurs. Existing caller-owned fixture lifetime remains supported.
 
 Stop bypasses the worker queue, including early/between-phase requests. Stop
 persistence failure blocks next primary work without suppressing required cleanup.
@@ -48,14 +58,17 @@ separate; no global topology/layout redesign was performed.
 
 ## Evidence and review focus
 
-- Backend: all 1758 tests pass (92.90 s), including 40 new cases; 349 focused
-  connected cases pass (40.38 s). Ruff and staged/working diff checks pass.
-  Change: 18 files, +1605/-51 lines.
+- Backend: all 1772 tests pass (95.28 s), including 54 cases above the full-review
+  base. Adapter-resource delta adds 14 cases; 80 focused connected cases pass
+  (27.67 s). Prior application slice passed 349 focused cases (40.38 s).
+  Ruff and staged/working diff checks pass. Application slice: 18 files,
+  +1605/-51 lines; adapter-resource delta: 5 files, +406/-12 lines.
 - UI: 12 API contract tests, lint and build pass; JS 303.08 kB (83.59 kB gzip),
   CSS 49.57 kB (9.82 kB gzip). Browser visual/click testing was not available.
 - Real Serial/DYNAMIXEL adapter implementations execute over fake ports/sessions
   in tests. Test-only routes/calibrations are not physical commissioning values.
 - Main sources: backend `app/hardware/owned_application_execution.py`,
+  `app/hardware/adapter_application.py`, `tests/test_adapter_application.py`,
   `owned_offline_runtime.py`, `owned_phase_session.py`, `owned_maintenance.py`,
   `simulated_lifecycle.py`, `app/main.py`, `tests/test_owned_application_api.py`;
   UI `src/OwnedDemoControls.tsx`, `src/guidedDemoApi.ts`, their API tests and the
@@ -64,10 +77,11 @@ separate; no global topology/layout redesign was performed.
 
 Please focus on out-of-queue Stop races and persistence failures, shared Service
 exclusion, teardown/restart without replay, null-run maintenance scope, mandatory
-flush/release ordering, and UI acceptance/stale-read/error behavior. Assess findings
+flush/release ordering, device-factory ordering/resource failure cleanup, context
+binding without inferred trust, and UI acceptance/stale-read/error behavior. Assess findings
 independently against this explicit candidate's boundaries.
 
-Production wiring, authentication, persistent SF physical trust, real safe-route
+Production activation/configuration, authentication, persistent SF physical trust, real safe-route
 verification, wet calibration and commissioning remain unfinished gated phases.
 Supplied input is not proof of physical state. Cross-database commits remain
 non-atomic. Advisory locks do not govern unwrapped adapters/arbitrary writers.

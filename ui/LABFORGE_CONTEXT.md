@@ -963,3 +963,12 @@ scope, so first flushing or Service-fault recovery needs no fabricated run.
 Explicit recovery retains exclusion until mandatory flushing succeeds. Plans,
 calibrations and current device context remain server-supplied inputs; no physical
 readiness is inferred. Backend detail: `docs/OWNED_APPLICATION_EXECUTION.md`.
+
+The subsequent `build_adapter_application_execution` helper prepares resource
+lifetime for those existing adapters. It opens nothing during construction;
+explicit startup locks/validates the existing bundle before Serial handshake and
+current-context preparation. Connection closes on the worker after orderly Stop
+or failed setup. The context provider receives only boot identity, never an
+unwrapped adapter or inferred position. Tests use fake transports; no live provider,
+production environment activation, concrete calibration or switching default is
+supplied.

@@ -1,12 +1,49 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-10-03
-- Development phase: owned application/API/UI execution integrated under fake transports; production activation remains gated;
+- Development phase: explicit adapter startup/teardown composition prepared under fake transports; production activation remains gated;
   V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — owned application, Service and Guided Demo UI
+## Current checkpoint — deferred adapter application composition
+
+- Active backend/UI worktrees remain `labforge-backend-multiphase` and
+  `labforge-ui-multiphase`, both on `codex/adapter-application-composition`.
+  Backend HEAD: `3d4298ff684788ce79cc9354be60f475baa94151`, based on
+  `37d5b1611ae148c8ec52a5a66ecf7ffb266fc231`. UI code is unchanged at
+  `904154eda2da8977a81f983b7aa74d8daa7a6deb`; this branch adds checkpoint/review
+  documentation over that UI commit.
+- User requested continuation after the connected software checkpoint. The next
+  safe slice prepares real adapter resource composition without enabling the
+  environment application, opening a real port or performing physical work.
+- `build_adapter_application_execution` composes the existing Serial/SF adapters,
+  timer and owned application. Construction opens nothing. On explicit startup,
+  bundle locks plus schema/identity checks precede the device factory and Serial
+  handshake. A second runtime or invalid bundle never reaches its transport factory.
+  Context factory runs on the worker and receives only the connected boot identity;
+  independently established current physical state and calibrations remain inputs.
+- Factory resources close on setup failure and orderly shutdown. Stop is requested
+  before waiting; the connection stays open while the current atomic operation
+  finishes, then closes on the worker before releasing bundle locks. No implicit
+  actuator/torque command or owner release is added. SF retains its existing
+  short-lived session cleanup. No diagnostic layer, SQL schema or migration is added.
+- Verification: 80 focused connected tests pass (27.67 s); all 1772 backend tests
+  pass (95.28 s), including 14 new cases. Ruff and staged/working diff checks pass.
+  Backend delta: 5 files, +406/-12 lines. UI changes are documentation only; the
+  preceding 12 API tests/lint/build results remain the UI implementation evidence.
+- Detail: backend `docs/OWNED_APPLICATION_EXECUTION.md`, explicit adapter resource
+  composition section. The existing consolidated packet
+  `docs/reviews/2026-10-03-owned-application-handoff.md` is updated to include this
+  delta. Independent review remains pending; accepted backend base stays `3d9fab24`.
+- Next: consolidated review of the connected application plus adapter composition.
+  Live activation requires a concrete approved configuration and independent current
+  context provider. Working pump margins, verified switching sequences, wet routes,
+  drain timing and physical commissioning remain separate gates. Boot identity is
+  correlation, not proof of current position. No real device, firmware, original
+  project database, production activation or main merge was used.
+
+## Previous checkpoint — owned application, Service and Guided Demo UI
 
 - Active worktrees: `/home/elvis/Documents/labforge-backend-multiphase` and
   `/home/elvis/Documents/labforge-ui-multiphase`. Both use
