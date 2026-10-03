@@ -1,6 +1,7 @@
 from dataclasses import replace
 from datetime import UTC, datetime
 import json
+import uuid
 
 import pytest
 
@@ -9,7 +10,7 @@ from app.hardware.recovery_reference_checks import ReferenceItem
 from app.hardware.simulated_p1_runner import SimulationBlocked
 from tests.test_owned_offline_runtime import bundle as bundle, open_runtime, start
 from tests.test_fresh_hardware_observations import devices as devices, REQUIRED
-from tests.test_arduino_serial import hello_ok
+from tests.test_arduino_serial import frame, hello_ok
 
 
 @pytest.fixture
@@ -202,14 +203,81 @@ def test_busy_runtime_gate_prevents_observation(recovery, devices):
     assert devices[2].query_count == 0
 
 
-def test_repeated_request_id_invalidates_reference_checks(recovery, devices):
-    import uuid
+@pytest.mark.parametrize("observation", ["initial", "confirmation"])
+@pytest.mark.parametrize("bracket", [0, 1])
+def test_repeated_request_id_invalidates_reference_checks(recovery, devices, observation, bracket):
     checks = begin(recovery, devices)
-    seen = next(iter(checks._requests))
-    devices[0]._request_id_factory = lambda: uuid.UUID(seen)
+    confirm(checks)
+    queries = [json.loads(value) for value in devices[2].writes[1:]]
+    assert checks._requests == {query["request_id"] for query in queries}
+    index = bracket + (2 if observation == "confirmation" else 0)
+    requests = iter([uuid.UUID(queries[index]["request_id"]), uuid.uuid4()])
+    devices[0]._request_id_factory = lambda: next(requests)
     with pytest.raises(SimulationBlocked, match="new status request"):
-        confirm(checks)
+        checks.report(checks.challenge)
     assert checks._confirmations == {}
+    with pytest.raises(SimulationBlocked, match="stale"):
+        confirm(checks)
+    assert devices[3].writes == []
+    assert all(json.loads(value)["type"] in {"HELLO", "QUERY_STATUS"} for value in devices[2].writes)
+    assert recovery._runner.device.calls == recovery._runner.device.sf_calls == []
+
+
+def test_equal_bracketing_ids_clear_confirmations_permanently(recovery, devices):
+    checks = begin(recovery, devices)
+    confirm(checks)
+    request_id = uuid.uuid4()
+    devices[0]._request_id_factory = lambda: request_id
+    with pytest.raises(ArduinoProtocolError, match="distinct status request IDs"):
+        checks.report(checks.challenge)
+    assert checks._confirmations == {}
+    with pytest.raises(SimulationBlocked, match="stale"):
+        confirm(checks)
+    assert devices[3].writes == []
+    assert all(json.loads(value)["type"] in {"HELLO", "QUERY_STATUS"} for value in devices[2].writes)
+    assert recovery._runner.device.calls == recovery._runner.device.sf_calls == []
+
+
+@pytest.mark.parametrize("stream", ["receive", "pending"])
+def test_stale_status_with_reused_before_id_cannot_pass_round(recovery, devices, monkeypatch, stream):
+    from app.protocol.models import Status
+
+    client, _, port, session = devices
+    checks = begin(recovery, devices)
+    confirm(checks)
+    previous = json.loads(port.writes[1])
+    stale = dict(
+        type="STATUS", backend_session_nonce=previous["backend_session_nonce"],
+        controller_boot_id=previous["controller_boot_id"], request_id=previous["request_id"],
+        controller_state="IDLE", software_state_trust="TRUSTED",
+        active_operation_command_id=None,
+    )
+    if stream == "receive":
+        port.incoming.extend(frame(**stale))
+    else:
+        client._pending_messages.append(Status(protocol="LABFORGE/1", **stale))
+    requests = iter([uuid.UUID(previous["request_id"]), uuid.uuid4()])
+    client._request_id_factory = lambda: next(requests)
+    original_write = port.write
+
+    def write(data):
+        # No fresh reply to the reused before query: only the queued stale
+        # reply can satisfy normal correlation. The after query replies normally.
+        if json.loads(data)["request_id"] == previous["request_id"]:
+            port.writes.append(data)
+            return len(data)
+        return original_write(data)
+
+    monkeypatch.setattr(port, "write", write)
+    with pytest.raises(SimulationBlocked, match="new status request"):
+        checks.report(checks.challenge)
+    assert checks._confirmations == {}
+    assert not port.incoming and not client._pending_messages
+    with pytest.raises(SimulationBlocked, match="stale"):
+        confirm(checks)
+    assert session.writes == []
+    assert all(json.loads(value)["type"] in {"HELLO", "QUERY_STATUS"} for value in port.writes)
+    assert recovery._runner.device.calls == recovery._runner.device.sf_calls == []
 
 
 def test_torque_on_invalidates_confirmations_without_changing_torque(recovery, devices):

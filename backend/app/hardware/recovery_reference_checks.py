@@ -135,7 +135,7 @@ class RecoveryReferenceChecks:
                     observations.arduino_connection_epoch)
         if hasattr(self, "_identity") and identity != self._identity:
             raise SimulationBlocked("reference-check controller session changed")
-        if status.request_id in self._requests:
+        if self._requests.intersection(observations.arduino_status_request_ids):
             raise SimulationBlocked("reference checks require a new status request")
         if (
             observations.sf_valve.observed_state is not BottomValveState.CLOSED
@@ -146,7 +146,7 @@ class RecoveryReferenceChecks:
             raise SimulationBlocked("recovery database context changed during observation")
         if self._database_versions() != self._versions:
             raise SimulationBlocked("recovery database context changed during observation")
-        self._requests.add(status.request_id)
+        self._requests.update(observations.arduino_status_request_ids)
         return observations
 
     def _operate(self, challenge, confirmation=None):

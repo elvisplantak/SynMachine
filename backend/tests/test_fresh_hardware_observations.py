@@ -72,6 +72,25 @@ def test_existing_protocol_and_sf_reads_do_not_authorize_release(devices):
     assert session.writes == [] and session.closed
 
 
+def test_observation_preserves_both_status_request_ids(devices):
+    report = observe(devices)
+    requests = [json.loads(value)["request_id"] for value in devices[2].writes[1:]]
+    assert report.arduino_status_request_ids == tuple(requests)
+    assert len(set(requests)) == 2
+    assert report.arduino_status.request_id == requests[1]
+
+
+def test_same_request_id_inside_observation_is_rejected(devices):
+    client, _, port, session = devices
+    request_id = uuid.uuid4()
+    client._request_id_factory = lambda: request_id
+    with pytest.raises(ArduinoProtocolError, match="distinct status request IDs"):
+        observe(devices)
+    assert port.query_count == 2
+    assert session.closed and session.writes == []
+    assert all(json.loads(value)["type"] in {"HELLO", "QUERY_STATUS"} for value in port.writes)
+
+
 @pytest.mark.parametrize("changes", [
     {"controller_state": "BUSY"},
     {"controller_state": "ERROR"},

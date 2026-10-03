@@ -43,6 +43,10 @@ OFF. OPEN, unknown position, torque ON, communication/read errors and repeated
 status request IDs invalidate the round. No corrective motion or torque write is
 attempted. SF's short-lived samples still do not establish persistent SF session
 trust, mechanical closure, fluidic sealing or unchanged physical state between reads.
+Both bracketing STATUS request IDs are consumed by the round. Equal IDs within
+one observation or reuse of either ID from any earlier observation permanently
+invalidates the round and clears its confirmations, including when a queued
+duplicate reply passes the Serial client's normal correlation checks.
 
 ## Database binding and invalidation
 

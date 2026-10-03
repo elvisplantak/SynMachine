@@ -15,6 +15,7 @@ from app.protocol.models import Status
 @dataclass(frozen=True)
 class CurrentHardwareObservations:
     arduino_status: Status
+    arduino_status_request_ids: tuple[str, str]
     arduino_connection_epoch: int
     capabilities: frozenset[str]
     sf_valve: SfValveObservation
@@ -67,8 +68,12 @@ def observe_current_hardware(
     before = sample()
     sf = sf_valve.inspect_state()
     after = sample()
+    if before.request_id == after.request_id:
+        raise ArduinoProtocolError("bracketing observations require distinct status request IDs")
     if (before.backend_session_nonce, before.controller_boot_id) != (
         after.backend_session_nonce, after.controller_boot_id
     ):
         raise ArduinoProtocolError("controller session changed during observation")
-    return CurrentHardwareObservations(after, epoch, capabilities, sf)
+    return CurrentHardwareObservations(
+        after, (before.request_id, after.request_id), epoch, capabilities, sf
+    )
