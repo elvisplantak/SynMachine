@@ -1,12 +1,54 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-10-03
-- Development phase: complete fake demo with owned Pause/Resume waits accepted; session-bound recovery reference checks implemented; exclusive offline reconciliation retained;
+- Development phase: owned recovery, mandatory flush and durable new-run permission implemented under fake transports; production activation remains gated;
   V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Session handoff — 2026-10-03
+## Current checkpoint — owned recovery, mandatory flush and new runs
+
+- Active persistent backend/UI worktrees remain `labforge-backend-multiphase`
+  and `labforge-ui-multiphase`, now on `codex/owned-recovery-flush`.
+  Backend HEAD: `a14c7beb77f7bd830a8368e1a400cf08be872b3b`, base `9245e9e`.
+- The approved task is implemented. The same owned runner, immutable plan store,
+  Arduino/SF journals and existing lifecycle connect recovery -> FLUSH_REQUIRED ->
+  operator-triggered mandatory flush -> READY -> owner release -> a new run.
+  No additional diagnostic layer, SQL schema, database or migration was added.
+- Recovery explicitly homes references and selects supplied confirmed Waste routes
+  before pump HOME/emptying. Successful recovery retains exclusion. A clean Stop
+  can instead enter flush from retained command-confirmed state, including emptying
+  pump contents toward Waste without unnecessary re-homing. Old runs never resume.
+- Flush reuses protected SF aspiration/CLOSE and Column drain/CLOSE/carousel
+  boundaries for two liquid cycles and final air passes. Volumes, calibration,
+  switching order, drain duration, tube margin and manual alignment are supplied;
+  no physical setting is inferred. Completion does not prove effective cleaning.
+- Durable maintenance intent precedes commands. Stop (including the last command),
+  ambiguity, write failure, changed sessions and process death retain ownership.
+  Explicit maintenance interruption reconciliation sends nothing; restart requires
+  deliberate recovery/flush. READY with unreleased ownership still blocks new runs.
+- New-run entry consumes fresh/retained process-local state with ownership-generation
+  checks and a new run identity. Normal completion also allows another run without
+  mandatory flush. Historical unknown command evidence remains unchanged.
+- `PreparedAdapterDevice` binds existing Serial/DYNAMIXEL adapters to the same
+  executor. Fresh observations run under ownership; tests inject fake ports/sessions.
+  Explicit monotonic timing is required. There is no environment startup/API/UI
+  activation, real device connection, motion, firmware change or main merge.
+- Final verification: 40 new focused tests passed (14.04 s); all 1710 backend tests
+  passed (72.62 s), including 42 cases above the prior checkpoint; Ruff and both
+  staged/working diff checks passed. Backend change: 21 files, +1829/-25 lines.
+- Detail: backend `docs/OWNED_RECOVERY_FLUSH.md`. Consolidated review handoff:
+  `docs/reviews/2026-10-03-owned-recovery-flush-handoff.md`.
+  This release boundary warrants one consolidated review. Last independently
+  accepted backend base remains `3d9fab24`; newer checkpoints, including this one,
+  are implemented/verified but not independently accepted.
+- Remaining gates: reviewed production composition, physically verified switching/
+  wet routes, working margins/drain timing and commissioning. SF host scope remains
+  correlation, not persistent physical trust; cross-database commits are non-atomic.
+  Advisory locks protect this explicit composition only. Optional standalone flush
+  from READY remains unintegrated. No physical/production authorization is implied.
+
+## Previous session handoff — 2026-10-03 (superseded by current checkpoint)
 
 - User requested a minimal clean stopping point, consolidated reviewer handoff and
   continuation in a new session. Do not start another implementation milestone
@@ -45,7 +87,7 @@
   logs are ephemeral and are not the continuity source. Canonical documents,
   committed code and this handoff preserve state.
 
-## Current implemented checkpoint — scoped recovery reference checks
+## Previous checkpoint — scoped recovery reference checks
 
 - Backend/UI worktrees remain `labforge-backend-multiphase` and
   `labforge-ui-multiphase`, branch `codex/recovery-reference-checks`.
