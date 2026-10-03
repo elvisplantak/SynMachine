@@ -43,6 +43,11 @@ User clarification on 2026-10-01: use the independent reviewer much less often.
 Continue safe implementation across small substeps and consolidate review at a
 substantial integration or safety boundary, rather than after each checkpoint.
 
+User clarification on 2026-10-03: while the reviewer is unavailable, continue the
+approved software integration autonomously. Consolidate independent review at the
+end of the complete connected task; no intermediate reviewer response is required.
+Physical execution, production activation and main merges remain gated.
+
 Before entering a materially different or riskier phase, Codex recommends the
 next phase and obtains concise user approval. In particular, completing
 no-motion protocol foundations does not authorize actuator implementation,

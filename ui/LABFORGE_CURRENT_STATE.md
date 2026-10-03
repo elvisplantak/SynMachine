@@ -1,12 +1,59 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-10-03
-- Development phase: owned recovery, mandatory flush and durable new-run permission implemented under fake transports; production activation remains gated;
+- Development phase: owned application/API/UI execution integrated under fake transports; production activation remains gated;
   V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — owned recovery, mandatory flush and new runs
+## Current checkpoint — owned application, Service and Guided Demo UI
+
+- Active worktrees: `/home/elvis/Documents/labforge-backend-multiphase` and
+  `/home/elvis/Documents/labforge-ui-multiphase`. Both use
+  `codex/owned-application-execution`. Backend HEAD:
+  `37d5b1611ae148c8ec52a5a66ecf7ffb266fc231`, based on
+  `e84ea97e177ff23be8d043e9b79be27a7a75e3a5`. UI implementation and this checkpoint
+  are committed together on that branch, based on
+  `e72db554f427a67ff9e0d77665863051ca3526ac`.
+- The approved software slice now connects FastAPI/Guided Demo and Arduino/SF
+  Service to one worker, runtime, shared owner and the existing plan/journals.
+  `create_app(application_execution=...)` is explicit injection; default
+  environment/production startup does not activate it or connect a device.
+- Run and maintenance Start acknowledge asynchronous acceptance; backend snapshots
+  and persisted events report actual phases/results. Manual phase/Stop/flush
+  confirmations cannot bypass owned execution. Stop bypasses the worker queue,
+  including before first command and between phases; Pause/Resume use the existing
+  started delay/reaction wait intents. Stop write failure prevents further primary
+  work while required cleanup remains available. Shutdown requests orderly Stop.
+- READY standalone flush and Service-fault recovery also work without any DemoRun.
+  An explicit machine-only interruption scope uses existing JSON persistence.
+  Startup reconciliation sends nothing, preserves old command evidence and never
+  resumes an old run. Successful recovery retains exclusion; mandatory flush alone
+  grants READY/owner release/new-run permission. No SQL migration/schema was added.
+- Connected UI reads real snapshots/events, submits explicit configured runs and
+  fresh attributed maintenance statements, and locks configuration during work.
+  SF mixing seconds, settling, fraction count/duration are explicit inputs. The
+  original local preview and topology remain available separately. Commands are
+  never automatically retried after transport errors.
+- Verification: 349 focused backend cases pass (40.38 s); all 1758 backend cases
+  pass (92.90 s), 40 cases above the preceding checkpoint. Ruff and staged/working
+  diff checks pass. Twelve UI API cases, UI lint and build pass. Built JS is
+  303.08 kB (83.59 kB gzip), CSS 49.57 kB (9.82 kB gzip). No browser-driven visual
+  verification was available. Backend change: 18 files, +1605/-51 lines.
+- Detail: backend `docs/OWNED_APPLICATION_EXECUTION.md` and
+  `docs/OWNED_RECOVERY_FLUSH.md`. Consolidated review packet:
+  `docs/reviews/2026-10-03-owned-application-handoff.md`. User deferred independent
+  review until the whole connected task is complete; it remains pending.
+  Last independently accepted backend base remains `3d9fab24`.
+- Remaining gates: independent consolidated review, approved production composition,
+  separately established physical state/routes/calibrations, working margins/drain
+  timing and supervised commissioning. Operator declarations are unauthenticated;
+  SF host scope is correlation, cross-database commits are non-atomic, and advisory
+  locks govern this explicit composition only. No firmware, real device, original
+  database, production activation or main merge was performed. There is no unfinished
+  implementation to reconstruct; continue from this committed software checkpoint.
+
+## Previous checkpoint — owned recovery, mandatory flush and new runs
 
 - Active persistent backend/UI worktrees remain `labforge-backend-multiphase`
   and `labforge-ui-multiphase`, now on `codex/owned-recovery-flush`.
@@ -70,7 +117,8 @@
   after commits; both feature branches were pushed. Follow-up report and complete
   targeted diff: `docs/reviews/2026-10-03-status-request-freshness-followup.md`
   and its linked patch. Neither the older chain nor the new integration is marked
-  independently accepted yet. No new implementation milestone was started.
+  independently accepted yet. At that checkpoint no new implementation milestone
+  had been started.
 
 ## Previous session handoff — 2026-10-03 (superseded by current checkpoint)
 

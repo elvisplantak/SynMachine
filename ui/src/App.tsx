@@ -1,5 +1,6 @@
 import { useState, useSyncExternalStore } from "react";
 import "./App.css";
+import { OwnedDemoControls } from "./OwnedDemoControls";
 
 type ValveState = "closed" | "k1k3" | "k1k2";
 type ValvePort = "k1" | "k2" | "k3";
@@ -2181,10 +2182,15 @@ function GuidedDemo({ onExit }: { onExit: () => void }) {
   const [previewStarted, setPreviewStarted] = useState(false);
   const [phaseIndex, setPhaseIndex] = useState(0);
   const [reactorPrimary, setReactorPrimary] = useState(true);
+  const [backendMode, setBackendMode] = useState(false);
+  const [executionLocked, setExecutionLocked] = useState(false);
 
   const total = Number(totalVolume);
   const combined = Number(combinedVolume);
   const volumesValid = Number.isFinite(total) && total > 0 && Number.isFinite(combined) && combined > 0 && combined <= total;
+  const timingValid = [reactionDuration, delayBetweenAdditions].every((value) =>
+    value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0)
+    && simulatedTemperature.trim() !== "" && Number.isFinite(Number(simulatedTemperature));
   const b1Volume = volumesValid ? combined * (ratioB1 / 100) : 0;
   const b2Volume = volumesValid ? combined - b1Volume : 0;
   const solventVolume = volumesValid ? Math.max(0, total - combined) : 0;
@@ -2233,23 +2239,23 @@ function GuidedDemo({ onExit }: { onExit: () => void }) {
     </div>
   );
 
-  if (demoSection === "log") {
+  if (demoSection === "log" && !backendMode) {
     return <DemoLog phases={phases} firstLiquid={firstLiquid} secondLiquid={secondLiquid} values={{ b1Volume: formatVolume(b1Volume), b2Volume: formatVolume(b2Volume), solventVolume: formatVolume(solventVolume), totalVolume: volumesValid ? formatVolume(total) : 0, ratioB1, additionOrder, additionSpeed, reactorMixing, sfMixing, simulatedTemperature, reactionDuration, delayBetweenAdditions }} onNavigate={setDemoSection} onExit={onExit} />;
   }
 
   return (
     <main className="appShell guidedDemoShell">
       <header className="guidedDemoHeader">
-        <div><div className="guidedDemoTitleRow"><div className="brand">LabForge Guided Demo</div><span>Frontend preview — no hardware control</span></div><p>Configure one colored-liquid run and preview remote controls</p></div>
-        <GuidedDemoNavigation activeSection="cockpit" onNavigate={setDemoSection} onExit={onExit} />
+        <div><div className="guidedDemoTitleRow"><div className="brand">LabForge Guided Demo</div><span>{backendMode ? "Backend execution view" : "Frontend preview — no hardware control"}</span></div><p>Configure one colored-liquid run and observe its progress</p><button type="button" disabled={executionLocked} onClick={() => { setBackendMode((mode) => !mode); setExecutionLocked(false); setStage("configure"); setPreviewStarted(false); setPhaseIndex(0); }}>{backendMode ? "Return to UI preview" : "Connect to backend"}</button></div>
+        <GuidedDemoNavigation activeSection={demoSection} onNavigate={setDemoSection} onExit={onExit} />
       </header>
 
-      <ol className="demoStageIndicator" aria-label="Guided Demo stages">
+      {!backendMode && <ol className="demoStageIndicator" aria-label="Guided Demo stages">
         {(["configure", "review", "live"] as DemoStage[]).map((item, index) => <li key={item} className={stage === item ? "active" : ""}><span>{index + 1}</span>{item === "configure" ? "Configure" : item === "review" ? "Review" : "Live control preview"}</li>)}
-      </ol>
+      </ol>}
 
       <section className="demoCockpitVisuals" aria-label="Persistent process visualization">
-        <div className="demoCockpitScheme"><FluidicScheme activeSegments={stage === "live" ? demoActiveSegments : new Set()} /></div>
+        <div className="demoCockpitScheme"><FluidicScheme activeSegments={!backendMode && stage === "live" ? demoActiveSegments : new Set()} /></div>
         <div className="demoPersistentCameras">
           <div className="demoCameraHeader"><span>Camera views</span><button type="button" onClick={() => setReactorPrimary((primary) => !primary)}>Swap cameras</button></div>
           <div className="demoCameraPrimary"><span>{reactorPrimary ? "Reactor camera" : "Overview camera"}</span><strong>Stream not connected</strong><small>No live video in frontend preview</small></div>
@@ -2257,8 +2263,21 @@ function GuidedDemo({ onExit }: { onExit: () => void }) {
         </div>
       </section>
 
-      {stage === "configure" && (
-        <div className="demoConfigureLayout demoControlTray">
+      {backendMode && <OwnedDemoControls
+        configuration={{
+          b1_ratio_percent: String(ratioB1), total_mixture_volume_ml: totalVolume,
+          combined_b1_b2_volume_ml: combinedVolume,
+          addition_order: additionOrder === "B1 then B2" ? "B1_THEN_B2" : "B2_THEN_B1",
+          addition_speed_command_percent: String(additionSpeed), reactor_mixing_command_percent: String(reactorMixing),
+          sf_mixing_command_percent: String(sfMixing), simulated_target_temperature_c: simulatedTemperature,
+          reaction_duration_seconds: String(Number(reactionDuration) * 60), delay_between_additions_seconds: delayBetweenAdditions,
+        }}
+        configurationValid={volumesValid && timingValid && stage === "review"}
+        onLock={setExecutionLocked} showLog={demoSection === "log"}
+      />}
+
+      {stage === "configure" && demoSection === "cockpit" && (
+        <fieldset disabled={executionLocked} className="demoConfigureLayout demoControlTray ownedDemoFields">
           <div className="demoSettingsColumn">
             <section className="demoPanel"><div className="demoSectionHeading"><span>Main settings</span><h2>Define the colored-liquid run</h2></div><div className="demoMainSettings">
               <label className="demoRangeField"><span>B1:B2 volume ratio <strong>B1 {ratioB1} : {100 - ratioB1} B2</strong></span><input type="range" min="0" max="100" value={ratioB1} onChange={(event) => setRatioB1(Number(event.target.value))} /></label>
@@ -2275,14 +2294,14 @@ function GuidedDemo({ onExit }: { onExit: () => void }) {
           </div>
           <section className="demoAdditionalPanel"><button type="button" aria-expanded={additionalOpen} onClick={() => setAdditionalOpen((open) => !open)}>Additional settings <span>{additionalOpen ? "Hide" : "Show"}</span></button>{additionalOpen && <div className="demoAdditionalSettings"><label>Combined B1+B2 volume<div className="demoInputWithUnit"><input type="number" min="0" step="0.1" value={combinedVolume} onChange={(event) => setCombinedVolume(event.target.value)} /><span>ml</span></div></label><label>Delay between additions<div className="demoInputWithUnit"><input type="number" min="0" value={delayBetweenAdditions} onChange={(event) => setDelayBetweenAdditions(event.target.value)} /><span>s</span></div></label></div>}</section>
           <footer className="demoConfigureFooter"><div><span className="demoFooterLabel">Calculated volumes</span>{volumeSummary}{!volumesValid && <p className="demoValidationMessage">Combined B1+B2 volume must be greater than zero and no larger than total volume.</p>}</div><div className="demoScopeStrip" aria-label="Demo scope"><span>Colored liquids only</span><span>One run</span><span>Heating disabled</span><span>Temperature simulated</span><span>Remote access not implemented</span><span>Local approval not implemented</span></div><button className="demoPrimaryButton" type="button" disabled={!volumesValid} onClick={() => setStage("review")}>Review configured run</button></footer>
-        </div>
+        </fieldset>
       )}
 
-      {stage === "review" && (
-        <div className="demoReviewLayout demoControlTray"><section className="demoPanel"><div className="demoSectionHeading"><span>Configured volume plan</span><h2>Review one colored-liquid run</h2></div>{volumeSummary}<dl className="demoReviewSettings"><div><dt>B1:B2 ratio</dt><dd>{ratioB1}:{100 - ratioB1}</dd></div><div><dt>Addition order</dt><dd>{additionOrder}</dd></div><div><dt>Addition speed command</dt><dd>{speedLabel} · {additionSpeed}%</dd></div><div><dt>Reactor mixing command</dt><dd>{reactorMixing}%</dd></div><div><dt>SF mixing command</dt><dd>{sfMixing}%</dd></div><div><dt>Simulated temperature</dt><dd>{simulatedTemperature} °C · Heating disabled</dd></div><div><dt>Reaction duration</dt><dd>{reactionDuration} min</dd></div><div><dt>Delay between additions</dt><dd>{delayBetweenAdditions} s</dd></div></dl></section><section className="demoPanel"><div className="demoSectionHeading"><span>Human-readable protocol</span><h2>Preview timeline</h2></div><ol className="demoProtocolTimeline"><li>Add S</li><li>Add {firstLiquid}</li><li>Delay {delayBetweenAdditions} s</li><li>Add {secondLiquid}</li><li>Reaction hold · {reactionDuration} min</li><li>Transfer to SF</li><li>SF mixing</li></ol></section><div className="demoReviewActions"><button type="button" onClick={() => setStage("configure")}>Back to settings</button><button className="demoPrimaryButton" type="button" onClick={() => setStage("live")}>Start UI preview</button></div></div>
+      {stage === "review" && demoSection === "cockpit" && (
+        <div className="demoReviewLayout demoControlTray"><section className="demoPanel"><div className="demoSectionHeading"><span>Configured volume plan</span><h2>Review one colored-liquid run</h2></div>{volumeSummary}<dl className="demoReviewSettings"><div><dt>B1:B2 ratio</dt><dd>{ratioB1}:{100 - ratioB1}</dd></div><div><dt>Addition order</dt><dd>{additionOrder}</dd></div><div><dt>Addition speed command</dt><dd>{speedLabel} · {additionSpeed}%</dd></div><div><dt>Reactor mixing command</dt><dd>{reactorMixing}%</dd></div><div><dt>SF mixing command</dt><dd>{sfMixing}%</dd></div><div><dt>Simulated temperature</dt><dd>{simulatedTemperature} °C · Heating disabled</dd></div><div><dt>Reaction duration</dt><dd>{reactionDuration} min</dd></div><div><dt>Delay between additions</dt><dd>{delayBetweenAdditions} s</dd></div></dl></section><section className="demoPanel"><div className="demoSectionHeading"><span>Human-readable protocol</span><h2>Preview timeline</h2></div><ol className="demoProtocolTimeline"><li>Add S</li><li>Add {firstLiquid}</li><li>Delay {delayBetweenAdditions} s</li><li>Add {secondLiquid}</li><li>Reaction hold · {reactionDuration} min</li><li>Transfer to SF</li><li>SF mixing</li></ol></section><div className="demoReviewActions"><button type="button" disabled={executionLocked} onClick={() => setStage("configure")}>Back to settings</button>{!backendMode && <button className="demoPrimaryButton" type="button" onClick={() => setStage("live")}>Start UI preview</button>}</div></div>
       )}
 
-      {stage === "live" && (
+      {stage === "live" && !backendMode && (
         <div className="demoLiveLayout demoControlTray">
           <section className="demoLiveStatus demoPanel"><div><span>UI preview · No hardware connected</span><h2>{phases[phaseIndex]}</h2></div><div className="demoPreviewActions"><button type="button" disabled={previewStarted} onClick={() => { setPreviewStarted(true); setPhaseIndex(1); }}>Start preview</button><button type="button" disabled={!previewStarted || phaseIndex === phases.length - 1} onClick={() => setPhaseIndex((current) => Math.min(current + 1, phases.length - 1))}>Next phase</button><button type="button" onClick={() => { setPreviewStarted(false); setPhaseIndex(0); }}>Reset preview</button></div></section>
           <div className="demoPhaseProgress">{phases.map((phase, index) => <div key={phase} className={index === phaseIndex ? "active" : index < phaseIndex ? "complete" : ""}><span>{index + 1}</span><small>{phase}</small></div>)}</div>

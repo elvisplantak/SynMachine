@@ -939,7 +939,9 @@ starting the run, rather than manual phase completion. Backend execution setting
 now carry optional `sf_mixing_duration_seconds`; automatic SF mixing requires an
 explicit positive finite value. Existing snapshots without it remain readable,
 but no duration is inferred and that automatic phase cannot be prepared.
-A corresponding UI input remains pending.
+A corresponding explicit seconds input is now present in the connected Guided
+Demo controls, together with settling and fraction settings. The existing local
+preview remains separate from backend execution.
 
 The owned fake-transport execution path holds shared hardware ownership through
 START, the complete interruptible wait, required STOP and lifecycle result
@@ -947,3 +949,17 @@ persistence. This uses the current firmware's fixed commissioned mixer profile;
 it does not implement or claim a mapping from `sf_mixing_command_percent` to
 physical speed. No new hardware execution, firmware change or production startup
 activation is authorized by this decision or its software tests.
+
+### Explicit application/UI integration — 2026-10-03
+
+The candidate `OwnedApplicationExecution` connects the FastAPI application and
+Guided Demo controls to the existing owned executor. One worker/shared owner and
+the same journals serve runs, recovery, flushing and Service. Default environment
+startup does not activate this candidate. Tests inject fake transports only.
+Connected controls read persisted phases/events, explicitly start work, send
+out-of-queue Stop and use existing pause-capable wait controls. They cannot manually
+confirm phase, Stop or flush completion. Maintenance also supports machine-only
+scope, so first flushing or Service-fault recovery needs no fabricated run.
+Explicit recovery retains exclusion until mandatory flushing succeeds. Plans,
+calibrations and current device context remain server-supplied inputs; no physical
+readiness is inferred. Backend detail: `docs/OWNED_APPLICATION_EXECUTION.md`.
