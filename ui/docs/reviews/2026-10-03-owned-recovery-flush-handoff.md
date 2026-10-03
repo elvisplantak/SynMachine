@@ -2,18 +2,24 @@ Please respond in Croatian/BHS. Review this completed software integration slice
 
 Repository: elvisplantak/labforge-backend
 Branch: codex/owned-recovery-flush
-Review HEAD: a14c7beb77f7bd830a8368e1a400cf08be872b3b
+Review HEAD: e84ea97e177ff23be8d043e9b79be27a7a75e3a5
+Integration commit: a14c7beb77f7bd830a8368e1a400cf08be872b3b
 Immediate base: 9245e9e3f66716eb5dde17aaa3bd3b432f058e99
 Last independently accepted base: 3d9fab24f325f3a2da59d69215465e110acd3c33
-The prior four-checkpoint range still has its separate 2026-10-03 handoff;
-neither those checkpoints nor this HEAD are described as independently accepted.
+The prior four-checkpoint range received a conditional acceptance with one LOW
+freshness finding. Its targeted correction is separately pinned to ff589ac on
+codex/status-request-freshness (base 9245e9e); see the status-request-freshness
+follow-up and complete patch. HEAD includes the identical correction via cherry-pick.
+Neither the prior range nor this integration is marked independently accepted yet.
 
 User approval: connect recovery, mandatory flush and durable owner release/new-run
 permission through the existing execution path; prepare existing real adapters
 using fake transports in tests. No additional diagnostic layer, physical execution,
 production activation or main merge was authorized.
 
-Scope: 21 files, +1829/-25 lines. Existing OwnedOfflineRuntime/OwnedTransferRunner,
+Scope: 27 files, +1936/-33 lines, including the 6-file freshness correction.
+The original integration scope was 21 files, +1829/-25 lines.
+Existing OwnedOfflineRuntime/OwnedTransferRunner,
 plan store, journals and ownership execute recovery -> FLUSH_REQUIRED -> explicit
 required flush -> READY -> owner release -> new run. Old runs/evidence remain
 terminal/unchanged. Clean Stop can flush retained pump contents without re-homing.
@@ -34,7 +40,10 @@ Focused review questions:
 4. Does adapter preparation keep journals-before-bytes, fresh correlation, explicit
    timing and transport cleanup without claiming physical/session trust?
 
-Local verification: 40 focused new tests passed; full suite 1710 passed in 72.62 s;
+Current HEAD verification after freshness correction: 108 focused connected tests
+passed in 18.67 s; full suite 1718 passed in 75.17 s. Ruff and diff/commit checks
+passed. Original integration verification: 40 focused new tests passed;
+full suite 1710 passed in 72.62 s;
 Ruff and staged/working diff checks passed. Includes actual subprocess death during
 recovery/flush, empty initial references, historical unknown evidence preservation,
 release/completion failures and a complete new ten-phase run after mandatory flush.

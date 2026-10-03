@@ -10,7 +10,9 @@
 
 - Active persistent backend/UI worktrees remain `labforge-backend-multiphase`
   and `labforge-ui-multiphase`, now on `codex/owned-recovery-flush`.
-  Backend HEAD: `a14c7beb77f7bd830a8368e1a400cf08be872b3b`, base `9245e9e`.
+  Backend HEAD: `e84ea97e177ff23be8d043e9b79be27a7a75e3a5`, base `9245e9e`.
+  The integration commit remains `a14c7be`; HEAD adds only the targeted
+  bracketing STATUS request-ID freshness correction from independent review.
 - The approved task is implemented. The same owned runner, immutable plan store,
   Arduino/SF journals and existing lifecycle connect recovery -> FLUSH_REQUIRED ->
   operator-triggered mandatory flush -> READY -> owner release -> a new run.
@@ -34,7 +36,8 @@
   executor. Fresh observations run under ownership; tests inject fake ports/sessions.
   Explicit monotonic timing is required. There is no environment startup/API/UI
   activation, real device connection, motion, firmware change or main merge.
-- Final verification: 40 new focused tests passed (14.04 s); all 1710 backend tests
+- Original integration verification: 40 new focused tests passed (14.04 s);
+  all 1710 backend tests
   passed (72.62 s), including 42 cases above the prior checkpoint; Ruff and both
   staged/working diff checks passed. Backend change: 21 files, +1829/-25 lines.
 - Detail: backend `docs/OWNED_RECOVERY_FLUSH.md`. Consolidated review handoff:
@@ -47,6 +50,27 @@
   correlation, not persistent physical trust; cross-database commits are non-atomic.
   Advisory locks protect this explicit composition only. Optional standalone flush
   from READY remains unintegrated. No physical/production authorization is implied.
+
+## Review follow-up — bracketing STATUS request-ID freshness
+
+- Consolidated reviewer response for `9245e9e` reports 0 Critical/High/Medium
+  defects and 1 LOW: only the second bracketing STATUS ID was consumed. The rest
+  of that reviewed scope was accepted conditionally on this correction.
+- Codex confirmed the finding independently and fixed it in isolation on
+  `codex/status-request-freshness`, HEAD
+  `ff589ac631f0a7210d62d5829f7e2b49916c3518`, directly based on `9245e9e`.
+  Both IDs are preserved and consumed; equal IDs or reuse of either prior ID
+  permanently invalidates the reference round and clears confirmations.
+- Isolated verification: 68 focused tests and all 1676 backend tests pass;
+  Ruff and diff checks pass. Eight added cases include stale STATUS in receive
+  and pending queues and absence of actuator commands/register writes.
+- The fix is also on the active integration branch as `e84ea97`. Integration
+  verification: 108 focused connected tests pass (18.67 s), all 1718 backend tests
+  pass (75.17 s), Ruff and commit/working diff checks pass. Backend trees were clean
+  after commits; both feature branches were pushed. Follow-up report and complete
+  targeted diff: `docs/reviews/2026-10-03-status-request-freshness-followup.md`
+  and its linked patch. Neither the older chain nor the new integration is marked
+  independently accepted yet. No new implementation milestone was started.
 
 ## Previous session handoff — 2026-10-03 (superseded by current checkpoint)
 

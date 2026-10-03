@@ -1,0 +1,154 @@
+diff --git a/app/hardware/fresh_hardware_observations.py b/app/hardware/fresh_hardware_observations.py
+index b2af0e7..bc68e8b 100644
+--- a/app/hardware/fresh_hardware_observations.py
++++ b/app/hardware/fresh_hardware_observations.py
+@@ -17,0 +18 @@ class CurrentHardwareObservations:
++    arduino_status_request_ids: tuple[str, str]
+@@ -69,0 +71,2 @@ def observe_current_hardware(
++    if before.request_id == after.request_id:
++        raise ArduinoProtocolError("bracketing observations require distinct status request IDs")
+@@ -74 +77,3 @@ def observe_current_hardware(
+-    return CurrentHardwareObservations(after, epoch, capabilities, sf)
++    return CurrentHardwareObservations(
++        after, (before.request_id, after.request_id), epoch, capabilities, sf
++    )
+diff --git a/app/hardware/recovery_reference_checks.py b/app/hardware/recovery_reference_checks.py
+index a2edbbf..4906a10 100644
+--- a/app/hardware/recovery_reference_checks.py
++++ b/app/hardware/recovery_reference_checks.py
+@@ -138 +138 @@ class RecoveryReferenceChecks:
+-        if status.request_id in self._requests:
++        if self._requests.intersection(observations.arduino_status_request_ids):
+@@ -149 +149 @@ class RecoveryReferenceChecks:
+-        self._requests.add(status.request_id)
++        self._requests.update(observations.arduino_status_request_ids)
+diff --git a/docs/FRESH_HARDWARE_OBSERVATIONS.md b/docs/FRESH_HARDWARE_OBSERVATIONS.md
+index 0be8cae..f567e54 100644
+--- a/docs/FRESH_HARDWARE_OBSERVATIONS.md
++++ b/docs/FRESH_HARDWARE_OBSERVATIONS.md
+@@ -17,0 +18,3 @@ identity prevent a report from being returned. There is no cached fallback.
++The report preserves both bracketing query IDs in
++`arduino_status_request_ids` (before, after); they must be distinct within the
++observation. Consumers checking freshness across observations must track both.
+diff --git a/docs/RECOVERY_REFERENCE_CHECKS.md b/docs/RECOVERY_REFERENCE_CHECKS.md
+index b45f312..b34e12c 100644
+--- a/docs/RECOVERY_REFERENCE_CHECKS.md
++++ b/docs/RECOVERY_REFERENCE_CHECKS.md
+@@ -45,0 +46,4 @@ trust, mechanical closure, fluidic sealing or unchanged physical state between r
++Both bracketing STATUS request IDs are consumed by the round. Equal IDs within
++one observation or reuse of either ID from any earlier observation permanently
++invalidates the round and clears its confirmations, including when a queued
++duplicate reply passes the Serial client's normal correlation checks.
+diff --git a/tests/test_fresh_hardware_observations.py b/tests/test_fresh_hardware_observations.py
+index a2689f0..b6a4986 100644
+--- a/tests/test_fresh_hardware_observations.py
++++ b/tests/test_fresh_hardware_observations.py
+@@ -74,0 +75,19 @@ def test_existing_protocol_and_sf_reads_do_not_authorize_release(devices):
++def test_observation_preserves_both_status_request_ids(devices):
++    report = observe(devices)
++    requests = [json.loads(value)["request_id"] for value in devices[2].writes[1:]]
++    assert report.arduino_status_request_ids == tuple(requests)
++    assert len(set(requests)) == 2
++    assert report.arduino_status.request_id == requests[1]
++
++
++def test_same_request_id_inside_observation_is_rejected(devices):
++    client, _, port, session = devices
++    request_id = uuid.uuid4()
++    client._request_id_factory = lambda: request_id
++    with pytest.raises(ArduinoProtocolError, match="distinct status request IDs"):
++        observe(devices)
++    assert port.query_count == 2
++    assert session.closed and session.writes == []
++    assert all(json.loads(value)["type"] in {"HELLO", "QUERY_STATUS"} for value in port.writes)
++
++
+diff --git a/tests/test_recovery_reference_checks.py b/tests/test_recovery_reference_checks.py
+index e0ee49b..82067f9 100644
+--- a/tests/test_recovery_reference_checks.py
++++ b/tests/test_recovery_reference_checks.py
+@@ -3,0 +4 @@ import json
++import uuid
+@@ -12 +13 @@ from tests.test_fresh_hardware_observations import devices as devices, REQUIRED
+-from tests.test_arduino_serial import hello_ok
++from tests.test_arduino_serial import frame, hello_ok
+@@ -205,2 +206,3 @@ def test_busy_runtime_gate_prevents_observation(recovery, devices):
+-def test_repeated_request_id_invalidates_reference_checks(recovery, devices):
+-    import uuid
++@pytest.mark.parametrize("observation", ["initial", "confirmation"])
++@pytest.mark.parametrize("bracket", [0, 1])
++def test_repeated_request_id_invalidates_reference_checks(recovery, devices, observation, bracket):
+@@ -208,2 +210,6 @@ def test_repeated_request_id_invalidates_reference_checks(recovery, devices):
+-    seen = next(iter(checks._requests))
+-    devices[0]._request_id_factory = lambda: uuid.UUID(seen)
++    confirm(checks)
++    queries = [json.loads(value) for value in devices[2].writes[1:]]
++    assert checks._requests == {query["request_id"] for query in queries}
++    index = bracket + (2 if observation == "confirmation" else 0)
++    requests = iter([uuid.UUID(queries[index]["request_id"]), uuid.uuid4()])
++    devices[0]._request_id_factory = lambda: next(requests)
+@@ -210,0 +217,18 @@ def test_repeated_request_id_invalidates_reference_checks(recovery, devices):
++        checks.report(checks.challenge)
++    assert checks._confirmations == {}
++    with pytest.raises(SimulationBlocked, match="stale"):
++        confirm(checks)
++    assert devices[3].writes == []
++    assert all(json.loads(value)["type"] in {"HELLO", "QUERY_STATUS"} for value in devices[2].writes)
++    assert recovery._runner.device.calls == recovery._runner.device.sf_calls == []
++
++
++def test_equal_bracketing_ids_clear_confirmations_permanently(recovery, devices):
++    checks = begin(recovery, devices)
++    confirm(checks)
++    request_id = uuid.uuid4()
++    devices[0]._request_id_factory = lambda: request_id
++    with pytest.raises(ArduinoProtocolError, match="distinct status request IDs"):
++        checks.report(checks.challenge)
++    assert checks._confirmations == {}
++    with pytest.raises(SimulationBlocked, match="stale"):
+@@ -211,0 +236,38 @@ def test_repeated_request_id_invalidates_reference_checks(recovery, devices):
++    assert devices[3].writes == []
++    assert all(json.loads(value)["type"] in {"HELLO", "QUERY_STATUS"} for value in devices[2].writes)
++    assert recovery._runner.device.calls == recovery._runner.device.sf_calls == []
++
++
++@pytest.mark.parametrize("stream", ["receive", "pending"])
++def test_stale_status_with_reused_before_id_cannot_pass_round(recovery, devices, monkeypatch, stream):
++    from app.protocol.models import Status
++
++    client, _, port, session = devices
++    checks = begin(recovery, devices)
++    confirm(checks)
++    previous = json.loads(port.writes[1])
++    stale = dict(
++        type="STATUS", backend_session_nonce=previous["backend_session_nonce"],
++        controller_boot_id=previous["controller_boot_id"], request_id=previous["request_id"],
++        controller_state="IDLE", software_state_trust="TRUSTED",
++        active_operation_command_id=None,
++    )
++    if stream == "receive":
++        port.incoming.extend(frame(**stale))
++    else:
++        client._pending_messages.append(Status(protocol="LABFORGE/1", **stale))
++    requests = iter([uuid.UUID(previous["request_id"]), uuid.uuid4()])
++    client._request_id_factory = lambda: next(requests)
++    original_write = port.write
++
++    def write(data):
++        # No fresh reply to the reused before query: only the queued stale
++        # reply can satisfy normal correlation. The after query replies normally.
++        if json.loads(data)["request_id"] == previous["request_id"]:
++            port.writes.append(data)
++            return len(data)
++        return original_write(data)
++
++    monkeypatch.setattr(port, "write", write)
++    with pytest.raises(SimulationBlocked, match="new status request"):
++        checks.report(checks.challenge)
+@@ -212,0 +275,6 @@ def test_repeated_request_id_invalidates_reference_checks(recovery, devices):
++    assert not port.incoming and not client._pending_messages
++    with pytest.raises(SimulationBlocked, match="stale"):
++        confirm(checks)
++    assert session.writes == []
++    assert all(json.loads(value)["type"] in {"HELLO", "QUERY_STATUS"} for value in port.writes)
++    assert recovery._runner.device.calls == recovery._runner.device.sf_calls == []
