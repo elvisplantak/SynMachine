@@ -15,6 +15,9 @@ then issues another correlated QUERY_STATUS. Both replies must report trusted
 software state, IDLE and no active command. Missing capabilities, correlation
 errors, timeouts, disconnection, changed connection generation or changed session
 identity prevent a report from being returned. There is no cached fallback.
+The report preserves both bracketing query IDs in
+`arduino_status_request_ids` (before, after); they must be distinct within the
+observation. Consumers checking freshness across observations must track both.
 
 `ArduinoSerialClient.connection_epoch` is a process-local generation incremented
 on close/reconnect. It detects a reconnect even when a fake/misconfigured transport
