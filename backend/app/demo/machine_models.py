@@ -197,6 +197,7 @@ class MachineSnapshot(BaseModel):
     event_sequence: int = Field(ge=0)
     active_run_id: str | None = None
     interrupted_run_id: str | None = None
+    interrupted_maintenance_id: str | None = None
     runtime_fault_reason: RuntimeHardwareFaultReason | None = None
     startup_recovery_reason: StartupRecoveryReason | None = None
     hardware_outcome_unknown: bool = False
@@ -204,7 +205,7 @@ class MachineSnapshot(BaseModel):
     active_execution: PhaseExecutionIntent | None = None
     active_maintenance: MaintenanceIntent | None = None
 
-    @field_validator("active_run_id", "interrupted_run_id")
+    @field_validator("active_run_id", "interrupted_run_id", "interrupted_maintenance_id")
     @classmethod
     def validate_run_id(cls, value: str | None) -> str | None:
         if value is not None and not value.strip():
@@ -213,6 +214,11 @@ class MachineSnapshot(BaseModel):
 
     @model_validator(mode="after")
     def validate_state_invariants(self) -> Self:
+        if self.interrupted_maintenance_id is not None and (
+            self.active_run_id is not None or self.interrupted_run_id is not None
+            or self.state not in {MachineState.RECOVERING, MachineState.FLUSH_REQUIRED, MachineState.FLUSHING}
+        ):
+            raise ValueError("machine-only maintenance requires exclusive maintenance scope")
         if self.active_maintenance is not None:
             intent = self.active_maintenance
             required = MachineState.RECOVERING if intent.kind is MaintenanceKind.RECOVERY else MachineState.FLUSHING
@@ -220,6 +226,8 @@ class MachineSnapshot(BaseModel):
                 raise ValueError("maintenance requires its matching machine state and no run execution")
             if self.interrupted_run_id != intent.run_id:
                 raise ValueError("maintenance requires its matching terminal run")
+            if intent.run_id is None and self.interrupted_maintenance_id != intent.execution_id:
+                raise ValueError("machine-only maintenance requires its matching execution scope")
         if self.active_run_id is not None and self.interrupted_run_id is not None:
             raise ValueError("active_run_id and interrupted_run_id cannot both be set")
         if self.state is MachineState.BUSY:
@@ -242,7 +250,7 @@ class MachineSnapshot(BaseModel):
             )
 
         if self.state in {MachineState.RECOVERY_REQUIRED, MachineState.RECOVERING}:
-            if self.interrupted_run_id is None:
+            if self.interrupted_run_id is None and self.interrupted_maintenance_id is None:
                 raise ValueError(f"{self.state.value} requires interrupted_run_id")
         elif self.state in {MachineState.STARTING, MachineState.READY}:
             if self.interrupted_run_id is not None:

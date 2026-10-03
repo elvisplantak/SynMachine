@@ -55,7 +55,7 @@ class SimulationLifecycleStore(SQLiteStore):
         self.simulation_id = simulation_id
         self._connection = sqlite3.connect(
             database.resolve().as_uri() + ("?mode=ro" if read_only else "?mode=rw"),
-            uri=True, isolation_level=None
+            uri=True, isolation_level=None, check_same_thread=not read_only,
         )
         try:
             actual = self._connection.execute(
@@ -194,6 +194,7 @@ class PlanLifecycleCoordinator:
         self.store = store
         self.runner = runner
         self.clock = clock
+        self.before_control_poll = lambda: None
 
     def execute(
         self,
@@ -268,6 +269,7 @@ class PlanLifecycleCoordinator:
                 raise SimulationBlocked("execution start was not committed")
 
         def wait_control():
+            self.before_control_poll()
             self.runner._check_boot(plan.prepared.assumptions.controller_boot_id)
             self.runner._sf._session_check()
             if self.runner._session is not None:
@@ -275,6 +277,7 @@ class PlanLifecycleCoordinator:
             return self.store.read_wait_control(run, intent)
 
         def stopped():
+            self.before_control_poll()
             if pausable:
                 return wait_control()[0] is RunStatus.ABORTING
             current = self.store.load_demo_run(run.run_id)

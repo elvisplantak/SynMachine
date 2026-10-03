@@ -19,6 +19,12 @@ from app.demo.machine_lifecycle import MachineTransitionError
 from app.demo.machine_models import MachineSnapshot
 from app.demo.models import DemoConfiguration, DemoExecutionSettings
 from app.demo.run_models import DemoRun
+from app.demo.events import DomainEvent
+from app.demo.machine_events import MachineEvent
+from app.demo.maintenance_plan import MaintenanceKind
+from app.hardware.owned_maintenance import MaintenanceReadiness
+from app.hardware.owned_application_execution import OwnedApplicationExecution, ExecutionAccepted
+from app.hardware.simulated_p1_runner import SimulationBlocked
 from app.hardware.runtime_configuration import (
     ArduinoRuntime,
     build_arduino_runtime_from_environment,
@@ -63,6 +69,11 @@ class CreateRunRequest(CommandRequest):
         if not value.strip():
             raise ValueError("run_id must not be empty")
         return value
+
+
+class MaintenanceCommandRequest(CommandRequest):
+    run_id: str | None = None
+    readiness: MaintenanceReadiness | None = None
 
 
 class RunMachineResponse(BaseModel):
@@ -228,7 +239,18 @@ def create_app(
     arduino_commands: ArduinoCommandExecutor | None = None,
     arduino_runtime: ArduinoRuntime | None = None,
     owned_hardware: OwnedHardware | None = None,
+    application_execution: OwnedApplicationExecution | None = None,
 ) -> FastAPI:
+    if application_execution is not None:
+        if any(value is not None for value in (
+            sf_bottom_valve, arduino_commands, arduino_runtime, owned_hardware
+        )):
+            raise ValueError("application execution cannot be mixed with other hardware compositions")
+        if (database_path is not None
+            and Path(database_path).resolve() != application_execution.bundle.lifecycle_path.resolve()):
+            raise ValueError("application lifecycle path differs from the owned bundle")
+        database_path = application_execution.bundle.lifecycle_path
+        arduino_commands = application_execution
     if owned_hardware is not None:
         if any(value is not None for value in (sf_bottom_valve, arduino_commands, arduino_runtime)):
             raise ValueError("owned hardware cannot be mixed with unguarded hardware arguments")
@@ -240,24 +262,30 @@ def create_app(
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         # LabForge v1 startup reconciliation assumes one FastAPI worker.
         occurred_at = startup_clock()
-        with SQLiteStore(configured_database_path) as store:
-            application.state.process_startup = bootstrap_process_startup(
-                store,
-                occurred_at,
-            )
+        if application_execution is not None:
+            application.state.process_startup = application_execution.start(occurred_at)
+        else:
+            with SQLiteStore(configured_database_path) as store:
+                application.state.process_startup = bootstrap_process_startup(store, occurred_at)
         if arduino_runtime is not None:
             arduino_runtime.start()
         try:
             yield
         finally:
+            if application_execution is not None:
+                application_execution.close(startup_clock())
             if arduino_runtime is not None:
                 arduino_runtime.close()
 
     application = FastAPI(title="LabForge backend", lifespan=lifespan)
 
     def get_store() -> Iterator[SQLiteStore]:
-        with SQLiteStore(configured_database_path) as store:
-            yield store
+        if application_execution is not None:
+            with application_execution.store() as store:
+                yield store
+        else:
+            with SQLiteStore(configured_database_path) as store:
+                yield store
 
     Store = Annotated[SQLiteStore, Depends(get_store)]
 
@@ -265,6 +293,7 @@ def create_app(
     @application.exception_handler(LifecycleTransitionError)
     @application.exception_handler(MachineTransitionError)
     @application.exception_handler(PersistenceConflictError)
+    @application.exception_handler(SimulationBlocked)
     async def handle_conflict(
         request: Request,
         error: GuidedDemoApplicationError
@@ -277,6 +306,19 @@ def create_app(
             status_code=status.HTTP_409_CONFLICT,
             content={"detail": str(error)},
         )
+
+    def require_domain_mode():
+        if application_execution is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="owned application execution requires command-result resolution",
+            )
+
+    @application.get(f"{API_PREFIX}/execution", summary="Read application execution activity")
+    def read_execution():
+        if application_execution is None:
+            raise HTTPException(status_code=503, detail="owned application execution is not configured")
+        return application_execution.status()
 
     @application.exception_handler(HardwareCommandError)
     async def handle_hardware_command_error(
@@ -306,6 +348,9 @@ def create_app(
     def set_sf_bottom_valve(
         command: SfBottomValveCommandRequest,
     ) -> SfBottomValveCommandResponse:
+        if application_execution is not None:
+            application_execution.sf_service_command(command.state)
+            return SfBottomValveCommandResponse(state=command.state, position_confirmed=True)
         if sf_bottom_valve is None:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -594,13 +639,28 @@ def create_app(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
         return run
 
+    @application.get(f"{API_PREFIX}/runs/{{run_id}}/events", response_model=list[DomainEvent])
+    def read_run_events(run_id: str, store: Store):
+        if store.load_demo_run(run_id) is None:
+            raise HTTPException(status_code=404, detail="Run not found")
+        return store.load_events("RUN", run_id)
+
+    @application.get(f"{API_PREFIX}/machine/events", response_model=list[MachineEvent])
+    def read_machine_events(store: Store):
+        if store.load_machine_snapshot() is None:
+            return []
+        return store.load_events("MACHINE", "machine")
+
     @application.post(
         f"{API_PREFIX}/machine/initialize",
         response_model=MachineSnapshot,
         summary="Initialize the machine lifecycle",
-        description="Creates the orchestration state only; it does not execute hardware startup.",
+        description="Creates orchestration state; injected owned execution requires explicit fresh input and confirms initial READY. No actuator command is sent.",
     )
     def initialize_machine(command: CommandRequest, store: Store) -> MachineSnapshot:
+        if application_execution is not None:
+            return application_execution.initialize_machine(command.occurred_at)
+        require_domain_mode()
         return GuidedDemoApplicationService(store).initialize_machine(command.occurred_at).machine
 
     @application.post(
@@ -610,16 +670,48 @@ def create_app(
         description="Executor confirmation of orchestration state; it does not move hardware.",
     )
     def complete_startup(command: CommandRequest, store: Store) -> MachineSnapshot:
+        require_domain_mode()
         return GuidedDemoApplicationService(store).complete_startup(command.occurred_at).machine
 
     @application.post(
         f"{API_PREFIX}/machine/flush/start",
-        response_model=MachineSnapshot,
+        response_model=MachineSnapshot | ExecutionAccepted,
         summary="Request a flush transition",
-        description="Starts flush orchestration only; it does not execute a physical flush plan.",
+        description="Injected owned execution accepts an explicit flush plan asynchronously; domain-only mode starts a lifecycle transition.",
     )
-    def start_flush(command: CommandRequest, store: Store) -> MachineSnapshot:
+    def start_flush(command: MaintenanceCommandRequest, store: Store):
+        if application_execution is not None:
+            machine = store.load_machine_snapshot()
+            run_id = command.run_id or (None if machine is None else machine.interrupted_run_id)
+            if machine is None or machine.interrupted_maintenance_id is None:
+                run_id = run_id or application_execution.status().run_id
+            if command.readiness is None:
+                raise HTTPException(status_code=422, detail="flush needs current readiness")
+            accepted = application_execution.start_maintenance(
+                MaintenanceKind.FLUSH, run_id, command.readiness, command.occurred_at
+            )
+            return JSONResponse(status_code=202, content=accepted.model_dump(mode="json"))
         return GuidedDemoApplicationService(store).start_flush(command.occurred_at).machine
+
+    @application.post(f"{API_PREFIX}/machine/recovery/start", response_model=ExecutionAccepted)
+    def start_recovery(command: MaintenanceCommandRequest, store: Store):
+        if application_execution is None:
+            raise HTTPException(status_code=503, detail="owned application execution is not configured")
+        if command.readiness is None:
+            raise HTTPException(status_code=422, detail="recovery needs current readiness")
+        machine = store.load_machine_snapshot()
+        run_id = command.run_id or (None if machine is None else machine.interrupted_run_id)
+        accepted = application_execution.start_maintenance(
+            MaintenanceKind.RECOVERY, run_id, command.readiness, command.occurred_at
+        )
+        return JSONResponse(status_code=202, content=accepted.model_dump(mode="json"))
+
+    @application.post(f"{API_PREFIX}/execution/{{operation_id}}/stop")
+    def stop_operation(operation_id: str, command: CommandRequest):
+        if application_execution is None:
+            raise HTTPException(status_code=503, detail="owned application execution is not configured")
+        result = application_execution.stop_operation(operation_id, command.occurred_at)
+        return result.model_dump(mode="json")
 
     @application.post(
         f"{API_PREFIX}/machine/flush/complete",
@@ -628,6 +720,7 @@ def create_app(
         description="Executor confirmation of orchestration state; it does not verify hardware.",
     )
     def complete_flush(command: CommandRequest, store: Store) -> MachineSnapshot:
+        require_domain_mode()
         return GuidedDemoApplicationService(store).complete_flush(command.occurred_at).machine
 
     @application.post(
@@ -636,6 +729,10 @@ def create_app(
         summary="Create a Guided Demo run",
     )
     def create_run(command: CreateRunRequest, store: Store) -> DemoRun:
+        if application_execution is not None:
+            return application_execution.create_run(
+                command.run_id, command.configuration, command.execution_settings, command.occurred_at
+            )
         return GuidedDemoApplicationService(store).create_run(
             command.run_id,
             command.configuration,
@@ -645,12 +742,15 @@ def create_app(
 
     @application.post(
         f"{API_PREFIX}/runs/{{run_id}}/start",
-        response_model=RunMachineResponse,
+        response_model=RunMachineResponse | ExecutionAccepted,
         summary="Start a Guided Demo run",
     )
     def start_run(
         run_id: str, command: CommandRequest, store: Store
-    ) -> RunMachineResponse:
+    ):
+        if application_execution is not None:
+            accepted = application_execution.start_run(run_id, command.occurred_at)
+            return JSONResponse(status_code=202, content=accepted.model_dump(mode="json"))
         result = GuidedDemoApplicationService(store).start_run(run_id, command.occurred_at)
         return RunMachineResponse(run=result.run, machine=result.machine)
 
@@ -666,6 +766,7 @@ def create_app(
     def complete_current_phase(
         run_id: str, command: CommandRequest, store: Store
     ) -> RunMachineResponse:
+        require_domain_mode()
         result = GuidedDemoApplicationService(store).complete_current_phase(
             run_id, command.occurred_at
         )
@@ -673,13 +774,18 @@ def create_app(
 
     @application.post(
         f"{API_PREFIX}/runs/{{run_id}}/stop/request",
-        response_model=RunMachineResponse,
+        response_model=RunMachineResponse | ExecutionAccepted,
         summary="Request Stop demo",
         description="Requests an orderly domain stop; it does not directly stop hardware.",
     )
     def request_stop_demo(
         run_id: str, command: CommandRequest, store: Store
-    ) -> RunMachineResponse:
+    ):
+        if application_execution is not None:
+            result = application_execution.request_stop(run_id, command.occurred_at)
+            if isinstance(result, ExecutionAccepted):
+                return result
+            return RunMachineResponse(run=result.run, machine=result.machine)
         result = GuidedDemoApplicationService(store).request_stop_demo(
             run_id, command.occurred_at
         )
@@ -697,10 +803,25 @@ def create_app(
     def confirm_stop_demo(
         run_id: str, command: CommandRequest, store: Store
     ) -> RunMachineResponse:
+        require_domain_mode()
         result = GuidedDemoApplicationService(store).confirm_stop_demo(
             run_id, command.occurred_at
         )
         return RunMachineResponse(run=result.run, machine=result.machine)
+
+    @application.post(f"{API_PREFIX}/runs/{{run_id}}/pause", response_model=RunMachineResponse)
+    def pause_run(run_id: str, command: CommandRequest):
+        if application_execution is None:
+            raise HTTPException(status_code=503, detail="owned application execution is not configured")
+        run, machine = application_execution.set_paused(run_id, paused=True, occurred_at=command.occurred_at)
+        return RunMachineResponse(run=run, machine=machine)
+
+    @application.post(f"{API_PREFIX}/runs/{{run_id}}/resume", response_model=RunMachineResponse)
+    def resume_run(run_id: str, command: CommandRequest):
+        if application_execution is None:
+            raise HTTPException(status_code=503, detail="owned application execution is not configured")
+        run, machine = application_execution.set_paused(run_id, paused=False, occurred_at=command.occurred_at)
+        return RunMachineResponse(run=run, machine=machine)
 
     return application
 

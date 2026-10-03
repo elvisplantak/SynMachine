@@ -28,6 +28,24 @@ from app.demo.phases import RunPhase
 NOW = datetime(2026, 7, 18, 12, 0, tzinfo=UTC)
 
 
+@pytest.mark.parametrize("values", [
+    dict(state=MachineState.READY, interrupted_maintenance_id="orphan"),
+    dict(state=MachineState.RECOVERING, interrupted_maintenance_id="orphan", interrupted_run_id="run"),
+    dict(state=MachineState.RECOVERING, interrupted_maintenance_id=""),
+    dict(state=MachineState.RECOVERING),
+])
+def test_machine_only_interruption_cannot_masquerade_as_ready_or_run_scope(values):
+    with pytest.raises(ValidationError):
+        MachineSnapshot(event_sequence=2, **values)
+
+
+def test_ownership_interruption_event_requires_machine_scope():
+    with pytest.raises(ValidationError, match="machine-only"):
+        MachineEvent(sequence_number=1, occurred_at=NOW,
+            event_type=MachineEventType.OWNERSHIP_INTERRUPTION_RECONCILED,
+            machine_state=MachineState.READY, message="invalid")
+
+
 def starting_machine() -> MachineSnapshot:
     return create_machine(NOW).machine
 

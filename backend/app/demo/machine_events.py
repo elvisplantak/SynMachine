@@ -16,6 +16,7 @@ from app.demo.maintenance_plan import MaintenanceIntent, MaintenanceKind
 
 
 class MachineEventType(StrEnum):
+    OWNERSHIP_INTERRUPTION_RECONCILED = "OWNERSHIP_INTERRUPTION_RECONCILED"
     MAINTENANCE_STARTED = "MAINTENANCE_STARTED"
     MAINTENANCE_COMPLETED = "MAINTENANCE_COMPLETED"
     MAINTENANCE_INTERRUPTED = "MAINTENANCE_INTERRUPTED"
@@ -47,6 +48,7 @@ class MachineEvent(BaseModel):
     event_type: MachineEventType
     machine_state: MachineState
     run_id: str | None = None
+    interrupted_maintenance_id: str | None = None
     message: str
     reason: str | None = None
     runtime_fault_reason: RuntimeHardwareFaultReason | None = None
@@ -66,6 +68,15 @@ class MachineEvent(BaseModel):
 
     @model_validator(mode="after")
     def validate_execution_metadata(self) -> "MachineEvent":
+        if self.event_type is MachineEventType.OWNERSHIP_INTERRUPTION_RECONCILED:
+            if (self.machine_state is not MachineState.RECOVERING or self.run_id is not None
+                or not self.interrupted_maintenance_id or not self.interrupted_maintenance_id.strip()):
+                raise ValueError("ownership interruption requires machine-only RECOVERING scope")
+        elif self.interrupted_maintenance_id is not None:
+            intent = self.maintenance_intent
+            if (intent is None or intent.run_id is not None or self.machine_state is MachineState.READY
+                or self.interrupted_maintenance_id != intent.execution_id):
+                raise ValueError("maintenance event requires matching machine-only scope")
         maintenance_events = {
             MachineEventType.MAINTENANCE_STARTED, MachineEventType.MAINTENANCE_COMPLETED,
             MachineEventType.MAINTENANCE_INTERRUPTED,
@@ -79,6 +90,9 @@ class MachineEvent(BaseModel):
             raise ValueError("maintenance event identity or timestamp differs from intent")
         if self.maintenance_intent is not None:
             kind = self.maintenance_intent.kind
+            if (self.maintenance_intent.run_id is None and self.machine_state is not MachineState.READY
+                and self.interrupted_maintenance_id != self.maintenance_intent.execution_id):
+                raise ValueError("machine-only maintenance event requires its execution scope")
             if self.event_type is MachineEventType.MAINTENANCE_INTERRUPTED:
                 expected_state = MachineState.RECOVERING
             elif self.event_type is MachineEventType.MAINTENANCE_STARTED:

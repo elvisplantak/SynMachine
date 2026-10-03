@@ -68,9 +68,15 @@ class PlanSource(BaseModel):
         reject_lost_keys(value, validated)
         return validated
 
-    run_id: Annotated[StrictStr, Field(min_length=1, pattern=r"\S")]
+    run_id: Annotated[StrictStr, Field(min_length=1, pattern=r"\S")] | None
     run_event_sequence: Annotated[StrictInt, Field(ge=0)]
     plan: SourcePlan
+
+    @model_validator(mode="after")
+    def validate_run_scope(self) -> Self:
+        if self.run_id is None and not isinstance(self.plan, MaintenancePlan):
+            raise ValueError("only machine maintenance may omit the run identity")
+        return self
 
 
 _PREPARED_ADAPTER = TypeAdapter(PreparedCommandPlan)

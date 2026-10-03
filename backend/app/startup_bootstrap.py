@@ -14,6 +14,8 @@ class ProcessStartupDisposition(StrEnum):
     READY = "READY"
     PHASE_EXECUTION_RECONCILED = "PHASE_EXECUTION_RECONCILED"
     ACTIVE_RUN_RECONCILED = "ACTIVE_RUN_RECONCILED"
+    MAINTENANCE_RECONCILED = "MAINTENANCE_RECONCILED"
+    OWNERSHIP_RECONCILED = "OWNERSHIP_RECONCILED"
     RECOVERY_REQUIRED = "RECOVERY_REQUIRED"
     RECOVERING = "RECOVERING"
     FLUSH_REQUIRED = "FLUSH_REQUIRED"
@@ -45,6 +47,8 @@ class ProcessStartupResult(BaseModel):
         reconciled = self.disposition in {
             ProcessStartupDisposition.PHASE_EXECUTION_RECONCILED,
             ProcessStartupDisposition.ACTIVE_RUN_RECONCILED,
+            ProcessStartupDisposition.MAINTENANCE_RECONCILED,
+            ProcessStartupDisposition.OWNERSHIP_RECONCILED,
         }
         if self.persistent_reconciliation_occurred is not reconciled:
             raise ValueError(

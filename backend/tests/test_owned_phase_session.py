@@ -14,6 +14,7 @@ from app.demo.hardware_contract import BottomValveState
 from app.demo.operation_executor import ProtectedOperationError
 from app.demo.phases import RunPhase
 from app.demo.run_models import RunStatus
+from app.demo.machine_models import MachineState
 from app.hardware.arduino_serial import ArduinoUnavailableError
 from app.hardware.owned_phase_session import OwnedPhaseSession, source_for_run
 from app.hardware.owned_transfer_runner import OwnedTransferRunner, provision_execution
@@ -181,11 +182,35 @@ def test_change_between_phases_prevents_new_plan_or_send(session_case, change):
         c.runner.device.sf_mixer_running = True
     else:
         c.stop()
+        # A Stop accompanied by an unrelated settings mutation remains foreign
+        # state; only the exact replayable Stop transition may be accepted.
+        run = c.coordinator.store.load_demo_run("run-1")
+        changed = run.model_copy(update={"execution_settings": run.execution_settings.model_copy(
+            update={"fraction_duration_seconds": Decimal("7")}
+        )})
+        c.coordinator.store._connection.execute(
+            "UPDATE demo_runs SET snapshot_json=? WHERE run_id='run-1'",
+            (changed.model_dump_json(),),
+        )
     before = [p.read_bytes() for p in c.paths]
     blocked_again(c, session)
     assert before == [p.read_bytes() for p in c.paths]
     assert c.retained() is None
     restart_rejected(c)
+
+
+def test_valid_stop_between_phases_retains_owner_without_any_new_command(session_case):
+    c, session = session_case()
+    session.execute_next()
+    before = counts(c)
+    c.stop()
+    result = session.execute_next()
+    assert result.run.status is RunStatus.ABORTED
+    assert result.machine.state is MachineState.FLUSH_REQUIRED
+    assert counts(c) == before
+    assert c.retained() == session._stopped_owner
+    assert session._stopped_cleanly and not session._valid
+    blocked_again(c, session)
 
 
 @pytest.mark.parametrize("target", ["sf", "arduino", "other_connection"])

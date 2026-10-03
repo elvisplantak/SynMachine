@@ -46,6 +46,21 @@ def source(kind="solvent", ctx=None, **changes):
     return PlanSource(**values)
 
 
+def test_only_machine_maintenance_may_omit_run_identity(tmp_path):
+    from app.demo.maintenance_plan import MaintenanceKind
+    from tests.test_owned_maintenance import plan
+
+    with pytest.raises(ValidationError, match="only machine maintenance"):
+        source(run_id=None)
+    ctx = context()
+    original = PlanSource(run_id=None, run_event_sequence=2, plan=plan(MaintenanceKind.FLUSH))
+    path = tmp_path / "machine-maintenance.db"
+    with SQLiteCommandPlanStore(path) as store:
+        saved = store.persist(original, ctx).plan
+    with SQLiteCommandPlanStore(path) as store:
+        assert store.load(ctx.phase_execution_id) == saved
+
+
 @pytest.mark.parametrize("kind", ["solvent", "first", "second", "reactor", "sf", "column"])
 def test_exact_roundtrip_for_all_source_plans_after_reopening(tmp_path, kind):
     path = tmp_path / "plans.db"

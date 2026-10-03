@@ -236,19 +236,7 @@ class OwnedOfflineRuntime:
                 or machine.active_execution is not None or machine.active_maintenance is not None
                 or self._store.load_demo_run(run_id) is not None):
                 raise SimulationBlocked("new run needs READY, no execution and a new identity")
-            previous = getattr(self, "_maintenance", None) or self._session
-            if previous is not None:
-                previous.validate_completion()
-                if previous.generation != generation:
-                    raise SimulationBlocked("hardware ownership changed since final command state")
-                state = previous._state
-            else:
-                device = self._runner.device
-                if generation != self.initial_inspection.ownership_generation:
-                    raise SimulationBlocked("hardware ownership changed since fresh input was supplied")
-                if device.used or device.calls or device.sf_calls:
-                    raise SimulationBlocked("new run needs an independently supplied unused fixture")
-                state = device.current
+            state = self._fresh_or_retained_state(generation)
             self._used = True
             service = GuidedDemoApplicationService(self._store)
             service.create_run(run_id, configuration, settings, occurred_at)
@@ -260,3 +248,109 @@ class OwnedOfflineRuntime:
             self._maintenance = None
         finally:
             self._gate.release()
+
+    def start_created_run(self, run_id, calibrations, *, occurred_at, column_readiness=None):
+        """Bind an API-created run to fresh input or current execution state.
+
+        Application construction supplies the same explicit bundle/device inputs.
+        No past command evidence or reference report is promoted to current trust.
+        """
+        from app.demo.run_models import RunStatus
+
+        self._check()
+        if not self._gate.acquire(blocking=False):
+            raise SimulationBlocked("runtime operation already active")
+        try:
+            generation = self._owner.idle_generation()
+            run = self._store.load_demo_run(run_id)
+            if run is None or run.status is not RunStatus.CREATED:
+                raise SimulationBlocked("start requires a newly configured CREATED run")
+            machine = self._store.load_machine_snapshot()
+            if machine is None:
+                machine = self._initialize_fresh_machine(occurred_at)
+            if (machine.state is not MachineState.READY or machine.active_execution is not None
+                or machine.active_maintenance is not None):
+                raise SimulationBlocked("start requires READY without active execution or maintenance")
+            state = self._fresh_or_retained_state(generation)
+            self._used = True
+            GuidedDemoApplicationService(self._store).start_run(run_id, occurred_at)
+            self._runner._new_run_binding = (run_id, generation, state)
+            self._runner._session = None
+            self._session = OwnedPhaseSession(
+                self._coordinator, run_id, calibrations, column_readiness=column_readiness
+            )
+            self._maintenance = None
+        finally:
+            self._gate.release()
+
+    def initialize_fresh_machine(self, occurred_at):
+        """Initialize from explicit unused input, never historical position trust."""
+        self._check()
+        if not self._gate.acquire(blocking=False):
+            raise SimulationBlocked("runtime operation already active")
+        try:
+            return self._initialize_fresh_machine(occurred_at)
+        finally:
+            self._gate.release()
+
+    def _initialize_fresh_machine(self, occurred_at):
+        from app.demo.run_models import RunStatus
+
+        initial = self.initial_inspection
+        machine = self._store.load_machine_snapshot()
+        if (self._used or (initial.machine is not None and initial.machine.state is not MachineState.STARTING)
+            or any(run.status is not RunStatus.CREATED for run in initial.runs)
+            or initial.owner_id is not None or initial.prepared_phase_ids
+            or any(row.non_successful for row in initial.journals)
+            or initial.incomplete_wait_operations
+            or (machine is not None and machine.state is not MachineState.STARTING)):
+            raise SimulationBlocked("initialization requires unresolved-history-free application state")
+        self._fresh_or_retained_state(self._owner.idle_generation())
+        service = GuidedDemoApplicationService(self._store)
+        if machine is None:
+            service.initialize_machine(occurred_at)
+        return service.complete_startup(occurred_at).machine
+
+    def reconcile_orphaned_ownership(self, occurred_at):
+        """Metadata only for retained Service ownership without an active run."""
+        from app.demo.machine_events import MachineEvent, MachineEventType
+        from app.demo.machine_models import MachineSnapshot
+
+        self._check()
+        if occurred_at.tzinfo is None or occurred_at.utcoffset() is None:
+            raise ValueError("ownership reconciliation timestamp must be timezone-aware")
+        if not self._gate.acquire(blocking=False):
+            raise SimulationBlocked("runtime operation already active")
+        try:
+            if self._used or self._session is not None:
+                raise SimulationBlocked("close the original runtime before reconciling")
+            owner_id = self._owner._validate_owner()
+            expected = self._store.load_machine_snapshot()
+            if owner_id is None or (expected is not None and expected.state is not MachineState.READY):
+                return expected
+            self._owner.retain_for_reconciliation()
+            machine = MachineSnapshot(state=MachineState.RECOVERING,
+                event_sequence=1 if expected is None else expected.event_sequence + 1,
+                interrupted_maintenance_id=owner_id)
+            event = MachineEvent(sequence_number=machine.event_sequence, occurred_at=occurred_at,
+                event_type=MachineEventType.OWNERSHIP_INTERRUPTION_RECONCILED,
+                machine_state=machine.state, interrupted_maintenance_id=owner_id,
+                message="Retained hardware ownership requires deliberate machine recovery")
+            self._store.persist_maintenance_transition(expected, machine, event)
+            return machine
+        finally:
+            self._gate.release()
+
+    def _fresh_or_retained_state(self, generation):
+        previous = getattr(self, "_maintenance", None) or self._session
+        if previous is not None:
+            previous.validate_completion()
+            if previous.generation != generation:
+                raise SimulationBlocked("hardware ownership changed since final command state")
+            return previous._state
+        device = self._runner.device
+        if generation != self.initial_inspection.ownership_generation:
+            raise SimulationBlocked("hardware ownership changed since fresh input was supplied")
+        if device.used or device.calls or device.sf_calls:
+            raise SimulationBlocked("new run needs an independently supplied unused fixture")
+        return device.current

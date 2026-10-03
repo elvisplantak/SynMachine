@@ -21,6 +21,9 @@ from app.demo.p2_sf_to_column_operation_plan import plan_p2_sf_to_column_operati
 from app.demo.phases import EXECUTION_INTENT_PHASES, PAUSABLE_EXECUTION_PHASES, RunPhase
 from app.demo.pausable_wait_plan import plan_pausable_wait
 from app.demo.run_models import RunStatus
+from app.demo import lifecycle
+from app.demo.application_service import GuidedDemoApplicationService
+from app.demo.events import DomainEventType
 from app.demo.timed_sf_operation_plan import plan_timed_sf_operations
 from app.hardware.command_plan_store import PlanSource
 from app.hardware.command_planning import ArduinoAction, CommandPlanningContext, SfBottomValveAction
@@ -165,13 +168,36 @@ class OwnedPhaseSession:
         if not self._valid:
             raise SimulationBlocked("phase session is invalid")
 
-    def _check_idle(self):
+    def _check_idle(self, *, allow_stop=False):
         self.check_connections()
         if self._owner.idle_generation() != self.generation:
             raise SimulationBlocked("Service or another phase changed hardware claim history")
-        if self.coordinator.store.load_demo_run(self._expected_run.run_id) != self._expected_run:
-            raise SimulationBlocked("run changed outside this phase session")
         self._check_fixture()
+        current = self.coordinator.store.load_demo_run(self._expected_run.run_id)
+        if current != self._expected_run:
+            if allow_stop and current is not None and current.status is RunStatus.ABORTING:
+                events = self.coordinator.store.load_events("RUN", current.run_id)
+                event = events[-1]
+                if event.event_type is DomainEventType.ABORT_REQUESTED:
+                    expected = lifecycle.request_abort(self._expected_run, event.occurred_at)
+                    if expected.run == current and expected.events == (event,):
+                        return event.occurred_at
+            raise SimulationBlocked("run changed outside this phase session")
+        return None
+
+    def _stop_between_phases(self, occurred_at):
+        # Reserve exclusion BEFORE confirming the stop lifecycle. No command or
+        # fictitious operation plan is needed at this already safe phase boundary.
+        phase_id = str(uuid4())
+        lease = self._owner.claim(phase_id, expected_generation=self.generation)
+        result = self._owner.invoke(lease, lambda: GuidedDemoApplicationService(
+            self.coordinator.store
+        ).confirm_stop_demo(self._expected_run.run_id, occurred_at))
+        self._owner.block(lease)
+        self._stopped_cleanly = True
+        self._stopped_owner = phase_id
+        self._valid = False
+        return result
 
     def _check_fixture(self):
         if (
@@ -239,7 +265,9 @@ class OwnedPhaseSession:
         if not self._gate.acquire(blocking=False):
             raise SimulationBlocked("phase session is already executing")
         try:
-            self._check_idle()
+            stop_at = self._check_idle(allow_stop=True)
+            if stop_at is not None:
+                return self._stop_between_phases(stop_at)
             if self._expected_run.status is not RunStatus.RUNNING:
                 raise SimulationBlocked("run is no longer running")
             if self._expected_run.phase not in EXECUTION_INTENT_PHASES:

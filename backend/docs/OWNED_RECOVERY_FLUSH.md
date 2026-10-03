@@ -3,7 +3,8 @@
 This candidate connects maintenance to the existing `OwnedOfflineRuntime`,
 `OwnedTransferRunner`, immutable plan store, Arduino/SF journals and shared
 `HardwareOwnership`. There is no new diagnostic layer, database or transport
-implementation. Environment startup and production APIs remain unchanged.
+implementation. Environment startup remains unchanged. The explicit application
+binding is documented in `OWNED_APPLICATION_EXECUTION.md`.
 
 ## Execution and release
 
@@ -54,7 +55,9 @@ to RECOVERING and retains the owner; it sends no command. A fresh full recovery
 and required flush are needed after restart. A crash/failure after READY but before
 owner release likewise blocks new-run entry and requires deliberate recovery.
 Recovery does not automatically start flush. Default application startup remains
-unchanged. Optional standalone flush from READY is not integrated by this slice.
+unchanged. The subsequent application binding adds standalone flushing from READY,
+including machine-only maintenance without a DemoRun. Retained ownership still
+requires recovery; a restart cannot skip that requirement.
 
 ## Existing adapter preparation
 

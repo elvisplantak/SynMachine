@@ -1156,6 +1156,8 @@ class SQLiteStore:
             final_event = events[-1]
             comparisons = (
                 ("state", final_event.machine_state, machine.state),
+                ("interrupted_maintenance_id", final_event.interrupted_maintenance_id,
+                    machine.interrupted_maintenance_id),
                 (
                     "runtime_fault_reason",
                     final_event.runtime_fault_reason,

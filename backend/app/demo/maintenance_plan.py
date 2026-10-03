@@ -30,7 +30,7 @@ class MaintenanceIntent(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     execution_id: str
     owner_id: str
-    run_id: str
+    run_id: str | None
     kind: MaintenanceKind
     started_at: datetime
     operator: str
@@ -43,12 +43,13 @@ class MaintenanceIntent(BaseModel):
             for v in (
                 self.execution_id,
                 self.owner_id,
-                self.run_id,
                 self.operator,
                 self.evidence_note,
             )
         ):
             raise ValueError("maintenance identities must be explicit")
+        if self.run_id is not None and not self.run_id.strip():
+            raise ValueError("maintenance run identity must not be empty")
         if self.started_at.tzinfo is None or self.started_at.utcoffset() is None:
             raise ValueError("maintenance timestamp must be timezone-aware")
         return self

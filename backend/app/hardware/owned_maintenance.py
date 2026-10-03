@@ -56,6 +56,8 @@ def transition(store, expected, intent, state, event_type, occurred_at, *, activ
         state=state,
         event_sequence=expected.event_sequence + 1,
         interrupted_run_id=None if state is MachineState.READY else intent.run_id,
+        interrupted_maintenance_id=(intent.execution_id
+            if state is not MachineState.READY and intent.run_id is None else None),
         active_maintenance=intent if active else None,
     )
     event = MachineEvent(
@@ -64,6 +66,7 @@ def transition(store, expected, intent, state, event_type, occurred_at, *, activ
         event_type=event_type,
         machine_state=state,
         run_id=intent.run_id,
+        interrupted_maintenance_id=machine.interrupted_maintenance_id,
         maintenance_intent=intent,
         message=f"Owned {intent.kind.value.lower()} {event_type.value.lower()}",
     )
@@ -149,19 +152,23 @@ def execute_maintenance(runtime, run_id, plan, readiness, occurred_at, stop_requ
     plan = MaintenancePlan.model_validate(plan.model_dump())
     readiness = MaintenanceReadiness.model_validate(readiness.model_dump())
     machine = runtime._store.load_machine_snapshot()
-    run = runtime._store.load_demo_run(run_id)
+    run = None if run_id is None else runtime._store.load_demo_run(run_id)
     if (
         machine is None
         or machine.active_execution is not None
         or machine.active_maintenance is not None
-        or run is None
-        or run.status not in (RunStatus.FAULTED, RunStatus.ABORTED, RunStatus.COMPLETED)
+        or (run_id is not None and (run is None
+            or run.status not in (RunStatus.FAULTED, RunStatus.ABORTED, RunStatus.COMPLETED)))
         or machine.state is MachineState.BUSY
         or machine.interrupted_run_id not in (None, run_id)
+        or (run_id is not None and machine.interrupted_maintenance_id is not None)
     ):
         raise SimulationBlocked("maintenance requires resolved terminal run and machine context")
-    if plan.kind is MaintenanceKind.FLUSH and machine.state is not MachineState.FLUSH_REQUIRED:
-        raise SimulationBlocked("mandatory flush requires FLUSH_REQUIRED")
+    standalone = plan.kind is MaintenanceKind.FLUSH and machine.state is MachineState.READY
+    if run_id is None and not standalone and machine.interrupted_maintenance_id is None:
+        raise SimulationBlocked("machine-only maintenance requires explicit interruption scope")
+    if plan.kind is MaintenanceKind.FLUSH and machine.state not in (MachineState.FLUSH_REQUIRED, MachineState.READY):
+        raise SimulationBlocked("flush requires READY or FLUSH_REQUIRED")
     if plan.kind is MaintenanceKind.RECOVERY and machine.state not in (
         MachineState.RECOVERING,
         MachineState.RECOVERY_REQUIRED,
@@ -170,10 +177,15 @@ def execute_maintenance(runtime, run_id, plan, readiness, occurred_at, stop_requ
     ):
         raise SimulationBlocked("recovery requires an explicitly retained interruption")
     current_owner = runtime._owner._validate_owner()
-    if current_owner is None:
+    if standalone and current_owner is not None:
+        raise SimulationBlocked("READY with retained ownership still requires recovery")
+    if not standalone and current_owner is None:
         raise SimulationBlocked("maintenance requires retained ownership")
     previous = getattr(runtime, "_maintenance", None)
-    if plan.kind is MaintenanceKind.FLUSH:
+    if standalone:
+        generation = runtime._owner.idle_generation()
+        state = runtime._fresh_or_retained_state(generation)
+    elif plan.kind is MaintenanceKind.FLUSH:
         # A restart or stale diagnostic report is never sufficient to skip recovery.
         if previous is not None and previous._valid and previous._kind is MaintenanceKind.RECOVERY:
             previous.validate_completion()
@@ -197,9 +209,13 @@ def execute_maintenance(runtime, run_id, plan, readiness, occurred_at, stop_requ
         state = runtime._runner.device.current
     phase_id = str(uuid4())
     state = state.model_copy(update={"phase_execution_id": phase_id})
+    source_sequence = machine.event_sequence if run is None else run.event_sequence
     stored = runtime._runner._plans.persist(
-        PlanSource(run_id=run_id, run_event_sequence=run.event_sequence, plan=plan), state
+        PlanSource(run_id=run_id, run_event_sequence=source_sequence, plan=plan), state
     ).plan
+    if standalone:
+        lease = runtime._owner.claim(phase_id, expected_generation=generation)
+        current_owner = lease.sequence_id
     # Identity binds readiness attribution to the same durable lifecycle intent.
     intent = MaintenanceIntent(
         execution_id=phase_id,
@@ -210,7 +226,8 @@ def execute_maintenance(runtime, run_id, plan, readiness, occurred_at, stop_requ
         operator=readiness.operator,
         evidence_note=readiness.evidence_note,
     )
-    lease = runtime._owner.begin_maintenance(current_owner, phase_id)
+    if not standalone:
+        lease = runtime._owner.begin_maintenance(current_owner, phase_id)
     session = OwnedMaintenanceSession(runtime, state)
     session._phase_id = phase_id
     session._kind = plan.kind
@@ -236,7 +253,7 @@ def execute_maintenance(runtime, run_id, plan, readiness, occurred_at, stop_requ
     def stopped():
         if (
             runtime._store.load_machine_snapshot() != expected
-            or runtime._store.load_demo_run(run_id) != run
+            or (run_id is not None and runtime._store.load_demo_run(run_id) != run)
         ):
             raise SimulationBlocked("maintenance lifecycle changed during execution")
         result = stop_requested()
@@ -268,7 +285,7 @@ def execute_maintenance(runtime, run_id, plan, readiness, occurred_at, stop_requ
         outcome, _ = runtime._runner.run(
             phase_id,
             run_id=run_id,
-            run_event_sequence=run.event_sequence,
+            run_event_sequence=source_sequence,
             stop_requested=stopped,
             before_execute=start,
             before_finish=finish,
