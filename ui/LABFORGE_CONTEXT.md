@@ -972,3 +972,16 @@ or failed setup. The context provider receives only boot identity, never an
 unwrapped adapter or inferred position. Tests use fake transports; no live provider,
 production environment activation, concrete calibration or switching default is
 supplied.
+
+### Guided browser verification profile — 2026-10-04
+
+Backend `python -m tests.browser_check` explicitly composes the owned application
+with existing Serial/SF adapters over hardwired fake transports. Its development
+fixtures are hypothetical test data, not established physical routes or calibration.
+Wall-clock waits allow browser Pause/Resume/Stop; an optional injected transport
+failure exercises retained ownership, recovery and mandatory flushing. A marked
+isolated temporary bundle persists across restarts and is never reset or repaired
+by the launcher. It rejects live-port environment settings before application import.
+No production activation or additional diagnostic API is added. Launch procedure:
+backend `docs/BROWSER_CHECK.md`. Automated startup/HTTP/restart tests pass; user-led
+browser interactions are still pending.

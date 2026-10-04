@@ -1,12 +1,42 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-10-03
-- Development phase: explicit adapter startup/teardown composition prepared under fake transports; production activation remains gated;
+- Checkpoint date: 2026-10-04
+- Development phase: fake backend profile ready for guided browser verification; production activation remains gated;
   V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — deferred adapter application composition
+## Current checkpoint — fake backend browser profile
+
+- Active backend/UI worktrees remain `labforge-backend-multiphase` and
+  `labforge-ui-multiphase`, both on `codex/browser-check-profile`. Backend HEAD:
+  `3b53094ac183ae1b239e986096581d745f74b6f4`, based on
+  `3d4298ff684788ce79cc9354be60f475baa94151`. UI code remains at
+  `904154eda2da8977a81f983b7aa74d8daa7a6deb`; this checkpoint updates documentation
+  over `a065e77e22c1a3d29823a15955592fbf12ce733c`.
+- User requested step-by-step browser verification and started Vite on
+  `127.0.0.1:5173`. Backend `python -m tests.browser_check` supplies explicit owned
+  application composition with existing real adapters over hardwired fake
+  transports and existing hypothetical test fixtures. No actual port/SDK is opened.
+  Real wall-clock waits and optional injected transport failure permit manual
+  Pause/Resume/Stop and recovery checks through existing HTTP/UI execution paths.
+- An isolated `/tmp/labforge-browser-check` bundle retains identities, journals
+  and ownership across restart. Foreign, partial, symlinked or mismatched bundles
+  are rejected without reset, migration or repair. Existing live-port environment
+  variables are rejected before application import. No production route or
+  diagnostic layer was added. Launch instructions: backend `docs/BROWSER_CHECK.md`.
+- Verification: 24 focused browser/adapter cases pass (9.11 s); all 1782 backend
+  tests pass (96.18 s). Ruff and diff checks pass. An actual CLI startup, HTTP
+  execution snapshot and orderly shutdown passed on an ephemeral localhost port.
+  Backend delta: 3 files, +365 lines. UI changes are documentation only.
+- Next: user starts the fake backend in a second terminal, then checks connected
+  Guided Demo in the browser step by step. Manual browser interactions remain
+  pending; automated HTTP checks do not claim visual/click verification.
+  Consolidated independent review remains pending; accepted backend base stays
+  `3d9fab24`. No real device, firmware, original database, production activation
+  or main merge was used. Test fixtures are not physical commissioning values.
+
+## Previous checkpoint — deferred adapter application composition
 
 - Active backend/UI worktrees remain `labforge-backend-multiphase` and
   `labforge-ui-multiphase`, both on `codex/adapter-application-composition`.
