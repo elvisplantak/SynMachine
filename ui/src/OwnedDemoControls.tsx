@@ -177,6 +177,7 @@ export function OwnedDemoControls({ configuration, configurationValid, onLock, s
     {!showLog && <>
       <section className="demoPanel">
         <div className="demoSectionHeading"><span>Before starting</span><h2>Execution settings</h2></div>
+        <p>SF mixing duration is applied by the executor using the fixed ON/OFF mixing profile. Stored mixing percentages do not set speed.</p>
         <fieldset disabled={active || pending || awaitingRefresh} className="ownedDemoFields demoMainSettings">
           <label>SF mixing duration (s)<input type="number" min="0" step="any" value={settings.mixing} onChange={(e) => setSettings({ ...settings, mixing: e.target.value })} /></label>
           <label>SF settling duration (s)<input type="number" min="0" step="any" value={settings.settling} onChange={(e) => setSettings({ ...settings, settling: e.target.value })} /></label>

@@ -13,6 +13,26 @@ body {
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+.executionAwareness {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 2px solid #46aabf;
+  background: #091629;
+}
+.executionAwareness p { margin: 4px 0; }
+.executionAwareness small { display: block; color: #b8cce1; }
+.executionAwareness button { flex-shrink: 0; padding: 10px; cursor: pointer; }
+.executionAttention { border-color: #e6bd67; background: #29200c; }
+@media (max-width: 700px) {
+  .executionAwareness { align-items: stretch; flex-direction: column; padding: 10px; }
+}
+
 .appShell {
   min-height: 100vh;
   width: 100%;

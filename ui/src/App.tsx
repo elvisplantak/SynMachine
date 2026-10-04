@@ -1,6 +1,7 @@
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import "./App.css";
 import { OwnedDemoControls } from "./OwnedDemoControls";
+import { ExecutionAwareness } from "./ExecutionAwareness";
 
 type ValveState = "closed" | "k1k3" | "k1k2";
 type ValvePort = "k1" | "k2" | "k3";
@@ -2165,7 +2166,7 @@ function DemoLog({ phases, firstLiquid, secondLiquid, values, onNavigate, onExit
   return <main className="appShell guidedDemoShell demoLogShell"><header className="guidedDemoHeader"><div><div className="guidedDemoTitleRow"><div className="brand">Demo Log</div><span>Example data — no backend storage</span></div><p>Configured values, run events, and recorded demo activity</p></div><GuidedDemoNavigation activeSection="log" onNavigate={onNavigate} onExit={onExit} /></header><p className="demoLogDataNotice">All values and events below are example frontend data. Configured volumes are not measured or confirmed delivered volumes.</p><section className="demoLogPanel demoLogSummary"><div className="demoSectionHeading"><span>Selected example demo run</span><h2>Run summary</h2></div><dl>{summary.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></section><div className="demoLogMainGrid"><section className="demoLogPanel demoLogTimeline"><div className="demoSectionHeading"><span>Example events</span><h2>Human event timeline</h2></div><ol>{humanEvents.map(([time, event]) => <li key={`${time}-${event}`}><time>{time}</time><span>{event}</span></li>)}</ol></section><aside className="demoLogSideColumn"><section className="demoLogPanel"><div className="demoSectionHeading"><span>Example command updates</span><h2>Control-change history</h2></div><div className="demoControlHistory">{changes.map(([time, control, previous, next, phase]) => <div key={`${time}-${control}`}><time>{time}</time><strong>{control}</strong><span>{previous} → {next}</span><small>{phase} · Command only; physical response not confirmed</small></div>)}</div></section><section className="demoLogPanel"><button className="demoTechnicalToggle" type="button" aria-expanded={technicalOpen} onClick={() => setTechnicalOpen((open) => !open)}>Show technical details <span>{technicalOpen ? "Hide" : "Expand"}</span></button>{technicalOpen && <ol className="demoTechnicalEvents">{technicalEvents.map(([time, event]) => <li key={`${time}-${event}`}><time>{time}</time><span>{event}</span></li>)}</ol>}</section></aside></div><section className="demoLogPanel"><div className="demoSectionHeading"><span>Example phase record</span><h2>Phase progress</h2></div><ol className="demoLogPhases">{phases.map((phase, index) => <li className={index < phases.length - 1 ? "complete" : "current"} key={phase}><span>{index + 1}</span><small>{phase}</small></li>)}</ol></section><section className="demoLogMedia" aria-label="Future camera media"><div><strong>Reactor camera media</strong><span>No recorded media in frontend draft</span><small>Storage and playback not implemented</small></div><div><strong>Overview camera media</strong><span>No recorded media in frontend draft</span><small>Storage and playback not implemented</small></div></section></main>;
 }
 
-function GuidedDemo({ onExit }: { onExit: () => void }) {
+function GuidedDemo({ onExit, backendRequest }: { onExit: () => void; backendRequest: number }) {
   const [demoSection, setDemoSection] = useState<DemoSection>("cockpit");
   const [stage, setStage] = useState<DemoStage>("configure");
   const [ratioB1, setRatioB1] = useState(40);
@@ -2182,8 +2183,16 @@ function GuidedDemo({ onExit }: { onExit: () => void }) {
   const [previewStarted, setPreviewStarted] = useState(false);
   const [phaseIndex, setPhaseIndex] = useState(0);
   const [reactorPrimary, setReactorPrimary] = useState(true);
-  const [backendMode, setBackendMode] = useState(false);
+  const [backendMode, setBackendMode] = useState(backendRequest > 0);
   const [executionLocked, setExecutionLocked] = useState(false);
+
+  useEffect(() => {
+    if (backendRequest > 0) {
+      setBackendMode(true);
+      setDemoSection("cockpit");
+      setStage("configure");
+    }
+  }, [backendRequest]);
 
   const total = Number(totalVolume);
   const combined = Number(combinedVolume);
@@ -2285,10 +2294,12 @@ function GuidedDemo({ onExit }: { onExit: () => void }) {
               <label>Addition order<select value={additionOrder} onChange={(event) => setAdditionOrder(event.target.value as AdditionOrder)}><option>B1 then B2</option><option>B2 then B1</option></select></label>
               <label>Reaction duration<div className="demoInputWithUnit"><input type="number" min="0" value={reactionDuration} onChange={(event) => setReactionDuration(event.target.value)} /><span>min</span></div></label>
             </div></section>
-            <section className="demoPanel"><div className="demoSectionHeading"><span>Process settings</span><h2>Preview control commands</h2></div><div className="demoProcessSettings">
-              <label className="demoRangeField"><span>Addition speed command <strong>{speedLabel} · {additionSpeed}%</strong></span><input type="range" min="0" max="100" value={additionSpeed} onChange={(event) => setAdditionSpeed(Number(event.target.value))} /></label>
-              <label className="demoRangeField"><span>Reactor mixing command <strong>{reactorMixing}%</strong></span><input type="range" min="0" max="100" value={reactorMixing} onChange={(event) => setReactorMixing(Number(event.target.value))} /></label>
-              <label className="demoRangeField"><span>SF mixing command <strong>{sfMixing}%</strong></span><input type="range" min="0" max="100" value={sfMixing} onChange={(event) => setSfMixing(Number(event.target.value))} /></label>
+            <section className="demoPanel"><div className="demoSectionHeading"><span>Process settings</span><h2>{backendMode ? "Stored demo values — not applied" : "Preview control commands"}</h2></div>
+              {backendMode && <p>These percentages are stored only. Pump speed and Reactor mixing percentages are not executed. SF mixing uses a fixed ON/OFF profile, with no percentage-to-speed mapping.</p>}
+              <div className="demoProcessSettings">
+              <label className="demoRangeField"><span>{backendMode ? "Stored addition percentage — not applied" : "Addition speed command"} <strong>{backendMode ? "" : `${speedLabel} · `}{additionSpeed}%</strong></span><input type="range" min="0" max="100" value={additionSpeed} disabled={backendMode} onChange={(event) => setAdditionSpeed(Number(event.target.value))} /></label>
+              <label className="demoRangeField"><span>{backendMode ? "Stored Reactor percentage — not applied" : "Reactor mixing command"} <strong>{reactorMixing}%</strong></span><input type="range" min="0" max="100" value={reactorMixing} disabled={backendMode} onChange={(event) => setReactorMixing(Number(event.target.value))} /></label>
+              <label className="demoRangeField"><span>{backendMode ? "Stored SF percentage — not applied" : "SF mixing command"} <strong>{sfMixing}%</strong></span><input type="range" min="0" max="100" value={sfMixing} disabled={backendMode} onChange={(event) => setSfMixing(Number(event.target.value))} /></label>
               <label>Simulated target temperature <small>Simulated · Heating disabled</small><div className="demoInputWithUnit"><input type="number" value={simulatedTemperature} onChange={(event) => setSimulatedTemperature(event.target.value)} /><span>°C</span></div></label>
             </div></section>
           </div>
@@ -2298,7 +2309,7 @@ function GuidedDemo({ onExit }: { onExit: () => void }) {
       )}
 
       {stage === "review" && demoSection === "cockpit" && (
-        <div className="demoReviewLayout demoControlTray"><section className="demoPanel"><div className="demoSectionHeading"><span>Configured volume plan</span><h2>Review one colored-liquid run</h2></div>{volumeSummary}<dl className="demoReviewSettings"><div><dt>B1:B2 ratio</dt><dd>{ratioB1}:{100 - ratioB1}</dd></div><div><dt>Addition order</dt><dd>{additionOrder}</dd></div><div><dt>Addition speed command</dt><dd>{speedLabel} · {additionSpeed}%</dd></div><div><dt>Reactor mixing command</dt><dd>{reactorMixing}%</dd></div><div><dt>SF mixing command</dt><dd>{sfMixing}%</dd></div><div><dt>Simulated temperature</dt><dd>{simulatedTemperature} °C · Heating disabled</dd></div><div><dt>Reaction duration</dt><dd>{reactionDuration} min</dd></div><div><dt>Delay between additions</dt><dd>{delayBetweenAdditions} s</dd></div></dl></section><section className="demoPanel"><div className="demoSectionHeading"><span>Human-readable protocol</span><h2>Preview timeline</h2></div><ol className="demoProtocolTimeline"><li>Add S</li><li>Add {firstLiquid}</li><li>Delay {delayBetweenAdditions} s</li><li>Add {secondLiquid}</li><li>Reaction hold · {reactionDuration} min</li><li>Transfer to SF</li><li>SF mixing</li></ol></section><div className="demoReviewActions"><button type="button" disabled={executionLocked} onClick={() => setStage("configure")}>Back to settings</button>{!backendMode && <button className="demoPrimaryButton" type="button" onClick={() => setStage("live")}>Start UI preview</button>}</div></div>
+        <div className="demoReviewLayout demoControlTray"><section className="demoPanel"><div className="demoSectionHeading"><span>Configured volume plan</span><h2>Review one colored-liquid run</h2></div>{volumeSummary}<dl className="demoReviewSettings"><div><dt>B1:B2 ratio</dt><dd>{ratioB1}:{100 - ratioB1}</dd></div><div><dt>Addition order</dt><dd>{additionOrder}</dd></div><div><dt>{backendMode ? "Stored addition percentage — not applied" : "Addition speed command"}</dt><dd>{backendMode ? "" : `${speedLabel} · `}{additionSpeed}%</dd></div><div><dt>{backendMode ? "Stored Reactor percentage — not applied" : "Reactor mixing command"}</dt><dd>{reactorMixing}%</dd></div><div><dt>{backendMode ? "Stored SF percentage — not applied" : "SF mixing command"}</dt><dd>{sfMixing}%</dd></div><div><dt>Simulated temperature</dt><dd>{simulatedTemperature} °C · Heating disabled</dd></div><div><dt>Reaction duration</dt><dd>{reactionDuration} min</dd></div><div><dt>Delay between additions</dt><dd>{delayBetweenAdditions} s</dd></div></dl></section><section className="demoPanel"><div className="demoSectionHeading"><span>Human-readable protocol</span><h2>Preview timeline</h2></div><ol className="demoProtocolTimeline"><li>Add S</li><li>Add {firstLiquid}</li><li>Delay {delayBetweenAdditions} s</li><li>Add {secondLiquid}</li><li>Reaction hold · {reactionDuration} min</li><li>Transfer to SF</li><li>SF mixing</li></ol></section><div className="demoReviewActions"><button type="button" disabled={executionLocked} onClick={() => setStage("configure")}>Back to settings</button>{!backendMode && <button className="demoPrimaryButton" type="button" onClick={() => setStage("live")}>Start UI preview</button>}</div></div>
       )}
 
       {stage === "live" && !backendMode && (
@@ -2520,6 +2531,11 @@ function ProtocolBuilder({
 
 export default function App() {
   const [activeScreen, setActiveScreen] = useState<Screen>("dashboard");
+  const [backendRequest, setBackendRequest] = useState(0);
+  const awareness = <ExecutionAwareness onInspect={() => {
+    setBackendRequest((request) => request + 1);
+    setActiveScreen("guidedDemo");
+  }} />;
   const [runName, setRunName] = useState("");
   const [preRunChecks, setPreRunChecks] = useState<PreRunChecks>({
     sourcesAvailable: false,
@@ -2555,7 +2571,7 @@ export default function App() {
 
   if (activeScreen === "protocolBuilder") {
     return (
-      <ProtocolBuilder
+      <>{awareness}<ProtocolBuilder
         runName={runName}
         preRunChecks={preRunChecks}
         steps={protocolSteps}
@@ -2574,24 +2590,24 @@ export default function App() {
           setProtocolSteps((currentSteps) => currentSteps.filter((step) => step.id !== id))
         }
         onNavigate={setActiveScreen}
-      />
+      /></>
     );
   }
 
   if (activeScreen === "logs") {
-    return <LogsScreen onNavigate={setActiveScreen} />;
+    return <>{awareness}<LogsScreen onNavigate={setActiveScreen} /></>;
   }
 
   if (activeScreen === "service") {
-    return <ServiceScreen onNavigate={setActiveScreen} />;
+    return <>{awareness}<ServiceScreen onNavigate={setActiveScreen} /></>;
   }
 
   if (activeScreen === "guidedDemo") {
-    return <GuidedDemo onExit={() => setActiveScreen("dashboard")} />;
+    return <>{awareness}<GuidedDemo backendRequest={backendRequest} onExit={() => setActiveScreen("dashboard")} /></>;
   }
 
   return (
-    <main className="appShell">
+    <>{awareness}<main className="appShell">
       <header className="topBar">
         <div>
           <div className="brand">LABFORGE SCHEME DRAFT</div>
@@ -2689,6 +2705,6 @@ export default function App() {
           <div>12:05 P1 ready for 2.0 ml transfer.</div>
         </div>
       </section>
-    </main>
+    </main></>
   );
 }

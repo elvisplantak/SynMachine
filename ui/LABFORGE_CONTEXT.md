@@ -995,3 +995,24 @@ commands. Successful flush/release permits a new run even after restart, while
 the old interrupted run remains a terminal historical record. UI guidance now
 explains the required repeated recovery and identifies previous request responses
 separately from actual backend state. These are software test results only.
+
+### Independent review and UI follow-up — 2026-10-04
+
+The supplied consolidated review accepted backend `e47d2acf` for the declared
+fake-only software scope without findings. UI `544f7c4e` needs follow-up for
+execution visibility across navigation/reload and non-applied percentage wording.
+The uncommitted candidate on `codex/connected-execution-review-followup` adds a
+global read-only execution banner with direct access to connected controls and
+visible unknown-state handling on read failure. It disables/labels stored
+addition/Reactor/SF percentages in connected settings/review while retaining
+explicit SF mixing duration as an execution input. It adds no backend API,
+command, speed mapping, automatic resubmission or resume. Twenty UI tests pass,
+including eight isolated fake-API browser cases. User initially requested no
+commit/push and a return to review after these two corrections. The subsequent
+independent follow-up review accepted the complete candidate with zero findings
+and closed both issues. The supplied request now authorizes one focused local
+commit; push still requires separate authorization. Codex confirmed the working
+diff matched the reviewed candidate and reran all UI checks successfully before
+finalization. Backend remains unchanged at the accepted fake-only checkpoint.
+Execution-driven flow animation was discussed and explicitly deferred; no
+animation implementation or physical execution is authorized by this checkpoint.

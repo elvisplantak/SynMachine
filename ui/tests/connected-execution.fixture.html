@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><title>Fake API UI regression</title></head>
+<body><div id="root"></div><pre id="result">pending</pre>
+<script type="module">
+import React from "react";
+import { createRoot } from "react-dom/client";
+import App from "/src/App.tsx";
+
+// Every application request is intercepted here. No real backend is contacted.
+const scenario = new URL(location.href).searchParams.get("scenario");
+const calls = [];
+const status = { configured: true, busy: false, executing: false, operation: null,
+  error: null, retained_owner_id: null, run_id: null, automatic_resume_allowed: false };
+const machine = { state: "READY", active_run_id: null, interrupted_run_id: null,
+  interrupted_maintenance_id: null, active_execution: null, active_maintenance: null };
+let run = null;
+let readFailure = false;
+let machineFailure = false;
+let hang = false;
+function active() {
+  run = { run_id: "fake-run", status: "RUNNING", phase: "REACTION_HOLD",
+    configuration: { total_mixture_volume_ml: "10" }, execution_settings: { sf_mixing_duration_seconds: "10" } };
+  Object.assign(status, { busy: true, executing: true, run_id: run.run_id,
+    operation: { operation_id: "fake-operation", action: "RUN", run_id: run.run_id } });
+  Object.assign(machine, { state: "BUSY", active_run_id: run.run_id,
+    active_execution: { phase: run.phase, start_committed_at: "2026-10-04T10:00:00Z" } });
+}
+window.fetch = async (url, options = {}) => {
+  const path = new URL(url, location.href).pathname;
+  const method = options.method ?? "GET";
+  calls.push({ path, method });
+  if (!path.startsWith("/api/v1/")) throw new Error("Unexpected application request");
+  if (method === "GET" && hang) return new Promise((_, reject) => {
+    options.signal.addEventListener("abort", () => reject(new Error("Fake read timed out")), { once: true });
+  });
+  if (method === "GET" && (readFailure || (machineFailure && path.endsWith("/machine")))) {
+    throw new Error("Fake backend disconnected");
+  }
+  let body;
+  let code = 200;
+  if (method === "GET") {
+    if (path.endsWith("/execution")) body = status;
+    else if (path.endsWith("/machine")) body = machine;
+    else if (path.endsWith("/events")) body = [];
+    else if (path.includes("/runs/")) body = run;
+    else { body = { detail: "Fake Service not configured" }; code = 503; }
+  } else {
+    const data = JSON.parse(options.body);
+    if (path === "/api/v1/runs") {
+      run = { ...data, status: "CREATED", phase: "READY" };
+      body = run;
+    } else if (path.endsWith("/start") && path.includes("/runs/")) {
+      Object.assign(status, { busy: true, executing: true, run_id: run.run_id,
+        operation: { operation_id: "fake-operation", action: "RUN", run_id: run.run_id } });
+      Object.assign(machine, { state: "BUSY", active_run_id: run.run_id,
+        active_execution: { phase: "REACTION_HOLD", start_committed_at: "2026-10-04T10:00:00Z" } });
+      Object.assign(run, { status: "RUNNING", phase: "REACTION_HOLD" });
+      body = status.operation; code = 202;
+    } else if (path.endsWith("/pause") || path.endsWith("/resume")) {
+      run.status = path.endsWith("/pause") ? "PAUSED" : "RUNNING";
+      body = { run };
+    } else if (path.endsWith("/stop")) {
+      run.status = "ABORTED";
+      Object.assign(status, { busy: false, executing: false, retained_owner_id: "fake-owner" });
+      Object.assign(machine, { state: "FLUSH_REQUIRED", active_run_id: null,
+        interrupted_run_id: run.run_id, active_execution: null });
+      body = { operation_id: status.operation.operation_id, run };
+    } else if (path.includes("/machine/recovery/") || path.includes("/machine/flush/")) {
+      const action = path.includes("/recovery/") ? "RECOVERY" : "FLUSH";
+      status.operation = { operation_id: "fake-maintenance", action, run_id: data.run_id };
+      status.busy = false; status.executing = false;
+      machine.state = action === "RECOVERY" ? "FLUSH_REQUIRED" : "READY";
+      if (action === "FLUSH") { status.retained_owner_id = null; machine.interrupted_run_id = null; }
+      body = status.operation; code = 202;
+    } else throw new Error(`Unexpected write: ${path}`);
+  }
+  return new Response(JSON.stringify(body), { status: code });
+};
+const assert = (condition, message) => { if (!condition) throw new Error(message); };
+const banner = () => document.querySelector('[aria-label="Backend execution awareness"]');
+const wait = async (condition) => {
+  const until = Date.now() + 9000;
+  while (!condition()) {
+    if (Date.now() > until) throw new Error("Timed out waiting for UI condition");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+};
+const button = (text) => [...document.querySelectorAll("button")].find((item) => item.textContent.trim() === text);
+const click = async (text) => {
+  try { await wait(() => button(text) && !button(text).matches(":disabled")); }
+  catch { throw new Error(`Button unavailable: ${text}; buttons=${[...document.querySelectorAll("button")].map((item) => `${item.textContent.trim()}:${item.disabled}`).join(", ")}; writes=${JSON.stringify(calls.filter((call) => call.method === "POST"))}`); }
+  button(text).click();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+};
+const input = (label) => [...document.querySelectorAll("label")].find((item) => item.textContent.startsWith(label))?.querySelector("input, textarea");
+const fill = (label, value) => {
+  const item = input(label);
+  assert(item && !item.matches(":disabled"), `Missing enabled input: ${label}`);
+  const prototype = item.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(prototype, "value").set.call(item, value);
+  item.dispatchEvent(new Event("input", { bubbles: true }));
+};
+let root;
+async function freshMount() {
+  if (root) { root.unmount(); await new Promise((resolve) => setTimeout(resolve, 50)); }
+  root = createRoot(document.getElementById("root"));
+  root.render(React.createElement(App));
+  await wait(() => banner());
+}
+async function readyBanner(text) {
+  await wait(() => banner()?.textContent.includes(text));
+  assert(banner().textContent.includes("Static preview values are not current machine state"), "Preview separation missing");
+}
+const noWrites = () => assert(calls.every((call) => call.method === "GET"), "Restore/navigation sent a command");
+async function confirmations() {
+  fill("Operator", "fake-browser-test");
+  fill("Evidence for this attempt", "Fake UI test only; no physical readiness verified.");
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  for (const item of document.querySelectorAll('.ownedDemoCheck input')) {
+    item.click();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert([...document.querySelectorAll('.ownedDemoCheck input')].every((item) => item.checked), "Test confirmations did not settle");
+}
+
+try {
+  if (scenario === "navigation") {
+    active(); await freshMount(); await readyBanner("Run: RUNNING");
+    await click("Open backend execution");
+    await wait(() => document.querySelector('[aria-label="Backend Guided Demo"]'));
+    await click("Exit demo");
+    assert(!document.querySelector('[aria-label="Backend Guided Demo"]'), "Demo did not exit");
+    await readyBanner("Run: RUNNING");
+    const originalBanner = banner();
+    await click("Service"); await readyBanner("Run: RUNNING");
+    assert(banner() === originalBanner, "Global execution observer unmounted on navigation");
+    await click("Logs"); await readyBanner("Run: RUNNING");
+    await click("Protocol Builder"); await readyBanner("Run: RUNNING");
+    window.scrollTo(0, 800);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const bounds = banner().getBoundingClientRect();
+    assert(bounds.top >= 0 && bounds.bottom <= innerHeight, "Execution banner disappeared while scrolling");
+    await click("Open backend execution");
+    await wait(() => document.querySelector('[aria-label="Backend Guided Demo"]'));
+    noWrites();
+  } else if (scenario === "fresh-mount") {
+    if (!new URL(location.href).searchParams.has("reloaded")) {
+      await freshMount(); await readyBanner("Machine: READY"); noWrites();
+      location.replace(`${location.href}&reloaded=1`);
+      await new Promise(() => {});
+    }
+    active(); await freshMount(); await readyBanner("Run: RUNNING");
+    active(); await freshMount(); await readyBanner("Run: RUNNING");
+    assert(button("Open backend execution"), "Missing direct path to live controls");
+    assert(calls.filter((call) => call.path.endsWith("/execution")).length >= 2, "Fresh mount reused frontend state");
+    noWrites();
+  } else if (scenario === "unresolved") {
+    for (const state of ["RECOVERY_REQUIRED", "RECOVERING", "FLUSH_REQUIRED", "FLUSHING", "READY"]) {
+      Object.assign(machine, { state, interrupted_maintenance_id: "fake-interruption" });
+      Object.assign(status, { retained_owner_id: "fake-owner" });
+      await freshMount(); await readyBanner(`Machine: ${state}`);
+      assert(banner().textContent.includes("needs attention"), `Unresolved ${state} hidden`);
+      assert(banner().textContent.includes("ownership retained"), "Retained ownership hidden");
+    }
+    noWrites();
+  } else if (scenario === "read-failure") {
+    active(); await freshMount(); await readyBanner("Run: RUNNING");
+    readFailure = true; await readyBanner("Backend state unavailable");
+    assert(!banner().textContent.includes("Machine: READY"), "Read failure claims readiness");
+    await freshMount(); await readyBanner("Backend state unavailable");
+    readFailure = false; machineFailure = true;
+    await freshMount(); await readyBanner("Backend state unavailable");
+    assert(banner().textContent.includes("readiness are unknown"), "Partial read claims readiness");
+    noWrites();
+  } else if (scenario === "read-timeout") {
+    hang = true; await freshMount(); await readyBanner("Checking backend execution");
+    await readyBanner("Backend state unavailable"); noWrites();
+  } else if (scenario === "percentages") {
+    await freshMount(); await readyBanner("Machine: READY"); await click("Open backend execution");
+    for (const label of ["Stored addition percentage", "Stored Reactor percentage", "Stored SF percentage"]) {
+      assert(input(label)?.disabled, `${label} not disabled`);
+      assert(input(label).closest("label").textContent.includes("not applied"), `${label} implies application`);
+    }
+    await click("Review configured run");
+    const review = document.querySelector(".demoReviewSettings");
+    assert(document.querySelector(".demoReviewLayout").textContent.match(/not applied/g)?.length === 3, "Review percentages imply application");
+    assert(review, "Missing actual backend state");
+    await click("Return to UI preview");
+    assert(input("Addition speed command") && !input("Addition speed command").disabled, "Local preview behavior lost");
+    noWrites();
+  } else if (scenario === "duration") {
+    await freshMount(); await readyBanner("Machine: READY"); await click("Open backend execution");
+    assert(input("SF mixing duration (s)") && !input("SF mixing duration (s)").disabled, "Real duration input disabled");
+    assert(document.querySelector('[aria-label="Backend Guided Demo"]').textContent.includes("SF mixing duration is applied by the executor"), "Actual input not distinguished");
+    noWrites();
+  } else if (scenario === "controls") {
+    await freshMount(); await readyBanner("Machine: READY"); await click("Open backend execution");
+    for (const [label, value] of [["SF mixing duration", "10"], ["SF settling duration", "5"], ["Fraction count", "2"], ["Duration per fraction", "5"]]) {
+      fill(label, value); await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    await click("Review configured run"); await click("Start configured run");
+    await readyBanner("Run: RUNNING");
+    assert(run.execution_settings.sf_mixing_duration_seconds === "10", "Duration not sent as execution input");
+    await click("Pause wait"); await readyBanner("Run: PAUSED");
+    await click("Resume wait"); await readyBanner("Run: RUNNING");
+    await click("Stop execution"); await readyBanner("Machine: FLUSH_REQUIRED");
+    assert(button("Start configured run").disabled, "Stop permits competing run");
+    await confirmations(); await click("Start recovery");
+    await wait(() => button("Start recovery") && !input("Operator").matches(":disabled"));
+    assert(button("Start configured run").disabled, "Recovery permits run before flush");
+    await confirmations(); await click("Flush system"); await readyBanner("Machine: READY");
+    await wait(() => !button("Start configured run").disabled);
+    assert([...document.querySelectorAll('.ownedDemoCheck input')].every((item) => !item.checked), "Readiness reused");
+    const writes = calls.filter((call) => call.method === "POST").map((call) => call.path);
+    assert(writes.length === 7, `Unexpected command count: ${writes.join(", ")}`);
+    assert(writes[0] === "/api/v1/runs" && writes[1].endsWith("/start") && writes[2].endsWith("/pause")
+      && writes[3].endsWith("/resume") && writes[4].endsWith("/stop")
+      && writes[5].includes("/recovery/") && writes[6].includes("/flush/"), "Existing commands changed");
+  } else throw new Error(`Unknown scenario: ${scenario}`);
+  root.unmount();
+  document.getElementById("result").textContent = `PASS:${scenario}`;
+} catch (error) {
+  document.getElementById("result").textContent = `FAIL:${scenario}:${error.stack}`;
+}
+</script></body></html>

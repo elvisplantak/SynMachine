@@ -1,12 +1,59 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-10-04
-- Development phase: connected recovery/flush/new-run software verified with fake transports; consolidated review pending; production activation remains gated;
+- Development phase: backend fake-only slice and connected execution UI follow-up independently accepted; local UI checkpoint authorized, push pending; production activation remains gated;
   V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — browser recovery/flush/restart verification complete
+## Current checkpoint — connected execution UI review follow-up
+
+- Backend remains clean on `codex/browser-check-profile`, HEAD
+  `e47d2acf777a96a09fde763c4d8cb5f6c8fa5139`. The supplied independent consolidated
+  review accepted that exact backend for the declared fake-only software scope,
+  with no findings; the prior STATUS request-ID finding is closed. This supersedes
+  `3d9fab24` as the last accepted backend point within that scope.
+- UI follow-up branch: `codex/connected-execution-review-followup`, created from
+  exact reviewed HEAD `544f7c4e33dc2422c714a26ec56c1a5c870732ca`. Independent
+  follow-up review accepted the complete uncommitted candidate with zero findings
+  at every severity and closed both prior UI findings. Before finalization, Codex
+  verified byte-for-byte equality with the reviewed 47,183-byte diff. The supplied
+  follow-up request now authorizes one focused local commit, with no push until
+  separately authorized. Only review-status documentation was updated afterward;
+  accepted application code and tests remain unchanged.
+- The reviewer reported one Medium (active/unresolved execution becomes invisible
+  after leaving Guided Demo or reloading) and one Low (stored percentages imply
+  command application). Codex independently confirmed both against the code.
+- A sticky global execution banner remains mounted across every screen. It reads
+  existing execution/machine/run APIs again on fresh mount and periodically,
+  represents active/retained/recovery/flush/intent states, distinguishes static
+  preview values from current state, and opens connected controls directly. Reads have
+  a five-second deadline; failed/partial/stalled reads show unknown current state,
+  not idle/READY. Restoration performs GETs only and never sends/resends commands.
+- Connected addition/Reactor/SF percentages are disabled and explicitly labeled
+  stored/not applied in settings and review. Local preview behavior is retained.
+  SF mixing duration remains an explicit actual execution input using the fixed
+  ON/OFF profile. Backend control policy, physical behavior and topology are unchanged.
+- Verification: `npm test` passes all 20 tests (12 API + 8 headless browser;
+  zero skipped), `npm run lint`, `npm run build`, and `git diff --check` pass.
+  JS 306.57 kB (84.51 kB gzip); CSS 50.08 kB (9.94 kB gzip).
+  The full UI checks were rerun successfully after review (20/20, zero skipped).
+  The reviewer inspected the regression tests but did not independently run them.
+  Browser cases cover navigation/scrolling, actual page reload/fresh mounting,
+  retained maintenance states, failed/timed-out reads, read-only restoration,
+  percentages/duration and the explicit Start/Pause/Resume/Stop/recovery/flush
+  sequence. Fixtures intercept all application fetches; the test server blocks
+  API fallthrough and uses temporary browser profiles/caches. See `tests/README.md`.
+- Next: preserve the accepted UI follow-up as one local commit on this feature
+  branch; push requires separate user authorization. No further software correction
+  is requested by the follow-up review. A later phase may prepare approved live
+  configuration and an independent current-context provider; physical routes,
+  calibration, drain timing and supervised commissioning remain separate gates.
+  Backend tests were not rerun for this UI-only change; previous 1782-test evidence
+  remains applicable. No firmware, real device, production activation or main merge
+  was used. Flow animation was discussed and explicitly deferred by the user.
+
+## Previous checkpoint — browser recovery/flush/restart verification complete
 
 - Active backend/UI worktrees remain `labforge-backend-multiphase` and
   `labforge-ui-multiphase`, both on `codex/browser-check-profile`. Backend HEAD:

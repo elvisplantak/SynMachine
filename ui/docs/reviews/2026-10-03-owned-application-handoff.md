@@ -5,6 +5,53 @@ while the reviewer was unavailable and authorized autonomous software integratio
 Do not infer authorization for production activation, real ports/motion, database
 migrations, firmware changes, main merges or firmware recovery artifacts.
 
+## Independent verdict and UI follow-up — 2026-10-04
+
+The user supplied the independent review of backend `e47d2acf777a96a09fde763c4d8cb5f6c8fa5139`
+and UI `544f7c4e33dc2422c714a26ec56c1a5c870732ca`. Backend was ACCEPTED for the
+declared fake-only software scope with zero findings; the earlier STATUS request-ID
+finding is CLOSED. The reviewer did not rerun the reported tests through GitHub.
+
+UI received one Medium (execution disappears behind preview after navigation/reload)
+and one Low (non-applied percentage controls imply real command application).
+Codex independently confirmed both. Independent follow-up review subsequently
+ACCEPTED the full uncommitted candidate on `codex/connected-execution-review-followup`
+against the exact reviewed UI HEAD above: Critical 0, High 0, Medium 0, Low 0. Both
+prior findings are CLOSED. Codex verified byte-for-byte equality with the reviewed
+47,183-byte diff before finalization. The supplied follow-up request authorizes one
+focused local commit and explicitly requires separate authorization for push.
+Only this acceptance/status documentation changed after review; application code
+and tests are the exact accepted candidate. No backend/firmware/physical behavior
+or topology changed.
+
+Accepted scope:
+- `src/ExecutionAwareness.tsx` plus narrow root integration in `src/App.tsx` and
+  scoped banner styles: global read-only observation survives every internal screen
+  transition, reads backend state afresh on reload, and provides a direct path to
+  connected controls. Active/unresolved/retained maintenance work remains visible.
+  Failed/partial/stalled reads show unknown readiness; a five-second read deadline
+  bounds a hung request. No command is sent by observation/restoration/navigation.
+- Connected percentage ranges are disabled and marked stored/not applied in
+  settings/review. Existing local preview stays available. `OwnedDemoControls`
+  explicitly distinguishes SF duration as an actual executor input under the fixed
+  ON/OFF profile. Start/Pause/Resume/Stop/recovery/flush policy is unchanged.
+- Eight real headless-browser regressions in `tests/connected-execution.test.mjs`
+  and its HTML fixture exercise navigation/scrolling, page reload/fresh mounts,
+  retained recovery/flush states, read failures/timeouts, read-only restoration,
+  percentages, duration and the explicit command sequence. Fetch is completely
+  faked and API fallthrough is blocked; no running backend is contacted. Browser
+  profiles and Vite caches are temporary. `tests/README.md` documents browser setup.
+
+Verification: `npm test` passes 20/20 (12 API + 8 browser; zero skipped), lint,
+build and diff checks pass. JS 306.57 kB (84.51 kB gzip), CSS 50.08 kB (9.94 kB gzip).
+The unchanged backend retains the earlier 1782-test evidence. Codex reran all
+reported UI checks after review: 20/20 tests, zero skipped, lint/build/diff checks
+pass. The reviewer inspected these regressions but did not independently run them.
+No further software correction is requested for the two closed findings.
+
+The accepted scope ends at this UI follow-up. Push requires separate user
+authorization; production/device/main authorization is not implied.
+
 ## Pinned scope
 
 - Backend repository: `elvisplantak/labforge-backend`, branch
@@ -19,7 +66,7 @@ migrations, firmware changes, main merges or firmware recovery artifacts.
   checkpoint report, rather than an unrelated default branch. Adapter-resource
   backend delta is `37d5b16..3d4298f`; browser profile delta is
   `3d4298f..e47d2ac`. The full review includes all three slices.
-- Last independently accepted backend base remains `3d9fab24`. Prior integration
+- At the original handoff, the last independently accepted backend base was `3d9fab24`. Prior integration
   and targeted STATUS freshness correction are not newly marked accepted here.
   Prior packets are `2026-10-03-owned-recovery-flush-handoff.md` and
   `2026-10-03-status-request-freshness-followup.md` in this directory.
