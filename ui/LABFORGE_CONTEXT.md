@@ -983,5 +983,15 @@ failure exercises retained ownership, recovery and mandatory flushing. A marked
 isolated temporary bundle persists across restarts and is never reset or repaired
 by the launcher. It rejects live-port environment settings before application import.
 No production activation or additional diagnostic API is added. Launch procedure:
-backend `docs/BROWSER_CHECK.md`. Automated startup/HTTP/restart tests pass; user-led
-browser interactions are still pending.
+backend `docs/BROWSER_CHECK.md`. User-led browser checks on 2026-10-04 confirmed
+initialization, Start/Pause/Resume/completion, clean Stop/mandatory flush, injected
+transport failure, restart/recovery/flush and a successful new run after another
+restart. The same marked temporary bundle was retained throughout.
+
+Restart between recovery and flushing preserves FLUSH_REQUIRED and ownership,
+but discards execution session continuity. Fresh explicit recovery must precede
+flushing in that new session. Durable FLUSH_REQUIRED alone cannot authorize
+commands. Successful flush/release permits a new run even after restart, while
+the old interrupted run remains a terminal historical record. UI guidance now
+explains the required repeated recovery and identifies previous request responses
+separately from actual backend state. These are software test results only.

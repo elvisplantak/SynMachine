@@ -1,19 +1,19 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-10-04
-- Development phase: fake backend profile ready for guided browser verification; production activation remains gated;
+- Development phase: connected recovery/flush/new-run software verified with fake transports; consolidated review pending; production activation remains gated;
   V7/V8 repair and supervised dry production recommissioning complete
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — fake backend browser profile
+## Current checkpoint — browser recovery/flush/restart verification complete
 
 - Active backend/UI worktrees remain `labforge-backend-multiphase` and
   `labforge-ui-multiphase`, both on `codex/browser-check-profile`. Backend HEAD:
-  `3b53094ac183ae1b239e986096581d745f74b6f4`, based on
-  `3d4298ff684788ce79cc9354be60f475baa94151`. UI code remains at
-  `904154eda2da8977a81f983b7aa74d8daa7a6deb`; this checkpoint updates documentation
-  over `a065e77e22c1a3d29823a15955592fbf12ce733c`.
+  `e47d2acf777a96a09fde763c4d8cb5f6c8fa5139`, based on browser-profile
+  checkpoint `3b53094ac183ae1b239e986096581d745f74b6f4`. UI implementation HEAD:
+  `a68c0a79e61ec4992a20eb11c5995633374e9e15`; the final checkpoint adds only
+  documentation over that commit. Initial connected UI commit remains `904154e`.
 - User requested step-by-step browser verification and started Vite on
   `127.0.0.1:5173`. Backend `python -m tests.browser_check` supplies explicit owned
   application composition with existing real adapters over hardwired fake
@@ -25,16 +25,32 @@
   are rejected without reset, migration or repair. Existing live-port environment
   variables are rejected before application import. No production route or
   diagnostic layer was added. Launch instructions: backend `docs/BROWSER_CHECK.md`.
-- Verification: 24 focused browser/adapter cases pass (9.11 s); all 1782 backend
-  tests pass (96.18 s). Ruff and diff checks pass. An actual CLI startup, HTTP
-  execution snapshot and orderly shutdown passed on an ephemeral localhost port.
-  Backend delta: 3 files, +365 lines. UI changes are documentation only.
-- Next: user starts the fake backend in a second terminal, then checks connected
-  Guided Demo in the browser step by step. Manual browser interactions remain
-  pending; automated HTTP checks do not claim visual/click verification.
-  Consolidated independent review remains pending; accepted backend base stays
-  `3d9fab24`. No real device, firmware, original database, production activation
-  or main merge was used. Test fixtures are not physical commissioning values.
+- User-led browser checks passed on the same marked temporary bundle:
+  initialization; Start/Pause/Resume/COMPLETED; second run Stop/ABORTED and mandatory
+  flush; injected third-command failure; restart to FAULTED/RECOVERY_REQUIRED;
+  deliberate recovery retaining FLUSH_REQUIRED/ownership; another restart retaining
+  the block; fresh recovery and flush; durable READY/release after restart; then
+  another completed run. Screenshots and read-only HTTP snapshots corroborate this.
+- A restart before flushing discards execution session continuity, even when
+  FLUSH_REQUIRED persists. Backend intentionally requires fresh recovery before
+  flushing in that new process. No permission gate was weakened. UI now explains
+  this, clears the initial reading message after connecting, and labels historical
+  request responses separately from actual machine/run state.
+- Verification: 47 focused browser/maintenance cases pass (19.97 s); all 1782
+  backend tests pass (100.39 s). Ruff and diff checks pass. Twelve UI API tests,
+  lint and build pass; JS 303.36 kB (83.67 kB gzip), CSS 49.57 kB (9.82 kB gzip).
+  Latest backend delta: 2 files, +55/-4; UI code delta: 1 file, +6/-2. Browser-profile
+  regression additionally proves restart cannot skip fresh recovery or discard
+  unknown command evidence, and successful release permits a run after restart.
+- Detailed browser settings/results: backend `docs/BROWSER_CHECK.md`. Hard process
+  death, Service contention, Stop during flushing and page reload were not manually
+  exercised in this session. User screenshots precede the final small UI text delta;
+  that delta passed lint/build and leaves control policy unchanged.
+- Next: independent consolidated review using the updated existing packet
+  `docs/reviews/2026-10-03-owned-application-handoff.md`. Accepted backend base stays
+  `3d9fab24`. The approved connected software slice is complete; live configuration,
+  current-context provider and physical commissioning remain gated. No real device,
+  firmware, original database, production activation or main merge was used.
 
 ## Previous checkpoint — deferred adapter application composition
 
