@@ -80,7 +80,37 @@ raises an injected transport error. It is not a retry or alternate transport.
 After the error, restart without that flag using the same state directory.
 Historical unknown outcome evidence must remain; recovery/flush must be deliberate.
 
-Manual browser results remain pending until those interactions are actually
-performed and observed. The launcher's automated tests verify environment
+If the backend restarts after recovery or clean Stop and before flushing,
+FLUSH_REQUIRED and ownership persist, but the execution session continuity does
+not. Repeat explicit recovery with fresh per-attempt confirmations, then flush
+in that same process. A durable FLUSH_REQUIRED snapshot alone cannot authorize
+commands. After successful flushing/release, READY and permission for a new run
+persist across restart; the interrupted historical run remains FAULTED/ABORTED.
+
+## Observed browser results — 2026-10-04
+
+User-led localhost browser checks used the same marked temporary bundle throughout,
+with real adapters over fake transports. Configuration: total 10 ml, B1 1.6 ml,
+B2 2.4 ml, S 6 ml, B1 then B2, addition delay 5 s, reaction 1 min, SF mixing
+10 s, settling 5 s, two fractions at 5 s each. These are hypothetical test values.
+
+- Initialization reached READY; Start/Pause/Resume reached PAUSED during reaction
+  hold and then COMPLETED/READY.
+- A second run stopped during reaction hold reached ABORTED/FLUSH_REQUIRED.
+  New run stayed blocked until deliberate flushing succeeded.
+- `--fault-command 3` stopped the next run with retained ownership. Restart without
+  injection produced FAULTED/RECOVERY_REQUIRED without a UI command or automatic
+  continuation. Explicit recovery reached FLUSH_REQUIRED while new run stayed blocked.
+- Restart between recovery and flushing preserved FLUSH_REQUIRED/ownership but
+  required recovery again in the current process. Repeated recovery and mandatory
+  flushing returned READY/released ownership.
+- A further restart preserved READY/new-run permission; a new run then completed
+  normally. User screenshots and read-only HTTP snapshots corroborated the results.
+- Fresh maintenance confirmations were cleared after each submitted attempt.
+
+This records the listed interactions only. Hard process death, Service contention,
+Stop during flushing and page reload were not manually exercised in this session.
+The launcher's automated tests verify environment
 rejection, complete HTTP execution with wall-clock waits, persistence across
-restart, failure/recovery/flush/new run and refusal to reset/rebind foreign state.
+restart, failure/recovery/flush/new run, lost recovery continuity after restart,
+durable release/new-run permission and refusal to reset/rebind foreign state.

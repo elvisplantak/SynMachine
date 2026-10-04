@@ -88,10 +88,31 @@ def test_fault_profile_retains_owner_and_restart_requires_recovery_flush(tmp_pat
         assert client.get(PREFIX + "/machine").json()["state"] == "RECOVERY_REQUIRED"
         assert client.post(PREFIX + "/runs", json=quick_payload("blocked")).status_code == 409
         maintenance(client, "RECOVERY", "browser-run")
-        assert wait_idle(client)["error"] is None
+        recovered = wait_idle(client)
+        assert recovered["error"] is None
+        assert recovered["retained_owner_id"] == status["retained_owner_id"]
+        assert client.post(PREFIX + "/runs", json=quick_payload("blocked")).status_code == 409
+    evidence = execution.bundle.execution_path.read_bytes()
+    app, execution = build_profile(directory, command_delay=0)
+    with ApiClient(app, lifespan="on") as client:
+        restarted = client.get(PREFIX + "/execution").json()
+        assert restarted["operation"] is None
+        assert restarted["retained_owner_id"] == recovered["retained_owner_id"]
+        assert client.get(PREFIX + "/machine").json()["state"] == "FLUSH_REQUIRED"
+        assert execution.bundle.execution_path.read_bytes() == evidence
         assert client.post(PREFIX + "/runs", json=quick_payload("blocked")).status_code == 409
         maintenance(client, "FLUSH", "browser-run")
+        assert "continuity" in wait_idle(client)["error"]
+        assert execution.bundle.execution_path.read_bytes() == evidence
+        maintenance(client, "RECOVERY", "browser-run")
         assert wait_idle(client)["error"] is None
+        maintenance(client, "FLUSH", "browser-run")
+        flushed = wait_idle(client)
+        assert flushed["error"] is None and flushed["retained_owner_id"] is None
+    app, _ = build_profile(directory, command_delay=0)
+    with ApiClient(app, lifespan="on") as client:
+        assert client.get(PREFIX + "/machine").json()["state"] == "READY"
+        assert client.get(PREFIX + "/execution").json()["retained_owner_id"] is None
         start(client, "after-browser-recovery")
         assert wait_idle(client)["error"] is None
 
