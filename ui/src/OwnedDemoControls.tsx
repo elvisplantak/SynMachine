@@ -38,7 +38,7 @@ export function OwnedDemoControls({ configuration, configurationValid, onLock, s
   const [events, setEvents] = useState<DemoEvent[]>([]);
   const [machineEvents, setMachineEvents] = useState<DemoEvent[]>([]);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [message, setMessage] = useState("Reading backend state…");
+  const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
   const [awaitingRefresh, setAwaitingRefresh] = useState(false);
   const [settings, setSettings] = useState({ mixing: "", settling: "", count: "", collection: "" });
@@ -153,7 +153,9 @@ export function OwnedDemoControls({ configuration, configurationValid, onLock, s
       </dl>
       {connectionError && <p role="alert">{connectionError}. Current state could not be refreshed.</p>}
       {status?.error && <p role="alert">Execution stopped: {status.error}</p>}
-      <p aria-live="polite">{message}</p>
+      <p aria-live="polite">{connectionError ? "Backend state could not be refreshed."
+        : message ? `Last request: ${message}`
+          : status ? "Backend state connected." : "Reading backend state…"}</p>
       <div className="demoPreviewActions">
         <button type="button" disabled={!status?.executing || !status.operation || pending || run?.status === "ABORTING"}
           onClick={() => void command(() => stopOperation(status!.operation!.operation_id, status!.operation!.run_id), "Stop requested. The current atomic operation finishes first.")}>Stop execution</button>
@@ -163,6 +165,8 @@ export function OwnedDemoControls({ configuration, configurationValid, onLock, s
           onClick={() => void command(() => runCommand(runId!, "resume"), "Resume requested for the current wait.")}>Resume wait</button>
       </div>
       {blockReason && <p className="demoLockedNote">{blockReason}</p>}
+      {machine?.state === "FLUSH_REQUIRED" && canRecover && !canFlush
+        && <p>Flushing requires a successful recovery in the current backend session. Repeat recovery after a backend restart.</p>}
       {(machine === null || machine.state === "STARTING") && <button type="button" disabled={!idle || status.retained_owner_id !== null || status.error !== null}
         onClick={() => void command(initializeMachine, "Initial backend state confirmed.")}>Initialize configured system</button>}
       {(unresolvedIntent || runUnresolved || (status?.retained_owner_id && !canRecover && machine?.state !== "FLUSH_REQUIRED")) && !active
