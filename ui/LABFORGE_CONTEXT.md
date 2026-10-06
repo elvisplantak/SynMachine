@@ -1016,3 +1016,25 @@ diff matched the reviewed candidate and reran all UI checks successfully before
 finalization. Backend remains unchanged at the accepted fake-only checkpoint.
 Execution-driven flow animation was discussed and explicitly deferred; no
 animation implementation or physical execution is authorized by this checkpoint.
+
+### Explicit adapter/current-context software preparation — 2026-10-06
+
+The user subsequently authorized and Codex pushed the accepted UI follow-up as
+`0699827` on 2026-10-04. Its application code is unchanged by this next milestone.
+User-approved adapter preparation at backend `36d6046` adds strict explicit
+configuration and fresh attributed current input to the existing owned executor.
+Startup leaves positions unknown; initial READY/Start and recovery bind input to
+the connected session/request and a configured monotonic deadline. Missing,
+foreign, stale or late input blocks before commands. Recovery can establish unknown
+references using existing commands; ownership remains held through mandatory flush.
+Successful same-session command continuity is retained instead of replaced by a
+new callback snapshot. No diagnostic API/layer or production activation was added.
+
+Fake transports verify the full fault/restart/recovery/flush/new-run path; 1826
+backend tests pass. Review is pending; last independently accepted fake-only
+backend remains `e47d2acf`. This typed callback does not yet implement a concrete
+live current-evidence source/operator workflow or authenticate physical truth.
+Static route/calibration inputs and software deadlines do not authorize physical
+use. Details and missing physical inputs: backend `docs/ADAPTER_CURRENT_CONTEXT.md`.
+Live configuration, physical readiness and execution remain separately gated;
+flow animation remains deferred.

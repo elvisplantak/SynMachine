@@ -1,12 +1,62 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-10-04
-- Development phase: backend fake-only slice and connected execution UI follow-up independently accepted; local UI checkpoint authorized, push pending; production activation remains gated;
-  V7/V8 repair and supervised dry production recommissioning complete
+- Checkpoint date: 2026-10-06
+- Development phase: explicit adapter/current-context software preparation complete;
+  fake-only verification, independent review pending; live activation remains gated
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — connected execution UI review follow-up
+## Current checkpoint — explicit adapter/current-context preparation
+
+- Active worktrees remain `labforge-backend-multiphase` and
+  `labforge-ui-multiphase`; feature branch `codex/adapter-current-context-preparation`.
+  Backend HEAD: `36d6046a10361bf7bdb5db7f440075573e9d2b41`, based on
+  `e47d2acf777a96a09fde763c4d8cb5f6c8fa5139`. Backend checkpoint is pushed.
+  UI branch starts from accepted/pushed `0699827604204f33f15393caddde71cbbec302ed`
+  and adds documentation only; UI application/tests remain unchanged.
+- The user approved software preparation of explicit adapter configuration and
+  an independent current-context boundary using fake transports. The strict
+  serializable profile requires all adapter settings, timing, calibration scope,
+  calibration inputs, existing route switching sequences and matching maintenance
+  plans. It contains no current positions/session identity and supplies no live
+  defaults or production/environment activation.
+- The existing owned worker/executor obtains typed current input with a fresh
+  request ID, connected boot/nonce/epoch, observation time and configured deadline.
+  Startup performs HELLO only and leaves references unknown. Initial READY and
+  first Start obtain separate input; missing/stale/foreign/late data blocks before
+  RUNNING or command bytes. Failure removes old input instead of falling back.
+  Direct fresh-runtime entry is covered by the same check. Existing legacy callers
+  retain their complete-pump-position startup requirement.
+- Recovery accepts unknown actuator references while requiring fresh stopped
+  Reactor and matching manual carousel alignment, together with existing per-attempt
+  readiness. Existing HOME/route/move completion establishes continuity. Mandatory
+  flush keeps ownership until durable READY/release; subsequent runs use completed
+  same-session state. Restart/Service changes cannot reconstruct that continuity.
+- Verification: 44 new focused tests pass; complete backend suite **1826 tests**
+  passes (103.01 s), Ruff and `git diff --check` pass. Fault/restart tests preserve
+  the journal/owner, reject old input, recover from unknown references, require
+  flushing and complete a new run. All transports are fake. Backend delta:
+  10 files, +949/-13. No dependency, SQL schema, firmware or UI-code change;
+  firmware build/resource reporting does not apply. UI's accepted 20-test/lint/build
+  evidence remains unchanged; it was not rerun for documentation-only work.
+- Technical contract/physical matrix: backend `docs/ADAPTER_CURRENT_CONTEXT.md`.
+  A synchronous current-input callback must bound its own I/O; the configured
+  deadline rejects late results and does not forcibly cancel a blocked callback.
+  Attributed evidence remains a caller statement, not authenticated physical proof.
+  No concrete live evidence source/operator workflow or filled physical profile
+  is implemented. Historical STATUS/boot/position reports are not readiness.
+- Independent review is requested at this integrated current-input boundary:
+  `docs/reviews/2026-10-06-adapter-current-context-handoff.md`. Last accepted backend
+  remains `e47d2acf` for the fake-only scope; `36d6046` is not yet independently
+  accepted. Codex will assess any findings independently.
+- Next: review this prepared boundary, then define an explicit real current-input
+  source and physically verified configuration. Working pump margins, route
+  switching safety, wet calibration where needed, drain/rinse/tube settings and
+  current manual alignment remain gates. No real port/device, production, EEPROM,
+  firmware upload or main merge was used. Physical work needs separate approval
+  and fresh motor-power readiness. Flow animation remains deferred.
+
+## Previous checkpoint — connected execution UI review follow-up
 
 - Backend remains clean on `codex/browser-check-profile`, HEAD
   `e47d2acf777a96a09fde763c4d8cb5f6c8fa5139`. The supplied independent consolidated
@@ -18,9 +68,10 @@
   follow-up review accepted the complete uncommitted candidate with zero findings
   at every severity and closed both prior UI findings. Before finalization, Codex
   verified byte-for-byte equality with the reviewed 47,183-byte diff. The supplied
-  follow-up request now authorizes one focused local commit, with no push until
-  separately authorized. Only review-status documentation was updated afterward;
-  accepted application code and tests remain unchanged.
+  follow-up request authorized one focused local commit. The user subsequently
+  explicitly approved its GitHub push; accepted UI HEAD `0699827604204f33f15393caddde71cbbec302ed`
+  was committed and pushed on 2026-10-04. Only review-status documentation was
+  updated afterward; accepted application code and tests remain unchanged.
 - The reviewer reported one Medium (active/unresolved execution becomes invisible
   after leaving Guided Demo or reloading) and one Low (stored percentages imply
   command application). Codex independently confirmed both against the code.
@@ -44,11 +95,10 @@
   percentages/duration and the explicit Start/Pause/Resume/Stop/recovery/flush
   sequence. Fixtures intercept all application fetches; the test server blocks
   API fallthrough and uses temporary browser profiles/caches. See `tests/README.md`.
-- Next: preserve the accepted UI follow-up as one local commit on this feature
-  branch; push requires separate user authorization. No further software correction
-  is requested by the follow-up review. A later phase may prepare approved live
-  configuration and an independent current-context provider; physical routes,
-  calibration, drain timing and supervised commissioning remain separate gates.
+- Closure: accepted UI commit `0699827` was pushed with separate user approval.
+  No further software correction was requested by the follow-up review. Adapter
+  configuration/current-input preparation is addressed by the next checkpoint;
+  physical routes, calibration, drain timing and commissioning remain separate gates.
   Backend tests were not rerun for this UI-only change; previous 1782-test evidence
   remains applicable. No firmware, real device, production activation or main merge
   was used. Flow animation was discussed and explicitly deferred by the user.
