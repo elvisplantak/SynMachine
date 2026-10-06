@@ -1068,8 +1068,14 @@ credential provisioning and actual reference acquisition remain gated.
 All 1858 backend tests and 26 UI tests pass; Ruff, UI lint/build and diff checks
 pass, using fake transports/intercepted APIs only. Optional fake launcher flag
 `--operator-confirmations` permits manual browser checking with a random
-process-local credential. This connected checkpoint needs consolidated review;
-last independently accepted backend remains `36d6046` for its earlier scope.
+process-local credential. Independent review accepted exact backend
+`1c0e906ac2ad440ea741032192c29a67ab771739` and UI implementation
+`7e36cf7b6518c08c514aa2e151b18f31ac888cb3` for this fake-only scope,
+with zero findings at every severity. Codex checked the key conclusions against
+source and agrees; no software correction is needed. The reviewer did not
+independently rerun verification commands, and no GitHub combined status checks
+were present on those HEADs. Later UI checkpoint/review closure commits change
+documentation only. Manual browser verification of the new panel remains pending.
 
 Existing P1/P2 step coordinates (HOME 0, approved maximum 20500) and demo-only
 1025 steps/ml remain confirmed. Working margins are explicitly recorded as

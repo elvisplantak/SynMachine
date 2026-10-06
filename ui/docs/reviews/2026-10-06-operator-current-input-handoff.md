@@ -1,8 +1,10 @@
 # Fresh operator current-input integration — independent review
 
-Date: 2026-10-06. Consolidated review pending, fake-only software scope.
-Please respond to the user in Croatian/BHS. Treat reviewer proposals as advisory;
-identify concrete code/trigger/evidence for findings.
+Date: 2026-10-06. Independent review accepted the exact implementation HEADs
+below for the declared fake-only software scope. Critical: 0; High: 0;
+Medium: 0; Low: 0. Codex checked the key conclusions against source and agrees;
+no software correction is needed. The original review scope/questions are
+retained below; the closure records the returned outcome.
 
 ## Exact pinned scope
 
@@ -79,3 +81,37 @@ attribution, `OperatorCurrentInput.tsx`, API/control diffs and focused tests.
 
 Report findings by severity with source/trigger and requested correction, or
 accept the exact pinned implementations for this declared fake-only software scope.
+
+
+## Review closure — 2026-10-06
+
+The independently accepted implementation checkpoints are:
+
+- Backend: `1c0e906ac2ad440ea741032192c29a67ab771739`.
+- UI: `7e36cf7b6518c08c514aa2e151b18f31ac888cb3`.
+
+Critical/High/Medium/Low findings are all zero. The reviewer accepted fresh
+request/session/deadline binding, rejection of stale input, explicit CREATED-run
+retry, bounded cancellation including response-before-consumption races,
+restart invalidation, retained ownership through Recovery and mandatory Flush,
+historical-only attribution, canonical legacy-plan compatibility and fresh UI
+forms without automatic replay. Codex independently checked the key conclusions
+against the implementation and agrees; no code correction is required.
+
+The declaration credential authenticates only `OperatorCurrentInput`. It does
+not authenticate `MaintenanceReadiness` or general execution/Service APIs.
+Complete operator/network/API authentication and credential provisioning remain
+separate production integration decisions; this is not a defect in this scope.
+
+The 1858 backend and 26 UI passing-test results and other checks above were
+reported by the implementation session. The reviewer did not independently rerun
+commands through the GitHub connector; no GitHub combined status checks were
+present on the reviewed HEADs. Documentation-only closure does not change the
+accepted implementation or its verification evidence.
+
+The physical worksheet remains incomplete and non-activatable. The next
+substantive boundary is a physically approved configuration/profile and a
+concrete method for acquiring real current references. Manual fake-browser
+verification of the new operator panel remains pending. Acceptance does not
+authorize live ports/devices, physical HOME/Recovery/Flush, liquid testing,
+production activation, firmware upload, EEPROM operations or merging to main.

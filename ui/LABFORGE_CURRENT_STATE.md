@@ -2,7 +2,7 @@
 
 - Checkpoint date: 2026-10-06
 - Development phase: fresh operator current-input software complete;
-  consolidated independent review pending; physical profile incomplete and live activation gated
+  independent review accepted for fake-only scope; physical profile incomplete and live activation gated
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
@@ -14,9 +14,12 @@
   `36d6046a10361bf7bdb5db7f440075573e9d2b41`. UI implementation HEAD:
   `7e36cf7b6518c08c514aa2e151b18f31ac888cb3`, based on
   `b2f00dfe8bf3a9a92ef09f71b174a14392576a70`. The final UI checkpoint adds
-  documentation only over that implementation HEAD. Feature branches are pushed;
-  these new changes are not yet independently accepted. Last accepted backend
-  remains `36d6046` for its exact earlier fake-only preparation scope.
+  documentation only over that implementation HEAD. Feature branches are pushed.
+  Independent review accepted the exact backend `1c0e906` and UI `7e36cf7`
+  implementation HEADs above for the declared fake-only scope, with zero
+  Critical/High/Medium/Low findings. Codex checked the key conclusions against
+  source and agrees; no software correction is needed. Last independently
+  accepted backend is now `1c0e906` for this exact scope.
 - The user approved the concrete current-input source and selected the existing
   UI for fresh declarations. After an accidental workspace-write rejection,
   the user explicitly reapproved additional UI regression/final verification.
@@ -50,6 +53,10 @@
   JS 313.51 kB (86.31 kB gzip), CSS 50.08 kB (9.94 kB gzip). Backend delta:
   16 files +1100/-25; UI implementation: six files +316/-3. No dependency,
   firmware or SQL schema change; firmware build/resource reporting does not apply.
+  The reviewer inspected source/tests but did not independently rerun commands;
+  no GitHub combined status checks were present on the reviewed HEADs. Review
+  closure changes documentation only; the implementation test evidence above
+  remains unchanged.
 - Optional fake-only launcher flag: `--operator-confirmations`. It generates a
   new credential per process and retains only the marked test bundle across
   restart. Both transports remain hardwired fakes; no real SDK/serial port opens.
@@ -61,9 +68,10 @@
   between every run/recovery/flush route remain unconfirmed. The backend
   `docs/ADAPTER_PHYSICAL_PROFILE.draft.json` preserves these distinctions and
   fails strict configuration validation while required fields remain null.
-- Next: consolidated review using
-  `docs/reviews/2026-10-06-operator-current-input-handoff.md`, then user-led
-  fake browser verification if desired. Physical working margins, complete route
+- Review outcome: `docs/reviews/2026-10-06-operator-current-input-handoff.md`.
+  Next: user-led fake browser verification of the new operator panel if desired,
+  then define the physically approved profile and concrete real current-reference
+  acquisition method. Physical working margins, complete route
   transitions, observation methods, drain/rinse/tube settings and live provisioning
   remain separate gates. No real device, production, EEPROM, upload or main merge;
   powered physical work requires separate approval and new motor-power readiness.
