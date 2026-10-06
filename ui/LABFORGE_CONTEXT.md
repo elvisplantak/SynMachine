@@ -1085,3 +1085,25 @@ The incomplete physical worksheet preserves known facts separately from null
 candidate inputs and cannot activate hardware. No real port, production, upload,
 EEPROM, main merge or flow animation is added. Further physical work requires
 separate approval and fresh readiness. Backend details: `docs/OPERATOR_CURRENT_INPUT.md`.
+
+
+### User-selected nominal demo pump range and route inventory — 2026-10-06
+
+After the operator current-input review, the user explicitly selected P1/P2
+full=0, empty=20500, nominal working volume=20 ml and no endpoint reserve for
+the supervised demo, keeping 1025 steps/ml. Precise measured calibration is
+deferred for this demo; no production calibration claim is made. This supersedes
+the earlier pending working-margin status only for the nominal demo scope.
+Firmware `HARDWARE_CONFIRMATIONS.md` records the decision; backend
+`ADAPTER_PHYSICAL_PROFILE.draft.json` now contains those user-selected values
+with `DEMO_NOMINAL` scope and remains non-activatable because other inputs are null.
+
+No execution/protocol code changed. The existing absolute pump-move contract
+accepts 1..20500; zero requires HOME. A nominal 20 ml ordinary aspiration from
+20500 would currently be rejected by the planner. Full-stroke cycle handling
+must be explicitly addressed if required, not silently converted to HOME.
+
+Backend `docs/DEMO_ROUTE_SWITCHING_INVENTORY.md` reconstructs all ten target sets,
+run/flush/recovery entries and existing hypothetical test orders. These orders
+can be discussed logically but remain unconfirmed for physical use; known dry
+Waste setup orders are separately retained. No real device was opened or moved.

@@ -62,17 +62,31 @@
   restart. Both transports remain hardwired fakes; no real SDK/serial port opens.
   Instructions: backend `docs/OPERATOR_CURRENT_INPUT.md` and `docs/BROWSER_CHECK.md`.
 - Physical clarification: P1/P2 positions are stepper steps. HOME 0, approved
-  maximum 20500 and demo-only 1025 steps/ml are already recorded. Working margins
-  remain explicitly **"jos nije potvrdjeno"**, with no candidate values invented.
-  Dated dry Waste HOME routes/setup orders are confirmed; complete transitions
-  between every run/recovery/flush route remain unconfirmed. The backend
+  maximum 20500 and demo-only 1025 steps/ml are already recorded. On 2026-10-06
+  the user explicitly selected full=0, empty=20500, nominal volume=20 ml and no
+  endpoint reserve for both pumps in the demo; precise measured calibration is
+  deferred. The candidate records these inputs as `DEMO_NOMINAL`. Zero remains
+  HOME-only under the current protocol; a nominal 20 ml ordinary aspiration
+  from 20500 is currently rejected. No runtime/protocol change was made.
+  Dated dry Waste HOME routes/setup orders are confirmed; safe switching for
+  the actual run/recovery/flush entries remains unconfirmed. The backend
   `docs/ADAPTER_PHYSICAL_PROFILE.draft.json` preserves these distinctions and
   fails strict configuration validation while required fields remain null.
+  Backend `docs/DEMO_ROUTE_SWITCHING_INVENTORY.md` reconstructs all ten final
+  route targets, actual run/flush/recovery entries and hypothetical test orders;
+  switching proposals are not physical confirmations or active defaults.
+- Later documentation-only follow-up: backend `3689c53` records the selected
+  nominal pump profile and route inventory; firmware `8551b39` records the
+  user decision in `HARDWARE_CONFIRMATIONS.md`. Accepted implementations
+  `1c0e906`/`7e36cf7` remain unchanged. The ten target sets and hypothetical
+  orders were checked against source; the nominal pump values validate and
+  the incomplete candidate still fails strict configuration validation
+  (31 missing/invalid inputs). Diff checks pass; no code/build/test change.
 - Review outcome: `docs/reviews/2026-10-06-operator-current-input-handoff.md`.
   Next: user-led fake browser verification of the new operator panel if desired,
   then define the physically approved profile and concrete real current-reference
-  acquisition method. Physical working margins, complete route
-  transitions, observation methods, drain/rinse/tube settings and live provisioning
+  acquisition method. Complete route transitions, observation methods,
+  drain/rinse/tube settings and live provisioning
   remain separate gates. No real device, production, EEPROM, upload or main merge;
   powered physical work requires separate approval and new motor-power readiness.
   Flow animation remains deferred.
