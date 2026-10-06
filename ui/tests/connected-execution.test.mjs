@@ -34,6 +34,10 @@ after(async () => {
 });
 
 const scenarios = {
+  "operator-retry": "explicit retry preserves the CREATED run and requests fresh blank RUN references",
+  "operator-confirmation": "fresh operator form binds credentials and clears state between attempts without command replay",
+  "operator-cancellation": "expired and cancelled operator requests cannot reuse credentials or automatically continue",
+
   navigation: "active execution remains visible after Exit, Service, Logs and Protocol navigation",
   "fresh-mount": "page reload and fresh frontend mount read and surface active backend work without commands",
   unresolved: "recovery, flushing and retained ownership survive a fresh frontend mount visibly",

@@ -18,6 +18,20 @@ export type ExecutionSettings = {
   fraction_duration_seconds: string;
 };
 
+export type OperatorInputChallenge = {
+  request_id: string; purpose: "RUN" | "RECOVERY"; operator: string;
+  controller_boot_id: number; connection_epoch: number; remaining_seconds: number;
+};
+
+export type OperatorReferences = {
+  evidence_note: string; observed_now_confirmed: true;
+  pumps: { pump_id: string; position_steps: number | null }[];
+  valve_positions: { valve: string; position_degrees: number }[];
+  reactor_mixer_running: boolean | null; sf_mixer_running: boolean | null;
+  sf_bottom_valve: "CLOSED" | "OPEN" | null;
+  column_position_degrees: number | null; carousel_position: number | null;
+};
+
 export type ExecutionStatus = {
   configured: true;
   busy: boolean;
@@ -27,6 +41,8 @@ export type ExecutionStatus = {
   retained_owner_id: string | null;
   run_id: string | null;
   automatic_resume_allowed: false;
+  current_input?: OperatorInputChallenge | null;
+  operator_current_input_configured?: boolean;
 };
 
 export type MachineSnapshot = {
@@ -66,10 +82,10 @@ export class DemoApiError extends Error {
   }
 }
 
-async function request(path: string, body?: unknown, signal?: AbortSignal): Promise<unknown> {
+async function request(path: string, body?: unknown, signal?: AbortSignal, credential?: string): Promise<unknown> {
   const response = await fetch(`/api/v1${path}`, {
     method: body === undefined ? "GET" : "POST",
-    ...(body === undefined ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
+    ...(body === undefined ? {} : { headers: { "Content-Type": "application/json", ...(credential === undefined ? {} : { Authorization: `Bearer ${credential}` }) }, body: JSON.stringify(body) }),
     signal,
   });
   const payload = await response.json().catch(() => null);
@@ -90,6 +106,17 @@ export async function readExecution(signal?: AbortSignal): Promise<ExecutionStat
     || (data.operation !== null && (!data.operation || typeof data.operation.operation_id !== "string"
       || typeof data.operation.action !== "string" || !isNullableString(data.operation.run_id)))) {
     throw new Error("Backend execution status is invalid");
+  }
+  if (data.operator_current_input_configured !== undefined && typeof data.operator_current_input_configured !== "boolean") {
+    throw new Error("Backend operator input status is invalid");
+  }
+  const current = data.current_input;
+  if (current !== undefined && current !== null && (!current || typeof current.request_id !== "string" || !current.request_id.trim()
+    || !["RUN", "RECOVERY"].includes(current.purpose) || typeof current.operator !== "string" || !current.operator.trim()
+    || !Number.isInteger(current.controller_boot_id) || current.controller_boot_id < 1 || current.controller_boot_id > 4294967295
+    || !Number.isInteger(current.connection_epoch) || current.connection_epoch < 1
+    || !Number.isFinite(current.remaining_seconds) || current.remaining_seconds < 0)) {
+    throw new Error("Backend current input challenge is invalid");
   }
   return data;
 }
@@ -194,4 +221,25 @@ export async function readMachineEvents(signal?: AbortSignal): Promise<DemoEvent
     throw new Error("Backend machine event history is invalid");
   }
   return data as DemoEvent[];
+}
+
+
+export async function submitCurrentInput(requestId: string, references: OperatorReferences, credential: string) {
+  const data = await request(`/execution/current-input/${encodeURIComponent(requestId)}`, references, undefined, credential) as {
+    request_id?: string; declaration_received?: boolean;
+  };
+  if (data.request_id !== requestId || data.declaration_received !== true) {
+    throw new Error("Backend did not acknowledge this current declaration");
+  }
+  return data;
+}
+
+export async function cancelCurrentInput(requestId: string, credential: string) {
+  const data = await request(`/execution/current-input/${encodeURIComponent(requestId)}/cancel`, {}, undefined, credential) as {
+    request_id?: string; cancelled?: boolean;
+  };
+  if (data.request_id !== requestId || data.cancelled !== true) {
+    throw new Error("Backend did not acknowledge this current cancellation");
+  }
+  return data;
 }

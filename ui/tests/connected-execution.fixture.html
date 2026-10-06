@@ -46,12 +46,42 @@ window.fetch = async (url, options = {}) => {
     else { body = { detail: "Fake Service not configured" }; code = 503; }
   } else {
     const data = JSON.parse(options.body);
+    if (path.includes("/execution/current-input/")) {
+      if (options.headers?.Authorization !== "Bearer fake-only-credential") {
+        return new Response(JSON.stringify({ detail: "operator credential rejected" }), { status: 401 });
+      }
+      const id = path.split("/")[5];
+      assert(id === status.current_input?.request_id, "Confirmation belongs to old request");
+      assert(!options.body.includes("fake-only-credential"), "Credential leaked into declaration");
+      const cancelled = path.endsWith("/cancel");
+      if (!cancelled) {
+        assert(data.observed_now_confirmed === true && data.carousel_position === 40, "Fresh manual declaration missing");
+        assert(data.operator === undefined && data.observed_at_monotonic === undefined, "Client supplied trusted metadata");
+        if (status.current_input.purpose === "RECOVERY") {
+          assert(data.pumps.every((pump) => pump.position_steps === null) && data.valve_positions.length === 0,
+            "Recovery invented unknown actuator references");
+        } else {
+          assert(data.pumps.length === 2 && data.pumps.every((pump) => pump.position_steps === 4100), "RUN pump inputs lost");
+          assert(data.valve_positions.length === 8 && data.valve_positions.every((valve) => valve.position_degrees === 0),
+            "RUN valve inputs lost");
+          assert(data.sf_mixer_running === false && data.sf_bottom_valve === "CLOSED"
+            && data.column_position_degrees === 0 && data.reactor_mixer_running === false, "RUN reference inputs lost");
+        }
+      }
+      status.current_input = null; status.busy = false; status.executing = false;
+      return new Response(JSON.stringify({ request_id: id, ...(cancelled ? { cancelled: true } : { declaration_received: true }) }));
+    }
     if (path === "/api/v1/runs") {
       run = { ...data, status: "CREATED", phase: "READY" };
       body = run;
     } else if (path.endsWith("/start") && path.includes("/runs/")) {
       Object.assign(status, { busy: true, executing: true, run_id: run.run_id,
         operation: { operation_id: "fake-operation", action: "RUN", run_id: run.run_id } });
+      if (scenario === "operator-retry") {
+        status.current_input = { request_id: "explicit-retry-request", purpose: "RUN", operator: "fixture operator",
+          controller_boot_id: 58, connection_epoch: 1, remaining_seconds: 120 };
+        return new Response(JSON.stringify(status.operation), { status: 202 });
+      }
       Object.assign(machine, { state: "BUSY", active_run_id: run.run_id,
         active_execution: { phase: "REACTION_HOLD", start_committed_at: "2026-10-04T10:00:00Z" } });
       Object.assign(run, { status: "RUNNING", phase: "REACTION_HOLD" });
@@ -193,6 +223,81 @@ try {
     assert(input("SF mixing duration (s)") && !input("SF mixing duration (s)").disabled, "Real duration input disabled");
     assert(document.querySelector('[aria-label="Backend Guided Demo"]').textContent.includes("SF mixing duration is applied by the executor"), "Actual input not distinguished");
     noWrites();
+  } else if (scenario === "operator-retry") {
+    run = { run_id: "existing-created-run", status: "CREATED", phase: "READY",
+      configuration: { total_mixture_volume_ml: "10" }, execution_settings: { sf_mixing_duration_seconds: "10" } };
+    Object.assign(status, { operator_current_input_configured: true, run_id: run.run_id,
+      error: "fresh input missing", operation: { operation_id: "old-request", action: "RUN", run_id: run.run_id } });
+    await freshMount(); await readyBanner("Machine: READY"); await click("Open backend execution");
+    await wait(() => button("Retry current run with fresh confirmation"));
+    noWrites();
+    await click("Retry current run with fresh confirmation");
+    await wait(() => input("Current P1 raw position"));
+    assert(input("Current P1 raw position").value === "" && input("Current P2 raw position").value === "",
+      "RUN reference inferred from preview/history");
+    assert(button("Confirm and continue requested action").matches(":disabled"), "Retry reused consent");
+    fill("Operator access credential", "fake-only-credential");
+    fill("Current reference evidence", "fresh fake RUN references");
+    fill("Current manually aligned carousel position", "40");
+    fill("Current P1 raw position", "4100"); fill("Current P2 raw position", "4100");
+    for (const [label, value] of [["Current Reactor mixer state", "stopped"], ["Current SF mixer state", "stopped"],
+      ["Current SF bottom valve state", "CLOSED"], ["Current Column reference", "0"],
+      ...Array.from({ length: 8 }, (_, i) => [`Current V${i + 1} reference`, "0"])]) {
+      const select = [...document.querySelectorAll("label")].find((item) => item.textContent.startsWith(label)).querySelector("select");
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(select, value);
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    document.querySelector('[aria-label="Fresh operator confirmation"] input[type="checkbox"]').click();
+    await click("Confirm and continue requested action");
+    await wait(() => !document.querySelector('[aria-label="Fresh operator confirmation"]'));
+    const writes = calls.filter((call) => call.method === "POST");
+    assert(writes.length === 2 && writes[0].path === "/api/v1/runs/existing-created-run/start"
+      && writes[1].path === "/api/v1/execution/current-input/explicit-retry-request", "Retry created a new run or replayed commands");
+    assert(run.run_id === "existing-created-run", "Retry replaced CREATED run identity");
+  } else if (scenario === "operator-confirmation" || scenario === "operator-cancellation") {
+    active();
+    status.retained_owner_id = "fake-owner";
+    machine.state = "RECOVERY_REQUIRED";
+    run.status = "FAULTED";
+    status.operation.action = "RECOVERY";
+    status.operator_current_input_configured = true;
+    status.current_input = { request_id: "current-request", purpose: "RECOVERY", operator: "fixture operator",
+      controller_boot_id: 58, connection_epoch: 1, remaining_seconds: 120 };
+    await freshMount(); await readyBanner("Machine: RECOVERY_REQUIRED"); await click("Open backend execution");
+    await wait(() => document.querySelector('[aria-label="Fresh operator confirmation"]'));
+    noWrites();
+    assert(button("Confirm and continue requested action").matches(":disabled"), "Empty form permits confirmation");
+    fill("Operator access credential", "wrong");
+    fill("Current reference evidence", "new fake manual alignment");
+    fill("Current manually aligned carousel position", "40");
+    const select = [...document.querySelectorAll("label")].find((item) => item.textContent.startsWith("Current Reactor mixer state")).querySelector("select");
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(select, "stopped");
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    document.querySelector('[aria-label="Fresh operator confirmation"] input[type="checkbox"]').click();
+    await click("Confirm and continue requested action");
+    await wait(() => document.querySelector('[aria-label="Fresh operator confirmation"]').textContent.includes("credential rejected"));
+    assert(input("Operator access credential").value === "", "Failed credential retained");
+    assert(calls.filter((call) => call.method === "POST").length === 1, "Declaration retried automatically");
+    fill("Operator access credential", "fake-only-credential");
+    await click(scenario === "operator-cancellation" ? "Cancel current confirmation" : "Confirm and continue requested action");
+    await wait(() => !document.querySelector('[aria-label="Fresh operator confirmation"]'));
+    assert(status.retained_owner_id === "fake-owner", "Declaration released owner");
+    const writes = calls.filter((call) => call.method === "POST");
+    assert(writes.length === 2 && writes.every((call) => call.path.includes("/execution/current-input/")), "Declaration dispatched extra commands");
+    Object.assign(status, { busy: true, executing: true, current_input: { request_id: "new-request", purpose: "RECOVERY",
+      operator: "fixture operator", controller_boot_id: 58, connection_epoch: 1, remaining_seconds: 120 } });
+    await wait(() => document.querySelector('[aria-label="Fresh operator confirmation"]'));
+    assert(input("Operator access credential").value === "" && input("Current reference evidence").value === "", "Old values reused on new request");
+    assert(!document.querySelector('[aria-label="Fresh operator confirmation"] input[type="checkbox"]').checked,
+      "Observation consent reused");
+    if (scenario === "operator-cancellation") {
+      status.current_input.remaining_seconds = 0;
+      await wait(() => input("Operator access credential").matches(":disabled"));
+    }
+    await freshMount(); await readyBanner("Machine: RECOVERY_REQUIRED"); await click("Open backend execution");
+    await wait(() => input("Operator access credential"));
+    assert(input("Operator access credential").value === "", "Page restoration retained credential");
+    assert(calls.filter((call) => call.method === "POST").length === 2, "Page restoration sent a declaration");
   } else if (scenario === "controls") {
     await freshMount(); await readyBanner("Machine: READY"); await click("Open backend execution");
     for (const [label, value] of [["SF mixing duration", "10"], ["SF settling duration", "5"], ["Fraction count", "2"], ["Duration per fraction", "5"]]) {

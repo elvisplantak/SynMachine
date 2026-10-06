@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import {
   createRun, maintenanceCommand, newRunBlockReason, readExecution, readMachine,
-  readRun, runCommand, readEvents, stopOperation, initializeMachine,
+  readRun, runCommand, readEvents, stopOperation, initializeMachine, submitCurrentInput, cancelCurrentInput,
 } from "../src/guidedDemoApi.ts";
 
 const originalFetch = globalThis.fetch;
@@ -121,4 +121,45 @@ test("backend events are used directly and malformed history is rejected", async
   assert.deepEqual(await readEvents("expected"), [event]);
   reply([{ ...event, message: null }]);
   await assert.rejects(readEvents("expected"), /event history is invalid/);
+});
+
+test("current confirmation challenge rejects malformed identity, purpose and time", async () => {
+  const current = { request_id: "current-request", purpose: "RECOVERY", operator: "fixture operator",
+    controller_boot_id: 58, connection_epoch: 1, remaining_seconds: 20 };
+  reply({ ...execution, current_input: current });
+  assert.equal((await readExecution()).current_input.request_id, "current-request");
+  for (const changed of [{ request_id: "" }, { operator: "" }, { purpose: "FLUSH" },
+    { remaining_seconds: -1 }, { remaining_seconds: "20" }, { controller_boot_id: 0 }, { connection_epoch: 0 }]) {
+    reply({ ...execution, current_input: { ...current, ...changed } });
+    await assert.rejects(readExecution(), /challenge is invalid/);
+  }
+});
+
+test("operator credential is scoped to a single explicit declaration header", async () => {
+  const credential = "fake-only-credential";
+  const references = { evidence_note: "fresh fixture statement", observed_now_confirmed: true };
+  const calls = [];
+  globalThis.fetch = async (path, options) => {
+    calls.push([path, options]);
+    return new Response(JSON.stringify(path.endsWith("/cancel")
+      ? { request_id: "current-request", cancelled: true }
+      : { request_id: "current-request", declaration_received: true }));
+  };
+  await submitCurrentInput("current-request", references, credential);
+  assert.equal(calls[0][1].headers.Authorization, `Bearer ${credential}`);
+  assert.equal(calls[0][0], "/api/v1/execution/current-input/current-request");
+  assert.equal(JSON.parse(calls[0][1].body).operator, undefined);
+  assert.equal(JSON.parse(calls[0][1].body).observed_at_monotonic, undefined);
+  assert.ok(!calls[0][1].body.includes(credential));
+  await cancelCurrentInput("current-request", credential);
+  assert.equal(calls[1][0], "/api/v1/execution/current-input/current-request/cancel");
+  reply({ request_id: "other", declaration_received: true });
+  await assert.rejects(submitCurrentInput("current-request", references, credential), /this current declaration/);
+});
+
+test("failed operator declaration never retries or sends another action", async () => {
+  let calls = 0;
+  globalThis.fetch = async () => { calls += 1; throw new Error("declaration connection lost"); };
+  await assert.rejects(submitCurrentInput("current-request", {}, "fake-only-credential"), /connection lost/);
+  assert.equal(calls, 1);
 });

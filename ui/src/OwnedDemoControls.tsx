@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { OperatorCurrentInput } from "./OperatorCurrentInput";
 import {
   createRun, maintenanceCommand, newRunBlockReason, readEvents, readExecution,
   readMachine, readMachineEvents, readRun, runCommand, initializeMachine, stopOperation,
@@ -171,8 +172,15 @@ export function OwnedDemoControls({ configuration, configurationValid, onLock, s
         onClick={() => void command(initializeMachine, "Initial backend state confirmed.")}>Initialize configured system</button>}
       {(unresolvedIntent || runUnresolved || (status?.retained_owner_id && !canRecover && machine?.state !== "FLUSH_REQUIRED")) && !active
         && <p>The interrupted operation requires backend restart and reconciliation before recovery.</p>}
+      {status?.operator_current_input_configured && idle && run?.status === "CREATED"
+        && status.retained_owner_id === null && !unresolvedIntent && (machine === null || machine.state === "READY")
+        && <button type="button" onClick={() => void command(() => runCommand(run.run_id, "start"),
+          "Current run requested again with a new confirmation attempt.")}>Retry current run with fresh confirmation</button>}
       <p>Phase completion describes command results. Volumes, cleaning and physical movement are not measured by this display.</p>
     </section>
+
+    {connectionError === null && status?.current_input && <OperatorCurrentInput
+      key={status.current_input.request_id} challenge={status.current_input} available={true} />}
 
     {!showLog && <>
       <section className="demoPanel">
