@@ -440,6 +440,19 @@ This confirms the intended logical position mapping. It does not yet confirm
 that any individual valve physically reaches the commanded position, uses the
 expected direction or step count, or provides the expected fluidic route.
 
+### User-confirmed V1-V8 connection change behavior — 2026-10-06
+
+Asked about the installed V1-V8 switching between 90 and 180 degrees, the user
+explicitly confirmed that the old connection is interrupted before the new
+connection opens. Record this as operator-confirmed break-before-make behavior
+for that change, together with the endpoint semantics above.
+
+This is not a new measurement of timing, sealing, pressure or passive fluid
+movement. It does not approve an overall valve switching/HOME order or physical
+execution. Proposed demo route orders still require the user's confirmation;
+no extra HOME step is inferred to be necessary solely to prevent overlap of the
+old and new connection in a 90/180 change.
+
 ### Arduino pin commissioning — updated 2026-08-05
 
 The available partially outdated wiring notes suggested the following map.
