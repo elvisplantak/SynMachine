@@ -449,9 +449,40 @@ for that change, together with the endpoint semantics above.
 
 This is not a new measurement of timing, sealing, pressure or passive fluid
 movement. It does not approve an overall valve switching/HOME order or physical
-execution. Proposed demo route orders still require the user's confirmation;
+execution. Destination-order approval is recorded separately below;
 no extra HOME step is inferred to be necessary solely to prevent overlap of the
 old and new connection in a 90/180 change.
+
+### User-approved demo destination switching orders — 2026-10-06
+
+After reviewing the concrete proposal, the user explicitly confirmed all ten
+destination switching orders for the supervised demo:
+
+| Destination route | Approved ordered targets in degrees |
+| --- | --- |
+| S -> P1 | V6=180 -> V1=90 |
+| B1 -> P1 | V4=180 -> V6=90 -> V1=90 |
+| B2 -> P1 | V4=90 -> V6=90 -> V1=90 |
+| P1 -> Reactor | V2=90 -> V1=180 |
+| P1 -> Waste | V2=180 -> V1=180 |
+| Reactor -> P2 | V3=90 |
+| P2 -> SF top | V7=180 -> V3=180 |
+| SF bottom -> P2 | V8=180 -> V7=90 -> V3=180 |
+| P2 -> Column | V5=90 -> V8=90 -> V7=90 -> V3=180 |
+| P2 -> Waste | V5=180 -> V8=90 -> V7=90 -> V3=180 |
+
+Procedure: keep pumps stationary while switching, await each command completion,
+omit already-reached targets and retain positions of valves not selected by the
+destination. Keep SF bottom CLOSED during P2 switching and Column bottom CLOSED
+during filling. Start pumping only after route commands complete, preserving
+the existing Reactor mixer-stopped requirements for Reactor/SF transfer.
+
+This is approval of the proposed demo procedure, not a new observed dry/wet
+test result. These destination orders do not select the overall startup/Recovery
+valve HOME order or grant physical-test authorization. Earlier dry Waste HOME
+setup records remain evidence for those distinct recorded setups. The user
+asked about a future supervised machine check; before each actual powered test,
+obtain its concrete authorization and a new motor-power readiness confirmation.
 
 ### Arduino pin commissioning — updated 2026-08-05
 
