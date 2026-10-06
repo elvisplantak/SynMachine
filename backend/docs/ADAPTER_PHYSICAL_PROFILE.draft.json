@@ -107,7 +107,25 @@
     "rinse_start_position": null,
     "installed_adapter_identity_timing_and_sf_coupling": null,
     "independent_method_for_current_raw_references": null,
-    "operator_identity_and_credential_provisioning": null
+    "operator_identity_and_credential_provisioning": null,
+    "valve_connection_change_behavior": {
+      "status": "USER_CONFIRMED",
+      "recorded_at": "2026-10-06",
+      "valves": [
+        "V1",
+        "V2",
+        "V3",
+        "V4",
+        "V5",
+        "V6",
+        "V7",
+        "V8"
+      ],
+      "scope": "Switching between nominal 90 and 180 degrees",
+      "behavior": "Old connection interrupted before new connection opens",
+      "source": "HARDWARE_CONFIRMATIONS.md: User-confirmed V1-V8 connection change behavior - 2026-10-06",
+      "limits": "No measured timing/sealing/pressure result; ordered route/HOME procedures and physical execution are not approved by this fact"
+    }
   },
   "confirmed_reference_facts": {
     "source": "labforge-firmware/HARDWARE_CONFIRMATIONS.md",

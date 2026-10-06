@@ -170,3 +170,125 @@ Remaining physical input is confirmation/correction of the intended valve
 switching orders for these actual entries, including any required isolation not
 expressible by today's exact-target-only `RouteSequence`. The inventory can be
 used route by route; the user need not reconstruct topology or algorithm phases.
+
+
+## Actual switching cases for discussion — 2026-10-06
+
+Status: `PROPOSED_NOT_PHYSICALLY_CONFIRMED`. No candidate route targets or
+execution code is changed. Tables use the explicit hypothetical orders above
+and the planner's actual no-op rule. They describe endpoint commands only,
+not hydraulic behavior during rotation. Pumps are not commanded to move until
+the route operations complete.
+
+`?` means the previous symbolic route does not constrain that valve. It does
+not mean a runtime may use an untrusted position: RUN still needs a complete
+fresh reference or retained same-session state. A conditional target becomes
+a command only when the actual known position differs. Valves not in the
+destination route keep their positions, even if omitted from the last column.
+
+These are 24 distinct route-history cases to discuss: 12 normal-run cases,
+six additional flush cases and six additional Waste-preparation entries.
+Repeated destination selections add no changes when all targets are reached.
+Fresh startup can provide other position combinations; those entries and
+Recovery from unknown references are separate from these history cases.
+
+### Normal run, repetition and next-run boundaries
+
+| Previous route | Next route | Commands in hypothetical order | Already at target; no command |
+| --- | --- | --- | --- |
+| `S_TO_P1` | `P1_TO_REACTOR` | V2=?->90 (if different); then V1=90->180 | none |
+| `P1_TO_REACTOR` | `S_TO_P1` | V6=?->180 (if different); then V1=180->90 | none |
+| `B1_TO_P1` | `P1_TO_REACTOR` | V2=?->90 (if different); then V1=90->180 | none |
+| `P1_TO_REACTOR` | `B1_TO_P1` | V4=?->180 (if different); then V6=?->90 (if different); then V1=180->90 | none |
+| `B2_TO_P1` | `P1_TO_REACTOR` | V2=?->90 (if different); then V1=90->180 | none |
+| `P1_TO_REACTOR` | `B2_TO_P1` | V4=?->90 (if different); then V6=?->90 (if different); then V1=180->90 | none |
+| `REACTOR_TO_P2` | `P2_TO_SF_TOP` | V7=?->180 (if different); then V3=90->180 | none |
+| `P2_TO_SF_TOP` | `REACTOR_TO_P2` | V3=180->90 | none |
+| `P2_TO_SF_TOP` | `SF_BOTTOM_TO_P2` | V8=?->180 (if different); then V7=180->90 | V3=180 |
+| `SF_BOTTOM_TO_P2` | `P2_TO_COLUMN` | V5=?->90 (if different); then V8=180->90 | V7=90, V3=180 |
+| `P2_TO_COLUMN` | `SF_BOTTOM_TO_P2` | V8=90->180 | V7=90, V3=180 |
+| `P2_TO_COLUMN` | `REACTOR_TO_P2` | V3=180->90 | none |
+
+### Additional flushing transitions
+
+| Previous route | Next route | Commands in hypothetical order | Already at target; no command |
+| --- | --- | --- | --- |
+| `P1_TO_WASTE` | `S_TO_P1` | V6=?->180 (if different); then V1=180->90 | none |
+| `P1_TO_REACTOR` | `P1_TO_WASTE` | V2=90->180 | V1=180 |
+| `P1_TO_WASTE` | `P1_TO_REACTOR` | V2=180->90 | V1=180 |
+| `P2_TO_WASTE` | `REACTOR_TO_P2` | V3=180->90 | none |
+| `SF_BOTTOM_TO_P2` | `P2_TO_WASTE` | V5=?->180 (if different); then V8=180->90 | V7=90, V3=180 |
+| `REACTOR_TO_P2` | `P2_TO_COLUMN` | V5=?->90 (if different); then V8=?->90 (if different); then V7=?->90 (if different); then V3=90->180 | none |
+
+### Additional Waste-preparation entries
+
+| Previous route | Next route | Commands in hypothetical order | Already at target; no command |
+| --- | --- | --- | --- |
+| `S_TO_P1` | `P1_TO_WASTE` | V2=?->180 (if different); then V1=90->180 | none |
+| `B1_TO_P1` | `P1_TO_WASTE` | V2=?->180 (if different); then V1=90->180 | none |
+| `B2_TO_P1` | `P1_TO_WASTE` | V2=?->180 (if different); then V1=90->180 | none |
+| `REACTOR_TO_P2` | `P2_TO_WASTE` | V5=?->180 (if different); then V8=?->90 (if different); then V7=?->90 (if different); then V3=90->180 | none |
+| `P2_TO_SF_TOP` | `P2_TO_WASTE` | V5=?->180 (if different); then V8=?->90 (if different); then V7=180->90 | V3=180 |
+| `P2_TO_COLUMN` | `P2_TO_WASTE` | V5=90->180 | V8=90, V7=90, V3=180 |
+
+### Three concrete examples
+
+1. **Solvent aspiration -> Reactor dispense.** After `S_TO_P1`, V1=90 and
+   V6=180. Propose V2->90 if required, then V1 90->180, then dispense P1.
+   If V2 was already 90, only V1 moves. On returning to solvent, V6 remains
+   180 and only V1 180->90 is needed. This is why first entry and a repeated
+   cycle can have different command counts without a different route.
+2. **SF top -> SF bottom aspiration.** After `P2_TO_SF_TOP`, V3=180 and
+   V7=180. Propose V8->180 if required, then V7 180->90. V3 remains 180:
+   it is not automatically closed and reopened. SF bottom must remain CLOSED
+   throughout switching, open only for protected P2 aspiration, then close.
+3. **SF bottom aspiration -> Column dispense.** After `SF_BOTTOM_TO_P2`,
+   V3=180, V7=90 and V8=180. With SF bottom CLOSED and Column bottom CLOSED,
+   propose V5->90 if required, then V8 180->90. V3/V7 remain unchanged.
+   The unchanged valves keep connecting P2 to the branch being switched;
+   their presence in the destination order does not provide isolation.
+
+### Confirmed behavior and remaining procedure decisions
+
+- On 2026-10-06 the user confirmed that installed V1-V8 interrupt the old
+  connection before opening the new one during 90/180 switching. This
+  resolves that particular uncertainty; it does not confirm pressure/sealing
+  or approve an entire ordered procedure. Canonical record: firmware
+  `HARDWARE_CONFIRMATIONS.md`, User-confirmed V1-V8 connection change behavior.
+- Whether the selected stationary-pump procedure is acceptable for the actual
+  fluid heights/pressure, including the unchanged V3/V7 cases above. No
+  gravity/siphon/pressure behavior is inferred here.
+- Whether switching needs explicit isolation beyond final route targets.
+  Current `RouteSequence` accepts only the final target set once per valve;
+  it cannot express V1->0 then V1->180 or closing an otherwise omitted valve.
+  Also, valve position 0 invokes HOME in the existing firmware contract; it
+  is not an independently verified instantaneous shutoff operation.
+- Safe entry for fresh declared positions and unknown-reference Recovery,
+  including the overall valve HOME order. Historical dry Waste setup orders
+  remain evidence for their recorded setups only.
+
+## Complete destination-order proposal for user confirmation
+
+With the user-confirmed old-before-new connection change, propose the ten
+destination orders listed in the existing order table above for the demo.
+Keep pumps stationary throughout route switching, await each command result,
+retain the existing SF/Column closure and mixer checks, and move a pump only
+after all required route commands complete. Already-reached targets remain
+no-ops. No additional zero/HOME/isolation movement is proposed here.
+
+These are proposed ordered procedures, not physical confirmations. Waste
+orders here prepare V2 before V1, and V5/V8/V7 before V3; they differ from
+the historical dry HOME-and-set setup order and therefore need explicit
+acceptance for this procedure. Previous dry setups remain recorded unchanged.
+
+The actual current positions still determine omitted commands. If the user
+requires disconnecting an already-connected pump/branch first, that is a
+different procedure requiring an explicit extension of the current planner.
+Do not translate that requirement into an implicit HOME command.
+
+Fresh startup entries and unknown-reference Recovery remain separate gates.
+The overall valve HOME order is not selected by this proposal. A generic
+instruction to continue or confirmation of internal valve behavior does not
+approve these proposed orders. Until the user accepts/corrects them, keep
+all physical candidate `route_sequences.targets` and the ordered/HOME
+confirmation field unset. Physical execution still needs separate approval.
