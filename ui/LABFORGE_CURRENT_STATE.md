@@ -2,7 +2,7 @@
 
 - Checkpoint date: 2026-10-06
 - Development phase: explicit adapter/current-context software preparation complete;
-  fake-only verification, independent review pending; live activation remains gated
+  fake-only verification and independent review accepted; live activation remains gated
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
@@ -14,6 +14,11 @@
   `e47d2acf777a96a09fde763c4d8cb5f6c8fa5139`. Backend checkpoint is pushed.
   UI branch starts from accepted/pushed `0699827604204f33f15393caddde71cbbec302ed`
   and adds documentation only; UI application/tests remain unchanged.
+  Independent review accepted backend
+  `36d6046a10361bf7bdb5db7f440075573e9d2b41` and UI documentation
+  `3be3124279942aa4efdb575b695fa6c8b421414b`, with zero findings at every
+  severity for the exact fake-transport/software-preparation scope. Codex
+  checked the key conclusions against source and agrees; no correction is needed.
 - The user approved software preparation of explicit adapter configuration and
   an independent current-context boundary using fake transports. The strict
   serializable profile requires all adapter settings, timing, calibration scope,
@@ -45,13 +50,17 @@
   Attributed evidence remains a caller statement, not authenticated physical proof.
   No concrete live evidence source/operator workflow or filled physical profile
   is implemented. Historical STATUS/boot/position reports are not readiness.
-- Independent review is requested at this integrated current-input boundary:
-  `docs/reviews/2026-10-06-adapter-current-context-handoff.md`. Last accepted backend
-  remains `e47d2acf` for the fake-only scope; `36d6046` is not yet independently
-  accepted. Codex will assess any findings independently.
-- Next: review this prepared boundary, then define an explicit real current-input
-  source and physically verified configuration. Working pump margins, route
-  switching safety, wet calibration where needed, drain/rinse/tube settings and
+- Review outcome is recorded in
+  `docs/reviews/2026-10-06-adapter-current-context-handoff.md`. Last independently
+  accepted backend is now `36d6046` for this exact fake-only preparation scope.
+  The reviewer inspected source/tests but did not independently rerun commands;
+  no GitHub status checks were present on that backend HEAD. This closure only
+  changes documentation; previous verification remains applicable.
+- Next substantive phase: define an explicit real current-input source and
+  physically verified configuration, subject to the governance phase approval
+  boundary. Future production composition must use the configured/session-bound
+  provider and cannot silently select the legacy context-factory path.
+  Working pump margins, route switching safety, wet calibration where needed, drain/rinse/tube settings and
   current manual alignment remain gates. No real port/device, production, EEPROM,
   firmware upload or main merge was used. Physical work needs separate approval
   and fresh motor-power readiness. Flow animation remains deferred.

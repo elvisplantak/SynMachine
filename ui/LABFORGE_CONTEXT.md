@@ -1031,10 +1031,16 @@ Successful same-session command continuity is retained instead of replaced by a
 new callback snapshot. No diagnostic API/layer or production activation was added.
 
 Fake transports verify the full fault/restart/recovery/flush/new-run path; 1826
-backend tests pass. Review is pending; last independently accepted fake-only
-backend remains `e47d2acf`. This typed callback does not yet implement a concrete
-live current-evidence source/operator workflow or authenticate physical truth.
+backend tests pass. Independent review accepted backend `36d6046` and UI
+documentation `3be3124` with zero findings for the declared fake-only preparation
+scope. Codex verified the key conclusions against source; no correction is
+needed. The reviewer did not independently rerun commands. This typed callback
+does not yet implement a concrete live current-evidence source/operator workflow
+or authenticate physical truth.
 Static route/calibration inputs and software deadlines do not authorize physical
 use. Details and missing physical inputs: backend `docs/ADAPTER_CURRENT_CONTEXT.md`.
+Future production composition must explicitly use the configured/session-bound
+provider rather than allow legacy assembly to bypass freshness. That is a future
+integration gate, not a defect in this accepted preparation checkpoint.
 Live configuration, physical readiness and execution remain separately gated;
 flow animation remains deferred.

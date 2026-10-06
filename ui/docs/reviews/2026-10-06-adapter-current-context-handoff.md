@@ -1,7 +1,11 @@
 # Adapter/current-context preparation — independent review
 
-Date: 2026-10-06. Respond in Croatian/BHS. Findings are advisory; Codex assesses
-them independently. This candidate is not yet independently accepted.
+Date: 2026-10-06. Review complete: accepted for the exact declared fake-transport /
+software-preparation scope, with Critical/High/Medium/Low all zero. Backend
+`36d6046a10361bf7bdb5db7f440075573e9d2b41` and UI documentation
+`3be3124279942aa4efdb575b695fa6c8b421414b` are independently accepted.
+Codex checked the key conclusions against source and agrees; no correction
+is requested or needed. The following preserves the original review scope.
 
 ## Pinned scope
 
@@ -59,3 +63,18 @@ Read `app/hardware/adapter_configuration.py`, the six small integration diffs,
 
 Report findings by severity with concrete source/trigger and requested correction,
 or accept the exact pinned commit for the declared fake-only preparation scope.
+
+## Review closure
+
+The reviewer confirmed fresh-entry coverage, removal of old input on acquisition
+failure, session/request/deadline correlation, explicit unknown-state recovery,
+journal preservation, retained ownership through required flush and valid
+same-session command continuity. Reported tests/checks were inspected but not
+independently rerun; no GitHub status checks were present on the reviewed backend
+HEAD. Code and test evidence remain unchanged by this documentation closure.
+
+Legacy context-factory compatibility is accepted within this preparation scope.
+Future production composition must explicitly use the configured/session-bound
+path rather than permit legacy assembly to bypass freshness. Concrete current
+evidence acquisition/attribution and a physically approved profile remain future
+gates. Review acceptance grants no production or physical execution permission.
