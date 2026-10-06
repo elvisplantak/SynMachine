@@ -1131,3 +1131,25 @@ startup and unknown-reference Recovery/HOME order remain separate decisions.
 No runtime, protocol, production, firmware-code or physical execution changed.
 Next: obtain acceptance/corrections for the concrete proposal, then record only
 the approved procedure and continue the remaining profile work.
+
+
+### Destination orders accepted; physical checking planned — 2026-10-06
+
+The user explicitly accepted the ten reviewed destination switching orders for
+the demo. This supersedes pending acceptance in the preceding proposal section.
+Firmware `HARDWARE_CONFIRMATIONS.md` records the exact ordered targets and
+stationary-pump/SF/Column/completion constraints. The backend worksheet now
+contains those approved orders, sourced from the user-accepted proposal, with
+startup/Recovery HOME entry and observed dry/wet results still separate. No
+active profile, runtime/protocol change or physical execution was introduced.
+
+The user asked about checking on the machine tomorrow, 2026-10-07. Proposed next
+session: establish actual installed device/contents/readiness with motor power
+off, agree current references/HOME entry, then seek concrete physical-test
+authorization and new motor-power readiness before staged dry valve checks with
+pumps stationary. Dry-air pump checks and small nominal-volume liquid-path checks
+follow only with their own agreed conditions/authorization. The fake browser
+launcher remains hardwired fake. The incomplete profile does not yet enable a
+full autonomous RUN/Recovery/Flush, and full 20 ml ordinary aspiration remains
+blocked by the zero/HOME command boundary. No physical authorization is inferred
+from the planning question or acceptance of destination orders.

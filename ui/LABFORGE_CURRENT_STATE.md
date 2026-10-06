@@ -68,13 +68,17 @@
   deferred. The candidate records these inputs as `DEMO_NOMINAL`. Zero remains
   HOME-only under the current protocol; a nominal 20 ml ordinary aspiration
   from 20500 is currently rejected. No runtime/protocol change was made.
-  Dated dry Waste HOME routes/setup orders are confirmed; safe switching for
-  the actual run/recovery/flush entries remains unconfirmed. The backend
+  Dated dry Waste HOME setups are confirmed; the user subsequently approved
+  the ten proposed demo destination switching orders. Overall startup/Recovery
+  valve HOME entry and observed dry/wet verification remain separate. The backend
   `docs/ADAPTER_PHYSICAL_PROFILE.draft.json` preserves these distinctions and
   fails strict configuration validation while required fields remain null.
   Backend `docs/DEMO_ROUTE_SWITCHING_INVENTORY.md` reconstructs all ten final
-  route targets, actual run/flush/recovery entries and hypothetical test orders;
-  switching proposals are not physical confirmations or active defaults.
+  route targets, actual run/flush/recovery entries and reviewed orders. The
+  destination orders are user-approved for demo, not new observed physical
+  test results or an activated profile. Offline validation accepts all ten
+  route sequences; the whole candidate still fails with 21 missing/invalid
+  inputs. Documentation diff checks pass; no code/build changes.
 - Later documentation-only follow-up: backend `3689c53` records the selected
   nominal pump profile and route inventory; firmware `8551b39` records the
   user decision in `HARDWARE_CONFIRMATIONS.md`. Accepted implementations
@@ -89,15 +93,18 @@
   (12 normal run, six additional flush, six Waste-preparation entries),
   conditional moves and already-reached targets. Logical checking covers
   124 synthetic endpoint combinations, not hydraulic behavior.
-  Ten destination orders are proposed for user acceptance; physical route
-  targets stay null. No added HOME/isolation or runtime/protocol change.
-  Next in this discussion: obtain explicit acceptance/corrections of the
-  concrete orders, then address startup/unknown-reference valve HOME entry
-  separately. A generic continuation instruction is not physical approval.
+  The user explicitly accepted all ten destination orders. Their ordered
+  targets are now recorded in the incomplete candidate, sourced from the
+  accepted proposal/canonical hardware record rather than test fixtures.
+  No new physical test result or added HOME/isolation/runtime/protocol change.
+  Next: prepare staged supervised checking for 2026-10-07, first valves dry
+  with pumps stationary; agree startup/current-reference/HOME entry and actual
+  device/readiness before concrete motion authorization. Full autonomous run
+  remains gated by the incomplete adapter/profile and maintenance inputs.
 - Review outcome: `docs/reviews/2026-10-06-operator-current-input-handoff.md`.
   Next: user-led fake browser verification of the new operator panel if desired,
   then define the physically approved profile and concrete real current-reference
-  acquisition method. Complete route transitions, observation methods,
+  acquisition method. Startup/Recovery HOME entry, observed route verification,
   drain/rinse/tube settings and live provisioning
   remain separate gates. No real device, production, EEPROM, upload or main merge;
   powered physical work requires separate approval and new motor-power readiness.
