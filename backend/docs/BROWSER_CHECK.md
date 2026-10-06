@@ -114,3 +114,48 @@ The launcher's automated tests verify environment
 rejection, complete HTTP execution with wall-clock waits, persistence across
 restart, failure/recovery/flush/new run, lost recovery continuity after restart,
 durable release/new-run permission and refusal to reset/rebind foreign state.
+
+
+## Optional fresh operator-input browser check — 2026-10-06
+
+Append `--operator-confirmations` to the launch command to replace the automatic
+fixture callback with the concrete UI declaration source. Both transport
+factories remain hardwired fakes. Use a separate empty state directory such as
+`/tmp/labforge-operator-browser-check` for an independent check, or retain the same
+marked bundle when deliberately verifying restart. No old bundle is reset.
+
+The launcher prints a new random `FAKE OPERATOR CREDENTIAL (this process only)`
+locally once. Enter that credential in the new panel when initialization/Start
+asks for current input; the configured identity is `browser-check operator`.
+Each request lasts 120 seconds in this fake profile. Input is blank and consent
+unchecked on each new request. Initialization and first Start need separate
+confirmations. These are hypothetical fixture references only:
+
+| UI field | Fake fixture value |
+| --- | --- |
+| P1/P2 raw position | 4100 for each |
+| V1-V8 | 0 degrees for each |
+| Reactor and SF mixers | Stopped |
+| SF bottom valve | Closed |
+| Column reference | HOME (0) |
+| Manually aligned carousel | 40 |
+| Evidence | An explicit note describing this new fake-only attempt |
+
+Never enter these fixture values as observations of a physical machine. A
+recovery request intentionally leaves pumps/valves/Column/SF unknown; supply only
+fresh stopped-Reactor/manual carousel-40 input in that panel, along with the
+existing per-attempt recovery readiness form. After recovery, deliberate mandatory
+flushing must still reach durable READY/release before a new run.
+
+Try missing/wrong credential, Cancel, Stop while waiting, expiration, partial
+RUN references and an explicit retry. No actuator commands may precede valid
+complete RUN input. Declaration acknowledgement is distinct from execution
+completion. Reload/navigation performs reads only; it cannot submit input.
+Restart rotates this fake credential, drops pending requests, preserves journal
+and ownership, and requires fresh recovery input when continuity was lost.
+
+Automated HTTP/source tests cover these boundaries, including shutdown during
+initialization and old request/credential rejection after restart. UI fake-API
+browser tests cover blank forms, credential clearing, per-request consent,
+unknown recovery references, cancellation/expiration and read-only restoration.
+These new interactions have not yet been manually checked by the user.

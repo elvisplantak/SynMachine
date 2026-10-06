@@ -21,7 +21,7 @@ from app.demo.maintenance_plan import MaintenanceKind, MaintenancePlan
 from app.demo.operation_models import SymbolicRouteId
 from app.hardware.arduino_serial import ArduinoSerialConfiguration
 from app.hardware.command_planning import (
-    CommandPlanningContext, PlanningModel, PumpPlanningState, RouteSequence, ValveTarget,
+    CommandPlanningContext, CurrentInputAttribution, PlanningModel, PumpPlanningState, RouteSequence, ValveTarget,
 )
 from app.hardware.execution_timer import MonotonicExecutionTimer
 from app.hardware.sf_bottom_valve import SfBottomValveConfiguration
@@ -182,6 +182,11 @@ class AdapterCurrentContextProvider:
         self._identity = None
         self._capabilities = None
 
+    @property
+    def operator_input_source(self):
+        from app.hardware.operator_current_input import OperatorCurrentInput
+        return self._callback if type(self._callback) is OperatorCurrentInput else None
+
     @staticmethod
     def _connection(arduino):
         if not arduino.connected or arduino.controller_boot_id is None:
@@ -254,6 +259,14 @@ class AdapterCurrentContextProvider:
                 raise SimulationBlocked("new run requires complete independently established current references")
         elif state.carousel_position != self.configuration.recovery_plan.recovery.carousel_position:
             raise SimulationBlocked("current manual alignment differs from recovery plan")
+        if self.operator_input_source is not None:
+            # Stored with existing plan assumptions as history only. Restart or
+            # later execution must never treat this receipt as fresh readiness.
+            context = context.model_copy(update={"current_input_attribution": CurrentInputAttribution(
+                request_id=request.request_id, purpose=purpose, operator=state.operator,
+                evidence_note=state.evidence_note, observed_at_monotonic=state.observed_at_monotonic,
+                attribution_method="OPERATOR_CREDENTIAL",
+            )})
         return context, state.sf_mixer_running
 
 
@@ -276,6 +289,9 @@ def build_configured_adapter_application_execution(
         raise TypeError("explicit transport factories are required for preparation")
     provider = AdapterCurrentContextProvider(configuration, current_state_provider, clock=context_clock)
     configuration = provider.configuration
+    source = provider.operator_input_source
+    if source is not None and source.clock is not context_clock:
+        raise ValueError("operator source and configured provider must share the monotonic clock")
     return build_adapter_application_execution(
         bundle, configuration.arduino.adapter_configuration(), configuration.sf.adapter_configuration(),
         configuration.calibrations, current_context_provider=provider,

@@ -476,3 +476,39 @@ def test_incompatible_table_rejected_without_repair(tmp_path):
     assert path.read_bytes() == before
     with sqlite3.connect(path) as db:
         assert db.execute("SELECT * FROM prepared_command_plans").fetchall() == [("existing",)]
+
+
+def test_pre_attribution_canonical_record_loads_without_migration_or_rewrite(tmp_path):
+    path = tmp_path / "legacy-plan.db"
+    ctx = context()
+    with SQLiteCommandPlanStore(path) as store:
+        saved = store.persist(source(), ctx).plan
+    with sqlite3.connect(path) as db:
+        payload, digest = db.execute(
+            "SELECT payload_json, payload_sha256 FROM prepared_command_plans"
+        ).fetchone()
+    assert "current_input_attribution" not in json.loads(payload)["prepared"]["assumptions"]
+    assert hashlib.sha256(payload.encode()).hexdigest() == digest
+    before = path.read_bytes()
+    with SQLiteCommandPlanStore(path) as store:
+        assert store.load(ctx.phase_execution_id) == saved
+        assert store.load(ctx.phase_execution_id).prepared.assumptions.current_input_attribution is None
+        assert not store.persist(source(), ctx).created
+    assert path.read_bytes() == before
+
+
+def test_explicit_null_attribution_does_not_relax_canonical_record_integrity(tmp_path):
+    path = tmp_path / "noncanonical-plan.db"
+    ctx = context()
+    with SQLiteCommandPlanStore(path) as store:
+        store.persist(source(), ctx)
+    with sqlite3.connect(path) as db:
+        payload = json.loads(db.execute("SELECT payload_json FROM prepared_command_plans").fetchone()[0])
+        payload["prepared"]["assumptions"]["current_input_attribution"] = None
+        modified = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        db.execute("UPDATE prepared_command_plans SET payload_json = ?, payload_sha256 = ?",
+                   (modified, hashlib.sha256(modified.encode()).hexdigest()))
+    before = path.read_bytes()
+    with SQLiteCommandPlanStore(path) as store, pytest.raises(PlanIntegrityError):
+        store.load(ctx.phase_execution_id)
+    assert path.read_bytes() == before

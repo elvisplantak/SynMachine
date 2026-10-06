@@ -61,7 +61,7 @@ def load_bundle(directory):
     return OfflineDatabaseBundle(paths[0], identities[0], paths[1], identities[1], paths[2], identities[2])
 
 
-def build_profile(directory, *, command_delay=0.15, fault_command=None):
+def build_profile(directory, *, command_delay=0.15, fault_command=None, operator_credential=None):
     require_fake_environment()
     if not math.isfinite(command_delay) or not 0 <= command_delay <= 1:
         raise ValueError("fake command delay must be finite and in 0..1 seconds")
@@ -81,6 +81,10 @@ def build_profile(directory, *, command_delay=0.15, fault_command=None):
     from tests.test_prepared_adapter_execution import FollowingSession
     from tests.test_sf_bottom_valve import configuration
 
+    operator_source = None
+    if operator_credential is not None:
+        from app.hardware.operator_current_input import OperatorCurrentInput
+        operator_source = OperatorCurrentInput(operator="browser-check operator", credential=operator_credential)
     bundle = load_bundle(directory)
 
     def port_factory(_):
@@ -107,14 +111,27 @@ def build_profile(directory, *, command_delay=0.15, fault_command=None):
             raise ValueError("fake browser fixture boot mismatch")
         return fixture
 
-    execution = build_adapter_application_execution(
-        bundle, ArduinoSerialConfiguration(port="browser-check-fake-arduino"),
-        configuration(port="browser-check-fake-sf"), plan(MaintenanceKind.RECOVERY).calibrations,
-        context_factory=current_context, sf_mixer_running=False, column_readiness=READINESS,
-        recovery_plan=plan(MaintenanceKind.RECOVERY), flush_plan=plan(MaintenanceKind.FLUSH),
-        arduino_port_factory=port_factory, arduino_sleep=lambda _: None,
-        sf_session_factory=sf_factory, sf_sleep=lambda _: None,
-    )
+    if operator_source is None:
+        execution = build_adapter_application_execution(
+            bundle, ArduinoSerialConfiguration(port="browser-check-fake-arduino"),
+            configuration(port="browser-check-fake-sf"), plan(MaintenanceKind.RECOVERY).calibrations,
+            context_factory=current_context, sf_mixer_running=False, column_readiness=READINESS,
+            recovery_plan=plan(MaintenanceKind.RECOVERY), flush_plan=plan(MaintenanceKind.FLUSH),
+            arduino_port_factory=port_factory, arduino_sleep=lambda _: None,
+            sf_session_factory=sf_factory, sf_sleep=lambda _: None,
+        )
+    else:
+        from app.hardware.adapter_configuration import build_configured_adapter_application_execution
+        from tests.test_adapter_configuration import profile
+        settings = profile().model_copy(update={
+            "current_context_timeout_seconds": 120.0,
+            "arduino": profile().arduino.model_copy(update={"command_timeout_seconds": 30.0}),
+        })
+        execution = build_configured_adapter_application_execution(
+            bundle, settings, current_state_provider=operator_source,
+            context_clock=operator_source.clock, arduino_port_factory=port_factory,
+            sf_session_factory=sf_factory, arduino_sleep=lambda _: None, sf_sleep=lambda _: None,
+        )
     return create_app(application_execution=execution), execution
 
 
@@ -124,16 +141,21 @@ def main(argv=None):
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--command-delay", type=float, default=0.15)
     parser.add_argument("--fault-command", type=int)
+    parser.add_argument("--operator-confirmations", action="store_true")
     args = parser.parse_args(argv)
     if not 1 <= args.port <= 65535:
         parser.error("port must be in 1..65535")
+    from secrets import token_urlsafe
+    credential = token_urlsafe(32) if args.operator_confirmations else None
     try:
         app, _ = build_profile(args.state_dir, command_delay=args.command_delay,
-            fault_command=args.fault_command)
+            fault_command=args.fault_command, operator_credential=credential)
     except (ValueError, OSError, json.JSONDecodeError) as error:
         parser.error(str(error))
     import uvicorn
     print(f"FAKE TRANSPORTS ONLY | state={args.state_dir.absolute()} | pid={os.getpid()}", flush=True)
+    if credential is not None:
+        print(f"FAKE OPERATOR CREDENTIAL (this process only): {credential}", flush=True)
     uvicorn.run(app, host="127.0.0.1", port=args.port, workers=1)
 
 

@@ -102,11 +102,14 @@ leak-tightness or effective cleaning. Existing fresh bracketing observations rem
 the non-actuating preflight under the shared owner; this provider does not duplicate
 them or extend the firmware protocol.
 
-The typed callback is the boundary for an independently established current-input
-source. It does not implement a concrete live operator workflow, acquire missing
-actuator references, or authenticate evidence. A caller that relabels old values
-with a new request/time can lie; no software envelope proves physical truth.
-Real input acquisition and authorization must be defined before live activation.
+The typed callback remains the boundary for independently established current
+input. The subsequent `OperatorCurrentInput` source provides fresh credential-
+attributed UI declarations on this existing path; see `OPERATOR_CURRENT_INPUT.md`.
+It does not acquire missing actuator references or authenticate physical truth.
+An operator can still misstate observations; no software envelope proves them.
+The non-activatable worksheet `ADAPTER_PHYSICAL_PROFILE.draft.json` leaves all
+unconfirmed live inputs null. Independent observation methods, physical profile
+verification and live authorization remain gates.
 
 ## Physical confirmation matrix
 
@@ -116,9 +119,9 @@ not current references; the current checkpoint overrides older V7/V8 fault/mappi
 
 | Input | Existing confirmed level | Still required for live configuration/use |
 | --- | --- | --- |
-| Tubing and valve targets | Physical tubing graph and nominal valve semantics documented | Physically verified routes, leak-tightness and safe switching sequence for each applicable path; static targets alone do not provide that sequence |
+| Tubing and valve targets | Physical tubing graph/nominal valve semantics plus dated dry P1/P2 Waste HOME routes and setup order documented | Complete safe transitions between run/recovery/flush routes, applicable wet routing and leak-tightness; dated dry setups do not establish every transition |
 | V7/V8 | Repair and supervised dry HOME/90-degree production-path regression closed | New current-session references; historical boot-71 positions cannot be reused |
-| P1/P2 | Common orientation, separate aspiration/dispense, supervised dry Service paths; nominal demo mapping accepted | Working full/empty margins, precise wet calibration where required, and verified route readiness before HOME/movement |
+| P1/P2 | Common orientation, HOME coordinate 0, approved maximum coordinate 20500, separate aspiration/dispense, supervised dry Service paths; nominal demo mapping accepted | Working full/empty margins, precise wet calibration where required, and verified route readiness before HOME/movement |
 | Pump nominal mapping | 1025 steps/ml accepted for the supervised colored-liquid demo | It is not measured volume, dead-volume compensation or a working-margin decision; do not silently label it WORKING_VERIFIED |
 | SF bottom valve | XL430/U2D2 identity, commissioned raw positions and fixed profile documented | Current register observation, unchanged coupling/calibration, leak/route verification and physical authorization |
 | Column bottom valve | Reassembled HOME/CLOSED/OPEN control path documented | Current reference, fluidic behavior, suitable measured drain duration and relevant remaining thermal confirmation |
@@ -139,8 +142,8 @@ partial state, connection/capability changes, complete runs with retained contin
 unknown-state recovery, failed recovery input, transport fault/restart with preserved
 journal and owner, mandatory flush, and a new completed run.
 
-The next decision is how to acquire and attribute real current references and
-which demo/working configuration is physically approved. This preparation does
+The next physical decision is how to establish actual current raw references
+and which demo/working configuration is physically approved. This preparation does
 not authorize live startup, EEPROM changes, firmware upload, physical recovery,
 physical flushing, unattended execution or a main merge. Flow animation remains
 deferred by the user.

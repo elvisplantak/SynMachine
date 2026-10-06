@@ -157,3 +157,32 @@ def test_changed_marker_cannot_rebind_database_identity(tmp_path):
         execution.start(NOW)
     assert bundle.ownership_path.read_bytes() == before
     assert inspect_owned_startup(bundle).owner_id is None
+
+
+def test_operator_browser_profile_uses_only_fake_transports_and_fresh_challenge(tmp_path):
+    from tests.test_operator_current_input import CREDENTIAL, challenge, declare
+
+    app, _ = build_profile(tmp_path, command_delay=0, operator_credential=CREDENTIAL)
+    with ApiClient(app, lifespan="on") as client:
+        status = client.get(PREFIX + "/execution").json()
+        assert status["operator_current_input_configured"] and status["current_input"] is None
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor() as pool:
+            initializing = pool.submit(client.post, PREFIX + "/machine/initialize", json=COMMAND)
+            initial = challenge(client)
+            assert declare(client, initial).status_code == 200
+            assert initializing.result(2).json()["state"] == "READY"
+        start(client)
+        current = challenge(client)
+        assert current["request_id"] != initial["request_id"]
+        assert current["operator"] == "browser-check operator"
+        assert declare(client, current).status_code == 200
+        assert wait_idle(client)["error"] is None
+        assert client.get(PREFIX + "/runs/browser-run").json()["status"] == "COMPLETED"
+
+
+def test_invalid_operator_credential_never_provisions_browser_bundle(tmp_path):
+    directory = tmp_path / "state"
+    with pytest.raises(ValueError, match="credential"):
+        build_profile(directory, operator_credential="short")
+    assert not directory.exists()

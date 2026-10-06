@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Literal, Protocol
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -23,6 +23,7 @@ from app.demo.events import DomainEvent
 from app.demo.machine_events import MachineEvent
 from app.demo.maintenance_plan import MaintenanceKind
 from app.hardware.owned_maintenance import MaintenanceReadiness
+from app.hardware.operator_current_input import OperatorCredentialRejected, OperatorReferenceInput
 from app.hardware.owned_application_execution import OwnedApplicationExecution, ExecutionAccepted
 from app.hardware.simulated_p1_runner import SimulationBlocked
 from app.hardware.runtime_configuration import (
@@ -319,6 +320,32 @@ def create_app(
         if application_execution is None:
             raise HTTPException(status_code=503, detail="owned application execution is not configured")
         return application_execution.status()
+
+    def operator_credential(authorization):
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Operator authorization required")
+        return authorization[7:]
+
+    @application.post(f"{API_PREFIX}/execution/current-input/{{request_id}}")
+    def submit_current_input(request_id: str, references: OperatorReferenceInput,
+                             authorization: Annotated[str | None, Header()] = None):
+        if application_execution is None:
+            raise HTTPException(status_code=503, detail="owned application execution is not configured")
+        try:
+            return application_execution.submit_current_input(
+                request_id, references, operator_credential(authorization)
+            )
+        except OperatorCredentialRejected as error:
+            raise HTTPException(status_code=401, detail=str(error)) from None
+
+    @application.post(f"{API_PREFIX}/execution/current-input/{{request_id}}/cancel")
+    def cancel_current_input(request_id: str, authorization: Annotated[str | None, Header()] = None):
+        if application_execution is None:
+            raise HTTPException(status_code=503, detail="owned application execution is not configured")
+        try:
+            return application_execution.cancel_current_input(request_id, operator_credential(authorization))
+        except OperatorCredentialRejected as error:
+            raise HTTPException(status_code=401, detail=str(error)) from None
 
     @application.exception_handler(HardwareCommandError)
     async def handle_hardware_command_error(

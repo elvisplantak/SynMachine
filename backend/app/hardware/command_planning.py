@@ -126,6 +126,17 @@ class PumpPlanningState(PlanningModel):
         return self
 
 
+class CurrentInputAttribution(PlanningModel):
+    """Historical declaration receipt, never a reference or execution permit."""
+
+    request_id: Annotated[str, Field(strict=True, min_length=1)]
+    purpose: Literal["RUN", "RECOVERY"]
+    operator: Annotated[str, Field(strict=True, min_length=1)]
+    evidence_note: Annotated[str, Field(strict=True, min_length=1, max_length=2000)]
+    observed_at_monotonic: Annotated[float, Field(strict=True, allow_inf_nan=False)]
+    attribution_method: Literal["OPERATOR_CREDENTIAL"]
+
+
 class CommandPlanningContext(PlanningModel):
     phase_execution_id: PhaseExecutionId
     # Conservative planning boundary: exclude the boot-counter exhaustion value.
@@ -136,6 +147,10 @@ class CommandPlanningContext(PlanningModel):
     reactor_mixer_running: StrictBool | None = None
     sf_bottom_valve: BottomValveState | None = None
     column_position_degrees: StrictInt | None = None
+    # Preserve the canonical representation of pre-attribution plan records.
+    current_input_attribution: CurrentInputAttribution | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
     # Physical tube aligned for fraction 1; never assumed to be tube 1.
     carousel_position: Annotated[StrictInt, Field(ge=1, le=40)] | None = None
 

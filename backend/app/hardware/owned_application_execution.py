@@ -23,6 +23,7 @@ from app.demo.run_models import RunStatus
 from app.hardware.owned_offline_runtime import OwnedOfflineRuntime
 from app.hardware.simulated_lifecycle import SimulationLifecycleStore
 from app.hardware.simulated_p1_runner import SimulationBlocked
+from app.hardware.operator_current_input import OperatorCurrentInput, OperatorInputChallenge
 from app.hardware.sequence_ownership import OwnershipBlocked
 from app.startup_bootstrap import ProcessStartupDisposition, ProcessStartupResult
 from app.persistence.sqlite_store import PersistenceError
@@ -45,6 +46,8 @@ class ApplicationExecutionStatus(BaseModel):
     retained_owner_id: str | None
     run_id: str | None
     automatic_resume_allowed: bool = False
+    current_input: OperatorInputChallenge | None = None
+    operator_current_input_configured: bool = False
 
 
 class OwnedApplicationExecution:
@@ -56,12 +59,16 @@ class OwnedApplicationExecution:
     """
 
     def __init__(self, bundle, device_factory, calibrations, *, timer_factory,
-                 column_readiness=None, recovery_plan=None, flush_plan=None):
+                 column_readiness=None, recovery_plan=None, flush_plan=None,
+                 operator_input_source=None):
         if not callable(device_factory) or not callable(timer_factory):
             raise TypeError("explicit device and timer factories are required")
         for plan, kind in ((recovery_plan, MaintenanceKind.RECOVERY), (flush_plan, MaintenanceKind.FLUSH)):
             if plan is not None and (plan.kind is not kind or plan.calibrations != calibrations):
                 raise ValueError("maintenance plan kind/calibration differs from application inputs")
+        if operator_input_source is not None and type(operator_input_source) is not OperatorCurrentInput:
+            raise TypeError("explicit operator current-input source required")
+        self._operator_input_source = operator_input_source
         self.bundle = bundle
         self._device_factory = device_factory
         self._timer_factory = timer_factory
@@ -168,7 +175,24 @@ class OwnedApplicationExecution:
                 busy=self._busy, executing=self._executing, operation=self._operation,
                 error=self._error, retained_owner_id=self._owner_id,
                 run_id=self._run_id,
+                operator_current_input_configured=self._operator_input_source is not None,
+                current_input=(None if self._operator_input_source is None
+                               else self._operator_input_source.pending()),
             )
+
+    def submit_current_input(self, request_id, references, credential):
+        with self._lock:
+            self._check()
+            if self._operator_input_source is None:
+                raise SimulationBlocked("operator current input is not configured")
+            return self._operator_input_source.submit(request_id, references, credential=credential)
+
+    def cancel_current_input(self, request_id, credential):
+        with self._lock:
+            self._check()
+            if self._operator_input_source is None:
+                raise SimulationBlocked("operator current input is not configured")
+            return self._operator_input_source.cancel(request_id, credential=credential)
 
     def _idle(self, callback):
         with self._lock:
@@ -299,12 +323,16 @@ class OwnedApplicationExecution:
                 raise SimulationBlocked("Stop requires the current executing operation")
             if self._operation.action != "RUN":
                 self._maintenance_stop.set()
+                if self._operator_input_source is not None:
+                    self._operator_input_source.cancel_pending()
                 return self._operation
             try:
                 with self.store(read_only=False) as store:
                     run = store.load_demo_run(run_id)
                     if run is not None and run.status is RunStatus.CREATED:
                         self._run_stop_at = occurred_at
+                        if self._operator_input_source is not None:
+                            self._operator_input_source.cancel_pending()
                         return self._operation
                     return GuidedDemoApplicationService(store).request_stop_demo(run_id, occurred_at)
             except (PersistenceError, sqlite3.Error) as error:
@@ -361,6 +389,8 @@ class OwnedApplicationExecution:
                     # A finished run or failed persistence is not force-aborted.
                     # Outstanding work still retains its existing durable owner.
                     pass
+            if self._operator_input_source is not None:
+                self._operator_input_source.close()
             self._closing = True
         try:
             self._pool.submit(self._runtime.close).result()

@@ -112,14 +112,17 @@ class ApiClient:
     def get(self, path: str) -> ApiResponse:
         return self._request("GET", path, None)
 
-    def post(self, path: str, *, json: dict[str, Any]) -> ApiResponse:
-        return self._request("POST", path, json)
+    def post(self, path: str, *, json: dict[str, Any] | None = None,
+             headers: dict[str, str] | None = None) -> ApiResponse:
+        return self._request("POST", path, json, headers)
 
     def _request(
-        self, method: str, path: str, json: dict[str, Any] | None
+        self, method: str, path: str, json: dict[str, Any] | None,
+        extra_headers: dict[str, str] | None = None,
     ) -> ApiResponse:
         request_body = dumps(json).encode() if json is not None else b""
         headers = {"Content-Type": "application/json"} if json is not None else {}
+        headers.update(extra_headers or {})
         request = Request(
             f"{self._base_url}{path}", data=request_body or None, headers=headers, method=method
         )

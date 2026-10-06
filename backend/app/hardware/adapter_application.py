@@ -92,4 +92,6 @@ def build_adapter_application_execution(
         bundle, device_resources, calibrations, timer_factory=timer_factory,
         column_readiness=column_readiness, recovery_plan=recovery_plan,
         flush_plan=flush_plan,
+        operator_input_source=(None if current_context_provider is None
+                               else current_context_provider.operator_input_source),
     )

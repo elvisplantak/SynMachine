@@ -244,6 +244,11 @@ class SQLiteCommandPlanStore:
         # instances. Unknown nested fields must not disappear from provenance.
         source_data = _model_data(source)
         context_data = _model_data(context)
+        # Optional historical metadata is absent in existing schema-1 records.
+        # Only its empty value is omitted; all actual input remains validated
+        # and compared exactly before any persistence or command dispatch.
+        if context_data.get("current_input_attribution") is None:
+            context_data.pop("current_input_attribution", None)
         source = PlanSource.model_validate(source_data)
         context = CommandPlanningContext.model_validate(context_data)
         source_json = _canonical(source_data)
