@@ -729,6 +729,29 @@ precision calibration, measured delivered-volume claim, dead-volume correction,
 repeatability result, or production working-margin decision. Precise P1/P2
 calibration remains deferred for the real machine.
 
+### User-selected nominal demo pump range — 2026-10-06
+
+For the supervised demo, the user explicitly selected the following for both
+P1 and P2, citing the previously successful pumping tests:
+
+- working full-chamber coordinate: `0` steps;
+- working empty-chamber coordinate: `20500` steps;
+- additional endpoint reserve: none;
+- nominal working volume: `20 ml`, retaining the existing `1025 steps/ml` mapping;
+- precise measured-volume calibration: deferred for this demo.
+
+This resolves the earlier pending working-margin choice for `DEMO_NOMINAL`
+use only. It is a user-selected demo policy, not a new measurement, precision
+calibration, production working-range validation or physical-execution approval.
+The common aspiration/dispense orientation and existing mechanical evidence
+remain unchanged.
+
+The current communication contract still permits ordinary absolute pump targets
+only in `1..20500`; reaching zero requires `PUMP_HOME`. The backend planner
+currently rejects an ordinary aspiration that would end at zero, including a
+nominal 20 ml stroke from 20500. This record does not alter that contract or
+authorize replacing a volume transfer with HOME.
+
 ### Accepted demo-only P1/P2 homing assumption — 2026-08-10
 
 The user confirmed that P1/P2 have no independent end sensor, second limit,
@@ -1053,7 +1076,9 @@ a manufacturer-limit validation.
 - `20500` remains a recovered software travel value and approximate endpoint, not a validated volume calibration.
 - `1025 steps/ml` is accepted only as the nominal supervised-demo conversion;
   precise experimental `steps/ml` calibration remains pending.
-- Working full and working empty margins remain pending experimental calibration.
+- Precise production working full/empty margins remain pending experimental
+  calibration. For the supervised nominal demo only, the 2026-10-06 user
+  decision above selects 0 and 20500 with no additional endpoint reserve.
 - No validated aspiration or dispense volume accuracy is documented yet.
 - No validated physical speed range exists yet.
 - No acceleration ramp or stall detection is currently confirmed.
