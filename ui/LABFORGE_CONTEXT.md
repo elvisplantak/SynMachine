@@ -1107,3 +1107,27 @@ Backend `docs/DEMO_ROUTE_SWITCHING_INVENTORY.md` reconstructs all ten target set
 run/flush/recovery entries and existing hypothetical test orders. These orders
 can be discussed logically but remain unconfirmed for physical use; known dry
 Waste setup orders are separately retained. No real device was opened or moved.
+
+
+### Valve transition proposal and confirmed connection behavior — 2026-10-06
+
+The user approved preparing concrete valve switching procedures and then
+explicitly confirmed that V1-V8 interrupt the old connection before the new one
+opens during 90/180 switching. Firmware `HARDWARE_CONFIRMATIONS.md` records that
+physical fact; no measured timing/sealing/pressure evidence is inferred.
+
+Backend `docs/DEMO_ROUTE_SWITCHING_INVENTORY.md` now distinguishes 24 route-history
+cases and no-op/conditional moves, with three detailed examples. A local logical
+check covered 124 synthetic endpoint combinations and all ten destination
+target/order sets; this is not hydraulic validation. Existing hypothetical
+destination orders are proposed for the stationary-pump demo procedure, keeping
+the existing SF/Column closure and completion checks. V3 may remain connected
+while V7/V8 change; the nearest-pump-last rationale does not provide automatic
+isolation when that valve is already at target.
+
+The user has not yet accepted those complete orders. All physical candidate
+route targets and the combined ordered/HOME confirmation remain unset. Fresh
+startup and unknown-reference Recovery/HOME order remain separate decisions.
+No runtime, protocol, production, firmware-code or physical execution changed.
+Next: obtain acceptance/corrections for the concrete proposal, then record only
+the approved procedure and continue the remaining profile work.

@@ -82,6 +82,18 @@
   orders were checked against source; the nominal pump values validate and
   the incomplete candidate still fails strict configuration validation
   (31 missing/invalid inputs). Diff checks pass; no code/build/test change.
+- Valve switching discussion: the user confirmed on 2026-10-06 that V1-V8
+  interrupt the old connection before opening the new one in 90/180 changes.
+  This fact is recorded in firmware `HARDWARE_CONFIRMATIONS.md` and the
+  backend worksheet. The inventory now separates 24 route-history cases
+  (12 normal run, six additional flush, six Waste-preparation entries),
+  conditional moves and already-reached targets. Logical checking covers
+  124 synthetic endpoint combinations, not hydraulic behavior.
+  Ten destination orders are proposed for user acceptance; physical route
+  targets stay null. No added HOME/isolation or runtime/protocol change.
+  Next in this discussion: obtain explicit acceptance/corrections of the
+  concrete orders, then address startup/unknown-reference valve HOME entry
+  separately. A generic continuation instruction is not physical approval.
 - Review outcome: `docs/reviews/2026-10-06-operator-current-input-handoff.md`.
   Next: user-led fake browser verification of the new operator panel if desired,
   then define the physically approved profile and concrete real current-reference
