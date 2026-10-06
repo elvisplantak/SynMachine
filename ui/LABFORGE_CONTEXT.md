@@ -1044,3 +1044,38 @@ provider rather than allow legacy assembly to bypass freshness. That is a future
 integration gate, not a defect in this accepted preparation checkpoint.
 Live configuration, physical readiness and execution remain separately gated;
 flow animation remains deferred.
+
+
+### Fresh operator current input through the existing UI — 2026-10-06
+
+The user approved this concrete input source and chose the existing UI. Backend
+`1c0e906` and UI implementation `7e36cf7` on `codex/operator-current-input`
+connect a bounded, credential-attributed, single-use operator declaration to the
+existing configured provider/owned executor. Initialization/first Start obtain
+separate fresh references. Unknown RUN data blocks before commands; recovery can
+retain unknown actuator references while requiring fresh stopped Reactor/manual
+alignment and existing maintenance readiness. Ownership remains through mandatory
+flushing and completed same-session command continuity serves later phases/runs.
+
+UI credentials/consent/references are never restored or automatically submitted.
+Stop/Cancel/timeout/shutdown unblock waiting input; restart invalidates request
+identity and cannot promote a historical declaration receipt into readiness.
+Receipt metadata stays in existing plan assumptions without secrets or migration;
+old canonical records remain readable. The narrow declaration credential does
+not establish general API authentication or physical truth. Production composition,
+credential provisioning and actual reference acquisition remain gated.
+
+All 1858 backend tests and 26 UI tests pass; Ruff, UI lint/build and diff checks
+pass, using fake transports/intercepted APIs only. Optional fake launcher flag
+`--operator-confirmations` permits manual browser checking with a random
+process-local credential. This connected checkpoint needs consolidated review;
+last independently accepted backend remains `36d6046` for its earlier scope.
+
+Existing P1/P2 step coordinates (HOME 0, approved maximum 20500) and demo-only
+1025 steps/ml remain confirmed. Working margins are explicitly recorded as
+"jos nije potvrdjeno". Dated dry Waste HOME routes/setup orders also exist;
+complete safe switching between every process route is still unconfirmed.
+The incomplete physical worksheet preserves known facts separately from null
+candidate inputs and cannot activate hardware. No real port, production, upload,
+EEPROM, main merge or flow animation is added. Further physical work requires
+separate approval and fresh readiness. Backend details: `docs/OPERATOR_CURRENT_INPUT.md`.

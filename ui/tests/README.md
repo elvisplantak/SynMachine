@@ -16,3 +16,11 @@ Cases exercise actual React/DOM navigation, scrolling, page reload/fresh mounts,
 retained recovery/flush states, failed/timed-out reads, connected percentage labels,
 SF duration input, and the explicit execution-control request sequence. They do
 not establish backend policy, physical readiness or device behavior.
+
+
+Fresh operator cases additionally cover blank RUN/recovery forms, credential
+clearing on success/error, explicit per-request consent, unknown recovery
+references, cancellation/expiration and read-only restoration. A RUN retry keeps
+the existing CREATED run ID and sends exactly one explicit Start and one
+declaration, with no new run or automatic command replay. Backend tests remain
+the authority for actual eligibility, ownership and durable command behavior.

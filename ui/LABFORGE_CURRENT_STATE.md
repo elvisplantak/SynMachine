@@ -1,12 +1,75 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-10-06
-- Development phase: explicit adapter/current-context software preparation complete;
-  fake-only verification and independent review accepted; live activation remains gated
+- Development phase: fresh operator current-input software complete;
+  consolidated independent review pending; physical profile incomplete and live activation gated
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — explicit adapter/current-context preparation
+## Current checkpoint — fresh operator current input through the UI
+
+- Both active worktrees (`labforge-backend-multiphase`, `labforge-ui-multiphase`)
+  are on `codex/operator-current-input`. Backend implementation HEAD:
+  `1c0e906ac2ad440ea741032192c29a67ab771739`, based on independently accepted
+  `36d6046a10361bf7bdb5db7f440075573e9d2b41`. UI implementation HEAD:
+  `7e36cf7b6518c08c514aa2e151b18f31ac888cb3`, based on
+  `b2f00dfe8bf3a9a92ef09f71b174a14392576a70`. The final UI checkpoint adds
+  documentation only over that implementation HEAD. Feature branches are pushed;
+  these new changes are not yet independently accepted. Last accepted backend
+  remains `36d6046` for its exact earlier fake-only preparation scope.
+- The user approved the concrete current-input source and selected the existing
+  UI for fresh declarations. After an accidental workspace-write rejection,
+  the user explicitly reapproved additional UI regression/final verification.
+  `OperatorCurrentInput` now provides a bounded, single-use request on the
+  existing configured provider/owned worker, with explicit operator credential,
+  server-stamped identity/time and unchanged session/eligibility checks.
+  Initialization and first Start require separate fresh input; missing references
+  block before RUNNING or actuator commands. Partial input can be received but
+  cannot waive readiness. An explicit retry keeps the original CREATED run.
+- Existing execution status exposes the pending challenge; two narrowly scoped
+  declaration/cancellation POSTs do not add a diagnostic layer or execution
+  worker. The credential authenticates an operator statement only, not physical
+  truth or other execution/Service API actions. Default production startup is
+  unchanged and no live credential/profile is provided.
+- The UI starts blank with fresh consent, clears credentials before every send
+  including errors, and stores none in browser storage/URLs/bodies. Reload and
+  restoration are reads only. Timeout, Stop, Cancel and shutdown end waiting
+  input; old/duplicate/foreign requests and old fake-process credentials are
+  rejected. Recovery permits other actuator references to remain unknown while
+  requiring stopped Reactor/manual carousel plus existing maintenance readiness.
+  Mandatory flushing retains ownership until durable READY/release; successful
+  same-session command continuity remains the basis for subsequent phases/runs.
+- Historical attribution is stored with existing prepared-plan assumptions,
+  without secrets or SQL migration. It cannot establish fresh readiness after
+  restart. Old canonical schema-1 records remain readable without rewriting;
+  exact derivation/canonical/SHA checks remain enforced.
+- Verification: full backend **1858 tests** passed (111.43 s), Ruff and diff
+  checks passed. New coverage: 28 operator-source/HTTP, two browser-profile and
+  two canonical-plan compatibility cases. Full UI **26 tests** passed (15 API,
+  11 isolated fake-API browser; zero skipped), lint/build/diff checks passed.
+  JS 313.51 kB (86.31 kB gzip), CSS 50.08 kB (9.94 kB gzip). Backend delta:
+  16 files +1100/-25; UI implementation: six files +316/-3. No dependency,
+  firmware or SQL schema change; firmware build/resource reporting does not apply.
+- Optional fake-only launcher flag: `--operator-confirmations`. It generates a
+  new credential per process and retains only the marked test bundle across
+  restart. Both transports remain hardwired fakes; no real SDK/serial port opens.
+  Instructions: backend `docs/OPERATOR_CURRENT_INPUT.md` and `docs/BROWSER_CHECK.md`.
+- Physical clarification: P1/P2 positions are stepper steps. HOME 0, approved
+  maximum 20500 and demo-only 1025 steps/ml are already recorded. Working margins
+  remain explicitly **"jos nije potvrdjeno"**, with no candidate values invented.
+  Dated dry Waste HOME routes/setup orders are confirmed; complete transitions
+  between every run/recovery/flush route remain unconfirmed. The backend
+  `docs/ADAPTER_PHYSICAL_PROFILE.draft.json` preserves these distinctions and
+  fails strict configuration validation while required fields remain null.
+- Next: consolidated review using
+  `docs/reviews/2026-10-06-operator-current-input-handoff.md`, then user-led
+  fake browser verification if desired. Physical working margins, complete route
+  transitions, observation methods, drain/rinse/tube settings and live provisioning
+  remain separate gates. No real device, production, EEPROM, upload or main merge;
+  powered physical work requires separate approval and new motor-power readiness.
+  Flow animation remains deferred.
+
+## Previous checkpoint — explicit adapter/current-context preparation
 
 - Active worktrees remain `labforge-backend-multiphase` and
   `labforge-ui-multiphase`; feature branch `codex/adapter-current-context-preparation`.
