@@ -44,43 +44,157 @@
     "route_sequences": [
       {
         "route_id": "P1_TO_WASTE",
-        "targets": null
+        "targets": [
+          {
+            "valve": "V2",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V1",
+            "position_degrees": 180
+          }
+        ]
       },
       {
         "route_id": "P2_TO_WASTE",
-        "targets": null
+        "targets": [
+          {
+            "valve": "V5",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V8",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V7",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V3",
+            "position_degrees": 180
+          }
+        ]
       },
       {
         "route_id": "S_TO_P1",
-        "targets": null
+        "targets": [
+          {
+            "valve": "V6",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V1",
+            "position_degrees": 90
+          }
+        ]
       },
       {
         "route_id": "B1_TO_P1",
-        "targets": null
+        "targets": [
+          {
+            "valve": "V4",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V6",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V1",
+            "position_degrees": 90
+          }
+        ]
       },
       {
         "route_id": "B2_TO_P1",
-        "targets": null
+        "targets": [
+          {
+            "valve": "V4",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V6",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V1",
+            "position_degrees": 90
+          }
+        ]
       },
       {
         "route_id": "P1_TO_REACTOR",
-        "targets": null
+        "targets": [
+          {
+            "valve": "V2",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V1",
+            "position_degrees": 180
+          }
+        ]
       },
       {
         "route_id": "REACTOR_TO_P2",
-        "targets": null
+        "targets": [
+          {
+            "valve": "V3",
+            "position_degrees": 90
+          }
+        ]
       },
       {
         "route_id": "P2_TO_SF_TOP",
-        "targets": null
+        "targets": [
+          {
+            "valve": "V7",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V3",
+            "position_degrees": 180
+          }
+        ]
       },
       {
         "route_id": "SF_BOTTOM_TO_P2",
-        "targets": null
+        "targets": [
+          {
+            "valve": "V8",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V7",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V3",
+            "position_degrees": 180
+          }
+        ]
       },
       {
         "route_id": "P2_TO_COLUMN",
-        "targets": null
+        "targets": [
+          {
+            "valve": "V5",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V8",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V7",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V3",
+            "position_degrees": 180
+          }
+        ]
       }
     ],
     "recovery_plan": null,
@@ -98,7 +212,15 @@
       "scope": "P1/P2 supervised demo only; no new measured-volume or production calibration claim",
       "command_contract_note": "PUMP_MOVE_ABSOLUTE_STEPS still accepts 1..20500; zero requires PUMP_HOME. A nominal 20 ml ordinary aspiration from 20500 is currently rejected; no implicit HOME substitution."
     },
-    "safe_ordered_valve_transitions_and_home_routes": null,
+    "safe_ordered_valve_transitions_and_home_routes": {
+      "status": "USER_APPROVED_DESTINATION_ORDERS_HOME_ENTRY_PENDING",
+      "recorded_at": "2026-10-06",
+      "source": "HARDWARE_CONFIRMATIONS.md: User-approved demo destination switching orders - 2026-10-06",
+      "scope": "All ten reviewed demo destination orders; stationary pumps, sequential completed commands, already-reached targets omitted; SF closed during P2 switching and Column closed during filling",
+      "observed_dry_wet_transition_results": "NOT_YET_RECORDED_FOR_THIS_PROCEDURE",
+      "overall_startup_recovery_valve_home_order": "UNCONFIRMED",
+      "physical_execution_authorization": "SEPARATE_PER_TEST"
+    },
     "recovery_valve_home_order_and_manual_carousel_position": null,
     "flush_liquid_volume_ml": null,
     "flush_air_volume_ml": null,

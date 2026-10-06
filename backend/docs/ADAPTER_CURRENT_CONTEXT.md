@@ -119,7 +119,7 @@ not current references; the current checkpoint overrides older V7/V8 fault/mappi
 
 | Input | Existing confirmed level | Still required for live configuration/use |
 | --- | --- | --- |
-| Tubing and valve targets | Physical tubing graph/nominal valve semantics plus dated dry P1/P2 Waste HOME routes and setup order documented | Complete safe transitions between run/recovery/flush routes, applicable wet routing and leak-tightness; dated dry setups do not establish every transition |
+| Tubing and valve targets | Tubing/nominal semantics and dry Waste setups documented; on 2026-10-06 the user confirmed old-before-new connection changes and accepted all ten demo destination orders | Overall startup/Recovery HOME entry, supervised observation of the accepted transitions, applicable wet routing/leak-tightness and current route readiness remain separate; approved orders are not new physical test results |
 | V7/V8 | Repair and supervised dry HOME/90-degree production-path regression closed | New current-session references; historical boot-71 positions cannot be reused |
 | P1/P2 | Common orientation, HOME 0, approved maximum 20500, separate aspiration/dispense and dry Service paths; on 2026-10-06 the user selected nominal demo full=0/empty=20500/20 ml with no reserve | Ordinary transfer targets still 1..20500, zero requires HOME; full-stroke cycle policy remains to address if needed. Precise calibration is deferred for demo and remains a production gate; route readiness before HOME/movement remains required |
 | Pump nominal mapping | 1025 steps/ml accepted for the supervised colored-liquid demo; full nominal range explicitly selected on 2026-10-06 | It is not measured volume or dead-volume compensation; do not label it WORKING_VERIFIED |

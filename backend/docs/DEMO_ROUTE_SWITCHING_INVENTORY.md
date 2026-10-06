@@ -292,3 +292,51 @@ instruction to continue or confirmation of internal valve behavior does not
 approve these proposed orders. Until the user accepts/corrects them, keep
 all physical candidate `route_sequences.targets` and the ordered/HOME
 confirmation field unset. Physical execution still needs separate approval.
+
+
+## User acceptance and planned supervised verification — 2026-10-06
+
+The user explicitly accepted the exact ten destination orders and reviewed
+stationary-pump procedure above. This supersedes the pending acceptance status
+in the preceding proposal sections. Canonical record: firmware
+`HARDWARE_CONFIRMATIONS.md`, User-approved demo destination switching orders.
+The physical worksheet now contains these approved ordered targets, transcribed
+from the accepted proposal. Existing test orders are not a source of approval.
+The complete profile remains incomplete/non-activatable; no runtime changed.
+
+Approval of destination switching does not select the overall valve HOME order,
+establish current references, approve liquid delivery/cleaning results or grant
+permission to open live ports or move devices. No new physical result is claimed.
+
+Suggested next session: supervised staged checking on 2026-10-07, with no motion
+in this planning session. Begin with motor power off: identify the installed
+firmware/device connections, actual contents and mechanical readiness; separate
+the previous fake browser launcher from a deliberately configured real Service
+session. Do not convert `tests.browser_check` into a real-device launcher.
+
+Before the first HOME/movement, agree on the concrete dry condition, fresh
+reference establishment and exact bounded commands; obtain authorization plus
+new motor-power readiness. The overall startup/Recovery valve HOME procedure is
+still a separate decision. Current references must come from this session, not
+old positions or durable historical success alone.
+
+First physical objective is valve switching only with pumps stationary and
+appropriate empty/dry conditions confirmed: establish references, then inspect
+selected P1 transitions before P2 transitions. At each step compare command
+completion with the user's observed valve position/path. No result is silently
+promoted into hydraulic/wet proof. Subsequent dry-air pump operation needs its
+own verified Waste/source path and explicitly agreed travel.
+
+Only after dry checking and the remaining input/profile gates may a separate
+supervised small nominal-volume liquid test check S -> P1 -> Reactor, then
+B1/B2 paths, then Reactor -> P2 -> SF and SF -> P2 -> Column. Agree the liquid,
+volume, destination capacity and actual readiness before that test. Full 20 ml
+ordinary aspiration is still rejected because zero is HOME-only; do not silently
+substitute HOME. No complete autonomous RUN/Recovery/Flush is promised for the
+next session while adapter/current-reference/HOME and flush inputs remain missing.
+
+Remaining integration inputs include installed adapter identity/timing, actual
+current-reference acquisition, startup/Recovery HOME order, rinse volumes/drain/
+tube settings and explicit real-profile composition. Preparation and fake tests
+precede any activation of that composition. Motor-power readiness must be newly
+confirmed before each powered physical test as required by the hardware record.

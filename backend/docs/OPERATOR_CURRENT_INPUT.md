@@ -92,9 +92,9 @@ strict canonical comparison, derivation and SHA-256 checks remain enforced.
 
 `ADAPTER_PHYSICAL_PROFILE.draft.json` is a non-activatable worksheet, deliberately
 rejected by `AdapterExecutionConfiguration`. The user selected nominal demo
-pump endpoints on 2026-10-06; ordered valve transitions, adapter timing/identity
-and recovery/flush plan inputs remain null. It is not a loader or a runnable
-profile. Never fill unknown values from test fixtures.
+pump endpoints and ten destination switching orders on 2026-10-06; adapter
+timing/identity and recovery/flush plan inputs remain null. It is not a loader
+or a runnable profile. Never fill unknown values from test fixtures.
 
 Firmware `HARDWARE_CONFIRMATIONS.md` owns physical facts. Existing nominal
 1025 steps/ml applies only to the supervised demo, not precise wet calibration
@@ -127,11 +127,13 @@ still requires HOME for zero and ordinary move targets 1..20500: a nominal
 Confirmed dry Waste HOME routes are P1 with V1=180/V2=180 and P2 with
 V3=180/V7=90/V8=90/V5=180. On 2026-08-08 the recorded dry setup homed/set
 V1 then V2 before P1 HOME, and V3 then V7 then V8 then V5 before P2 HOME.
-Those are existing confirmed setups, not missing tubing facts. Complete safe
-switching between all run/flush routes, including transient connections from
-each applicable previous route, remains unconfirmed. Test fixture orders must
-not substitute for that physical confirmation. Later V7/V8 repair evidence
-overrides obsolete pin/fault records, but creates no wet-transition approval.
+Those are existing confirmed setups, not missing tubing facts. On 2026-10-06
+the user confirmed old-before-new V1-V8 connection changes and accepted the
+ten proposed demo destination switching orders. The worksheet records these
+user-approved orders; overall startup/Recovery HOME entry and observed dry/wet
+verification remain separate. Test fixtures are not confirmation evidence.
+Later V7/V8 repair evidence overrides obsolete pin/fault records, but creates
+no wet-transition approval.
 
 ## Software checkpoint and verification
 
@@ -160,5 +162,6 @@ occurred. Manual browser verification of the new panel is still pending.
 The user-selected endpoints above were recorded after acceptance of the
 operator current-input implementation; no runtime or protocol code changed.
 All ten route target sets and actual run/flush/recovery entries are listed
-in `DEMO_ROUTE_SWITCHING_INVENTORY.md`. Proposed test switching orders remain
-unconfirmed and are not copied into the physical candidate.
+in `DEMO_ROUTE_SWITCHING_INVENTORY.md`. The user subsequently accepted the
+exact proposed destination orders; these are now transcribed into the
+incomplete candidate with the canonical hardware confirmation as source.
