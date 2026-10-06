@@ -131,6 +131,11 @@ class OwnedPhaseSession:
         supplied = {PumpId.P1: calibrations.p1, PumpId.P2: calibrations.p2}
         if any(p.calibration != supplied[p.calibration.pump_id] for p in self._state.pumps):
             raise SimulationBlocked("calibration differs from independent fixture")
+        if getattr(self._device, "_current_context_provider", None) is not None:
+            self._column_readiness = ColumnFractionCollectionReadiness(
+                carousel_ready_confirmed=self._state.carousel_position is not None,
+                column_bottom_valve_referenced_confirmed=self._state.column_position_degrees is not None,
+            )
         self._mixer = False
         self._boot = self._device.controller_boot_id
         self._arduino_session = self._device.arduino_session_id

@@ -114,13 +114,14 @@ class RouteSequence(PlanningModel):
 
 class PumpPlanningState(PlanningModel):
     calibration: PumpCalibration
-    position_steps: Annotated[StrictInt, Field(ge=0, le=20500)]
+    position_steps: Annotated[StrictInt, Field(ge=0, le=20500)] | None
 
     @model_validator(mode="after")
     def validate_position(self) -> Self:
         full = self.calibration.working_full_chamber_position_steps
         empty = self.calibration.working_empty_chamber_position_steps
-        if empty > 20500 or not full <= self.position_steps <= empty:
+        if empty > 20500 or (self.position_steps is not None
+                             and not full <= self.position_steps <= empty):
             raise ValueError("pump position and working range must fit 0..20500")
         return self
 
@@ -194,7 +195,7 @@ class PreparedOperation:
 class PreparedCommandPlan:
     assumptions: CommandPlanningContext
     operations: tuple[PreparedOperation, ...]
-    projected_pump_positions: tuple[tuple[PumpId, int], ...]
+    projected_pump_positions: tuple[tuple[PumpId, int | None], ...]
     # Projection is valid ONLY if every operation completes successfully.
     projected_carousel_position: int | None
 
@@ -298,7 +299,7 @@ class _Planner:
         if allowed.get(self.active_route) is not pump_id:
             raise CommandPlanningError("pump operation does not match the selected route")
         pump = self.pumps.get(pump_id)
-        if pump is None:
+        if pump is None or pump.position_steps is None:
             raise CommandPlanningError(f"{pump_id} reference/position is unknown")
         if not volume.is_finite() or volume <= 0:
             raise CommandPlanningError("pump volume must be finite and positive")
@@ -343,7 +344,7 @@ class _Planner:
                 flush_actions = []
                 for pump_id, waste in ((PumpId.P1, SymbolicRouteId.P1_TO_WASTE),
                                        (PumpId.P2, SymbolicRouteId.P2_TO_WASTE)):
-                    if pump_id not in self.pumps:
+                    if pump_id not in self.pumps or self.positions[pump_id] is None:
                         raise CommandPlanningError("flush needs both explicit pump references")
                     flush_actions.extend(self._route(waste))
                     empty = self.pumps[pump_id].calibration.working_empty_chamber_position_steps

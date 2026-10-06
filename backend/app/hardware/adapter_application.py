@@ -20,7 +20,8 @@ from app.hardware.simulated_p1_runner import SimulationBlocked
 
 def build_adapter_application_execution(
     bundle, arduino_configuration, sf_configuration, calibrations, *,
-    context_factory, sf_mixer_running, column_readiness=None,
+    context_factory=None, sf_mixer_running=None, column_readiness=None,
+    current_context_provider=None,
     recovery_plan=None, flush_plan=None,
     timer_factory=MonotonicExecutionTimer,
     arduino_port_factory=None, arduino_monotonic=monotonic, arduino_sleep=sleep,
@@ -37,8 +38,15 @@ def build_adapter_application_execution(
         or type(sf_configuration) is not SfBottomValveConfiguration
         or type(calibrations) is not PumpCalibrationSet):
         raise TypeError("explicit adapter configurations and calibrations are required")
-    if not callable(context_factory):
-        raise TypeError("independent current-context factory is required")
+    if current_context_provider is None:
+        if not callable(context_factory):
+            raise TypeError("independent current-context factory is required")
+    else:
+        from app.hardware.adapter_configuration import AdapterCurrentContextProvider
+        if type(current_context_provider) is not AdapterCurrentContextProvider:
+            raise TypeError("explicit current-context provider is required")
+        if context_factory is not None or sf_mixer_running is not None:
+            raise TypeError("configured current provider cannot mix with legacy state inputs")
     if sf_mixer_running is not None and type(sf_mixer_running) is not bool:
         raise TypeError("SF mixer state must be an explicit boolean or unknown")
     calibrations = PumpCalibrationSet.model_validate(calibrations.model_dump())
@@ -53,10 +61,13 @@ def build_adapter_application_execution(
         device = None
         try:
             arduino.connect()
-            context = context_factory(arduino.controller_boot_id)
+            context = (context_factory(arduino.controller_boot_id)
+                if current_context_provider is None else current_context_provider.bootstrap(arduino))
             if type(context) is not CommandPlanningContext:
                 raise TypeError("independent current context must be a CommandPlanningContext")
             context = CommandPlanningContext.model_validate(context.model_dump())
+            if current_context_provider is None and any(p.position_steps is None for p in context.pumps):
+                raise SimulationBlocked("legacy current context requires explicit pump positions")
             expected = {p.pump_id: p for p in (calibrations.p1, calibrations.p2)}
             if {p.calibration.pump_id: p.calibration for p in context.pumps} != expected:
                 raise SimulationBlocked("current-context calibrations differ from application inputs")
@@ -65,7 +76,9 @@ def build_adapter_application_execution(
                 **({"session_factory": sf_session_factory} if sf_session_factory is not None else {}),
                 clock=sf_monotonic, sleep=sf_sleep,
             )
-            device = PreparedAdapterDevice(context, arduino, sf)
+            device = PreparedAdapterDevice(
+                context, arduino, sf, current_context_provider=current_context_provider
+            )
             device.sf_mixer_running = sf_mixer_running
             yield device
         finally:

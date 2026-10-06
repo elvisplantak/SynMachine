@@ -206,7 +206,10 @@ def execute_maintenance(runtime, run_id, plan, readiness, occurred_at, stop_requ
                 raise SimulationBlocked("retained Stop owner changed")
         state = previous._state
     else:
-        state = runtime._runner.device.current
+        from app.hardware.prepared_adapter_device import PreparedAdapterDevice
+        device = runtime._runner.device
+        state = (device.acquire_current_context("RECOVERY")
+                 if type(device) is PreparedAdapterDevice else device.current)
     phase_id = str(uuid4())
     state = state.model_copy(update={"phase_execution_id": phase_id})
     source_sequence = machine.event_sequence if run is None else run.event_sequence

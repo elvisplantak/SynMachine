@@ -119,6 +119,16 @@ context fails startup and closes the connection. The factory must independently
 establish current physical context; relabeling historical references to a new boot
 is not supported. No concrete live-context provider or physical defaults are added.
 
+The configured preparation variant, `build_configured_adapter_application_execution`,
+uses an explicit validated profile and a session-bound current-state provider.
+Startup leaves actuator references unknown; initial READY/Start and recovery obtain
+fresh attributed input on the worker before planning. Missing or late input blocks
+without sending commands. The original callback contract remains available for
+existing explicit callers and still requires complete pump positions at startup.
+Neither variant provides a concrete live evidence source or activation permission.
+See `docs/ADAPTER_CURRENT_CONTEXT.md` for the strict inputs, continuity rules and
+physical confirmation matrix.
+
 Startup failures close acquired resources and release runtime locks. On normal
 shutdown the existing application first requests orderly Stop and joins execution;
 the runner closes, the resource scope invalidates the binding/closes Serial on the

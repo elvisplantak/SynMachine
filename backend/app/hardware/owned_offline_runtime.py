@@ -119,6 +119,7 @@ class OwnedOfflineRuntime:
                 or any(row.total for row in initial.journals)
             ):
                 raise SimulationBlocked("only a pristine bundle can start a fresh offline run")
+            self._fresh_or_retained_state(self._owner.idle_generation())
             self._used = True  # A failed initialization must not be retried here.
             service = GuidedDemoApplicationService(self._store)
             service.initialize_machine(occurred_at)
@@ -365,4 +366,5 @@ class OwnedOfflineRuntime:
             raise SimulationBlocked("hardware ownership changed since fresh input was supplied")
         if device.used or device.calls or device.sf_calls:
             raise SimulationBlocked("new run needs an independently supplied unused fixture")
-        return device.current
+        return (device.acquire_current_context("RUN")
+                if type(device) is PreparedAdapterDevice else device.current)
