@@ -91,9 +91,10 @@ strict canonical comparison, derivation and SHA-256 checks remain enforced.
 ## Physical profile still incomplete
 
 `ADAPTER_PHYSICAL_PROFILE.draft.json` is a non-activatable worksheet, deliberately
-rejected by `AdapterExecutionConfiguration`. Unknown working margins, ordered
-valve transitions, adapter timing/identity and recovery/flush plan inputs remain
-null. It is not a loader or a runnable profile. Never fill it from test fixtures.
+rejected by `AdapterExecutionConfiguration`. The user selected nominal demo
+pump endpoints on 2026-10-06; ordered valve transitions, adapter timing/identity
+and recovery/flush plan inputs remain null. It is not a loader or a runnable
+profile. Never fill unknown values from test fixtures.
 
 Firmware `HARDWARE_CONFIRMATIONS.md` owns physical facts. Existing nominal
 1025 steps/ml applies only to the supervised demo, not precise wet calibration
@@ -115,9 +116,13 @@ Pump positions are absolute stepper coordinates, not millimetres or revolutions.
 The hardware record already accepts HOME coordinate 0 and maximum coordinate
 20500 for P1/P2, plus the demo-only nominal 1025 steps/ml mapping. These facts
 are retained in the worksheet's reference section, separate from current state.
-Working full/empty margins remain explicitly `jos nije potvrdjeno`; candidate
-coordinates/working volume remain null. Volume units are ml. No new measurement
-is inferred from an old dry movement or the accepted maximum coordinate.
+On 2026-10-06 the user selected full=0, empty=20500, nominal volume=20 ml
+and no additional endpoint reserve for both pumps in the supervised demo.
+The worksheet records `DEMO_NOMINAL`, retaining 1025 steps/ml; precise measured
+calibration is deferred. This supplies a demo policy, not new measured-volume
+evidence or a production working-range approval. The current command contract
+still requires HOME for zero and ordinary move targets 1..20500: a nominal
+20 ml ordinary aspiration from 20500 is currently rejected by the planner.
 
 Confirmed dry Waste HOME routes are P1 with V1=180/V2=180 and P2 with
 V3=180/V7=90/V8=90/V5=180. On 2026-08-08 the recorded dry setup homed/set
@@ -148,3 +153,12 @@ CSS: 50.08 kB / 9.94 kB gzip. All transports and intercepted API responses are
 fake. The draft JSON parses and its candidate is strictly rejected as incomplete.
 No dependency, SQL schema, firmware, real device or production activation change
 occurred. Manual browser verification of the new panel is still pending.
+
+
+## Later demo-profile clarification — 2026-10-06
+
+The user-selected endpoints above were recorded after acceptance of the
+operator current-input implementation; no runtime or protocol code changed.
+All ten route target sets and actual run/flush/recovery entries are listed
+in `DEMO_ROUTE_SWITCHING_INVENTORY.md`. Proposed test switching orders remain
+unconfirmed and are not copied into the physical candidate.

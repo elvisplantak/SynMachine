@@ -5,7 +5,7 @@
   "candidate_configuration": {
     "profile_id": null,
     "evidence_note": null,
-    "calibration_scope": null,
+    "calibration_scope": "DEMO_NOMINAL",
     "current_context_timeout_seconds": null,
     "arduino": {
       "port": null,
@@ -30,15 +30,15 @@
     "calibrations": {
       "p1": {
         "pump_id": "P1",
-        "working_full_chamber_position_steps": null,
-        "working_empty_chamber_position_steps": null,
-        "working_volume_ml": null
+        "working_full_chamber_position_steps": 0,
+        "working_empty_chamber_position_steps": 20500,
+        "working_volume_ml": "20"
       },
       "p2": {
         "pump_id": "P2",
-        "working_full_chamber_position_steps": null,
-        "working_empty_chamber_position_steps": null,
-        "working_volume_ml": null
+        "working_full_chamber_position_steps": 0,
+        "working_empty_chamber_position_steps": 20500,
+        "working_volume_ml": "20"
       }
     },
     "route_sequences": [
@@ -88,10 +88,15 @@
   },
   "confirmation_record": {
     "working_pump_margins_and_volume": {
-      "status": "jos nije potvrdjeno",
+      "status": "USER_SELECTED_DEMO_NOMINAL",
+      "recorded_at": "2026-10-06",
       "position_units": "stepper_steps",
       "working_volume_units": "ml",
-      "source": "HARDWARE_CONFIRMATIONS.md: Confirmed limitations; working margins remain pending"
+      "additional_endpoint_reserve_steps": 0,
+      "precise_measured_calibration": "DEFERRED",
+      "source": "HARDWARE_CONFIRMATIONS.md: User-selected nominal demo pump range \u2014 2026-10-06",
+      "scope": "P1/P2 supervised demo only; no new measured-volume or production calibration claim",
+      "command_contract_note": "PUMP_MOVE_ABSOLUTE_STEPS still accepts 1..20500; zero requires PUMP_HOME. A nominal 20 ml ordinary aspiration from 20500 is currently rejected; no implicit HOME substitution."
     },
     "safe_ordered_valve_transitions_and_home_routes": null,
     "recovery_valve_home_order_and_manual_carousel_position": null,
@@ -111,7 +116,7 @@
       "home_coordinate_steps": 0,
       "approved_maximum_coordinate_steps": 20500,
       "demo_nominal_steps_per_ml": 1025,
-      "working_margins_status": "jos nije potvrdjeno"
+      "working_margins_status": "DEMO_SELECTED_NO_ADDITIONAL_RESERVE; precise production calibration remains unconfirmed"
     },
     "dry_pump_home_waste_route_setups": [
       {
