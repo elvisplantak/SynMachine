@@ -1,0 +1,154 @@
+"""One supervised P1 valve-only check, using existing planning/Service primitives.
+
+Default mode is offline preview. Execution needs separate procedure approval and
+fresh motor-power readiness. Each NEXT authorizes one command within that scope.
+Never resume/retry this script after a failed or unknown physical outcome.
+"""
+
+import argparse
+import json
+import os
+import sys
+from datetime import UTC, datetime
+from pathlib import Path
+from uuid import uuid4
+
+from app.demo.operation_models import OperationKind, SelectRouteOperation, SymbolicRouteId
+from app.hardware.arduino_command_journal import ArduinoCommandJournalState, SQLiteArduinoCommandJournal
+from app.hardware.arduino_serial import ArduinoSerialClient, ArduinoSerialConfiguration
+from app.hardware.command_planning import ArduinoAction, CommandPlanningContext, RouteSequence, ValveTarget, prepare_command_plan
+from app.hardware.durable_arduino import DurableArduinoCommandExecutor
+
+ROOT = Path('/home/elvis/Documents/labforge-backend-multiphase')
+PORT = '/dev/serial/by-id/usb-Arduino__www.arduino.cc__0042_14532303532351F0D070-if00'
+HOME_ORDER = ('V1', 'V2', 'V4', 'V6')
+ROUTES = (
+    'S_TO_P1', 'P1_TO_REACTOR', 'S_TO_P1', 'P1_TO_REACTOR',
+    'B1_TO_P1', 'P1_TO_REACTOR', 'B2_TO_P1', 'P1_TO_REACTOR',
+    'P1_TO_WASTE', 'P1_TO_REACTOR',
+)
+APPROVED_ORDERS = {
+    'S_TO_P1': (('V6', 180), ('V1', 90)),
+    'B1_TO_P1': (('V4', 180), ('V6', 90), ('V1', 90)),
+    'B2_TO_P1': (('V4', 90), ('V6', 90), ('V1', 90)),
+    'P1_TO_REACTOR': (('V2', 90), ('V1', 180)),
+    'P1_TO_WASTE': (('V2', 180), ('V1', 180)),
+}
+
+
+def build_steps(phase, boot):
+    worksheet = json.loads((ROOT / 'docs/ADAPTER_PHYSICAL_PROFILE.draft.json').read_text())
+    sequences = tuple(RouteSequence.model_validate(item) for item in
+                      worksheet['candidate_configuration']['route_sequences']
+                      if item['route_id'] in ROUTES)
+    actual = {sequence.route_id.value: tuple((target.valve, target.position_degrees)
+              for target in sequence.targets) for sequence in sequences}
+    if len(sequences) != len(APPROVED_ORDERS) or actual != APPROVED_ORDERS:
+        raise RuntimeError('Worksheet differs from reviewed P1 destination orders')
+    operations = tuple(SelectRouteOperation(
+        operation_kind=OperationKind.SELECT_ROUTE, operation_number=i,
+        cycle_number=1, cycle_count=1, route_id=SymbolicRouteId(route),
+    ) for i, route in enumerate(ROUTES, 1))
+    # This projection is valid only AFTER every explicit HOME below completes.
+    context = CommandPlanningContext(
+        phase_execution_id=phase, controller_boot_id=boot,
+        valve_positions=tuple(ValveTarget(valve=v, position_degrees=0) for v in HOME_ORDER),
+        route_sequences=sequences,
+    )
+    plan = prepare_command_plan(operations, context)
+    steps = [(f'HOME {valve}', ArduinoAction(str(uuid4()), 'VALVE_HOME', (('valve', valve),)))
+             for valve in HOME_ORDER]
+    for route, operation in zip(ROUTES, plan.operations, strict=True):
+        if operation.required_followup:
+            raise RuntimeError('Unexpected followup in valve-only plan')
+        steps.extend((route, action) for action in operation.actions)
+    for _, action in steps:
+        if not isinstance(action, ArduinoAction):
+            raise RuntimeError('Non-Arduino action in valve-only check')
+        arguments = dict(action.arguments)
+        if action.command not in ('VALVE_HOME', 'VALVE_SET_POSITION') or arguments.get('valve') not in HOME_ORDER:
+            raise RuntimeError('Command outside approved P1 valve-only scope')
+    return steps
+
+
+def build_v2_steps():
+    return [
+        ('HOME V2', ArduinoAction(str(uuid4()), 'VALVE_HOME', (('valve', 'V2'),))),
+        ('V2 to 90 degrees', ArduinoAction(str(uuid4()), 'VALVE_SET_POSITION',
+                                         (('valve', 'V2'), ('position_degrees', 90)))),
+    ]
+
+
+def run_steps(executor, phase, steps, input_stream, emit):
+    for number, (label, action) in enumerate(steps, 1):
+        emit({'event': 'WAITING_FOR_NEXT', 'number': number, 'label': label,
+              'command': action.command, 'arguments': dict(action.arguments)})
+        if input_stream.readline().strip() != 'NEXT':
+            emit({'event': 'HALTED_BEFORE_COMMAND', 'number': number})
+            return False
+        entry = executor.execute(phase_execution_id=phase,
+                                 operation_command_id=action.operation_command_id,
+                                 command=action.command, arguments=dict(action.arguments))
+        emit({'event': 'COMMAND_RESULT', 'number': number, 'label': label,
+              'operation_command_id': entry.operation_command_id,
+              'state': entry.state.value, 'result': entry.result,
+              'error_code': entry.error_code})
+        if entry.state is not ArduinoCommandJournalState.COMPLETED:
+            raise RuntimeError('Command not completed; continuation blocked')
+    return True
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--execute', action='store_true')
+    parser.add_argument('--procedure-approved', action='store_true')
+    parser.add_argument('--motor-power-ready', action='store_true')
+    parser.add_argument('--v2-only', action='store_true')
+    args = parser.parse_args()
+    phase = ('v2-recheck-' if args.v2_only else 'p1-dry-') + str(uuid4())
+    if not args.execute:
+        steps = build_v2_steps() if args.v2_only else build_steps(phase, 1)
+        for i, (label, action) in enumerate(steps, 1):
+            print(json.dumps({'number': i, 'label': label, 'command': action.command,
+                              'arguments': dict(action.arguments)}))
+        print('OFFLINE PREVIEW ONLY; HOME assumptions are projections, not current references.')
+        return
+    if not args.procedure_approved or not args.motor_power_ready:
+        parser.error('Execution requires procedure approval and NEW motor-power readiness')
+    output = Path('/home/elvis/Documents/labforge-firmware/docs/commissioning/2026-10-07') / phase
+    output.mkdir(parents=True, exist_ok=False)
+    with (output / 'events.jsonl').open('x') as log:
+        def emit(event):
+            event['observed_at_utc'] = datetime.now(UTC).isoformat()
+            line = json.dumps(event)
+            log.write(line + '\n')
+            log.flush()
+            os.fsync(log.fileno())
+            print(line, flush=True)
+        client = ArduinoSerialClient(ArduinoSerialConfiguration(port=PORT))
+        try:
+            with SQLiteArduinoCommandJournal(output / 'commands.sqlite3') as journal:
+                hello = client.connect()
+                status = client.query_status()
+                emit({'event': 'SESSION', 'hello': hello.model_dump(mode='json'),
+                      'status': status.model_dump(mode='json'), 'evidence_directory': str(output)})
+                if status.controller_state != 'IDLE' or status.active_operation_command_id is not None:
+                    raise RuntimeError('Controller is not idle')
+                if not {'VALVE_HOME', 'VALVE_SET_POSITION'} <= client.capabilities:
+                    raise RuntimeError('Required valve capabilities absent')
+                steps = build_v2_steps() if args.v2_only else build_steps(phase, hello.controller_boot_id)
+                completed = run_steps(DurableArduinoCommandExecutor(client, journal),
+                                      phase, steps, sys.stdin, emit)
+                emit({'event': 'SOFTWARE_SEQUENCE_COMPLETED' if completed else 'SEQUENCE_HALTED',
+                      'physical_observations': 'Require separate operator confirmation'})
+        except BaseException as error:
+            emit({'event': 'SEQUENCE_ERROR_NO_RETRY', 'error_type': type(error).__name__,
+                  'error': str(error)})
+            raise
+        finally:
+            client.close()
+            emit({'event': 'CONNECTION_CLOSED', 'no_cleanup_motion_sent': True})
+
+
+if __name__ == '__main__':
+    main()

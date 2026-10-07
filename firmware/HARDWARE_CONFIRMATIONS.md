@@ -1,5 +1,38 @@
 # Hardware confirmations
 
+## Current supervised P1 dry-check checkpoint — 2026-10-07
+
+The user authorized a valve-only dry P1 procedure with stationary pumps and an
+empty system, then a separate bounded V2 recheck. Fresh motor-power readiness
+was obtained for each powered test. Existing backend planner/Serial/durable
+Service primitives were used; no firmware code, upload or live demo profile changed.
+
+In boot 80, HOME V1/V2/V4/V6, V6=180 and V1=90 completed and the user confirmed
+each physical result. The next V2=90 command failed after STARTED with
+`VALVE_HOME_SWITCH_UNEXPECTED`. The host stopped and closed without retry or
+cleanup motion. The user did not observe that attempted movement, then confirmed
+motor power OFF and that V2's HOME lever was close to, but not pressing, the switch.
+This later mechanical observation does not establish the electrical input at failure.
+
+The separately approved HOME V2 -> V2=90 recheck in boot 81 completed both commands.
+The user confirmed correct HOME and movement away to the expected position without
+abnormal behavior. The original failure's cause remains unresolved; this is not
+proof of a repaired switch, wiring, stable signal or a complete verified route.
+
+At the user's stop, latest physically confirmed nominal positions are V1=90,
+V2=90, V4=HOME and V6=180. These historical observations cannot restore reference
+trust after reconnect/reset. No pump, P2 or other actuator was exercised.
+The full 19-command P1 plan was not completed. Evidence and SQL journals:
+`docs/commissioning/2026-10-07/README.md`.
+
+The user requested slower valve rotation for later checks. Current source's
+2000 us STEP interval/400 steps per 90 degrees is unchanged. A slower profile
+requires a separately prepared/verified firmware timing change and upload approval;
+no unsupported speed field or workaround is inferred. The user plans to resume
+on 2026-10-08. At stop the connection is closed and there is no queued host motion.
+Motor power was last confirmed ON for the recheck; OFF was requested but has
+not yet been confirmed. Obtain NEW readiness before every next powered test.
+
 ## Current V7/V8 repair and commissioning checkpoint — 2026-09-29
 
 This checkpoint supersedes the historical V7/V8 drive-fault status and STEP/DIR
