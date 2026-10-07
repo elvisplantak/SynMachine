@@ -1,10 +1,39 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-10-06
+- Checkpoint date: 2026-10-07
 - Development phase: fresh operator current-input software complete;
   independent review accepted for fake-only scope; physical profile incomplete and live activation gated
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
+
+## Latest physical checkpoint — partial P1 dry check, stopped by user
+
+- On 2026-10-07 the user authorized the valve-only P1 procedure and separately
+  HOME V2 -> V2=90, with fresh motor-power readiness each time. Existing planner,
+  Serial adapter and durable Service primitives were used, without activating
+  the incomplete full-run profile. No production code or firmware upload changed.
+- Boot 80: HOME V1/V2/V4/V6, V6=180 and V1=90 completed and were physically
+  confirmed. The next V2=90 failed after STARTED with `VALVE_HOME_SWITCH_UNEXPECTED`;
+  the host halted and closed, without retry. The operator missed that movement;
+  after switching motor power OFF, observed the HOME lever not pressing the switch.
+- Separately authorized boot-81 recheck: HOME V2 then V2=90 both completed and
+  were physically confirmed. The original fault's cause is unresolved. The full
+  P1 route plan, pumps, P2 and wet paths remain unchecked; this is not full demo
+  acceptance. Latest observed V1=90, V2=90, V4=HOME, V6=180 are historical only.
+- The user stopped for lack of time and plans to resume on 2026-10-08, requesting
+  slower valve rotation. No timing or speed change was made. The current valve
+  protocol has no speed parameter; slower motion needs a prepared/verified
+  firmware profile and separate upload approval. No host connection remains.
+  Motor power was last confirmed ON; OFF was requested at stop but not confirmed.
+  New current references/readiness are required before later physical work.
+- Evidence: firmware `docs/commissioning/2026-10-07/README.md`, raw events and SQL
+  journal exports. Five fake-only host supervision checks passed; no full suite
+  or firmware build repeated because no production code changed. Accepted backend
+  `1c0e906` and UI `7e36cf7` implementation evidence remains unchanged.
+- Product order: first finish and physically verify the demo, then UVP (Unos
+  vlastite procedure), retaining all necessary tests, then command-driven flow
+  animation. UVP and animation implementation remain deferred. No new reviewer
+  round is requested for this incomplete physical checkpoint.
 
 ## Current checkpoint — fresh operator current input through the UI
 

@@ -1153,3 +1153,28 @@ launcher remains hardwired fake. The incomplete profile does not yet enable a
 full autonomous RUN/Recovery/Flush, and full 20 ml ordinary aspiration remains
 blocked by the zero/HOME command boundary. No physical authorization is inferred
 from the planning question or acceptance of destination orders.
+
+
+### Partial P1 dry verification and user stop — 2026-10-07
+
+The user-authorized valve-only P1 check used existing backend planning and durable
+Service primitives. Boot 80 completed HOME V1/V2/V4/V6, V6=180 and V1=90 with
+operator confirmation, then V2=90 FAILED (`VALVE_HOME_SWITCH_UNEXPECTED`, started).
+The host halted/closed without retry. After confirmed motor power OFF, the user
+observed V2's HOME lever not pressing the switch; the attempted move was not seen.
+A separately authorized HOME V2 -> 90 recheck with new power readiness completed
+in boot 81 and was physically confirmed. The original cause remains unresolved;
+do not promote the successful recheck to full route/demo acceptance or restore
+references from these historical observations. Firmware canonical hardware record
+and `docs/commissioning/2026-10-07/README.md` retain exact scope/events/SQL evidence.
+
+The user stopped and plans to resume on 2026-10-08, requesting slower valve motion.
+No timing/protocol/production-code change or firmware upload was made. Prepare and
+verify any slower fixed firmware profile before obtaining upload approval and new
+physical-test readiness. Last motor-power confirmation is ON; OFF was requested
+at stop but not yet confirmed. All host connections are closed, with no queued
+motion. The incomplete full-run profile remains gated.
+
+Product priority is explicit: complete and verify the demo on the machine first,
+then UVP (Unos vlastite procedure) with all necessary tests, then command-driven
+flow animation. Neither deferred feature has begun implementation.
