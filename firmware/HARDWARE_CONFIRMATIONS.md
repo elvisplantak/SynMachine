@@ -77,9 +77,14 @@ A software-only correction is now prepared and natively verified; see
 `docs/commissioning/2026-10-09/README.md` and the serial protocol's pump HOME
 section. It waits motionless for a late signal without increasing search travel.
 This is not a measured switch-settling fact or a confirmed repair of the physical
-failure. The installed firmware remains `caef934`; no corrective upload, Serial
-reopen or new motion has occurred. Full-span HOME and P2 pump acceptance remain
-pending. Separate upload authorization and NEW powered-test readiness are required.
+failure. At preparation the installed firmware was `caef934`. The user then
+explicitly approved upload while motor power remained OFF. Firmware `8a5d93c`
+is now installed on the same confirmed Mega USB identity; avrdude verified all
+40880 flash bytes, with prepared HEX hash unchanged. No actuator command or
+EEPROM provisioning occurred during upload. Evidence:
+`docs/commissioning/2026-10-09/pump-home-wait-upload-verification.json`.
+Full-span HOME and P2 pump acceptance remain pending. No physical retest or Serial
+reopen followed upload; NEW powered-test readiness/authorization are required.
 
 ## Current supervised P1 dry-check checkpoint — 2026-10-07
 

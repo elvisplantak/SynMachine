@@ -1,0 +1,17 @@
+{
+  "recorded_at_utc": "2026-10-09T15:57:29.271617+00:00",
+  "firmware_commit": "8a5d93cb5de3ac4577317d8008e4e3b683b8ddbb",
+  "environment": "megaatmega2560",
+  "port": "/dev/serial/by-id/usb-Arduino__www.arduino.cc__0042_14532303532351F0D070-if00",
+  "hex_sha256": "8b87d2fb0b0cc2efbd4544b0ac5d6755d5a62a7799f0d6008daff1668da57a8b",
+  "flash_bytes_verified": 40880,
+  "static_sram_bytes": 3140,
+  "upload_exit_code": 0,
+  "avrdude_verification": "40880 bytes of flash verified",
+  "operator_motor_power": "OFF",
+  "operator_upload_authorization": "Explicit user approval after prepared correction on 2026-10-09",
+  "actuator_commands_sent": 0,
+  "eeprom_provisioning_performed": false,
+  "physical_pump_fix_verified": false,
+  "next_powered_check": "Separate fresh dry-system readiness and authorization required; P1 Waste setup then HOME -> 20500 -> HOME; halt on any failure"
+}

@@ -158,3 +158,21 @@ performed; installed firmware remains caef934 and its separate upload evidence
 above is unchanged. The failed physical journal remains FAILED. Upload and a
 new bounded dry recheck require separate authorization/readiness. No increase
 of travel allowance or wet/full-demo acceptance is inferred. GitHub push is deferred.
+
+
+## Corrective upload completed — physical recheck pending
+
+After explicit user approval with motor power OFF, firmware 8a5d93c was uploaded
+to the confirmed Mega by-id device. Avrdude verified all 40880 flash bytes;
+upload exited 0 and HEX SHA-256 matches the prepared artifact above. No actuator
+command or EEPROM provisioning occurred. The previous caef934 upload evidence
+is retained unchanged; this upload has its own
+`pump-home-wait-upload-verification.json`. There is no open host connection or
+queued motion. Motor power remains last confirmed OFF. Boot 87's failed journal
+is not changed by upload, and the physical failure's cause remains unproven.
+
+Proposed next powered scope is a dry P1-only repeat: HOME V1/V2, select P1 Waste
+(V2=180 then V1=180), P1 HOME -> absolute 20500 -> HOME. This omits the already
+completed short stroke and all P2 commands. Fresh empty-system/air-outlet, closed
+bottom-valve/stopped-mixer prerequisites and motor readiness/approval are required
+before execution. On any failure the host halts without retry or cleanup movement.
