@@ -6,7 +6,59 @@
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — P1 full-span and terminal parking accepted, valve/P2 trials pending
+## Current checkpoint — full supervised dry demo accepted on the machine
+
+- Installed firmware remains e2e9d3c on codex/sf-mixer-service-integration;
+  accepted production backend/UI code remains 1c0e906/7e36cf7. No new upload or
+  production activation. Local evidence/documentation commits; GitHub push deferred.
+- Boot 91 completed all 16 V1-V8 HOME -> terminal nominal 5-degree commands;
+  the user confirmed normal physical release on all valves. Boot 92 completed
+  all 12 P2-only Waste setup/HOME/1000/HOME/terminal 1000 commands; the user
+  confirmed normal P2 movement and HOME-lever release. Both closed without retry/
+  cleanup. Journals/events/SQL/result verification: firmware dated commissioning docs.
+  Dry 22-step valve release is confirmed for this trial, not wet-route alignment.
+- The user approved one whole empty-system demo, confirmed carousel aligned to
+  tube 1 and installed SF mixing element safe in existing DIR=LOW direction.
+  Boot 93 SF read-only identity probe failed before any actuator command. Exit 1,
+  closed; zero command/phase/wait records, original probe owner BLOCKED and retained.
+  User clarified SF servo power was actually OFF, turned it ON and explicitly
+  requested repeating. A separate fresh attempt used proven zero actuation;
+  no owner/history reset or replay, no unknown physical command retried.
+- Boot 94 full attempt completed all 10 phases, 57 Arduino + 4 SF commands, 6 waits
+  and 34 owned sequences in 435.485 s (~7 min 15 s). All journals are COMPLETED and sends
+  exactly match checked preview. Its isolated persisted machine is READY/run
+  COMPLETED, owner idle; first failed probe bundle unchanged. The user saw the
+  entire pump/valve/SF mixer/SF bottom/Column/carousel sequence and confirmed
+  normal physical operation without binding or unusual sound. Dry demo accepted.
+- Composition reuses owned durable Service bootstrap plus existing
+  OwnedOfflineRuntime.start_created_run and ten-phase builders in the same
+  SQLite bundle and Arduino session. Initial run state derives only from
+  successful same-process/current-boot bootstrap commands and fresh operator
+  declarations. No fixture calibration, new engine, API/profile/production activation.
+- Empty-system nominal 10 ml: S=6/B1=1.6/B2=2.4, 1025 steps/ml; no measured-volume claim.
+  Bootstrap SF CLOSE/mixer STOP, Column HOME/CLOSED 4 degrees, all route-valve HOME,
+  approved Waste selection, each pump HOME/20500, no-motion carousel reference 1.
+  Run S/B1, wait 5 s, B2, reaction wait 60 s (Reactor OFF), SF transfer/mix 10 s/settle 5 s,
+  SF-to-Column, two 5 s fractions; Column CLOSED during carousel 1-to-2 move.
+- Final command-confirmed P1=P2=20500, V1=180,V2=90,V4=90,V6=90,V3=180,V7=90,
+  V8=90,V5=90; SF/Column CLOSED, SF mixer OFF, carousel 2. No actuator left HOME,
+  hence no extra terminal parking. Connection closed, no live process or queued
+  motion; motor power last confirmed ON. Saved positions are historical after
+  close and cannot establish fresh references on a later reconnect.
+- Verification: 15 new full-demo fake checks, 20 P2-only checks and 211 existing
+  relevant owned execution checks passed; firmware unchanged (211 native tests,
+  Mega 41056 flash / 3148 SRAM). Failures retain exclusion/stop progression, existing
+  required STOP/CLOSE followups remain; no ad hoc retry/cleanup. Diff checks passed.
+  Evidence and helper/test/preview snapshots: firmware
+  docs/commissioning/2026-10-09/README.md. Full result events/three SQL exports/JSON:
+  full-dry-demo-56594eb7-bbbb-4525-9254-e99d585a01c6/.
+- Next scope: consolidated dry-execution review and a separately defined/approved
+  bounded wet check. Full physical profile, general wet startup/Recovery HOME
+  order, maintenance parameters and measured flow/sealing remain unconfirmed.
+  Reactor mixer was OFF/uncommanded; no new wiring/control inferred from
+  connected hardware. UVP and animation remain deferred until demo evaluation.
+
+## Previous checkpoint — P1 full-span and terminal parking accepted
 
 - User selected a separate terminal movement at the end of the whole successful
   test/procedure, only for actuators left at HOME: P1/P2 to 1000 absolute steps,
