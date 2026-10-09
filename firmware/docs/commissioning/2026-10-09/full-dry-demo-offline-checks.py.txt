@@ -1,0 +1,242 @@
+"""Fake-only checks for the exact supervised empty-system composition."""
+import io
+import json
+import sqlite3
+import sys
+
+import pytest
+import labforge_full_dry_demo as demo
+from app.hardware.arduino_serial import ArduinoUnavailableError, ArduinoCommandFailedError
+from tests.test_owned_pausable_demo import Clock
+
+
+def connected():
+    client, sf, port, sessions = demo.fake_adapters()
+    client.connect()
+    return client, sf, port, sessions
+
+
+def rows(path, query, args=()):
+    with sqlite3.connect(path.as_uri()+'?mode=ro', uri=True) as db:
+        return db.execute(query, args).fetchall()
+
+
+def test_complete_exact_scope_durable_intent_and_owner(tmp_path):
+    client, sf, port, sessions = connected()
+    events = []
+    clock = Clock()
+
+    def check(values):
+        table, key = ('arduino_command_journal', 'operation_command_id') if 'command' in values else ('sf_action_journal', 'action_id')
+        assert rows(tmp_path/'execution.sqlite3', f'SELECT state FROM {table} WHERE {key}=?', (values['operation_command_id'],)) == [('INTENT_PERSISTED',)]
+        assert rows(tmp_path/'owner.sqlite3', 'SELECT sequence_id FROM hardware_owner')[0][0] is not None
+
+    try:
+        sends = demo.run(client, sf, tmp_path, clock.timer(), events.append, before_send=check)
+        assert len(sends) == 61
+        assert len({e['operation_command_id'] for e in events if e['event']=='COMMAND_INTENT_BEFORE_TRANSPORT'}) == 61
+        assert rows(tmp_path/'execution.sqlite3', 'SELECT state,COUNT(*) FROM arduino_command_journal GROUP BY state') == [('COMPLETED', 57)]
+        assert rows(tmp_path/'execution.sqlite3', 'SELECT state,COUNT(*) FROM sf_action_journal GROUP BY state') == [('COMPLETED', 4)]
+        assert rows(tmp_path/'owner.sqlite3', 'SELECT sequence_id FROM hardware_owner') == [(None,)]
+        assert len([e for e in events if e['event']=='PHASE_RESULT']) == 10
+        final = events[-1]
+        assert final['event']=='SOFTWARE_SEQUENCE_COMPLETED'
+        assert final['final_state']['carousel_position']==2
+        assert all(v['position_degrees'] in (90,180) for v in final['final_state']['valve_positions'])
+        assert all(p['position_steps']==20500 for p in final['final_state']['pumps'])
+        assert not final['terminal_home_parking_required']
+        assert all(s.closed for s in sessions)
+        assert clock.now == 90_000_000_000  # 5 + 60 + 10 + 5 + 2*5 seconds.
+        assert [s['arguments']['target_steps'] for s in sends if s.get('command')=='PUMP_MOVE_ABSOLUTE_STEPS'] == [20500,20500,14350,20500,18860,20500,18040,20500,10250,20500,10250,20500]
+        assert demo.CALIBRATIONS.p1.steps_per_ml == 1025
+    finally:
+        client.close()
+
+
+@pytest.mark.parametrize('command,args', [
+    ('COLUMN_BOTTOM_VALVE_HOME', {}),
+    ('VALVE_HOME', {'valve':'V2'}),
+    ('PUMP_HOME', {'pump':'P2'}),
+])
+def test_bootstrap_unknown_halts_no_run_or_suffix(tmp_path, command, args):
+    client, sf, port, _ = connected()
+    events=[]
+    def fail(message):
+        if message['command']==command and message['arguments']==args:
+            raise ArduinoUnavailableError('fake transport lost')
+    port.before_command=fail
+    try:
+        with pytest.raises(ArduinoUnavailableError):
+            demo.run(client,sf,tmp_path,Clock().timer(),events.append)
+        assert not any(e['event']=='PHASE_START' for e in events)
+        assert rows(tmp_path/'owner.sqlite3','SELECT sequence_id FROM hardware_owner')[0][0] is not None
+        assert rows(tmp_path/'execution.sqlite3',"SELECT COUNT(*) FROM arduino_command_journal WHERE state='OUTCOME_UNKNOWN'") == [(1,)]
+        messages=[json.loads(w) for w in port.writes if json.loads(w)['type']=='COMMAND']
+        assert messages[-1]['command']==command and messages[-1]['arguments']==args
+        assert not any(m['command']=='CAROUSEL_MOVE_TO_POSITION' for m in messages)
+    finally:
+        client.close()
+
+
+def test_demo_unknown_aspiration_halts_keeps_owner(tmp_path):
+    client,sf,port,_=connected()
+    events=[]
+    def fail(message):
+        if message['command']=='PUMP_MOVE_ABSOLUTE_STEPS' and message['arguments']['target_steps']==14350:
+            raise ArduinoUnavailableError('fake aspiration outcome unknown')
+    port.before_command=fail
+    try:
+        with pytest.raises(ArduinoUnavailableError):
+            demo.run(client,sf,tmp_path,Clock().timer(),events.append)
+        assert len([e for e in events if e['event']=='PHASE_START'])==1
+        assert not any(e['event']=='SOFTWARE_SEQUENCE_COMPLETED' for e in events)
+        assert rows(tmp_path/'owner.sqlite3','SELECT sequence_id FROM hardware_owner')[0][0] is not None
+        assert not any(e.get('command')=='SF_MIXER_SET_STATE' and e['arguments']['running'] for e in events)
+    finally:
+        client.close()
+
+
+def test_mixer_wait_failure_retains_required_stop_and_blocks_later_phases(tmp_path):
+    client,sf,_,_=connected()
+    events=[]
+    clock=Clock()
+    def hook():
+        if clock.now>65_000_000_000:
+            raise RuntimeError('fake mixer wait failure')
+    clock.hook=hook
+    try:
+        with pytest.raises(Exception):
+            demo.run(client,sf,tmp_path,clock.timer(),events.append)
+        sent=[e for e in events if e['event']=='COMMAND_INTENT_BEFORE_TRANSPORT']
+        assert sent[-1]['command']=='SF_MIXER_SET_STATE' and sent[-1]['arguments']=={'running':False}
+        assert len([e for e in events if e['event']=='PHASE_START'])==7
+        assert rows(tmp_path/'owner.sqlite3','SELECT sequence_id FROM hardware_owner')[0][0] is not None
+    finally:
+        client.close()
+
+
+def test_checked_scope_mismatch_blocks_before_send(tmp_path):
+    client,sf,port,_=connected()
+    events=[]
+    expected,_=demo.preview()
+    expected[2]={'command':'VALVE_HOME','arguments':{'valve':'V8'}}
+    try:
+        with pytest.raises(RuntimeError,match='differs'):
+            demo.run(client,sf,tmp_path,Clock().timer(),events.append,expected_sends=expected)
+        commands=[json.loads(w) for w in port.writes if json.loads(w)['type']=='COMMAND']
+        assert len(commands)==1 and commands[0]['command']=='SF_MIXER_SET_STATE'
+        assert rows(tmp_path/'owner.sqlite3','SELECT sequence_id FROM hardware_owner')[0][0] is not None
+    finally:
+        client.close()
+
+
+def test_scope_successfully_reproduces_without_reconnection(tmp_path):
+    expected,_=demo.preview()
+    client,sf,_,_=connected()
+    epoch=client.connection_epoch
+    nonce=client.backend_session_nonce
+    try:
+        assert demo.run(client,sf,tmp_path,Clock().timer(),lambda e:None,expected_sends=expected)==expected
+        assert (client.connection_epoch,client.backend_session_nonce)==(epoch,nonce)
+    finally:
+        client.close()
+
+
+def test_missing_fresh_conditions_blocks_before_preview_or_ports(monkeypatch):
+    monkeypatch.setattr(sys,'argv',['runner','--execute','--procedure-approved'])
+    monkeypatch.setattr(demo,'preview',lambda: pytest.fail('preview should not run'))
+    with pytest.raises(SystemExit):
+        demo.main()
+
+
+def test_cancel_before_real_port_or_evidence_creation(monkeypatch):
+    monkeypatch.setattr(sys,'argv',['runner','--execute','--procedure-approved','--conditions-confirmed'])
+    monkeypatch.setattr(demo,'preview',lambda:([],[]))
+    monkeypatch.setattr(sys,'stdin',io.StringIO('CANCEL\n'))
+    monkeypatch.setattr(demo,'ArduinoSerialClient',lambda _: pytest.fail('real adapter constructed'))
+    demo.main()
+
+
+def test_existing_bundle_cannot_be_reprovisioned_or_replayed(tmp_path):
+    demo.provision(tmp_path)
+    client,sf,port,_=connected()
+    try:
+        with pytest.raises(FileExistsError):
+            demo.run(client,sf,tmp_path,Clock().timer(),lambda e:None)
+        assert not any(json.loads(w)['type']=='COMMAND' for w in port.writes)
+    finally:
+        client.close()
+
+
+def test_definitive_bootstrap_failure_preserved_not_retried(tmp_path):
+    client,sf,port,_=connected()
+    events=[]
+    def fail(message):
+        if message['command']=='PUMP_HOME':
+            raise ArduinoCommandFailedError('PUMP_MOTION_TIMEOUT', True)
+    port.before_command=fail
+    try:
+        with pytest.raises(ArduinoCommandFailedError):
+            demo.run(client,sf,tmp_path,Clock().timer(),events.append)
+        assert rows(tmp_path/'execution.sqlite3',"SELECT state,error_code,execution_started FROM arduino_command_journal WHERE state='FAILED'")==[('FAILED','PUMP_MOTION_TIMEOUT',1)]
+        assert len([e for e in events if e.get('command')=='PUMP_HOME'])==1
+        assert not any(e['event']=='PHASE_START' for e in events)
+        assert rows(tmp_path/'owner.sqlite3','SELECT sequence_id FROM hardware_owner')[0][0] is not None
+    finally:
+        client.close()
+
+
+def test_sf_aspiration_unknown_retains_required_close_and_exclusion(tmp_path):
+    client,sf,port,_=connected()
+    events=[]
+    aspirations=[]
+    def fail(message):
+        if message['command']=='PUMP_MOVE_ABSOLUTE_STEPS' and message['arguments']['target_steps']==10250:
+            aspirations.append(message)
+            if len(aspirations)==2:
+                raise ArduinoUnavailableError('fake SF aspiration unknown')
+    port.before_command=fail
+    try:
+        with pytest.raises(ArduinoUnavailableError):
+            demo.run(client,sf,tmp_path,Clock().timer(),events.append)
+        sent=[e for e in events if e['event']=='COMMAND_INTENT_BEFORE_TRANSPORT']
+        assert sent[-1]['sf_bottom_valve']=='CLOSED'
+        assert len([e for e in events if e['event']=='PHASE_START'])==9
+        assert rows(tmp_path/'owner.sqlite3','SELECT sequence_id FROM hardware_owner')[0][0] is not None
+        assert not any(e.get('command')=='COLUMN_BOTTOM_VALVE_SET_POSITION' and e['arguments']['position_degrees']==94 for e in sent)
+    finally:
+        client.close()
+
+
+def test_unknown_sf_preflight_blocks_before_actuation(tmp_path,monkeypatch):
+    client,sf,port,sessions=connected()
+    from app.hardware.sf_bottom_valve import SfValveObservation
+    monkeypatch.setattr(sf,'inspect_state',lambda:SfValveObservation(3000,False,None))
+    events=[]
+    try:
+        with pytest.raises(RuntimeError,match='prerequisite'):
+            demo.run(client,sf,tmp_path,Clock().timer(),events.append)
+        assert not any(json.loads(w)['type']=='COMMAND' for w in port.writes)
+        assert sessions==[]
+        assert rows(tmp_path/'owner.sqlite3','SELECT sequence_id FROM hardware_owner')[0][0] is not None
+    finally:
+        client.close()
+
+
+def test_sf_ping_communication_failure_blocks_before_any_command(tmp_path,monkeypatch):
+    client,sf,port,sessions=connected()
+    from app.demo.hardware_contract import HardwareCommandError
+    def unavailable():
+        raise HardwareCommandError('[TxRxResult] There is no status packet!')
+    monkeypatch.setattr(sf,'inspect_state',unavailable)
+    events=[]
+    try:
+        with pytest.raises(HardwareCommandError,match='no status packet'):
+            demo.run(client,sf,tmp_path,Clock().timer(),events.append)
+        assert not any(json.loads(w)['type']=='COMMAND' for w in port.writes)
+        assert sessions==[]
+        assert rows(tmp_path/'execution.sqlite3','SELECT COUNT(*) FROM arduino_command_journal')==[(0,)]
+        assert rows(tmp_path/'execution.sqlite3','SELECT COUNT(*) FROM sf_action_journal')==[(0,)]
+        assert rows(tmp_path/'owner.sqlite3',"SELECT state FROM hardware_sequences") == [('BLOCKED',)]
+    finally:
+        client.close()

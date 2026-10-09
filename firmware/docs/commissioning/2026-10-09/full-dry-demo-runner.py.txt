@@ -1,0 +1,310 @@
+"""Explicit supervised empty-system demo using existing owned backend execution.
+
+No API/profile activation, EEPROM provisioning, restart adoption, or new engine.
+Bootstrap completes through the same owned durable Service path, then supplies
+fresh in-process command-confirmed state to the existing ten-phase run path.
+Default is fake-transport preview. Real execution requires explicit flags and
+RUN_BLOCK before either port opens. Never retry after an unresolved result.
+"""
+import argparse
+from contextlib import closing
+from datetime import UTC, datetime
+from decimal import Decimal
+import hashlib
+import json
+import os
+from pathlib import Path
+import sqlite3
+import sys
+import tempfile
+from uuid import uuid4
+
+from app.demo.application_service import GuidedDemoApplicationService
+from app.demo.calibration_models import PumpCalibration, PumpCalibrationSet, PumpId
+from app.demo.guided_demo_phase_executor import ColumnFractionCollectionReadiness
+from app.demo.hardware_contract import BottomValveState
+from app.demo.models import AdditionOrder, DemoConfiguration, DemoExecutionSettings
+from app.demo.run_models import RunStatus
+from app.hardware.arduino_serial import ArduinoSerialClient, ArduinoSerialConfiguration
+from app.hardware.command_planning import CommandPlanningContext, PumpPlanningState, RouteSequence, ValveTarget
+from app.hardware.execution_timer import MonotonicExecutionTimer
+from app.hardware.fresh_hardware_observations import observe_current_hardware
+from app.hardware.owned_offline_runtime import OwnedOfflineRuntime
+from app.hardware.owned_startup_inspection import OfflineDatabaseBundle
+from app.hardware.owned_transfer_runner import OwnedTransferRunner, provision_execution
+from app.hardware.prepared_adapter_device import PreparedAdapterDevice
+from app.hardware.sequence_ownership import HardwareOwnership, provision_ownership
+from app.hardware.sf_bottom_valve import SfBottomValveActuator, SfBottomValveConfiguration
+from app.hardware.simulated_lifecycle import provision_lifecycle
+
+ARDUINO_PORT = '/dev/serial/by-id/usb-Arduino__www.arduino.cc__0042_14532303532351F0D070-if00'
+SF_PORT = '/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTA2U3CN-if00-port0'
+DOC_ROOT = Path('/home/elvis/Documents/labforge-firmware/docs/commissioning/2026-10-09')
+WORKSHEET = Path('/home/elvis/Documents/labforge-backend-multiphase/docs/ADAPTER_PHYSICAL_PROFILE.draft.json')
+HOME_ORDER = ('V1', 'V2', 'V4', 'V6', 'V3', 'V7', 'V8', 'V5')
+APPROVED_ROUTES = {
+    'P1_TO_WASTE': (('V2', 180), ('V1', 180)),
+    'P2_TO_WASTE': (('V5', 180), ('V8', 90), ('V7', 90), ('V3', 180)),
+    'S_TO_P1': (('V6', 180), ('V1', 90)),
+    'B1_TO_P1': (('V4', 180), ('V6', 90), ('V1', 90)),
+    'B2_TO_P1': (('V4', 90), ('V6', 90), ('V1', 90)),
+    'P1_TO_REACTOR': (('V2', 90), ('V1', 180)),
+    'REACTOR_TO_P2': (('V3', 90),),
+    'P2_TO_SF_TOP': (('V7', 180), ('V3', 180)),
+    'SF_BOTTOM_TO_P2': (('V8', 180), ('V7', 90), ('V3', 180)),
+    'P2_TO_COLUMN': (('V5', 90), ('V8', 90), ('V7', 90), ('V3', 180)),
+}
+CAPABILITIES = frozenset(('PUMP_HOME', 'PUMP_MOVE_ABSOLUTE_STEPS', 'VALVE_HOME',
+    'VALVE_SET_POSITION', 'COLUMN_BOTTOM_VALVE_HOME', 'COLUMN_BOTTOM_VALVE_SET_POSITION',
+    'CAROUSEL_SET_REFERENCE', 'CAROUSEL_MOVE_TO_POSITION', 'SF_MIXER_SET_STATE'))
+CALIBRATIONS = PumpCalibrationSet(**{p.lower(): PumpCalibration(pump_id=PumpId(p),
+    working_full_chamber_position_steps=0, working_empty_chamber_position_steps=20500,
+    working_volume_ml=Decimal('20')) for p in ('P1', 'P2')})
+CONFIGURATION = DemoConfiguration(b1_ratio_percent=40, total_mixture_volume_ml=10,
+    combined_b1_b2_volume_ml=4, addition_order=AdditionOrder.B1_THEN_B2,
+    addition_speed_command_percent=50, reactor_mixing_command_percent=0,
+    sf_mixing_command_percent=40, simulated_target_temperature_c=25,
+    reaction_duration_seconds=60, delay_between_additions_seconds=5)
+SETTINGS = DemoExecutionSettings(sf_mixing_duration_seconds=10,
+    sf_settling_duration_seconds=5, fraction_count=2, fraction_duration_seconds=5)
+
+
+def routes():
+    draft = json.loads(WORKSHEET.read_text())['candidate_configuration']
+    sequences = tuple(RouteSequence.model_validate(r) for r in draft['route_sequences'])
+    actual = {r.route_id.value: tuple((t.valve, t.position_degrees) for t in r.targets) for r in sequences}
+    if len(sequences) != 10 or actual != APPROVED_ROUTES:
+        raise RuntimeError('Worksheet differs from user-approved destination orders')
+    if draft['calibrations'] != CALIBRATIONS.model_dump(mode='json'):
+        raise RuntimeError('Worksheet differs from user-selected demo nominal pump mapping')
+    return sequences
+
+
+def provision(directory):
+    owner, execution, lifecycle = (directory / n for n in ('owner.sqlite3', 'execution.sqlite3', 'lifecycle.sqlite3'))
+    oid = provision_ownership(owner)
+    eid = provision_execution(execution, oid)
+    lid = provision_lifecycle(lifecycle, eid)
+    return OfflineDatabaseBundle(owner, oid, execution, eid, lifecycle, lid)
+
+
+def descriptor(values):
+    if 'command' in values:
+        return {'command': values['command'], 'arguments': values['arguments']}
+    return {'sf_bottom_valve': values['state']}
+
+
+def bootstrap(client, sf, bundle, emit, before_send):
+    boot = client.controller_boot_id
+    context = CommandPlanningContext(phase_execution_id='dry-bootstrap', controller_boot_id=boot,
+        route_sequences=routes())  # No assumed actuator references before HOME.
+    device = PreparedAdapterDevice(context, client, sf)
+    device.before_send = before_send
+    device.before_sf_send = before_send
+    positions = {}
+    pumps = {}
+    phase = 'dry-bootstrap-' + str(uuid4())
+    with closing(HardwareOwnership(bundle.ownership_path, bundle.ownership_id)) as owner:
+        with closing(OwnedTransferRunner(bundle.execution_path, bundle.execution_id, owner,
+                device, timer=MonotonicExecutionTimer())) as runner:
+            lease = owner.claim('dry-bootstrap-probe')
+            observations = owner.invoke(lease, lambda: observe_current_hardware(client, sf, required_commands=CAPABILITIES))
+            if observations.sf_valve.observed_state is not BottomValveState.CLOSED or observations.sf_valve.torque_enabled:
+                owner.block(lease)
+                raise RuntimeError('SF observation differs from fresh CLOSED/torque-off prerequisite')
+            owner.complete(lease)
+            emit({'event': 'READ_ONLY_PREFLIGHT', 'sf_present_position': observations.sf_valve.present_position,
+                  'controller_boot_id': boot})
+            runner.hardware.sf_service.set_state(BottomValveState.CLOSED)
+
+            def command(name, **args):
+                entry = runner.hardware.arduino_service.execute(phase_execution_id=phase,
+                    operation_command_id=str(uuid4()), command=name, arguments=args)
+                emit({'event': 'BOOTSTRAP_RESULT', 'command': name, 'arguments': args,
+                      'state': entry.state.value, 'operation_command_id': entry.operation_command_id,
+                      'result': entry.result})
+                if name == 'VALVE_HOME':
+                    positions[args['valve']] = 0
+                elif name == 'VALVE_SET_POSITION':
+                    positions[args['valve']] = args['position_degrees']
+                elif name == 'PUMP_HOME':
+                    pumps[args['pump']] = 0
+                elif name == 'PUMP_MOVE_ABSOLUTE_STEPS':
+                    pumps[args['pump']] = args['target_steps']
+
+            command('SF_MIXER_SET_STATE', running=False)
+            command('COLUMN_BOTTOM_VALVE_HOME')
+            command('COLUMN_BOTTOM_VALVE_SET_POSITION', position_degrees=4)
+            for valve in HOME_ORDER:
+                command('VALVE_HOME', valve=valve)
+            for pump in ('P1', 'P2'):
+                for valve, target in APPROVED_ROUTES[pump + '_TO_WASTE']:
+                    command('VALVE_SET_POSITION', valve=valve, position_degrees=target)
+                command('PUMP_HOME', pump=pump)
+                command('PUMP_MOVE_ABSOLUTE_STEPS', pump=pump, target_steps=20500)
+            # No motion: fresh user alignment is declared in this same boot.
+            command('CAROUSEL_SET_REFERENCE', position=1)
+            if client.controller_boot_id != boot or not client.connected:
+                raise RuntimeError('Session changed during bootstrap')
+    device.close()
+    return CommandPlanningContext(phase_execution_id='dry-ready', controller_boot_id=boot,
+        pumps=tuple(PumpPlanningState(calibration=getattr(CALIBRATIONS, p.lower()),
+                    position_steps=pumps[p]) for p in ('P1', 'P2')),
+        valve_positions=tuple(ValveTarget(valve=v, position_degrees=positions[v]) for v in HOME_ORDER),
+        route_sequences=routes(), reactor_mixer_running=False,
+        sf_bottom_valve=BottomValveState.CLOSED, column_position_degrees=4, carousel_position=1)
+
+
+def run(client, sf, directory, timer, emit, *, expected_sends=None, before_send=lambda _: None):
+    bundle = provision(directory)
+    sent = []
+
+    def observe(values):
+        item = descriptor(values)
+        if expected_sends is not None and (len(sent) >= len(expected_sends) or item != expected_sends[len(sent)]):
+            raise RuntimeError('Command differs from fully checked dry preview; no send')
+        before_send(values)
+        sent.append(item)
+        emit({'event': 'COMMAND_INTENT_BEFORE_TRANSPORT', 'number': len(sent), **item,
+              'phase_execution_id': values['phase_execution_id'],
+              'operation_command_id': values['operation_command_id']})
+
+    context = bootstrap(client, sf, bundle, emit, observe)
+    # New unused device receives only successful current-process/current-boot
+    # bootstrap receipts; no reconnect, historical reconstruction or owner reset.
+    device = PreparedAdapterDevice(context, client, sf)
+    device.sf_mixer_running = False
+    device.before_send = observe
+    device.before_sf_send = observe
+    run_id = 'dry-demo-' + str(uuid4())
+    try:
+        with OwnedOfflineRuntime(bundle, device, timer=timer) as runtime:
+            GuidedDemoApplicationService(runtime._store).create_run(run_id, CONFIGURATION, SETTINGS, datetime.now(UTC))
+            runtime.start_created_run(run_id, CALIBRATIONS, occurred_at=datetime.now(UTC),
+                column_readiness=ColumnFractionCollectionReadiness(True, True))
+            for number in range(1, 11):
+                snapshot = runtime._store.load_demo_run(run_id)
+                emit({'event': 'PHASE_START', 'number': number, 'phase': snapshot.phase.value})
+                result = runtime.execute_next()
+                if result is None:
+                    raise RuntimeError('Unsupported/incomplete phase; continuation blocked')
+                emit({'event': 'PHASE_RESULT', 'number': number, 'run_status': result.run.status.value,
+                      'next_phase': result.run.phase.value})
+                if result.run.status not in (RunStatus.RUNNING, RunStatus.COMPLETED):
+                    raise RuntimeError('Run did not remain successful; continuation blocked')
+            if result.run.status is not RunStatus.COMPLETED:
+                raise RuntimeError('Whole dry demo did not complete')
+            state = runtime._session._state
+            if (any(p.position_steps != 20500 for p in state.pumps)
+                or any(v.position_degrees not in (90, 180) for v in state.valve_positions)
+                or state.column_position_degrees != 4 or state.sf_bottom_valve is not BottomValveState.CLOSED
+                or state.carousel_position != 2 or device.sf_mixer_running is not False):
+                raise RuntimeError('Unexpected successful final actuator state')
+            if expected_sends is not None and sent != expected_sends:
+                raise RuntimeError('Actual scope differs from full dry preview')
+            runtime._owner.idle_generation()
+            emit({'event': 'SOFTWARE_SEQUENCE_COMPLETED', 'run_id': run_id,
+                  'final_state': state.model_dump(mode='json'), 'sf_mixer_running': False,
+                  'terminal_home_parking_required': False,
+                  'physical_observations': 'Require separate operator confirmation'})
+    finally:
+        device.close()  # No ad hoc retry or cleanup movement.
+    return sent
+
+
+def fake_adapters():
+    # Only fake transport implementations, never fixture calibration/context.
+    from tests.test_prepared_adapter_execution import CommandPort, FollowingSession
+    from tests.test_arduino_serial import NONCE, Clock
+    from app.hardware.sf_bottom_valve import REGISTERS
+    port = CommandPort()
+    client = ArduinoSerialClient(ArduinoSerialConfiguration(port='/dev/fake', command_timeout_seconds=.1),
+        port_factory=lambda _: port, nonce_factory=lambda: NONCE, sleep=lambda _: None, monotonic=Clock())
+    sessions = []
+    position = [2559]
+
+    class PersistentSession(FollowingSession):
+        def read(self, device_id, register):
+            if register == REGISTERS['present_position']:
+                return position[0]
+            return super().read(device_id, register)
+
+        def write(self, device_id, register, value):
+            super().write(device_id, register, value)
+            if register == REGISTERS['goal_position']:
+                position[0] = value
+
+    def factory(_):
+        s = PersistentSession()
+        s.values[REGISTERS['torque_enable']] = 0
+        sessions.append(s)
+        return s
+
+    sf = SfBottomValveActuator(SfBottomValveConfiguration(port='/dev/fake-sf'), session_factory=factory, sleep=lambda _: None)
+    return client, sf, port, sessions
+
+
+def preview():
+    from tests.test_owned_pausable_demo import Clock
+    client, sf, _, _ = fake_adapters()
+    events = []
+    try:
+        client.connect()
+        with tempfile.TemporaryDirectory(prefix='labforge-full-dry-preview-') as temp:
+            sends = run(client, sf, Path(temp), Clock().timer(), events.append)
+    finally:
+        client.close()
+    return sends, events
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--execute', action='store_true')
+    parser.add_argument('--procedure-approved', action='store_true')
+    parser.add_argument('--conditions-confirmed', action='store_true')
+    args = parser.parse_args()
+    if args.execute and not (args.procedure_approved and args.conditions_confirmed):
+        parser.error('Fresh dry/power/bottom CLOSED/Reactor OFF/carousel 1/safe SF direction and full-block approval required')
+    sends, events = preview()
+    fingerprint = hashlib.sha256(json.dumps(sends, sort_keys=True).encode()).hexdigest()
+    if not args.execute:
+        print(json.dumps({'mode': 'FAKE_TRANSPORT_PREVIEW_ONLY', 'scope_sha256': fingerprint,
+                          'configuration': CONFIGURATION.model_dump(mode='json'),
+                          'settings': SETTINGS.model_dump(mode='json'), 'sends': sends,
+                          'phases': [e for e in events if e['event'] == 'PHASE_START']}, indent=2))
+        return
+    print('WAITING_FOR_RUN_BLOCK: EMPTY system; bootstrap then 10 phases; real adapters; no production activation.', flush=True)
+    if sys.stdin.readline().strip() != 'RUN_BLOCK':
+        print('BLOCK_CANCELLED_BEFORE_PORT_OPEN', flush=True)
+        return
+    directory = DOC_ROOT / ('full-dry-demo-' + str(uuid4()))
+    directory.mkdir(exist_ok=False)
+    (directory / 'checked-preview.json').write_text(json.dumps({'scope_sha256': fingerprint, 'sends': sends}, indent=2)+'\n')
+    with (directory / 'events.jsonl').open('x') as log:
+        def emit(event):
+            event['observed_at_utc'] = datetime.now(UTC).isoformat()
+            line = json.dumps(event)
+            log.write(line+'\n')
+            log.flush()
+            os.fsync(log.fileno())
+            print(line, flush=True)
+        client = ArduinoSerialClient(ArduinoSerialConfiguration(port=ARDUINO_PORT))
+        try:
+            emit({'event': 'OPERATOR_PREREQUISITES', 'system_empty': True, 'motor_power_ready': True,
+                  'sf_column_bottom_closed': True, 'reactor_mixer_stopped': True, 'carousel_aligned_position': 1,
+                  'sf_mixer_direction_safe': 'existing DIR=LOW', 'source': 'Fresh user statements; not sensors',
+                  'scope_sha256': fingerprint, 'evidence_directory': str(directory)})
+            hello = client.connect()
+            emit({'event': 'SESSION', 'hello': hello.model_dump(mode='json')})
+            sf = SfBottomValveActuator(SfBottomValveConfiguration(port=SF_PORT))
+            run(client, sf, directory, MonotonicExecutionTimer(), emit, expected_sends=sends)
+        except BaseException as error:
+            emit({'event': 'SEQUENCE_ERROR_NO_RETRY', 'error_type': type(error).__name__, 'error': str(error)})
+            raise
+        finally:
+            client.close()
+            emit({'event': 'CONNECTION_CLOSED', 'no_ad_hoc_cleanup_motion_sent': True})
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,87 @@
+{
+  "recorded_at_utc": "2026-10-09T17:55:19.786132+00:00",
+  "firmware_commit": "e2e9d3c5be17cdf703a684e29a6c9dd4a54ec735",
+  "controller_boot_id": 92,
+  "completed_commands": 12,
+  "journal_completed_entries": 12,
+  "process_exit_code": 0,
+  "operator_physical_confirmation": "User confirmed P2 HOME -> 1000 -> HOME -> terminal 1000 normal, HOME lever released",
+  "connection_closed": true,
+  "retry_or_cleanup_motion": false,
+  "wet_or_full_demo_acceptance": false,
+  "historical_positions_are_fresh_reconnect_references": false,
+  "sequence": [
+    {
+      "number": 1,
+      "label": "HOME V3",
+      "operation_command_id": "a3491333-c69b-4fc9-8d52-d0a9a37b7462",
+      "state": "COMPLETED"
+    },
+    {
+      "number": 2,
+      "label": "HOME V7",
+      "operation_command_id": "7c20fb8e-98f2-405f-b156-e5f38f66cc13",
+      "state": "COMPLETED"
+    },
+    {
+      "number": 3,
+      "label": "HOME V8",
+      "operation_command_id": "85cfa468-e4de-4989-81d9-7a2cc66eb6e7",
+      "state": "COMPLETED"
+    },
+    {
+      "number": 4,
+      "label": "HOME V5",
+      "operation_command_id": "04187540-b645-4719-ba18-27174d34517d",
+      "state": "COMPLETED"
+    },
+    {
+      "number": 5,
+      "label": "P2_TO_WASTE",
+      "operation_command_id": "c1d6413a-2b78-541a-90b4-1f578f712f3d",
+      "state": "COMPLETED"
+    },
+    {
+      "number": 6,
+      "label": "P2_TO_WASTE",
+      "operation_command_id": "afa36a8b-7867-585a-a1b7-bb4865ec7978",
+      "state": "COMPLETED"
+    },
+    {
+      "number": 7,
+      "label": "P2_TO_WASTE",
+      "operation_command_id": "59f01525-e7c8-5b90-8c5a-7de919e9e9a2",
+      "state": "COMPLETED"
+    },
+    {
+      "number": 8,
+      "label": "P2_TO_WASTE",
+      "operation_command_id": "d1b99609-7c6d-504f-a154-0414508ba12b",
+      "state": "COMPLETED"
+    },
+    {
+      "number": 9,
+      "label": "P2 PUMP_HOME",
+      "operation_command_id": "1acc0301-cae9-4a24-b0a8-f2fb9049b032",
+      "state": "COMPLETED"
+    },
+    {
+      "number": 10,
+      "label": "P2 PUMP_MOVE_ABSOLUTE_STEPS",
+      "operation_command_id": "f6a0cbd4-d9ee-4988-99fb-55c13f8bc1d9",
+      "state": "COMPLETED"
+    },
+    {
+      "number": 11,
+      "label": "P2 PUMP_HOME",
+      "operation_command_id": "f006732a-d78d-40e3-8d7c-8522ad279ab1",
+      "state": "COMPLETED"
+    },
+    {
+      "number": 12,
+      "label": "Final P2 parking to 1000 steps",
+      "operation_command_id": "bffc3769-c989-445b-8a3a-911bbd248689",
+      "state": "COMPLETED"
+    }
+  ]
+}

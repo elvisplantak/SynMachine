@@ -1,6 +1,65 @@
 # Hardware confirmations
 
-## Terminal HOME release request — 2026-10-09, trial pending
+## Whole supervised empty-system demo accepted — 2026-10-09, boot 94
+
+Boot93 first handshook Arduino but SF read-only identity probe returned
+There is no status packet. Verified zero actuator commands/phase plans/waits;
+exit1, closed, no retry/cleanup. Its probe owner remains BLOCKED and unchanged.
+The user clarified SF servo power had been OFF, switched it ON and explicitly
+requested repeating. A separately authorized fresh attempt followed only because
+the first attempt proved no actuation; no unresolved physical command was retried,
+no blocked owner adopted/released, no journal replayed. In boot94 the existing
+SF adapter read present_position2573, torque OFF, CLOSED within tolerance.
+
+Bootstrap plus all ten existing Guided Demo phases completed normally in one
+Arduino session: 57 Arduino + 4 SF commands, 6 timed waits, all durable entries
+COMPLETED; exit0 and connection closed. About 7 minutes15 seconds elapsed. Scope
+was empty system, nominal10ml (S6/B1 1.6/B2 2.4), Reactor mixer OFF, SF mixing10s,
+settling5s and two5s fractions. Carousel reference1 used fresh user alignment;
+actual move1-to-2 occurred while Column CLOSED. User saw the full sequence and
+confirmed all pumps/valves/SF mixer/SF bottom/Column/carousel operated normally
+without binding or unusual sound. This establishes this dry end-to-end sequence.
+It does not confirm wet flow/sealing/delivered volume, general startup/Recovery
+HOME orders, production profile, or Reactor mixer control.
+
+Final command-confirmed P1=P2=20500; V1=180,V2=90,V4=90,V6=90,V3=180,V7=90,
+V8=90,V5=90; SF bottom CLOSED, Column CLOSED4, SF mixer OFF, carousel2. No
+actuator left at HOME, hence no terminal parking required. These positions are
+historical after close, not current-session references for a later reconnect.
+No host connection/queued motion remains; motor power last confirmed ON.
+Installed firmware remains e2e9d3c, no new upload. Events/SQL/result verification:
+docs/commissioning/2026-10-09/full-dry-demo-56594eb7-bbbb-4525-9254-e99d585a01c6/.
+
+## Terminal release dry acceptance and full-demo prerequisites — 2026-10-09
+
+Following explicit empty-system/power-ready/closed-bottom/Reactor-stopped approval,
+boot 91 completed 16 commands: HOME V1/V2/V4/V6/V3/V7/V8/V5, then terminal nominal
+5 degrees in the same order. All durable results were COMPLETED and the host
+closed without retry or cleanup. Pumps and other actuators were not commanded.
+The user subsequently confirmed all V1-V8 offsets normal and HOME levers released.
+This establishes this dry 22-step (4.95-degree) release, not safe wet alignment.
+
+Boot 92 completed the P2-only 12-command block: HOME V3/V7/V8/V5; select P2 Waste
+V5=180 -> V8=90 -> V7=90 -> V3=180; P2 HOME -> 1000 -> HOME -> terminal 1000.
+All durable results were COMPLETED; exit 0, connection closed, no error/retry/
+cleanup. P1 remained uncommanded. The user confirmed P2 normal movement and
+HOME-lever release. This dry P2 short-stroke/parking check is accepted; it is not
+new measured-volume calibration. Historical positions do not establish fresh
+references on reconnect. Installed firmware remains e2e9d3c, no new upload.
+Evidence/events/SQL/result verification: docs/commissioning/2026-10-09/
+valve-park-dry-88a0ba90-c9df-4aab-9929-28d27acc954a/ and
+p2-pump-dry-2282ffd4-54ee-4598-a071-3cd01b5dee9d/.
+
+The user approved continuing into one whole supervised empty-system demo, stated
+that components are connected, and explicitly confirmed carousel aligned at tube
+1 and installed SF mixing element safe in existing DIR=LOW clockwise direction
+viewed from motor front. Motor power last confirmed ON; Reactor remains stopped.
+These are fresh operator statements, not sensor readings or generic wet-startup
+approval. No new Reactor mixer control/pins are inferred from connected hardware.
+The full dry demo subsequently completed and was physically confirmed as below.
+Production profile, wet acceptance, UVP and animation remain gated.
+
+## Terminal HOME release request — earlier preparation, 2026-10-09
 
 The user selected a separate end-of-whole-test/procedure movement for actuators
 left at HOME: P1/P2 to 1000 absolute steps and V1-V8 to nominal 5 degrees. The

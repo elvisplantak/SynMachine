@@ -15,3 +15,6 @@ out/
 .venv-platformio/
 __pycache__/
 *.py[cod]
+/docs/commissioning/**/owner.sqlite3
+/docs/commissioning/**/execution.sqlite3
+/docs/commissioning/**/lifecycle.sqlite3

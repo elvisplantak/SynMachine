@@ -304,3 +304,120 @@ and whitespace/status checks suffice for this physical evidence checkpoint;
 passing 211 native tests and the build remain those for installed e2e9d3c.
 The next valve parking trial and P2 check require separate exact authorization
 and fresh stated readiness. GitHub push remains deferred.
+
+
+## Valve terminal parking and P2 accepted dry results
+
+Boot 91: all 16 V1-V8 HOME/nominal-5-degree terminal commands COMPLETED; the user
+confirmed normal release on all valves. Boot 92: all 12 P2-only Waste/HOME/1000/
+HOME/terminal-1000 commands COMPLETED; the user confirmed normal P2 release.
+Both hosts exited 0 and closed without retry/cleanup. Events, original local
+SQLite, exported SQL and result-verification JSON are in the corresponding
+valve-park-dry-88a0ba90-c9df-4aab-9929-28d27acc954a/ and
+p2-pump-dry-2282ffd4-54ee-4598-a071-3cd01b5dee9d/ directories.
+P2-only host verification passed 20 fake-only checks. Reproducible snapshots:
+p2-pump-runner.py.txt and p2-pump-offline-checks.py.txt. Dependencies remain the
+previous sequential P1 helper and terminal-parking helper. Dry valve release
+is not wet-route alignment, and saved positions are historical after reconnect.
+
+## Whole dry demo prepared through existing owned execution
+
+The user authorized one continuous empty-system run after the isolated blocks
+and confirmed carousel tube 1 plus safe existing SF mixer direction. Scope is
+10 ml DEMO_NOMINAL (S=6, B1=1.6, B2=2.4), 1025 steps/ml, no liquid or measured
+volume claim. Bootstrap in one Arduino session uses read-only identity/state
+preflight, owned durable SF CLOSE and mixer STOP, Column HOME -> CLOSED 4, all
+8 route-valve HOME, verified Waste destinations then each pump HOME -> 20500,
+and no-motion carousel reference 1. Empty-system HOME order is isolated dry
+commissioning only, not a wet startup/Recovery procedure.
+
+The same three SQLite databases and ownership/command executors are retained.
+Only after every bootstrap command succeeds, a new unused PreparedAdapterDevice
+receives current-process/current-boot completed-command state; Arduino is never
+reconnected. OwnedOfflineRuntime.start_created_run and its existing ten phase
+builders perform the demo. No test-fixture calibration/context, new execution
+engine, API, profile loader, production activation or EEPROM provisioning.
+
+Sequence: S -> B1 -> 5-second wait -> B2 -> 60-second reaction wait (Reactor motor
+OFF) -> Reactor to SF -> 10-second SF mixing -> 5-second settling -> SF bottom
+to P2 -> P2 to Column -> two 5-second fractions with Column CLOSED during carousel
+1-to-2 movement. Speed percentages remain command/preview metadata; actual
+firmware pump/valve/mixer timings remain installed constants. End state: pumps
+20500, all V1-V8 at 90/180, SF/Column CLOSED, SF mixer OFF, carousel 2; no actuator
+left at HOME, hence no extra terminal parking needed.
+
+Default runner is fake transport preview. Real execution requires explicit
+procedure/conditions flags and RUN_BLOCK before port open, compares every send
+with the whole checked preview, and logs durable-intent-before-transport events.
+Failure/unknown results stop progression and retain unresolved ownership. Existing
+required mixer STOP/SF CLOSE/Column CLOSE followups remain intact; the host adds
+no ad hoc cleanup or retry. Existing files cannot be reprovisioned or replayed.
+This remains a supervised isolated dry composition, not production UI activation.
+
+Verification: 15 new fake checks and 211 relevant existing owned-runtime/adapter/
+phase/timed/pause checks passed. New coverage includes intent plus ownership
+before every send, bootstrap failure/unknown, SF observation mismatch, same-session
+handoff, send-scope mismatch, no-port cancellation, no re-provision/replay, mixer
+required STOP and SF aspiration required CLOSE while retaining failed ownership.
+Full preview has 57 Arduino + 4 SF commands and 90 seconds configured dwell.
+Scope SHA-256: cee872f2824cbd84c1ef94aa93cb197b2a27905623c75940f308f850ff47333b.
+Snapshots: full-dry-demo-runner.py.txt and full-dry-demo-offline-checks.py.txt;
+checked preview and preparation verification JSON are adjacent. Physical full
+completion/observation is still pending. No firmware/backend/UI code changed.
+GitHub pushes remain deferred.
+
+
+## First full-demo attempt stopped before actuation; authorized fresh repeat
+
+Boot 93 successfully handshook Arduino but the read-only SF identity probe failed
+with HardwareCommandError: [TxRxResult] There is no status packet! No actuator
+command, phase plan or wait was sent/created. The host exited 1 and closed with
+no retry or cleanup. The probe owner remains BLOCKED in its original bundle;
+no owner was released, repaired or journal overwritten. SQL and verification:
+full-dry-demo-21cd33b5-d901-4593-9551-a24beffaf01b/.
+
+The user subsequently clarified SF servo power had actually been OFF, turned it
+ON and explicitly requested repeating the entire test. This explains the missing
+response as an operator report, not an electrically measured diagnosis. A new
+explicit attempt is justified by proven zero actuation in the first attempt and
+fresh power readiness; it does not replay or adopt its retained owner/history.
+The additional fake SF-ping-failure regression passed; full composition now has
+15 fake checks (existing relevant suite 211 already passed).
+
+The new attempt full-dry-demo-56594eb7-bbbb-4525-9254-e99d585a01c6/ ran in boot94.
+SF identity/state probe succeeded at present_position2573, torque OFF/CLOSED
+within existing tolerance. Its completed result is recorded below.
+
+
+## Whole dry demo completed and physically confirmed — boot 94
+
+The explicitly authorized fresh attempt completed in 435.485 seconds (about
+7 minutes 15 seconds), exit 0. All 57 Arduino and 4 SF durable journal entries
+are COMPLETED, exactly matching the checked preview in order and unique IDs.
+All 10 prepared phases and 6 waits (90 seconds configured dwell total) completed;
+all 34 owned sequences completed with no retained owner in this new bundle.
+Its persisted offline machine is READY and run COMPLETED; no production
+application was activated. The previous boot93 no-motion probe remains BLOCKED
+and unchanged in its separate original bundle. No automatic retry/replay occurred.
+
+The user subsequently confirmed seeing the entire pump/valve/SF mixer/SF bottom/
+Column/carousel sequence and that all physical motion was normal, without binding
+or unusual sound. This supervised empty-system end-to-end demo is accepted dry.
+Wet flow, sealing, actual delivered volumes and a general startup/Recovery/flush
+procedure remain separate unconfirmed scopes. Reactor mixer was OFF throughout;
+no new Reactor actuation was implemented or tested.
+
+Final command-confirmed positions: P1=P2=20500; V1=180,V2=90,V4=90,V6=90,V3=180,
+V7=90,V8=90,V5=90; SF bottom CLOSED, Column CLOSED4, SF mixer OFF, carousel tube2.
+No actuator remained at HOME, so no terminal parking suffix was needed. Positions
+are historical after connection close and cannot serve as fresh reconnect trust.
+The host closed; no active process or queued movement remains. Last motor power
+confirmation remains ON. Any next physical scope needs its own readiness/approval.
+
+Evidence: full-dry-demo-56594eb7-bbbb-4525-9254-e99d585a01c6/events.jsonl,
+checked-preview.json, owner.sql, execution.sql, lifecycle.sql and
+result-verification.json. Local SQLite originals remain ignored and preserved.
+Software verification remains 15 new whole-demo fake checks, 20 P2-only checks
+and 211 existing relevant owned execution checks passed; installed firmware tests/
+build/resources remain unchanged (211 native, 41056 flash,3148 SRAM). No code
+change or upload occurred during this full physical execution. GitHub push deferred.
