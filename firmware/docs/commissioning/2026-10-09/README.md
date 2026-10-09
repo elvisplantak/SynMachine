@@ -118,3 +118,43 @@ additional travel allowance or successful full-span regression is inferred.
 Motor power OFF was requested after the failure but is not yet confirmed.
 Evidence: `pump-dry-fa3ce511-3f30-4170-9fed-c68eb98a897e/events.jsonl` and
 `commands.sql`; the original SQLite journal is retained locally and ignored.
+
+The user subsequently reported P1 seated at HOME and pressing the switch, with
+normal sound. This is a mechanical observation; no electrical input or timing
+was measured. The user subsequently confirmed motor power OFF. The software
+command remains FAILED and position untrusted. Source inspection found a timing
+edge: if HOME is inactive on the immediate read after pulse 20500, the controller
+finishes with timeout and cannot observe a later activation. Pre-correction native
+coverage activates the fake input inside the final pulse and did not establish
+behavior for a mechanically delayed signal. This is a candidate explanation,
+not proof of the physical failure's cause. No code change, upload, Serial reopen
+or additional movement was performed during this follow-up inspection.
+
+## Prepared final HOME signal wait — software verified, not uploaded
+
+The new native delayed-input regression failed on the installed source: its
+fake switch activates after the final STEP pulse and the command has already
+terminated. This proves a software timing edge, not the cause of boot 87's
+physical failure. The shared P1/P2 controller now holds STEP inactive at the
+20500-pulse search limit if HOME is initially inactive. It permits an observed
+activation strictly before 30 ms from the final pulse, then requires the existing
+30 ms continuous-active confirmation. Missing/deadline-late input fails with
+PUMP_MOTION_TIMEOUT; a candidate that goes inactive at the search limit also
+fails immediately. The wait is not restarted, and no additional pulse occurs.
+The 30 ms arrival budget is software policy, not measured mechanical settling.
+Targets, pins, polarity, pump speed, ordinary homing and command schemas are unchanged.
+
+Verification after the correction: 46 focused controller/runtime tests passed;
+all 204 warning-enabled native tests passed (-Wall -Wextra -Werror). Seven new
+tests cover delayed signal, last permitted arrival across clock wrap, deadline
+rejection, glitch/abort without extra motion, and both pumps' lifecycle/cache
+completion/failure replay without retry. The existing missing-HOME bound test
+now also checks the motionless deadline. Mega 2560 build passed: 40880 flash
+bytes (+74 over installed firmware), 3140 static SRAM bytes (unchanged).
+Prepared HEX SHA-256:
+`8b87d2fb0b0cc2efbd4544b0ac5d6755d5a62a7799f0d6008daff1668da57a8b`.
+Self-review and diff checks passed. No upload or new hardware communication was
+performed; installed firmware remains caef934 and its separate upload evidence
+above is unchanged. The failed physical journal remains FAILED. Upload and a
+new bounded dry recheck require separate authorization/readiness. No increase
+of travel allowance or wet/full-demo acceptance is inferred. GitHub push is deferred.

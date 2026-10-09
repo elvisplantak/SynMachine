@@ -420,7 +420,15 @@ stable active signal may then use at most 400 away pulses to release HOME before
 searching again; a stable inactive signal is inconsistent with trusted zero and
 fails closed without movement toward HOME. HOME activation and release must
 remain stable for 30 ms while motion is paused before they affect state or
-establish trusted zero. The integrated pump runtime must call the nonblocking
+establish trusted zero. At the 20,500-pulse HOME search limit, an immediately
+inactive input now enters a motionless final-signal wait. The input must become
+active before 30 ms from the final pulse, then remain continuously active for
+the existing 30 ms stability interval. Reaching the arrival deadline without
+an observed active signal, or losing that signal during confirmation at the
+search limit, fails with `PUMP_MOTION_TIMEOUT`; no extra pulse, restarted wait,
+or position-trust restoration is permitted. This is a bounded software timing
+policy, not a measured switch-settling fact or an increase in travel allowance.
+The integrated pump runtime must call the nonblocking
 `update()` method regularly at a cadence materially shorter than this interval so the
 sampling-based stability policy is meaningful; blocking delays are prohibited.
 Absolute

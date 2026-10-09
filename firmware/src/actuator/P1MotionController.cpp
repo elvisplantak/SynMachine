@@ -87,6 +87,17 @@ P1MotionResult P1MotionController::update(uint32_t nowUs) {
     return P1MotionResult::NONE;
   }
 
+  if (state_ == P1MotionState::WAITING_FINAL_HOME_SIGNAL) {
+    // The final electrical pulse can precede mechanical switch activation.
+    // Hold STEP inactive; a late input never authorizes another search pulse.
+    // Reuse the existing 30 ms interval as a bounded software arrival budget.
+    if (timeReached(nowUs, homeStableSinceUs_ + kP1HomeStableUs))
+      return finish(P1MotionResult::MOTION_TIMEOUT);
+    if (io_.homeActive())
+      pauseForHomeStability(P1MotionState::CONFIRMING_HOME_ACTIVE, nowUs);
+    return P1MotionResult::NONE;
+  }
+
   if (state_ == P1MotionState::CONFIRMING_HOME_ACTIVE) {
     if (!io_.homeActive()) {
       if (stageSteps_ >= kP1MaximumAbsoluteSteps)
@@ -184,7 +195,8 @@ P1MotionResult P1MotionController::update(uint32_t nowUs) {
       pauseForHomeStability(P1MotionState::CONFIRMING_HOME_ACTIVE, nowUs);
       return P1MotionResult::NONE;
     }
-    return finish(P1MotionResult::MOTION_TIMEOUT);
+    pauseForHomeStability(P1MotionState::WAITING_FINAL_HOME_SIGNAL, nowUs);
+    return P1MotionResult::NONE;
   }
   if (state_ == P1MotionState::MOVING) {
     if (releasingHomeDuringMove_ && positionSteps_ == targetSteps_) {

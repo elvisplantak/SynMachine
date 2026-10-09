@@ -595,6 +595,84 @@ void test_p2_is_rejected_when_runtime_has_no_p2_controller() {
   TEST_ASSERT_EQUAL_UINT32(0, p1Io.risingEdges);
 }
 
+void check_final_home_wait_lifecycle(bool delayedSignal) {
+  for (unsigned selected = 0; selected < 2; ++selected) {
+    FakeIo p1Io;
+    FakeIo p2Io;
+    P1MotionController p1Controller(p1Io);
+    P1MotionController p2Controller(p2Io);
+    FakeIo& io = selected == 0 ? p1Io : p2Io;
+    FakeIo& otherIo = selected == 0 ? p2Io : p1Io;
+    P1MotionController& controller =
+        selected == 0 ? p1Controller : p2Controller;
+    P1CommandRuntime runtime(p1Controller, p2Controller);
+    SessionState session;
+    establishSession(session);
+    CommandStatusCache cache;
+    char command[384];
+    makeCommand(command, sizeof(command), "PUMP_HOME",
+                selected == 0 ? "{\"pump\":\"P1\"}" : "{\"pump\":\"P2\"}");
+    uint8_t output[kCommandLifecycleFrameCapacity]{};
+    dispatch(runtime, session, cache, command, output, sizeof(output));
+    size_t length = 0;
+    bool startsMotion = false;
+    TEST_ASSERT_TRUE(runtime.nextLifecycleFrame(
+        IDENTITY, cache, output, sizeof(output), length, startsMotion));
+    TEST_ASSERT_TRUE(runtime.confirmStartedFrameWritten(0, cache));
+    uint32_t nowUs = kP1DirectionSetupUs;
+    for (uint32_t i = 0; i < kP1MaximumAbsoluteSteps; ++i) {
+      runtime.update(nowUs, cache);
+      nowUs += kP1StepIntervalUs;
+    }
+    const uint32_t finalPulseUs = nowUs - kP1StepIntervalUs;
+    TEST_ASSERT_EQUAL(CommandState::STARTED, cache.find(OPERATION)->record.state);
+    TEST_ASSERT_TRUE(controller.busy());
+    TEST_ASSERT_FALSE(runtime.hasPendingLifecycleFrame());
+    dispatch(runtime, session, cache, command, output, sizeof(output));
+    TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                                "\"type\":\"STARTED\""));
+    if (delayedSignal) {
+      io.home = true;
+      runtime.update(nowUs, cache);
+      runtime.update(nowUs + kP1HomeStableUs - 1, cache);
+      TEST_ASSERT_EQUAL(CommandState::STARTED, cache.find(OPERATION)->record.state);
+      runtime.update(nowUs + kP1HomeStableUs, cache);
+    } else {
+      runtime.update(finalPulseUs + kP1HomeStableUs, cache);
+    }
+    TEST_ASSERT_TRUE(runtime.nextLifecycleFrame(
+        IDENTITY, cache, output, sizeof(output), length, startsMotion));
+    TEST_ASSERT_FALSE(startsMotion);
+    const CommandState terminal = delayedSignal ? CommandState::COMPLETED
+                                               : CommandState::FAILED;
+    const char* terminalType = delayedSignal ? "\"type\":\"COMPLETED\""
+                                            : "\"type\":\"FAILED\"";
+    TEST_ASSERT_EQUAL(terminal, cache.find(OPERATION)->record.state);
+    TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output), terminalType));
+    if (!delayedSignal) {
+      TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output),
+                                  "\"error_code\":\"PUMP_MOTION_TIMEOUT\""));
+      TEST_ASSERT_TRUE(cache.find(OPERATION)->record.executionStarted);
+      TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED, controller.positionTrust());
+    }
+    dispatch(runtime, session, cache, command, output, sizeof(output));
+    TEST_ASSERT_NOT_NULL(strstr(reinterpret_cast<char*>(output), terminalType));
+    TEST_ASSERT_EQUAL_UINT32(kP1MaximumAbsoluteSteps, io.risingEdges);
+    TEST_ASSERT_FALSE(io.step);
+    TEST_ASSERT_EQUAL_UINT32(1, io.directionWrites);
+    TEST_ASSERT_EQUAL_UINT32(0, otherIo.risingEdges);
+    TEST_ASSERT_EQUAL_UINT32(0, otherIo.directionWrites);
+  }
+}
+
+void test_both_pumps_delay_terminal_home_until_stable_late_signal() {
+  check_final_home_wait_lifecycle(true);
+}
+
+void test_both_pumps_cache_missing_final_home_failure_without_retry() {
+  check_final_home_wait_lifecycle(false);
+}
+
 }  // namespace
 
 int main(int, char**) {
@@ -615,5 +693,7 @@ int main(int, char**) {
   RUN_TEST(test_home_completion_is_cached_and_duplicate_only_replays);
   RUN_TEST(test_p2_command_selects_only_p2_controller);
   RUN_TEST(test_p2_is_rejected_when_runtime_has_no_p2_controller);
+  RUN_TEST(test_both_pumps_delay_terminal_home_until_stable_late_signal);
+  RUN_TEST(test_both_pumps_cache_missing_final_home_failure_without_retry);
   return UNITY_END();
 }

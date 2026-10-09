@@ -65,6 +65,22 @@ motor power OFF was requested but is not yet confirmed. No full-span pump
 acceptance or limit change is claimed. Evidence:
 `docs/commissioning/2026-10-09/pump-dry-fa3ce511-3f30-4170-9fed-c68eb98a897e/`.
 
+The user subsequently observed P1 seated at HOME, pressing the switch, with
+normal sound. This confirms the visible mechanical arrival, not the electrical
+HOME level or its timing at the final pulse. The failed command remains FAILED;
+this observation does not establish trusted coordinate zero. The user subsequently
+confirmed motor power OFF. Inspection of installed source shows that after the
+final permitted pulse an inactive immediate read terminates HOME without waiting for later activation;
+activation after that read is a possible explanation, not an established cause.
+
+A software-only correction is now prepared and natively verified; see
+`docs/commissioning/2026-10-09/README.md` and the serial protocol's pump HOME
+section. It waits motionless for a late signal without increasing search travel.
+This is not a measured switch-settling fact or a confirmed repair of the physical
+failure. The installed firmware remains `caef934`; no corrective upload, Serial
+reopen or new motion has occurred. Full-span HOME and P2 pump acceptance remain
+pending. Separate upload authorization and NEW powered-test readiness are required.
+
 ## Current supervised P1 dry-check checkpoint — 2026-10-07
 
 The user authorized a valve-only dry P1 procedure with stationary pumps and an
