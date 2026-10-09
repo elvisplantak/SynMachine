@@ -16,5 +16,7 @@
   "physical_terminal_parking_verified": false,
   "physical_full_span_pump_home_verified": false,
   "next_powered_check": "NEW readiness and exact approval required; dry P1 Waste setup then HOME -> 20500 -> HOME -> 1000; halt on any failure",
-  "log_file": "terminal-parking-upload.log.txt"
+  "log_file": "terminal-parking-upload.log.txt",
+  "raw_upload_log_sha256": "6d5fdc2be6fe76bfe68946665fee78275454208830a4ab9187cf4247e305622d",
+  "stored_log_trailing_whitespace_normalized": true
 }

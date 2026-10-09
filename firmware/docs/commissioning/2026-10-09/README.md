@@ -254,7 +254,8 @@ artifact, firmware e2e9d3c was uploaded to the confirmed Mega USB by-id device
 (resolved /dev/ttyACM1). Avrdude verified all 41056 flash bytes; upload exited 0.
 Post-upload HEX SHA-256 remains
 93e133bdc130583edfcd27a12ef61cbe396d0a2bf6dd972d913f3447a4745dcf.
-Static SRAM is 3148 bytes. Raw upload output: terminal-parking-upload.log.txt;
+Static SRAM is 3148 bytes. Upload output: terminal-parking-upload.log.txt
+(trailing whitespace normalized; original log SHA-256 is retained in the JSON);
 structured evidence: terminal-parking-upload-verification.json. Earlier uploads
 and boot 87's failed journal remain unchanged.
 
