@@ -6,7 +6,7 @@
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — terminal HOME release prepared, dry trial pending
+## Current checkpoint — terminal HOME release installed, dry trial pending
 
 - User selected a separate terminal movement at the end of the whole successful
   test/procedure, only for actuators left at HOME: P1/P2 to 1000 absolute steps,
@@ -34,11 +34,16 @@
   commands (HOME V1/V2 -> Waste -> P1 HOME -> 20500 -> HOME -> 1000), and a
   separate empty-system 16-command V1-V8 HOME -> terminal 5-degree trial with
   pumps stationary. Isolated dry HOME orders do not authorize wet Recovery.
-- This change has not been uploaded or physically tested. Installed Mega
-  firmware remains 8a5d93c; no Serial connection or queued command remains.
-  Motor power is last confirmed OFF. Upload requires separate approval.
-  Boot 87's failed journal and unproven root cause remain unchanged. P1 full-span
-  HOME/P2 pump acceptance and wet/demo acceptance remain pending.
+- After NEW explicit confirmation of motor power OFF and authorization, firmware
+  e2e9d3c was uploaded to the confirmed Mega by-id USB device (/dev/ttyACM1).
+  Avrdude verified all 41056 flash bytes; exit 0 and HEX SHA-256 matched the
+  prepared artifact. No actuator command or EEPROM provisioning occurred.
+  Evidence: firmware docs/commissioning/2026-10-09/terminal-parking-upload-verification.json
+  and its raw upload log. No subsequent Serial connection, physical test or
+  queued motion remains. Motor power is last confirmed OFF. NEW readiness and
+  exact authorization are required for either prepared dry scope.
+  Boot 87's failed journal and unproven root cause remain unchanged. Five-degree
+  HOME release, P1 full-span HOME/P2 pump and wet/demo acceptance remain pending.
 - Full production procedure parking through the UI is not activated; complete
   live profile and safe wet alignment remain prerequisites. Backend/UI code
   remains independently accepted 1c0e906/7e36cf7. UVP and animation remain deferred.
