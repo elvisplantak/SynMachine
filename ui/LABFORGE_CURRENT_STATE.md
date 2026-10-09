@@ -6,7 +6,7 @@
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — dry valves confirmed, P1 full-span HOME failed
+## Current checkpoint — final pump HOME signal wait prepared, upload pending
 
 - On 2026-10-09 the user requested continuation of supervised testing. Firmware
   `caef934` on `codex/sf-mixer-service-integration` implements the earlier request
@@ -53,10 +53,26 @@
   failure blocking HOME and absent full-span approval blocking Serial open.
   No firmware/production backend/UI code changed for this test. Events/SQL:
   firmware `docs/commissioning/2026-10-09/pump-dry-fa3ce511-3f30-4170-9fed-c68eb98a897e/`.
-  Operator physical observation is pending. Motor power OFF was requested after
-  failure, not yet confirmed. No host connection/queued command remains. Obtain
-  NEW readiness/approval before another powered check; no automatic retry or
-  increase of travel limits. Historical positions cannot restore trust on reconnect.
+  The user subsequently observed P1 seated at HOME, pressing the switch, with
+  normal sound, then confirmed motor power OFF. Electrical HOME level/timing
+  were not measured; failed journal and untrusted position remain unchanged.
+- The delayed-final-signal native regression failed on the installed source.
+  The shared P1/P2 controller correction now waits motionless for an observed
+  signal strictly before 30 ms after the final permitted pulse, then requires
+  30 ms continuous-active confirmation. Missing/late input or a dropped final
+  candidate fails without restarting the wait, any extra pulse or restored trust.
+  This is bounded software policy, not measured switch settling or proof of
+  boot 87's cause. Pins, targets, pump speed and command schemas are unchanged.
+- Verification: 46 focused controller/runtime tests and all 204 warning-enabled
+  native tests passed (-Wall -Wextra -Werror), including both pumps' lifecycle/
+  cached replay, deadline, glitch, abort and clock-wrap cases. Mega build passed:
+  40880 flash bytes (+74), 3140 static SRAM bytes (unchanged). Self-review and
+  diff checks passed. Protocol and commissioning evidence document the correction.
+  It is prepared only: installed firmware remains caef934. No corrective upload,
+  Serial reopen or powered movement occurred. No host connection/queued command
+  remains; motor power is confirmed OFF. Separate upload authorization and NEW
+  readiness/approval are required for the next bounded powered recheck. P1
+  full-span HOME/P2 pump acceptance, wet testing and full demo remain pending.
 - Upload evidence: firmware `docs/commissioning/2026-10-09/upload-verification.json`.
   GitHub pushes are deferred at the user's request; preserve local commits.
 - Canonical scope and readiness gates: firmware `HARDWARE_CONFIRMATIONS.md`.
