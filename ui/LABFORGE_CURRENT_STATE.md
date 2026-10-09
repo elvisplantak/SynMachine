@@ -1,10 +1,28 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-10-07
+- Checkpoint date: 2026-10-09
 - Development phase: fresh operator current-input software complete;
   independent review accepted for fake-only scope; physical profile incomplete and live activation gated
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
+
+## Current preparation — slower route valves, awaiting upload approval
+
+- On 2026-10-09 the user requested continuation of supervised testing. Firmware
+  `caef934` on `codex/sf-mixer-service-integration` implements the earlier request
+  for slower V1-V8 movement: STEP interval 2000 -> 4000 us for both HOME and
+  position moves, nominally half the previous pulse rate. Other actuator timing,
+  references, limits, HOME filtering and protocol are unchanged.
+- Focused controller/runtime checks: 18 passed. Complete warning-enabled native
+  suite: 197 passed (`-Wall -Wextra -Werror`). Mega 2560 build passed with unchanged
+  40806 flash bytes / 3140 static SRAM bytes; diff checks passed.
+- No current serial connection, firmware upload or movement was performed.
+  Separate upload authorization and current motor-power OFF confirmation are
+  required next; then fresh empty-system/test approval and powered readiness for
+  bounded HOME V2 -> V2=90, before the remaining P1 valve procedure. The original
+  V2 fault remains unresolved; this timing change is not a confirmed repair or
+  physical validation. Backend/UI implementation acceptance remains unchanged.
+- Canonical scope and readiness gates: firmware `HARDWARE_CONFIRMATIONS.md`.
 
 ## Latest physical checkpoint — partial P1 dry check, stopped by user
 
