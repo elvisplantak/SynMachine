@@ -10,7 +10,8 @@
 
 - Installed firmware remains e2e9d3c on codex/sf-mixer-service-integration;
   accepted production backend/UI code remains 1c0e906/7e36cf7. No new upload or
-  production activation. Local evidence/documentation commits; GitHub push deferred.
+  production activation. On 2026-10-09 the user authorized publishing all pending
+  firmware/UI feature-branch commits to GitHub; the earlier push deferral is lifted.
 - Boot 91 completed all 16 V1-V8 HOME -> terminal nominal 5-degree commands;
   the user confirmed normal physical release on all valves. Boot 92 completed
   all 12 P2-only Waste setup/HOME/1000/HOME/terminal 1000 commands; the user
@@ -52,8 +53,9 @@
   Evidence and helper/test/preview snapshots: firmware
   docs/commissioning/2026-10-09/README.md. Full result events/three SQL exports/JSON:
   full-dry-demo-56594eb7-bbbb-4525-9254-e99d585a01c6/.
-- Next scope: consolidated dry-execution review and a separately defined/approved
-  bounded wet check. Full physical profile, general wet startup/Recovery HOME
+- The user scheduled the liquid check for 2026-10-10. Next scope: consolidated
+  dry-execution review and a separately defined/approved bounded wet check with
+  fresh physical readiness; no hardware connection or movement is scheduled automatically. Full physical profile, general wet startup/Recovery HOME
   order, maintenance parameters and measured flow/sealing remain unconfirmed.
   Reactor mixer was OFF/uncommanded; no new wiring/control inferred from
   connected hardware. UVP and animation remain deferred until demo evaluation.
