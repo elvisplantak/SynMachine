@@ -6,7 +6,7 @@
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — slower route valves installed, powered check pending
+## Current checkpoint — grouped dry P1 confirmed, P2 awaiting observation
 
 - On 2026-10-09 the user requested continuation of supervised testing. Firmware
   `caef934` on `codex/sf-mixer-service-integration` implements the earlier request
@@ -16,14 +16,33 @@
 - Focused controller/runtime checks: 18 passed. Complete warning-enabled native
   suite: 197 passed (`-Wall -Wextra -Werror`). Mega 2560 build passed with unchanged
   40806 flash bytes / 3140 static SRAM bytes; diff checks passed.
-- The user subsequently confirmed motor power OFF and authorized upload.
-  Firmware `caef934` is now installed on the confirmed Mega (`/dev/ttyACM1`);
-  avrdude verified all 40806 flash bytes. No actuator command or EEPROM
-  provisioning was performed. Five fake-only host supervision checks passed.
-  Motor power is last confirmed OFF; new empty-system/test approval and powered
-  readiness are required for HOME V2 -> V2=90, with a pause after HOME, before
-  the remaining P1 valve procedure. Original V2 fault/speed validation remain
-  unresolved. Backend/UI implementation acceptance remains unchanged.
+- The user confirmed motor power OFF and authorized upload. Firmware `caef934`
+  is installed on the confirmed Mega (`/dev/ttyACM1`); avrdude verified all 40806
+  flash bytes. No actuator command or EEPROM provisioning occurred during upload.
+  With separately authorized readiness, boot 84 completed V2 HOME -> 90 without
+  error and closed. HOME/acceptable slower movement were operator-confirmed;
+  final 90-degree visual confirmation was not separately supplied.
+- Grouped dry P1: boot 85 completed all 19 valve commands on V1/V2/V4/V6 without
+  error/retry and closed. The user confirmed normal physical movement throughout,
+  without binding/unusual sound. Final commanded V1=180, V2=90, V4=90, V6=90.
+- Grouped dry P2: after the user approved the described block in reply to its
+  listed readiness/closure prerequisites, boot 86 completed all 25 valve commands
+  on V3/V7/V8/V5 without error/retry and closed. Guard states were operator
+  declarations, not sensor observations. Final commanded V3=90, V5=180, V7=90,
+  V8=90; operator confirmation of the P2 block is pending. P1/P2 pumps and all
+  bottom valves, mixers and carousel remained uncommanded in both blocks.
+- Nine/ten fake-only supervision checks passed for P1/P2 respectively, including
+  block failure/unknown-result stop, durable intent and cancellation; P2 additionally
+  checks missing closure/mixer prerequisites. The existing planner/Serial/durable
+  primitives were reused; no production backend/UI/firmware code changed after
+  the slowdown. Evidence, snapshots and SQL: firmware
+  `docs/commissioning/2026-10-09/README.md`.
+- The original V2 failure did not recur; its cause remains unproven. This selected
+  dry transition coverage does not establish flow/sealing/every route-history case
+  or a general startup/Recovery HOME procedure. Last motor readiness is ON; no
+  host connection/queued command remains. Historical positions cannot restore
+  trust on reconnect; obtain NEW readiness for the next powered check. Full live
+  profile, pump/wet/demo acceptance remain gated; accepted backend/UI code unchanged.
 - Upload evidence: firmware `docs/commissioning/2026-10-09/upload-verification.json`.
   GitHub pushes are deferred at the user's request; preserve local commits.
 - Canonical scope and readiness gates: firmware `HARDWARE_CONFIRMATIONS.md`.
