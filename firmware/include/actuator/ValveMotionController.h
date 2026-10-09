@@ -6,7 +6,7 @@ namespace labforge {
 
 constexpr uint16_t kValveStepsPer90Degrees = 400;
 constexpr uint16_t kValveMaximumSearchSteps = 1600;
-constexpr uint32_t kValveStepIntervalUs = 2000;
+constexpr uint32_t kValveStepIntervalUs = 4000;
 constexpr uint16_t kValveStepHighUs = 20;
 constexpr uint16_t kValveDirectionSetupUs = 5;
 constexpr uint32_t kValveHomeStableUs = 30000;

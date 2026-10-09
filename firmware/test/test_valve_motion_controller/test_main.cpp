@@ -215,6 +215,30 @@ void test_no_catch_up_burst_after_late_update() {
   TEST_ASSERT_EQUAL_UINT16(1, io.pulses);
   controller.update(now + 1000001);
   TEST_ASSERT_EQUAL_UINT16(1, io.pulses);
+  controller.update(now + 1000000 + kValveStepIntervalUs - 1);
+  TEST_ASSERT_EQUAL_UINT16(1, io.pulses);
+  controller.update(now + 1000000 + kValveStepIntervalUs);
+  TEST_ASSERT_EQUAL_UINT16(2, io.pulses);
+  controller.update(now + 1000000 + kValveStepIntervalUs);
+  TEST_ASSERT_EQUAL_UINT16(2, io.pulses);
+}
+
+void test_home_pulse_spacing_survives_clock_wrap() {
+  FakeIo io;
+  ValveMotionController controller(io, true);
+  const uint32_t start = UINT32_MAX - kValveStepIntervalUs / 2;
+  const uint32_t firstPulse = start + kValveDirectionSetupUs;
+  TEST_ASSERT_EQUAL(ValvePrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(start));
+  controller.update(firstPulse - 1);
+  TEST_ASSERT_EQUAL_UINT16(0, io.pulses);
+  controller.update(firstPulse);
+  TEST_ASSERT_EQUAL_UINT16(1, io.pulses);
+  controller.update(firstPulse + kValveStepIntervalUs - 1);
+  TEST_ASSERT_EQUAL_UINT16(1, io.pulses);
+  controller.update(firstPulse + kValveStepIntervalUs);
+  TEST_ASSERT_EQUAL_UINT16(2, io.pulses);
+  TEST_ASSERT_EQUAL(ValveMotionState::SEARCHING_HOME, controller.state());
 }
 
 void test_abort_invalidates_started_motion() {
@@ -312,6 +336,7 @@ int main(int, char**) {
   RUN_TEST(test_repeated_home_at_trusted_zero_ignores_short_low_glitch);
   RUN_TEST(test_repeated_home_at_trusted_zero_fails_closed_on_stable_low);
   RUN_TEST(test_no_catch_up_burst_after_late_update);
+  RUN_TEST(test_home_pulse_spacing_survives_clock_wrap);
   RUN_TEST(test_abort_invalidates_started_motion);
   RUN_TEST(test_missing_home_times_out_untrusted_with_step_inactive);
   RUN_TEST(test_home_stuck_during_release_fails_untrusted_with_step_inactive);

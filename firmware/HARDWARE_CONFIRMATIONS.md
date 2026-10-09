@@ -1,5 +1,27 @@
 # Hardware confirmations
 
+## Slower route-valve firmware prepared, not installed — 2026-10-09
+
+At the user's request to resume testing with slower valve movement, source now
+uses a 4000 us STEP interval for V1-V8 instead of 2000 us. This halves the nominal
+pulse rate from 500 to 250 steps/s; 400 steps per 90 degrees remains unchanged.
+The interval applies to both HOME searches and position moves. Pulse width,
+direction setup, HOME filtering, search/release bounds and failure behavior are
+unchanged. Pumps and other actuators retain their existing timing.
+
+This is a software preparation, not a confirmed physical speed or a repair of
+the original V2 `VALVE_HOME_SWITCH_UNEXPECTED` failure described below. Focused
+valve controller/runtime verification passed 18 tests; all 197 native tests passed
+with `-Wall -Wextra -Werror`. New/extended coverage checks pulse deadlines after
+delayed updates and HOME pulse spacing across clock wrap. Mega 2560 build passed:
+40806 flash bytes and 3140 static SRAM bytes, unchanged from the prior build.
+
+No serial port was opened, firmware uploaded or actuator moved during this
+preparation. Upload requires separate authorization and current motor-power OFF
+confirmation. Then obtain fresh empty-system/test approval and motor-power
+readiness for a bounded HOME V2 -> V2=90 check before returning to the incomplete
+P1 route procedure. Historical positions and readiness cannot be reused.
+
 ## Current supervised P1 dry-check checkpoint — 2026-10-07
 
 The user authorized a valve-only dry P1 procedure with stationary pumps and an
