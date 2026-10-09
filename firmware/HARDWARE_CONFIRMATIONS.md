@@ -1,6 +1,6 @@
 # Hardware confirmations
 
-## Slower route-valve firmware installed, powered check pending — 2026-10-09
+## Slower route-valve firmware and grouped dry checks — 2026-10-09
 
 At the user's request to resume testing with slower valve movement, source now
 uses a 4000 us STEP interval for V1-V8 instead of 2000 us. This halves the nominal
@@ -21,14 +21,34 @@ authorized upload. Production firmware `caef934` was uploaded to the confirmed
 Arduino Mega USB identity ending `14532303532351F0D070-if00` (`/dev/ttyACM1`).
 Avrdude verified all 40806 flash bytes against the built HEX; SHA-256:
 `d67e80eb8003c9b9fc2f8e35fc0d3c3f23175561c2671627e55f8f0739ce65d9`.
-No EEPROM provisioning or actuator command was performed. Motor power remains
-last confirmed OFF. The host runner was prepared for today's evidence directory;
+No EEPROM provisioning or actuator command was performed during upload. Motor
+power was confirmed OFF for upload. The host runner was prepared for today's evidence directory;
 five fake-only supervision checks and the offline two-command preview passed.
 
-Obtain fresh empty-system/test approval and motor-power readiness for a bounded
-HOME V2 -> V2=90 check before returning to the incomplete P1 route procedure.
-Pause after HOME for physical confirmation; stop without retry on any failed or
-unknown result. Historical positions and readiness cannot be reused. Evidence:
+The separately authorized boot-84 V2 recheck completed HOME and V2=90 without
+error and closed. The user confirmed HOME/acceptable slower movement; visual
+confirmation of the final 90-degree position is pending. This does not resolve
+the original fault. Motor power was last confirmed ON for this check.
+
+With fresh readiness, boot 85 completed the grouped dry P1 block: 19 commands on
+V1/V2/V4/V6, pumps stationary, no error/retry. The user confirmed that all movements
+were normal without binding or unusual sound. The earlier V2 error did not recur;
+its original cause remains unproven. Final commanded V1=180, V2=90, V4=90, V6=90.
+
+The user then approved the described P2 block in reply to listed prerequisites.
+Its planning guards were operator-declared empty system, power readiness, SF and
+Column bottom CLOSED and Reactor mixer OFF, not sensor measurements. Boot 86
+completed all 25 commands on V3/V7/V8/V5 without error/retry. Final commanded
+V3=90, V5=180, V7=90, V8=90; operator visual confirmation of this block is pending.
+No pump, mixer, bottom valve or carousel command was sent. Both connections closed.
+P1/P2 host supervision checks passed nine/ten fake-only tests respectively.
+
+The isolated four-valve HOME orders used in these empty-system checks are not a
+general startup/Recovery procedure. These selected transitions do not establish
+liquid flow, sealing or every route-history case. Historical positions/readiness
+cannot establish fresh trust on reconnect. Obtain NEW readiness before any next
+powered test. No pump/wet/full-demo acceptance is claimed. Scope and journals:
+`docs/commissioning/2026-10-09/README.md`. Upload evidence:
 `docs/commissioning/2026-10-09/upload-verification.json`. GitHub pushes are deferred
 at the user's request while connectivity/authentication is being resolved.
 
