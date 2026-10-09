@@ -6,7 +6,7 @@
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current preparation — slower route valves, awaiting upload approval
+## Current checkpoint — slower route valves installed, powered check pending
 
 - On 2026-10-09 the user requested continuation of supervised testing. Firmware
   `caef934` on `codex/sf-mixer-service-integration` implements the earlier request
@@ -16,12 +16,16 @@
 - Focused controller/runtime checks: 18 passed. Complete warning-enabled native
   suite: 197 passed (`-Wall -Wextra -Werror`). Mega 2560 build passed with unchanged
   40806 flash bytes / 3140 static SRAM bytes; diff checks passed.
-- No current serial connection, firmware upload or movement was performed.
-  Separate upload authorization and current motor-power OFF confirmation are
-  required next; then fresh empty-system/test approval and powered readiness for
-  bounded HOME V2 -> V2=90, before the remaining P1 valve procedure. The original
-  V2 fault remains unresolved; this timing change is not a confirmed repair or
-  physical validation. Backend/UI implementation acceptance remains unchanged.
+- The user subsequently confirmed motor power OFF and authorized upload.
+  Firmware `caef934` is now installed on the confirmed Mega (`/dev/ttyACM1`);
+  avrdude verified all 40806 flash bytes. No actuator command or EEPROM
+  provisioning was performed. Five fake-only host supervision checks passed.
+  Motor power is last confirmed OFF; new empty-system/test approval and powered
+  readiness are required for HOME V2 -> V2=90, with a pause after HOME, before
+  the remaining P1 valve procedure. Original V2 fault/speed validation remain
+  unresolved. Backend/UI implementation acceptance remains unchanged.
+- Upload evidence: firmware `docs/commissioning/2026-10-09/upload-verification.json`.
+  GitHub pushes are deferred at the user's request; preserve local commits.
 - Canonical scope and readiness gates: firmware `HARDWARE_CONFIRMATIONS.md`.
 
 ## Latest physical checkpoint — partial P1 dry check, stopped by user
