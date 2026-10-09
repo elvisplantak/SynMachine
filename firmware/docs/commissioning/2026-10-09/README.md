@@ -46,7 +46,7 @@ Historical logs cannot restore current trust on the next reconnect. Events and S
 in this block; its original cause is not established. GitHub pushes remain deferred.
 
 
-## P2 block — software completed, physical confirmation pending
+## P2 block — software completed and operator confirmed
 
 After the P1 block's physical confirmation, the user approved starting the described
 P2 valve-only block in reply to its listed prerequisites. The plan used fresh
@@ -58,8 +58,9 @@ this does not establish a universal startup/Recovery HOME procedure.
 Boot 86 completed all 25 commands (four HOME, 21 position moves) without error or
 retry in approximately 47.8 seconds and closed. Scope was V3/V5/V7/V8 only; pumps,
 SF/Column bottom valves, mixers and carousel remained uncommanded. Final commanded
-positions are V3=90, V5=180, V7=90, V8=90. Operator visual confirmation of this
-block is pending. Recorded software success does not establish actual fluid flow,
+positions are V3=90, V5=180, V7=90, V8=90. The user subsequently confirmed
+that the complete block proceeded correctly. This is dry mechanical confirmation;
+recorded software success does not establish actual fluid flow,
 sealing, or current reference trust after another reconnect.
 
 The planner selected Reactor -> SF top -> Reactor -> SF top -> SF bottom ->
@@ -73,3 +74,47 @@ The runner reuses the existing P1 sequential host loop and backend planner/execu
 not a new diagnostic or production execution layer. Snapshots:
 `p2-supervised-runner.py.txt`, `p2-offline-supervision-checks.py.txt`.
 Events and SQL: `p2-dry-c5c3b311-0125-4369-b767-0feee8b11cf0/`.
+
+
+## Dry pump block — halted on P1 full-span HOME failure
+
+The user requested moving on to pumps. The prepared plan contains 22 commands:
+HOME V1/V2, select approved P1 Waste (V2=180 then V1=180), then P1 HOME -> absolute
+1000 -> HOME -> absolute 20500 -> HOME -> absolute 200. Next HOME V3/V7/V8/V5,
+select approved P2 Waste (V5=180 -> V8=90 -> V7=90 -> V3=180), then P2 HOME ->
+absolute 1000 -> HOME -> absolute 200. Final pump targets are 200, with both Waste
+routes retained. Existing firmware pump timing remains 1500 us; the slower valve
+profile does not change pump timing. No absolute zero target or volume-transfer
+HOME substitution occurs. This is dry commissioning, not a 20 ml delivery claim.
+
+The P1 20500-to-HOME step is a supervised full-span regression after the previously
+recorded boundary correction; a successful HOME cannot prove activation happened
+on exactly the final permitted pulse, because this interface reports no pump pulse
+counter. Known test distances/limits come from the canonical hardware record.
+The isolated HOME/setup orders do not establish a general Recovery procedure.
+
+The block requires NEW dry-system/power readiness, the stated closed/stopped
+conditions, and explicit approval for the P1 20500-step regression before Serial
+opens. The default preview is offline; RUN_BLOCK gates live startup. Twelve
+fake-only supervision checks passed, including a Waste-route failure preventing
+pump HOME, absent full-span approval preventing Serial open, and existing durable
+intent/failure/unknown/cancellation boundaries. The existing planner, Serial client,
+durable executor and P1 sequential host loop are reused. Snapshots: `pump-supervised-runner.py.txt` and
+`pump-offline-supervision-checks.py.txt`. GitHub push remains deferred.
+
+After fresh operator confirmation of the described prerequisites and full-span
+scope, boot 87 executed eight commands successfully. P1 Waste setup, initial
+HOME, the 1000-step move, its return HOME and the move to 20500 all reported
+COMPLETED. Command 9, P1 HOME from 20500, failed with `PUMP_MOTION_TIMEOUT`
+after approximately 31.1 seconds. The durable journal records FAILED with
+execution_started=1. The runner immediately halted and closed without retry or
+cleanup motion; commands 10-22, including all P2 setup/motion, were not sent.
+
+In the installed controller, this error denotes exhaustion of the bounded HOME
+search (20500 pulses) without an accepted HOME signal. It is not a host Serial
+timeout. The log does not establish the physical stop position or whether the
+lever reached the switch; operator observation is pending. No cause, repair,
+additional travel allowance or successful full-span regression is inferred.
+Motor power OFF was requested after the failure but is not yet confirmed.
+Evidence: `pump-dry-fa3ce511-3f30-4170-9fed-c68eb98a897e/events.jsonl` and
+`commands.sql`; the original SQLite journal is retained locally and ignored.

@@ -39,7 +39,7 @@ The user then approved the described P2 block in reply to listed prerequisites.
 Its planning guards were operator-declared empty system, power readiness, SF and
 Column bottom CLOSED and Reactor mixer OFF, not sensor measurements. Boot 86
 completed all 25 commands on V3/V7/V8/V5 without error/retry. Final commanded
-V3=90, V5=180, V7=90, V8=90; operator visual confirmation of this block is pending.
+V3=90, V5=180, V7=90, V8=90; the user confirmed the complete block proceeded correctly.
 No pump, mixer, bottom valve or carousel command was sent. Both connections closed.
 P1/P2 host supervision checks passed nine/ten fake-only tests respectively.
 
@@ -51,6 +51,19 @@ powered test. No pump/wet/full-demo acceptance is claimed. Scope and journals:
 `docs/commissioning/2026-10-09/README.md`. Upload evidence:
 `docs/commissioning/2026-10-09/upload-verification.json`. GitHub pushes are deferred
 at the user's request while connectivity/authentication is being resolved.
+
+The subsequently approved dry pump block on boot 87 halted at command 9.
+Eight commands reported COMPLETED: P1 Waste setup, initial P1 HOME, absolute
+1000, return HOME and absolute 20500. The following P1 HOME failed with
+`PUMP_MOTION_TIMEOUT` after approximately 31.1 seconds; the journal records
+FAILED with execution started. The installed controller reports this error
+when the bounded HOME search reaches 20500 pulses without accepting HOME.
+No final physical position or failure cause is established by this receipt.
+The connection closed without retry or cleanup motion. P1 final 200 and all P2
+setup/pump commands were not sent. Operator physical observation is pending;
+motor power OFF was requested but is not yet confirmed. No full-span pump
+acceptance or limit change is claimed. Evidence:
+`docs/commissioning/2026-10-09/pump-dry-fa3ce511-3f30-4170-9fed-c68eb98a897e/`.
 
 ## Current supervised P1 dry-check checkpoint — 2026-10-07
 
