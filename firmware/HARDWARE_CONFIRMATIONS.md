@@ -17,10 +17,14 @@ The valve controller verifies stable HOME release at 22 steps, without further
 travel if release fails. Hardware validation is still required.
 
 All 211 warning-enabled native tests and the Mega build passed (41056 flash,
-3148 static SRAM bytes). Prepared source/artifact are not yet uploaded; installed
-firmware remains 8a5d93c. Motor power is last confirmed OFF, with no new Serial
-connection or actuator command. Fresh upload and powered-test authorization are
-required. Commissioning scope/evidence: `docs/commissioning/2026-10-09/README.md`.
+3148 static SRAM bytes). The user subsequently confirmed motor power OFF and
+explicitly authorized upload. Firmware e2e9d3c is now installed on the same
+confirmed Mega USB identity; avrdude verified all 41056 flash bytes, with HEX
+SHA-256 matching the prepared artifact. No actuator command or EEPROM provisioning
+occurred. Evidence: `docs/commissioning/2026-10-09/terminal-parking-upload-verification.json`.
+No physical retest or Serial reopen followed upload. Motor power is last confirmed
+OFF; NEW powered-test readiness/authorization are required. Commissioning scope:
+`docs/commissioning/2026-10-09/README.md`.
 
 ## Slower route-valve firmware and grouped dry checks — 2026-10-09
 

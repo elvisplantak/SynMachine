@@ -245,3 +245,23 @@ is unchanged. Physical 5-degree release, P1 full-span HOME/P2 pump acceptance,
 and wet/demo acceptance remain pending. Full production procedure parking is
 not activated through the UI; safe wet alignment and the complete live profile
 must be confirmed before that integration. GitHub push remains deferred.
+
+
+## Terminal parking upload completed — physical checks pending
+
+After the user explicitly confirmed motor power OFF and authorized this exact
+artifact, firmware e2e9d3c was uploaded to the confirmed Mega USB by-id device
+(resolved /dev/ttyACM1). Avrdude verified all 41056 flash bytes; upload exited 0.
+Post-upload HEX SHA-256 remains
+93e133bdc130583edfcd27a12ef61cbe396d0a2bf6dd972d913f3447a4745dcf.
+Static SRAM is 3148 bytes. Raw upload output: terminal-parking-upload.log.txt;
+structured evidence: terminal-parking-upload-verification.json. Earlier uploads
+and boot 87's failed journal remain unchanged.
+
+No actuator command, EEPROM provisioning, subsequent Serial monitor/session or
+physical test occurred. The port was checked unoccupied before upload, which
+completed and closed. Motor power remains last confirmed OFF. This does not
+confirm HOME release at 5 degrees or repair the earlier physical HOME failure.
+The prepared P1-only 8-command recheck and separate 16-command valve trial each
+require NEW stated dry/closed/stopped prerequisites, motor-power readiness and
+exact physical authorization. No queued motion remains; GitHub push is deferred.
