@@ -1,6 +1,6 @@
 # Hardware confirmations
 
-## Slower route-valve firmware prepared, not installed — 2026-10-09
+## Slower route-valve firmware installed, powered check pending — 2026-10-09
 
 At the user's request to resume testing with slower valve movement, source now
 uses a 4000 us STEP interval for V1-V8 instead of 2000 us. This halves the nominal
@@ -16,11 +16,21 @@ with `-Wall -Wextra -Werror`. New/extended coverage checks pulse deadlines after
 delayed updates and HOME pulse spacing across clock wrap. Mega 2560 build passed:
 40806 flash bytes and 3140 static SRAM bytes, unchanged from the prior build.
 
-No serial port was opened, firmware uploaded or actuator moved during this
-preparation. Upload requires separate authorization and current motor-power OFF
-confirmation. Then obtain fresh empty-system/test approval and motor-power
-readiness for a bounded HOME V2 -> V2=90 check before returning to the incomplete
-P1 route procedure. Historical positions and readiness cannot be reused.
+After software preparation, the user confirmed motor power OFF and explicitly
+authorized upload. Production firmware `caef934` was uploaded to the confirmed
+Arduino Mega USB identity ending `14532303532351F0D070-if00` (`/dev/ttyACM1`).
+Avrdude verified all 40806 flash bytes against the built HEX; SHA-256:
+`d67e80eb8003c9b9fc2f8e35fc0d3c3f23175561c2671627e55f8f0739ce65d9`.
+No EEPROM provisioning or actuator command was performed. Motor power remains
+last confirmed OFF. The host runner was prepared for today's evidence directory;
+five fake-only supervision checks and the offline two-command preview passed.
+
+Obtain fresh empty-system/test approval and motor-power readiness for a bounded
+HOME V2 -> V2=90 check before returning to the incomplete P1 route procedure.
+Pause after HOME for physical confirmation; stop without retry on any failed or
+unknown result. Historical positions and readiness cannot be reused. Evidence:
+`docs/commissioning/2026-10-09/upload-verification.json`. GitHub pushes are deferred
+at the user's request while connectivity/authentication is being resolved.
 
 ## Current supervised P1 dry-check checkpoint — 2026-10-07
 

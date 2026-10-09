@@ -1,0 +1,18 @@
+{
+  "recorded_at_utc": "2026-10-09T14:06:53.722221+00:00",
+  "firmware_commit": "caef934",
+  "environment": "megaatmega2560",
+  "port": "/dev/serial/by-id/usb-Arduino__www.arduino.cc__0042_14532303532351F0D070-if00",
+  "hex_sha256": "d67e80eb8003c9b9fc2f8e35fc0d3c3f23175561c2671627e55f8f0739ce65d9",
+  "flash_bytes_verified": 40806,
+  "static_sram_bytes": 3140,
+  "upload_exit_code": 0,
+  "avrdude_verification": "40806 bytes of flash verified",
+  "operator_motor_power": "OFF",
+  "operator_upload_authorization": "Explicit user confirmation on 2026-10-09",
+  "actuator_commands_sent": 0,
+  "eeprom_provisioning_performed": false,
+  "physical_speed_verified": false,
+  "original_v2_fault_resolved": false,
+  "next_powered_check": "Requires fresh authorization/readiness; HOME V2 then V2=90 with operator pause"
+}
