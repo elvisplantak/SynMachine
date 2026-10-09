@@ -6,7 +6,7 @@
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — grouped dry P1 confirmed, P2 awaiting observation
+## Current checkpoint — dry valves confirmed, P1 full-span HOME failed
 
 - On 2026-10-09 the user requested continuation of supervised testing. Firmware
   `caef934` on `codex/sf-mixer-service-integration` implements the earlier request
@@ -29,7 +29,7 @@
   listed readiness/closure prerequisites, boot 86 completed all 25 valve commands
   on V3/V7/V8/V5 without error/retry and closed. Guard states were operator
   declarations, not sensor observations. Final commanded V3=90, V5=180, V7=90,
-  V8=90; operator confirmation of the P2 block is pending. P1/P2 pumps and all
+  V8=90; the user confirmed the complete P2 block proceeded correctly. P1/P2 pumps and all
   bottom valves, mixers and carousel remained uncommanded in both blocks.
 - Nine/ten fake-only supervision checks passed for P1/P2 respectively, including
   block failure/unknown-result stop, durable intent and cancellation; P2 additionally
@@ -37,12 +37,26 @@
   primitives were reused; no production backend/UI/firmware code changed after
   the slowdown. Evidence, snapshots and SQL: firmware
   `docs/commissioning/2026-10-09/README.md`.
-- The original V2 failure did not recur; its cause remains unproven. This selected
-  dry transition coverage does not establish flow/sealing/every route-history case
-  or a general startup/Recovery HOME procedure. Last motor readiness is ON; no
-  host connection/queued command remains. Historical positions cannot restore
-  trust on reconnect; obtain NEW readiness for the next powered check. Full live
-  profile, pump/wet/demo acceptance remain gated; accepted backend/UI code unchanged.
+- The original V2 failure did not recur; its cause remains unproven. Selected
+  dry valve transition coverage does not establish flow/sealing/every route-history
+  case or a general startup/Recovery HOME procedure. Full live profile and wet/demo
+  acceptance remain gated; accepted backend/UI code unchanged.
+- With NEW dry-system/power readiness and explicit full-span approval, boot 87
+  started the prepared 22-command pump block. Eight commands completed: P1 Waste
+  setup, HOME -> 1000 -> HOME -> 20500. Command 9, HOME from 20500, failed with
+  `PUMP_MOTION_TIMEOUT` after approximately 31.1 seconds. Durable journal records
+  FAILED with execution_started=1. This is the controller's bounded HOME-search
+  failure, not a host transport timeout. Physical stop position/cause remain
+  unconfirmed; full-span HOME regression did not pass. The host halted and closed
+  without retry/cleanup. Final P1 200 and all P2 setup/pump commands were not sent.
+- Twelve fake-only pump host checks passed before execution, including route
+  failure blocking HOME and absent full-span approval blocking Serial open.
+  No firmware/production backend/UI code changed for this test. Events/SQL:
+  firmware `docs/commissioning/2026-10-09/pump-dry-fa3ce511-3f30-4170-9fed-c68eb98a897e/`.
+  Operator physical observation is pending. Motor power OFF was requested after
+  failure, not yet confirmed. No host connection/queued command remains. Obtain
+  NEW readiness/approval before another powered check; no automatic retry or
+  increase of travel limits. Historical positions cannot restore trust on reconnect.
 - Upload evidence: firmware `docs/commissioning/2026-10-09/upload-verification.json`.
   GitHub pushes are deferred at the user's request; preserve local commits.
 - Canonical scope and readiness gates: firmware `HARDWARE_CONFIRMATIONS.md`.
