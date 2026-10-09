@@ -172,7 +172,76 @@ queued motion. Motor power remains last confirmed OFF. Boot 87's failed journal
 is not changed by upload, and the physical failure's cause remains unproven.
 
 Proposed next powered scope is a dry P1-only repeat: HOME V1/V2, select P1 Waste
-(V2=180 then V1=180), P1 HOME -> absolute 20500 -> HOME. This omits the already
+(V2=180 then V1=180), P1 HOME -> absolute 20500 -> HOME -> final 1000.
+The final parking target was subsequently selected by the user, as recorded below. This omits the already
 completed short stroke and all P2 commands. Fresh empty-system/air-outlet, closed
 bottom-valve/stopped-mixer prerequisites and motor readiness/approval are required
 before execution. On any failure the host halts without retry or cleanup movement.
+
+
+## Terminal HOME release — software verified, upload and dry trial pending
+
+The user selected parking at the end of the whole successful test/procedure:
+1000 absolute steps for either pump left at HOME, and nominal 5 degrees for any
+V1-V8 left at HOME. This valve trial uses 22 steps (4.95 degrees) from the existing
+400 steps/90 degrees ratio. It is not yet a confirmed release distance or wet
+alignment. Column uses its existing CLOSED 4-degree offset; no comparable SF
+adapter HOME movement is invented. Normal route targets remain 90/180.
+
+Firmware extends the existing VALVE_SET_POSITION command to accept 5 only from
+trusted raw zero. After 22 steps, STEP stays inactive while inactive HOME must
+remain stable for 30 ms within a fixed 60 ms target-arrival deadline. Failed
+release invalidates trust and reports VALVE_HOME_SWITCH_STUCK without extra
+travel. HOME itself still ends at zero, and parking retains the raw offset for
+subsequent 90/180 positioning. Integer degree reporting uses a 32-bit product to
+avoid AVR 16-bit overflow and rounds the trial offset to 5.
+
+The host derives terminal positions only from the current block's completed
+command path. Uncommanded/unknown and non-HOME actuators are untouched. Pump
+parking requires final verified Waste selection; both pumps park after the whole
+combined 22-command block, not after its individual P1/P2 parts. Cancellation,
+failure or unknown outcome halts before any remaining suffix; no finally cleanup
+motion is sent. A parking failure is not reported as sequence success.
+
+Prepared bounded scopes (offline previews, not authorization):
+- P1-only recheck: 8 commands, HOME V1/V2 -> Waste (V2=180 then V1=180) ->
+  P1 HOME -> 20500 -> HOME -> 1000. P2 remains uncommanded.
+- Separate empty-system valve trial: 16 commands, HOME V1,V2,V4,V6,V3,V7,V8,V5,
+  then terminal SET_POSITION=5 for each in that order. Pumps/bottom adapters,
+  mixers and carousel remain uncommanded. This isolated dry HOME order is not
+  a general wet startup or Recovery sequence.
+
+Both live modes require NEW power/empty-system/closed-bottom/stopped-mixer
+readiness and exact procedure approval, plus RUN_BLOCK before Serial open.
+The P1 full-span recheck additionally requires explicit 20500-step approval.
+The trial target selection does not establish present physical readiness.
+
+Verification: 45 focused valve controller/contract/cache/runtime tests passed;
+all 211 native tests passed with -Wall -Wextra -Werror. Mega 2560 build passed:
+41056 flash bytes (+176), 3148 static SRAM bytes (+8), compared with installed
+8a5d93c. Prepared HEX SHA-256:
+93e133bdc130583edfcd27a12ef61cbe396d0a2bf6dd972d913f3447a4745dcf.
+Ten new fake-only terminal checks passed, including final HOME failure/unknown
+blocking every park, park failure halting the suffix, and whole-block ordering.
+Existing host checks passed: P1 9, P2 10, pump 16. No device was opened or moved.
+
+Snapshots below preserve this preparation separately from the earlier physical
+run's immutable helpers/journal:
+- terminal-parking.py.txt -> /tmp/labforge_terminal_parking.py
+- terminal-parking-offline-checks.py.txt -> /tmp/check_labforge_terminal_parking.py
+- p1-terminal-parking-runner.py.txt -> /tmp/labforge_p1_dry_check.py
+- valve-terminal-parking-runner.py.txt -> /tmp/labforge_p2_dry_check.py
+- pump-terminal-parking-runner.py.txt -> /tmp/labforge_pump_dry_check.py
+- pump-terminal-parking-checks.py.txt -> /tmp/check_labforge_pump_dry_runner.py
+
+Restore the related helpers together. Run offline with the backend venv Python
+and PYTHONPATH=/home/elvis/Documents/labforge-backend-multiphase. Preview modes
+are --p1-full-span-only on the pump runner and --all-valves-parking-trial on the
+P2 runner; neither opens a transport without --execute and the approval flags.
+
+Motor power remains last confirmed OFF. Installed firmware remains 8a5d93c;
+this parking artifact is not uploaded. Boot 87's failed journal/root-cause status
+is unchanged. Physical 5-degree release, P1 full-span HOME/P2 pump acceptance,
+and wet/demo acceptance remain pending. Full production procedure parking is
+not activated through the UI; safe wet alignment and the complete live profile
+must be confirmed before that integration. GitHub push remains deferred.

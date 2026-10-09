@@ -1,4 +1,5 @@
 #include <unity.h>
+#include <initializer_list>
 
 #include "actuator/ValveMotionController.h"
 
@@ -274,6 +275,125 @@ void test_missing_home_times_out_untrusted_with_step_inactive() {
   TEST_ASSERT_FALSE(controller.busy());
 }
 
+uint32_t reachParkTarget(ValveMotionController& controller, FakeIo& io,
+                         uint32_t now) {
+  TEST_ASSERT_EQUAL(ValvePrepareResult::READY,
+                    controller.prepareSetPosition(kValveParkHomeDegrees));
+  TEST_ASSERT_TRUE(controller.start(now));
+  for (uint16_t i = 0; i < kValveParkHomeSteps; ++i) {
+    now += kValveStepIntervalUs;
+    TEST_ASSERT_EQUAL(ValveMotionResult::NONE, controller.update(now));
+  }
+  TEST_ASSERT_EQUAL_UINT16(kValveParkHomeSteps, io.pulses);
+  TEST_ASSERT_EQUAL(ValveMotionState::CONFIRMING_FINAL_PARK_RELEASE,
+                    controller.state());
+  TEST_ASSERT_FALSE(io.step);
+  return now;
+}
+
+void test_parking_releases_home_with_22_pulses_and_preserves_reference() {
+  for (bool towardHigh : {false, true}) {
+    FakeIo io;
+    ValveMotionController controller(io, towardHigh);
+    uint32_t now = 100;
+    establishHome(controller, io, now);
+    TEST_ASSERT_EQUAL_UINT16(0, io.pulses);  // HOME itself does not park.
+    now = reachParkTarget(controller, io, now);
+    TEST_ASSERT_EQUAL(!towardHigh, io.direction);
+    TEST_ASSERT_TRUE(controller.busy());
+    io.home = false;
+    controller.update(++now);
+    TEST_ASSERT_EQUAL(ValveMotionResult::NONE,
+                      controller.update(now + kValveHomeStableUs - 1));
+    TEST_ASSERT_EQUAL(ValveMotionResult::COMPLETED,
+                      controller.update(now + kValveHomeStableUs));
+    TEST_ASSERT_EQUAL_UINT16(kValveParkHomeSteps, io.pulses);
+    TEST_ASSERT_EQUAL_UINT16(5, controller.positionDegrees());
+    TEST_ASSERT_EQUAL(ValvePositionTrust::TRUSTED, controller.positionTrust());
+
+    // Position 5 is an offset from zero, never a new zero/reference.
+    now += kValveHomeStableUs;
+    TEST_ASSERT_EQUAL(ValvePrepareResult::READY, controller.prepareSetPosition(90));
+    TEST_ASSERT_TRUE(controller.start(now));
+    for (uint16_t i = kValveParkHomeSteps; i < kValveStepsPer90Degrees; ++i) {
+      now += kValveStepIntervalUs;
+      controller.update(now);
+    }
+    TEST_ASSERT_EQUAL_UINT16(400, io.pulses);
+    TEST_ASSERT_EQUAL_UINT16(90, controller.positionDegrees());
+    TEST_ASSERT_EQUAL(ValvePrepareResult::READY, controller.prepareSetPosition(180));
+    TEST_ASSERT_TRUE(controller.start(now));
+    for (uint16_t i = 0; i < kValveStepsPer90Degrees; ++i) {
+      now += kValveStepIntervalUs;
+      controller.update(now);
+    }
+    TEST_ASSERT_EQUAL_UINT16(800, io.pulses);
+    TEST_ASSERT_EQUAL_UINT16(180, controller.positionDegrees());
+  }
+}
+
+void test_parking_is_only_allowed_from_trusted_home() {
+  FakeIo io;
+  ValveMotionController controller(io, true);
+  TEST_ASSERT_EQUAL(ValvePrepareResult::POSITION_UNTRUSTED, controller.prepareSetPosition(5));
+  uint32_t now = 100;
+  establishHome(controller, io, now);
+  now = reachParkTarget(controller, io, now);
+  io.home = false;
+  controller.update(++now);
+  controller.update(now + kValveHomeStableUs);
+  TEST_ASSERT_EQUAL(ValvePrepareResult::INVALID_TARGET, controller.prepareSetPosition(5));
+  TEST_ASSERT_EQUAL_UINT16(22, io.pulses);
+}
+
+void test_stuck_parking_switch_fails_at_22_without_extra_pulses() {
+  FakeIo io;
+  ValveMotionController controller(io, true);
+  uint32_t now = 100;
+  establishHome(controller, io, now);
+  now = reachParkTarget(controller, io, now);
+  TEST_ASSERT_EQUAL(ValveMotionResult::NONE,
+                    controller.update(now + 2 * kValveHomeStableUs - 1));
+  TEST_ASSERT_EQUAL(ValveMotionResult::HOME_SWITCH_STUCK,
+                    controller.update(now + 2 * kValveHomeStableUs));
+  TEST_ASSERT_EQUAL(ValvePositionTrust::UNTRUSTED, controller.positionTrust());
+  TEST_ASSERT_EQUAL_UINT16(22, io.pulses);
+  TEST_ASSERT_FALSE(io.step);
+}
+
+void test_parking_bounce_does_not_reset_deadline_across_clock_wrap() {
+  FakeIo io;
+  ValveMotionController controller(io, false);
+  uint32_t now = UINT32_MAX - kValveHomeStableUs -
+                 kValveParkHomeSteps * kValveStepIntervalUs - 10000;
+  establishHome(controller, io, now);
+  now = reachParkTarget(controller, io, now);
+  io.home = false;
+  controller.update(now + 10000);
+  io.home = true;
+  controller.update(now + 20000);
+  io.home = false;
+  controller.update(now + 40000);
+  TEST_ASSERT_EQUAL(ValveMotionResult::HOME_SWITCH_STUCK,
+                    controller.update(now + 2 * kValveHomeStableUs));
+  TEST_ASSERT_EQUAL(ValvePositionTrust::UNTRUSTED, controller.positionTrust());
+  TEST_ASSERT_EQUAL_UINT16(22, io.pulses);
+}
+
+void test_abort_parking_wait_keeps_position_untrusted_without_later_motion() {
+  FakeIo io;
+  ValveMotionController controller(io, true);
+  uint32_t now = 100;
+  establishHome(controller, io, now);
+  now = reachParkTarget(controller, io, now);
+  TEST_ASSERT_TRUE(controller.abort());
+  io.home = false;
+  TEST_ASSERT_EQUAL(ValveMotionResult::NONE,
+                    controller.update(now + 2 * kValveHomeStableUs));
+  TEST_ASSERT_EQUAL(ValvePositionTrust::UNTRUSTED, controller.positionTrust());
+  TEST_ASSERT_EQUAL_UINT16(22, io.pulses);
+}
+
 void test_home_stuck_during_release_fails_untrusted_with_step_inactive() {
   FakeIo io;
   ValveMotionController controller(io, true);
@@ -339,6 +459,11 @@ int main(int, char**) {
   RUN_TEST(test_home_pulse_spacing_survives_clock_wrap);
   RUN_TEST(test_abort_invalidates_started_motion);
   RUN_TEST(test_missing_home_times_out_untrusted_with_step_inactive);
+  RUN_TEST(test_parking_releases_home_with_22_pulses_and_preserves_reference);
+  RUN_TEST(test_parking_is_only_allowed_from_trusted_home);
+  RUN_TEST(test_stuck_parking_switch_fails_at_22_without_extra_pulses);
+  RUN_TEST(test_parking_bounce_does_not_reset_deadline_across_clock_wrap);
+  RUN_TEST(test_abort_parking_wait_keeps_position_untrusted_without_later_motion);
   RUN_TEST(test_home_stuck_during_release_fails_untrusted_with_step_inactive);
   RUN_TEST(test_stable_unexpected_home_fails_untrusted_with_step_inactive);
   return UNITY_END();

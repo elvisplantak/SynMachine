@@ -1,0 +1,197 @@
+"""Bounded supervised dry pump check on verified Waste routes; default is an offline preview.
+
+Reuses the existing backend planner/Serial/durable executor and the tested P1
+runner's sequential execution. Guard states are fresh operator declarations,
+not device measurements. Only approved Waste setup valves and P1/P2 are commanded; no bottom-valve motion.
+"""
+
+import argparse
+import json
+import os
+import sys
+from datetime import UTC, datetime
+from pathlib import Path
+from uuid import uuid4
+
+from app.demo.hardware_contract import BottomValveState
+from app.demo.operation_models import OperationKind, SelectRouteOperation, SymbolicRouteId
+from app.hardware.command_planning import ArduinoAction, CommandPlanningContext, RouteSequence, ValveTarget, prepare_command_plan
+from app.hardware.arduino_command_journal import SQLiteArduinoCommandJournal
+from app.hardware.arduino_serial import ArduinoSerialClient, ArduinoSerialConfiguration
+from app.hardware.durable_arduino import DurableArduinoCommandExecutor
+from labforge_p1_dry_check import run_steps
+from labforge_terminal_parking import with_terminal_parking
+
+ROOT = Path('/home/elvis/Documents/labforge-backend-multiphase')
+PORT = '/dev/serial/by-id/usb-Arduino__www.arduino.cc__0042_14532303532351F0D070-if00'
+HOME_ORDER = ('V1', 'V2', 'V3', 'V7', 'V8', 'V5')
+ROUTES = ('P1_TO_WASTE', 'P2_TO_WASTE')
+APPROVED_ORDERS = {
+    'P1_TO_WASTE': (('V2', 180), ('V1', 180)),
+    'P2_TO_WASTE': (('V5', 180), ('V8', 90), ('V7', 90), ('V3', 180)),
+}
+
+
+def build_steps(phase, boot, *, sf_closed, column_closed, reactor_stopped, full_span_approved):
+    if not all(value is True for value in (sf_closed, column_closed, reactor_stopped, full_span_approved)):
+        raise RuntimeError('Dry conditions and explicit P1 full-span approval required')
+    worksheet = json.loads((ROOT / 'docs/ADAPTER_PHYSICAL_PROFILE.draft.json').read_text())
+    sequences = tuple(RouteSequence.model_validate(item) for item in
+                      worksheet['candidate_configuration']['route_sequences']
+                      if item['route_id'] in ROUTES)
+    actual = {sequence.route_id.value: tuple((target.valve, target.position_degrees)
+              for target in sequence.targets) for sequence in sequences}
+    if len(sequences) != len(APPROVED_ORDERS) or actual != APPROVED_ORDERS:
+        raise RuntimeError('Worksheet differs from approved Waste destination orders')
+    operations = tuple(SelectRouteOperation(
+        operation_kind=OperationKind.SELECT_ROUTE, operation_number=i,
+        cycle_number=1, cycle_count=1, route_id=SymbolicRouteId(route),
+    ) for i, route in enumerate(ROUTES, 1))
+    # Valve zero is only a post-HOME projection. No historical pump position used.
+    context = CommandPlanningContext(
+        phase_execution_id=phase, controller_boot_id=boot,
+        valve_positions=tuple(ValveTarget(valve=v, position_degrees=0) for v in HOME_ORDER),
+        route_sequences=sequences, sf_bottom_valve=BottomValveState.CLOSED,
+        column_position_degrees=4, reactor_mixer_running=False,
+    )
+    plan = prepare_command_plan(operations, context)
+    steps = []
+
+    def append_home(valve):
+        steps.append((f'HOME {valve}', ArduinoAction(str(uuid4()), 'VALVE_HOME', (('valve', valve),))))
+
+    def append_route(index):
+        operation = plan.operations[index]
+        if operation.required_followup:
+            raise RuntimeError('Unexpected route followup')
+        steps.extend((ROUTES[index], action) for action in operation.actions)
+
+    def append_pump(pump, target):
+        if target is None:
+            steps.append((f'HOME {pump}', ArduinoAction(str(uuid4()), 'PUMP_HOME', (('pump', pump),))))
+        else:
+            steps.append((f'{pump} to {target} steps', ArduinoAction(str(uuid4()),
+                          'PUMP_MOVE_ABSOLUTE_STEPS', (('pump', pump), ('target_steps', target)))))
+
+    for valve in ('V1', 'V2'):
+        append_home(valve)
+    append_route(0)
+    # Both fixed strokes are established commissioning facts, not new volume targets.
+    for target in (None, 1000, None, 20500, None):
+        append_pump('P1', target)
+    for valve in ('V3', 'V7', 'V8', 'V5'):
+        append_home(valve)
+    append_route(1)
+    for target in (None, 1000, None):
+        append_pump('P2', target)
+    for _, action in steps:
+        if not isinstance(action, ArduinoAction):
+            raise RuntimeError('Non-Arduino action in dry pump check')
+        arguments = dict(action.arguments)
+        if action.command in ('VALVE_HOME', 'VALVE_SET_POSITION'):
+            if arguments.get('valve') not in HOME_ORDER:
+                raise RuntimeError('Valve outside approved Waste setup')
+        elif action.command in ('PUMP_HOME', 'PUMP_MOVE_ABSOLUTE_STEPS'):
+            if arguments.get('pump') not in ('P1', 'P2'):
+                raise RuntimeError('Pump outside approved dry check')
+            if action.command == 'PUMP_MOVE_ABSOLUTE_STEPS' and arguments.get('target_steps') not in (1000, 20500):
+                raise RuntimeError('Pump target outside approved dry check')
+        else:
+            raise RuntimeError('Command outside approved dry check')
+    return with_terminal_parking(steps)
+
+
+def build_p1_recheck_steps(phase, boot, **conditions):
+    full = build_steps(phase, boot, **conditions)
+    # Reuse verified Waste setup; omit short strokes and every P2 command.
+    # Parking follows successful final HOME, never a failure/unknown outcome.
+    steps = with_terminal_parking(full[:5] + full[7:9])
+    expected = (
+        ('VALVE_HOME', {'valve': 'V1'}),
+        ('VALVE_HOME', {'valve': 'V2'}),
+        ('VALVE_SET_POSITION', {'valve': 'V2', 'position_degrees': 180}),
+        ('VALVE_SET_POSITION', {'valve': 'V1', 'position_degrees': 180}),
+        ('PUMP_HOME', {'pump': 'P1'}),
+        ('PUMP_MOVE_ABSOLUTE_STEPS', {'pump': 'P1', 'target_steps': 20500}),
+        ('PUMP_HOME', {'pump': 'P1'}),
+        ('PUMP_MOVE_ABSOLUTE_STEPS', {'pump': 'P1', 'target_steps': 1000}),
+    )
+    if tuple((action.command, dict(action.arguments)) for _, action in steps) != expected:
+        raise RuntimeError('P1 recheck differs from bounded final-parking scope')
+    return steps
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--execute', action='store_true')
+    parser.add_argument('--procedure-approved', action='store_true')
+    parser.add_argument('--motor-power-ready', action='store_true')
+    parser.add_argument('--conditions-confirmed', action='store_true')
+    parser.add_argument('--run-block', action='store_true')
+    parser.add_argument('--full-span-approved', action='store_true')
+    parser.add_argument('--p1-full-span-only', action='store_true')
+    args = parser.parse_args()
+    builder = build_p1_recheck_steps if args.p1_full_span_only else build_steps
+    phase = ('p1-span-dry-' if args.p1_full_span_only else 'pump-dry-') + str(uuid4())
+    if not args.execute:
+        steps = builder(phase, 1, sf_closed=True, column_closed=True, reactor_stopped=True, full_span_approved=True)
+        for i, (label, action) in enumerate(steps, 1):
+            print(json.dumps({'number': i, 'label': label, 'command': action.command,
+                              'arguments': dict(action.arguments)}))
+        print('OFFLINE PREVIEW ONLY; HOME and guard states are assumptions, not current references.')
+        return
+    if not all((args.procedure_approved, args.motor_power_ready, args.conditions_confirmed, args.full_span_approved)):
+        parser.error('Requires procedure approval, NEW readiness, empty/closed/stopped conditions and explicit P1 20500-step regression approval')
+    if args.run_block:
+        scope = 'P1 Waste setup + HOME -> 20500 -> HOME -> final 1000-step parking' if args.p1_full_span_only else 'Waste setup + dry P1/P2 motion; includes P1 20500-step regression and final 1000-step parking'
+        print(f'WAITING_FOR_RUN_BLOCK: {scope}; halt on any failure.', flush=True)
+        if sys.stdin.readline().strip() != 'RUN_BLOCK':
+            print('BLOCK_CANCELLED_BEFORE_SERIAL_OPEN', flush=True)
+            return
+    output = Path('/home/elvis/Documents/labforge-firmware/docs/commissioning/2026-10-09') / phase
+    output.mkdir(parents=True, exist_ok=False)
+    with (output / 'events.jsonl').open('x') as log:
+        def emit(event):
+            event['observed_at_utc'] = datetime.now(UTC).isoformat()
+            line = json.dumps(event)
+            log.write(line + '\n')
+            log.flush()
+            os.fsync(log.fileno())
+            print(line, flush=True)
+        # Validate the complete scope and supplied guards before opening a port.
+        builder(phase, 1, sf_closed=args.conditions_confirmed,
+                    column_closed=args.conditions_confirmed, reactor_stopped=args.conditions_confirmed, full_span_approved=args.full_span_approved)
+        emit({'event': 'OPERATOR_CONDITIONS', 'system_empty': True, 'motor_power_ready': True,
+              'sf_bottom_closed': True, 'column_bottom_closed': True, 'reactor_mixer_stopped': True,
+              'p1_full_span_approved': args.full_span_approved,
+              'p1_full_span_only': args.p1_full_span_only,
+              'source': 'Fresh user readiness for described dry pump block; not sensor feedback'})
+        client = ArduinoSerialClient(ArduinoSerialConfiguration(port=PORT))
+        try:
+            with SQLiteArduinoCommandJournal(output / 'commands.sqlite3') as journal:
+                hello = client.connect()
+                status = client.query_status()
+                emit({'event': 'SESSION', 'hello': hello.model_dump(mode='json'),
+                      'status': status.model_dump(mode='json'), 'evidence_directory': str(output)})
+                if status.controller_state != 'IDLE' or status.active_operation_command_id is not None:
+                    raise RuntimeError('Controller is not idle')
+                if not {'VALVE_HOME', 'VALVE_SET_POSITION', 'PUMP_HOME', 'PUMP_MOVE_ABSOLUTE_STEPS'} <= client.capabilities:
+                    raise RuntimeError('Required valve/pump capabilities absent')
+                steps = builder(phase, hello.controller_boot_id,
+                                    sf_closed=args.conditions_confirmed,
+                                    column_closed=args.conditions_confirmed,
+                                    reactor_stopped=args.conditions_confirmed, full_span_approved=args.full_span_approved)
+                completed = run_steps(DurableArduinoCommandExecutor(client, journal),
+                                      phase, steps, sys.stdin, emit, block_approved=args.run_block)
+                emit({'event': 'SOFTWARE_SEQUENCE_COMPLETED' if completed else 'SEQUENCE_HALTED',
+                      'physical_observations': 'Require separate operator confirmation'})
+        except BaseException as error:
+            emit({'event': 'SEQUENCE_ERROR_NO_RETRY', 'error_type': type(error).__name__, 'error': str(error)})
+            raise
+        finally:
+            client.close()
+            emit({'event': 'CONNECTION_CLOSED', 'no_cleanup_motion_sent': True})
+
+
+if __name__ == '__main__':
+    main()

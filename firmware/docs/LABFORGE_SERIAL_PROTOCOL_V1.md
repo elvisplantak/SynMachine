@@ -294,10 +294,29 @@ separate supervised dry checkpoints.
 The approved rotary-valve commands are `VALVE_HOME` and
 `VALVE_SET_POSITION`, supported for `V1` through `V8`. `VALVE_HOME` contains
 exactly `valve`. `VALVE_SET_POSITION` contains exactly `valve` and integer
-`position_degrees`, restricted to `0`, `90`, or `180`. Position zero uses the
+`position_degrees`, restricted to `0`, `5`, `90`, or `180`. Position zero uses the
 homing path; 90 and 180 require position trust established by successful
 homing. The complete `STARTED` frame is handed to Serial before any valve DIR
 or STEP side effect, and only one physical command may be active globally.
+
+Position 5 is a user-selected terminal dry-parking trial, not a fluidic route.
+It is accepted only from trusted coordinate zero. It moves 22 steps away from
+HOME (nominal 4.95 degrees using 400 steps per 90 degrees), then holds STEP
+inactive and requires continuously inactive HOME for 30 ms, within a fixed
+60 ms deadline after reaching the target. Bounce cannot extend that deadline;
+missing release fails with `VALVE_HOME_SWITCH_STUCK` and invalidates trust,
+without an extra pulse. It retains the raw 22-step offset from HOME; reported
+integer position is rounded to 5. Subsequent moves to 90/180 use that raw offset.
+The command retains existing lifecycle, duplicate-cache and abort semantics.
+
+HOME itself still completes at zero. The host decides when the complete
+procedure has succeeded and sends separate terminal positioning commands only
+for actuators left at HOME. Failure/unknown outcome/cancellation does not trigger
+parking as cleanup. The current dry host uses 1000 absolute steps for P1/P2 on
+verified Waste selections and the existing 4-degree CLOSED target for the Column
+bottom valve. No analogous HOME offset is assumed for the SF bottom adapter.
+Five-degree switch release and wet alignment are not physically confirmed;
+production route planning/profile activation remains unchanged and gated.
 
 ```json
 {"protocol":"LABFORGE/1","type":"COMMAND","backend_session_nonce":"123e4567-e89b-12d3-a456-426614174000","controller_boot_id":4294967295,"phase_execution_id":"phase-execution-1","operation_command_id":"323e4567-e89b-12d3-a456-426614174002","command":"VALVE_SET_POSITION","arguments":{"valve":"V4","position_degrees":180}}
@@ -309,9 +328,9 @@ HOME arrival, release, and trusted-zero consistency are stability-checked for
 never authorizes movement farther toward HOME; persistent inconsistency fails
 closed and invalidates trust. The runtime must service `update()` frequently
 enough for sampling-based stability to be meaningful and must not add blocking
-delays. The initial motion profile uses confirmed 20 us STEP HIGH and 5 us DIR
-setup timing with a conservative 2,000 us rising-edge interval pending the
-dedicated supervised production-path checkpoint.
+delays. The motion profile uses confirmed 20 us STEP HIGH and 5 us DIR setup
+timing. The rising-edge interval was increased from 2,000 to 4,000 us on
+2026-10-09 at the user's request; grouped dry valve checks subsequently passed.
 
 The approved geared column-bottom-valve commands are
 `COLUMN_BOTTOM_VALVE_HOME`, with an exactly empty `arguments` object, and

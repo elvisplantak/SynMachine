@@ -233,6 +233,86 @@ void test_runtime_maps_stable_unexpected_home_during_positioning() {
   TEST_ASSERT_FALSE(io.step);
 }
 
+void test_each_valve_parks_only_after_started_and_replays_without_movement() {
+  for (uint8_t selected = 0; selected < 8; ++selected) {
+    PumpIo pumpIo;
+    P1MotionController p1(pumpIo);
+    P1MotionController p2(pumpIo);
+    ValveIo io[8];
+    ValveMotionController valves[] = {
+        {io[0], true}, {io[1], false}, {io[2], true}, {io[3], true},
+        {io[4], true}, {io[5], false}, {io[6], true}, {io[7], true}};
+    ValveMotionController* pointers[] = {&valves[0], &valves[1], &valves[2], &valves[3],
+                                        &valves[4], &valves[5], &valves[6], &valves[7]};
+    establishValveHome(valves[selected], io[selected], 0);
+    P1CommandRuntime runtime(p1, p2, pointers, 8);
+    SessionState session;
+    session.establish(NONCE);
+    CommandStatusCache cache;
+    char arguments[64];
+    std::snprintf(arguments, sizeof(arguments),
+                  "{\"valve\":\"V%u\",\"position_degrees\":5}", selected + 1U);
+    char command[384];
+    makeCommand(command, sizeof(command), "VALVE_SET_POSITION", arguments);
+    uint8_t output[kCommandLifecycleFrameCapacity]{};
+    runtime.dispatch(reinterpret_cast<const uint8_t*>(command), std::strlen(command),
+                     IDENTITY, session, cache, output, sizeof(output));
+    TEST_ASSERT_NOT_NULL(std::strstr(reinterpret_cast<char*>(output), "\"type\":\"ACCEPTED\""));
+    TEST_ASSERT_EQUAL_UINT32(0, io[selected].directionWrites);
+    size_t length = 0;
+    bool startsMotion = false;
+    TEST_ASSERT_TRUE(runtime.nextLifecycleFrame(IDENTITY, cache, output, sizeof(output), length, startsMotion));
+    TEST_ASSERT_TRUE(startsMotion);
+    TEST_ASSERT_EQUAL_UINT32(0, io[selected].directionWrites);
+    uint32_t now = kValveHomeStableUs;
+    TEST_ASSERT_TRUE(runtime.confirmStartedFrameWritten(now, cache));
+    for (uint16_t step = 0; step < kValveParkHomeSteps; ++step) {
+      now += kValveStepIntervalUs;
+      runtime.update(now, cache);
+    }
+    TEST_ASSERT_EQUAL(CommandState::STARTED, cache.find(OPERATION)->record.state);
+    io[selected].home = false;
+    runtime.update(++now, cache);
+    runtime.update(now + kValveHomeStableUs, cache);
+    TEST_ASSERT_EQUAL(CommandState::COMPLETED, cache.find(OPERATION)->record.state);
+    TEST_ASSERT_TRUE(runtime.nextLifecycleFrame(IDENTITY, cache, output, sizeof(output), length, startsMotion));
+    runtime.dispatch(reinterpret_cast<const uint8_t*>(command), std::strlen(command),
+                     IDENTITY, session, cache, output, sizeof(output));
+    TEST_ASSERT_NOT_NULL(std::strstr(reinterpret_cast<char*>(output), "\"type\":\"COMPLETED\""));
+    for (uint8_t other = 0; other < 8; ++other)
+      TEST_ASSERT_EQUAL_UINT32(other == selected ? kValveParkHomeSteps : 0, io[other].pulses);
+    TEST_ASSERT_EQUAL_UINT16(5, valves[selected].positionDegrees());
+  }
+}
+
+void test_parking_unreleased_switch_maps_to_cached_failure_without_extra_motion() {
+  PumpIo pumpIo;
+  P1MotionController p1(pumpIo);
+  P1MotionController p2(pumpIo);
+  ValveIo io;
+  ValveMotionController valve(io, true);
+  establishValveHome(valve, io, 0);
+  ValveMotionController* pointers[] = {&valve};
+  P1CommandRuntime runtime(p1, p2, pointers, 1);
+  SessionState session;
+  session.establish(NONCE);
+  CommandStatusCache cache;
+  uint32_t now = kValveHomeStableUs;
+  dispatchAndStart(runtime, session, cache, "VALVE_SET_POSITION",
+                   "{\"valve\":\"V1\",\"position_degrees\":5}", now);
+  for (uint16_t step = 0; step < kValveParkHomeSteps; ++step) {
+    now += kValveStepIntervalUs;
+    runtime.update(now, cache);
+  }
+  runtime.update(now + 2 * kValveHomeStableUs, cache);
+  TEST_ASSERT_EQUAL(CommandState::FAILED, cache.find(OPERATION)->record.state);
+  TEST_ASSERT_EQUAL(CommandErrorCode::VALVE_HOME_SWITCH_STUCK, cache.find(OPERATION)->record.errorCode);
+  TEST_ASSERT_TRUE(cache.find(OPERATION)->record.executionStarted);
+  TEST_ASSERT_EQUAL_UINT16(22, io.pulses);
+  TEST_ASSERT_FALSE(io.step);
+  TEST_ASSERT_EQUAL(ValvePositionTrust::UNTRUSTED, valve.positionTrust());
+}
+
 }  // namespace
 
 void setUp() {}
@@ -245,5 +325,7 @@ int main(int, char**) {
   RUN_TEST(test_runtime_maps_missing_home_to_valve_motion_timeout);
   RUN_TEST(test_runtime_maps_stuck_home_during_release);
   RUN_TEST(test_runtime_maps_stable_unexpected_home_during_positioning);
+  RUN_TEST(test_each_valve_parks_only_after_started_and_replays_without_movement);
+  RUN_TEST(test_parking_unreleased_switch_maps_to_cached_failure_without_extra_motion);
   return UNITY_END();
 }

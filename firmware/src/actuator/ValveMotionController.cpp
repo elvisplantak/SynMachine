@@ -8,7 +8,8 @@ bool timeReached(uint32_t now, uint32_t deadline) {
 }
 
 bool validTarget(uint16_t degrees) {
-  return degrees == 0 || degrees == 90 || degrees == 180;
+  return degrees == 0 || degrees == kValveParkHomeDegrees ||
+         degrees == 90 || degrees == 180;
 }
 
 }  // namespace
@@ -19,6 +20,7 @@ ValveMotionController::ValveMotionController(ValveMotionIo& io,
 
 ValvePrepareResult ValveMotionController::prepareHome() {
   if (busy()) return ValvePrepareResult::BUSY;
+  parkingHome_ = false;
   state_ = ValveMotionState::PREPARED_HOME;
   return ValvePrepareResult::READY;
 }
@@ -30,11 +32,15 @@ ValvePrepareResult ValveMotionController::prepareSetPosition(
   if (targetDegrees == 0) return prepareHome();
   if (trust_ != ValvePositionTrust::TRUSTED)
     return ValvePrepareResult::POSITION_UNTRUSTED;
+  if (targetDegrees == kValveParkHomeDegrees && positionSteps_ != 0)
+    return ValvePrepareResult::INVALID_TARGET;
   const uint16_t targetSteps =
-      static_cast<uint16_t>((targetDegrees / 90) * kValveStepsPer90Degrees);
+      targetDegrees == kValveParkHomeDegrees ? kValveParkHomeSteps
+          : static_cast<uint16_t>((targetDegrees / 90) * kValveStepsPer90Degrees);
   if (targetSteps == positionSteps_)
     return ValvePrepareResult::TARGET_ALREADY_REACHED;
   targetSteps_ = targetSteps;
+  parkingHome_ = targetDegrees == kValveParkHomeDegrees;
   state_ = ValveMotionState::PREPARED_MOVE;
   return ValvePrepareResult::READY;
 }
@@ -71,6 +77,23 @@ ValveMotionResult ValveMotionController::update(uint32_t nowUs) {
       state_ == ValveMotionState::PREPARED_HOME ||
       state_ == ValveMotionState::PREPARED_MOVE)
     return ValveMotionResult::NONE;
+
+  if (state_ == ValveMotionState::CONFIRMING_FINAL_PARK_RELEASE) {
+    const bool active = io_.homeActive();
+    if (active != homeCandidateActive_) {
+      homeCandidateActive_ = active;
+      homeStableSinceUs_ = nowUs;
+    }
+    // nextPulseUs_ is a fixed, motionless confirmation deadline in this state.
+    if (!active && timeReached(nowUs, homeStableSinceUs_ + kValveHomeStableUs) &&
+        !timeReached(nowUs, nextPulseUs_ + 1))
+      return finish(ValveMotionResult::COMPLETED);
+    if (timeReached(nowUs, nextPulseUs_)) {
+      trust_ = ValvePositionTrust::UNTRUSTED;
+      return finish(ValveMotionResult::HOME_SWITCH_STUCK);
+    }
+    return ValveMotionResult::NONE;
+  }
 
   if (state_ == ValveMotionState::CONFIRMING_HOME) {
     const bool homeActive = io_.homeActive();
@@ -166,6 +189,11 @@ ValveMotionResult ValveMotionController::update(uint32_t nowUs) {
     --positionSteps_;
   else
     ++positionSteps_;
+  if (positionSteps_ == targetSteps_ && parkingHome_) {
+    pauseForHome(nowUs, ValveMotionState::CONFIRMING_FINAL_PARK_RELEASE);
+    nextPulseUs_ = nowUs + 2 * kValveHomeStableUs;
+    return ValveMotionResult::NONE;
+  }
   if (positionSteps_ == targetSteps_)
     return finish(ValveMotionResult::COMPLETED);
   return ValveMotionResult::NONE;
@@ -178,6 +206,7 @@ bool ValveMotionController::abort() {
   io_.writeStep(false);
   state_ = ValveMotionState::IDLE;
   releasingHome_ = false;
+  parkingHome_ = false;
   if (started) trust_ = ValvePositionTrust::UNTRUSTED;
   return true;
 }
@@ -185,7 +214,8 @@ bool ValveMotionController::abort() {
 ValveMotionState ValveMotionController::state() const { return state_; }
 ValvePositionTrust ValveMotionController::positionTrust() const { return trust_; }
 uint16_t ValveMotionController::positionDegrees() const {
-  return static_cast<uint16_t>((positionSteps_ * 90U) /
+  return static_cast<uint16_t>((static_cast<uint32_t>(positionSteps_) * 90U +
+                               kValveStepsPer90Degrees / 2) /
                                kValveStepsPer90Degrees);
 }
 bool ValveMotionController::busy() const {

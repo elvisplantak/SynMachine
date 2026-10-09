@@ -10,6 +10,9 @@ constexpr uint32_t kValveStepIntervalUs = 4000;
 constexpr uint16_t kValveStepHighUs = 20;
 constexpr uint16_t kValveDirectionSetupUs = 5;
 constexpr uint32_t kValveHomeStableUs = 30000;
+// User-selected dry parking trial, not confirmed fluidic alignment.
+constexpr uint16_t kValveParkHomeDegrees = 5;
+constexpr uint16_t kValveParkHomeSteps = 22;
 
 class ValveMotionIo {
  public:
@@ -45,6 +48,7 @@ enum class ValveMotionState : uint8_t {
   SEARCHING_HOME,
   MOVING,
   CONFIRMING_UNEXPECTED_HOME,
+  CONFIRMING_FINAL_PARK_RELEASE,
 };
 
 class ValveMotionController {
@@ -81,6 +85,7 @@ class ValveMotionController {
   bool homeCandidateActive_ = false;
   bool directionHigh_ = false;
   bool releasingHome_ = false;
+  bool parkingHome_ = false;
 };
 
 }  // namespace labforge

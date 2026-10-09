@@ -46,7 +46,7 @@ void test_valve_home_accepts_only_v1_through_v8() {
 }
 
 void test_valve_position_accepts_only_canonical_angles() {
-  for (int degrees : {0, 90, 180}) {
+  for (int degrees : {0, 5, 90, 180}) {
     char arguments[96];
     std::snprintf(arguments, sizeof(arguments),
                   "{\"position_degrees\":%d,\"valve\":\"V8\"}", degrees);
@@ -90,6 +90,9 @@ void test_valve_position_rejects_missing_extra_wrong_types_and_angles() {
            "{\"valve\":\"V1\",\"position_degrees\":\"90\"}",
            "{\"valve\":\"V9\",\"position_degrees\":90}",
            "{\"valve\":\"V1\",\"position_degrees\":45}",
+           "{\"valve\":\"V1\",\"position_degrees\":4}",
+           "{\"valve\":\"V1\",\"position_degrees\":6}",
+           "{\"valve\":\"V1\",\"position_degrees\":\"5\"}",
            "{\"valve\":\"V1\",\"position_degrees\":270}",
        }) {
     ValveSetPositionCommand command{};

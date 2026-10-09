@@ -81,6 +81,7 @@ bool validSemanticIdentity(const CommandSemanticIdentity& identity) {
   if (identity.command == CommandKind::VALVE_SET_POSITION)
     return identity.pump == PumpId::NONE && identity.targetSteps == 0 &&
            validValve && (identity.targetDegrees == 0 ||
+                          identity.targetDegrees == 5 ||
                           identity.targetDegrees == 90 ||
                           identity.targetDegrees == 180) &&
            identity.carouselPosition == 0 && !identity.mixerRunning;

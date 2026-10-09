@@ -13,7 +13,7 @@ ValveId parseValve(const char* value) {
 }
 
 bool validDegrees(int64_t value) {
-  return value == 0 || value == 90 || value == 180;
+  return value == 0 || value == 5 || value == 90 || value == 180;
 }
 
 }  // namespace

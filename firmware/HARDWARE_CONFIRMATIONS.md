@@ -1,5 +1,27 @@
 # Hardware confirmations
 
+## Terminal HOME release request — 2026-10-09, trial pending
+
+The user selected a separate end-of-whole-test/procedure movement for actuators
+left at HOME: P1/P2 to 1000 absolute steps and V1-V8 to nominal 5 degrees. The
+existing 400 steps/90 degrees ratio maps this trial to 22 steps (4.95 degrees).
+This is an authorized trial target, not confirmed release distance or safe wet
+alignment. The existing Column bottom CLOSED offset remains 4 degrees; no new
+HOME offset is assumed for the SF bottom adapter.
+
+Software preparation uses existing sequential Service commands. HOME still
+establishes coordinate zero. Only successful completion of the entire dry block
+permits its parking suffix; failure/unknown result/cancellation halts without
+parking or retry. Pump parking requires the block's verified Waste selection.
+The valve controller verifies stable HOME release at 22 steps, without further
+travel if release fails. Hardware validation is still required.
+
+All 211 warning-enabled native tests and the Mega build passed (41056 flash,
+3148 static SRAM bytes). Prepared source/artifact are not yet uploaded; installed
+firmware remains 8a5d93c. Motor power is last confirmed OFF, with no new Serial
+connection or actuator command. Fresh upload and powered-test authorization are
+required. Commissioning scope/evidence: `docs/commissioning/2026-10-09/README.md`.
+
 ## Slower route-valve firmware and grouped dry checks — 2026-10-09
 
 At the user's request to resume testing with slower valve movement, source now
