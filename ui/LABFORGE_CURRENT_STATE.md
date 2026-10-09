@@ -6,7 +6,7 @@
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — final pump HOME signal wait prepared, upload pending
+## Current checkpoint — final pump HOME signal wait installed, dry recheck pending
 
 - On 2026-10-09 the user requested continuation of supervised testing. Firmware
   `caef934` on `codex/sf-mixer-service-integration` implements the earlier request
@@ -68,11 +68,16 @@
   cached replay, deadline, glitch, abort and clock-wrap cases. Mega build passed:
   40880 flash bytes (+74), 3140 static SRAM bytes (unchanged). Self-review and
   diff checks passed. Protocol and commissioning evidence document the correction.
-  It is prepared only: installed firmware remains caef934. No corrective upload,
-  Serial reopen or powered movement occurred. No host connection/queued command
-  remains; motor power is confirmed OFF. Separate upload authorization and NEW
-  readiness/approval are required for the next bounded powered recheck. P1
-  full-span HOME/P2 pump acceptance, wet testing and full demo remain pending.
+  The user subsequently explicitly approved upload with motor power OFF.
+  Firmware 8a5d93c is installed on the confirmed Mega; avrdude verified all 40880
+  flash bytes and HEX hash matched the prepared artifact. No actuator command or
+  EEPROM provisioning occurred. Evidence: firmware
+  `docs/commissioning/2026-10-09/pump-home-wait-upload-verification.json`.
+  No host connection/queued command remains; motor power is last confirmed OFF.
+  NEW dry readiness/approval are required before a proposed seven-command P1-only
+  recheck: HOME V1/V2 -> P1 Waste (V2=180, V1=180) -> P1 HOME -> 20500 -> HOME.
+  No physical recheck has occurred. Boot 87 journal remains FAILED; root cause
+  unproven. P1 full-span HOME/P2 pump acceptance, wet test and demo remain pending.
 - Upload evidence: firmware `docs/commissioning/2026-10-09/upload-verification.json`.
   GitHub pushes are deferred at the user's request; preserve local commits.
 - Canonical scope and readiness gates: firmware `HARDWARE_CONFIRMATIONS.md`.
