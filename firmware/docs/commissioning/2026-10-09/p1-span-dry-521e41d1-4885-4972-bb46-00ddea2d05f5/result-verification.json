@@ -1,0 +1,77 @@
+{
+  "recorded_at_utc": "2026-10-09T16:44:33.653228+00:00",
+  "firmware_commit": "e2e9d3c5be17cdf703a684e29a6c9dd4a54ec735",
+  "controller_boot_id": 90,
+  "completed_commands": 8,
+  "journal_completed_entries": 8,
+  "process_exit_code": 0,
+  "sequence": [
+    {
+      "number": 1,
+      "label": "HOME V1",
+      "operation_command_id": "1be14827-2b28-424e-8b60-1ef0a44d83ec",
+      "state": "COMPLETED"
+    },
+    {
+      "number": 2,
+      "label": "HOME V2",
+      "operation_command_id": "355622ef-4173-4efc-a0fe-b8f0d2ea028b",
+      "state": "COMPLETED"
+    },
+    {
+      "number": 3,
+      "label": "P1_TO_WASTE",
+      "operation_command_id": "bce0b27b-05b7-55df-9426-97cf80e590a4",
+      "state": "COMPLETED"
+    },
+    {
+      "number": 4,
+      "label": "P1_TO_WASTE",
+      "operation_command_id": "52e60a3c-e183-530d-9757-92d656c2b297",
+      "state": "COMPLETED"
+    },
+    {
+      "number": 5,
+      "label": "HOME P1",
+      "operation_command_id": "f9c8ca96-ab5f-456e-8c4f-d0d6c9e7abfd",
+      "state": "COMPLETED"
+    },
+    {
+      "number": 6,
+      "label": "P1 to 20500 steps",
+      "operation_command_id": "f9827650-9d2b-41e3-9cec-14620f0d5084",
+      "state": "COMPLETED"
+    },
+    {
+      "number": 7,
+      "label": "HOME P1",
+      "operation_command_id": "048ed2b7-201e-4bdf-b2d1-8df46989461d",
+      "state": "COMPLETED"
+    },
+    {
+      "number": 8,
+      "label": "Final P1 parking to 1000 steps",
+      "operation_command_id": "d0456d81-0f3b-49ba-b1a1-0b4f4f44d170",
+      "state": "COMPLETED"
+    }
+  ],
+  "operator_prerequisites": "Fresh confirmation of empty system, SF/Column bottom CLOSED, Reactor mixer stopped, motor power ON and exact P1 block approval; declarations, not sensor readings",
+  "operator_physical_confirmation": "P1 returned to HOME normally, then moved away; HOME lever released; no unusual sound",
+  "last_commanded_positions": {
+    "V1_degrees": 180,
+    "V2_degrees": 180,
+    "P1_steps": 1000
+  },
+  "other_actuators_commanded": false,
+  "connection_closed": true,
+  "retry_or_cleanup_motion": false,
+  "motor_power_last_confirmed": "ON",
+  "historical_positions_are_fresh_reconnect_references": false,
+  "original_failure_root_cause_proven": false,
+  "earlier_failed_journal_changed": false,
+  "wet_or_full_demo_acceptance": false,
+  "remaining_dry_checks": [
+    "V1-V8 terminal nominal 5-degree release",
+    "P2 pump check with final 1000-step parking"
+  ]
+}

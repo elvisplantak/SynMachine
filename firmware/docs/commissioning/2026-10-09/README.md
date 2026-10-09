@@ -266,3 +266,41 @@ confirm HOME release at 5 degrees or repair the earlier physical HOME failure.
 The prepared P1-only 8-command recheck and separate 16-command valve trial each
 require NEW stated dry/closed/stopped prerequisites, motor-power readiness and
 exact physical authorization. No queued motion remains; GitHub push is deferred.
+
+
+## P1-only full-span and final parking check — completed and operator-confirmed
+
+With NEW readiness for the stated empty-system/closed-bottom/stopped-mixer
+prerequisites and explicit P1 full-span authorization, boot 90 completed all
+8 prepared commands on installed firmware e2e9d3c:
+1. HOME V1.
+2. HOME V2.
+3. V2=180 (P1 Waste selection).
+4. V1=180 (P1 Waste selection).
+5. P1 HOME.
+6. P1 absolute 20500 steps.
+7. P1 HOME from the full-span target.
+8. P1 absolute 1000 steps, terminal parking after successful procedure steps.
+
+All eight command receipts and all eight durable journal entries are COMPLETED,
+with no error; process exited 0 and closed the connection. No retry or cleanup
+motion occurred. P2, V3-V8, bottom valves, mixers and carousel were not commanded.
+The initial closed/stopped states were fresh operator declarations, not sensor
+measurements. The user then explicitly confirmed normal return to HOME, final
+movement away and release of the HOME lever, without unusual sound.
+
+This establishes acceptance of this dry P1 full-span HOME/terminal-parking check.
+It does not prove the original boot-87 failure's cause, wet flow/sealing,
+calibration, P2 acceptance or complete demo execution. Boot 87 remains FAILED;
+its evidence/journal was not modified. Final commanded V1=180, V2=180 and P1=1000
+are historical observations, not current references for a later reconnect.
+Motor power is last confirmed ON. No host connection or queued command remains.
+
+Evidence: p1-span-dry-521e41d1-4885-4972-bb46-00ddea2d05f5/events.jsonl,
+commands.sql and result-verification.json. Original commands.sqlite3 is retained
+locally and ignored. Source/helpers were checked against the committed snapshots
+before execution; no firmware/backend/UI production code changed. Documentation
+and whitespace/status checks suffice for this physical evidence checkpoint;
+passing 211 native tests and the build remain those for installed e2e9d3c.
+The next valve parking trial and P2 check require separate exact authorization
+and fresh stated readiness. GitHub push remains deferred.

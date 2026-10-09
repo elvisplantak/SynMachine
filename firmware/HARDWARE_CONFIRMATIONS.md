@@ -22,9 +22,20 @@ explicitly authorized upload. Firmware e2e9d3c is now installed on the same
 confirmed Mega USB identity; avrdude verified all 41056 flash bytes, with HEX
 SHA-256 matching the prepared artifact. No actuator command or EEPROM provisioning
 occurred. Evidence: `docs/commissioning/2026-10-09/terminal-parking-upload-verification.json`.
-No physical retest or Serial reopen followed upload. Motor power is last confirmed
-OFF; NEW powered-test readiness/authorization are required. Commissioning scope:
-`docs/commissioning/2026-10-09/README.md`.
+At upload completion motor power was confirmed OFF. With subsequent NEW
+empty-system/closed-bottom/stopped-mixer prerequisites, motor power ON and explicit
+approval of the P1-only full-span block, boot 90 completed all 8 commands:
+HOME V1/V2 -> P1 Waste (V2=180, V1=180) -> P1 HOME -> 20500 -> HOME -> 1000.
+The user physically confirmed normal P1 return to HOME, subsequent parking away
+and release of the HOME lever, without unusual sound. This confirms this dry P1
+full-span HOME and terminal 1000-step check; it does not prove the cause of boot
+87's earlier failure or wet behavior. The earlier failed journal is unchanged.
+No error/retry/cleanup occurred, and the connection closed. Other actuators were
+not commanded. Last commanded V1/V2=180 and P1=1000 are historical only after
+reconnect; motor power is last confirmed ON. Valve 5-degree release and P2 pump
+checks remain pending and need separate fresh readiness/authorization. Evidence:
+`docs/commissioning/2026-10-09/p1-span-dry-521e41d1-4885-4972-bb46-00ddea2d05f5/`.
+Commissioning scope: `docs/commissioning/2026-10-09/README.md`.
 
 ## Slower route-valve firmware and grouped dry checks — 2026-10-09
 
