@@ -6,7 +6,45 @@
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — final pump HOME signal wait installed, dry recheck pending
+## Current checkpoint — terminal HOME release prepared, dry trial pending
+
+- User selected a separate terminal movement at the end of the whole successful
+  test/procedure, only for actuators left at HOME: P1/P2 to 1000 absolute steps,
+  V1-V8 to nominal 5 degrees. The latter maps to 22 steps (4.95 degrees) with
+  the existing 400 steps/90 degrees ratio; physical release and safe wet
+  alignment remain unconfirmed. Column retains its existing CLOSED 4-degree
+  offset; no comparable HOME offset is assumed for the SF bottom adapter.
+- Firmware e2e9d3c on codex/sf-mixer-service-integration extends the
+  existing VALVE_SET_POSITION command for this dry trial. Target 5 requires
+  trusted zero, moves 22 steps, then requires 30 ms stable inactive HOME within
+  a fixed 60 ms motionless deadline. Failed release invalidates trust without
+  further travel. HOME still establishes zero; parking preserves the raw offset.
+  STARTED ordering, duplicate caching, abort and normal 90/180 targets remain.
+- Dry host terminal steps use the existing sequential durable Service executor,
+  derive positions only from this block and leave unknown/non-HOME actuators
+  untouched. Pump parking requires final verified Waste selection; both pumps
+  park after the entire combined block. Any failure/unknown result/cancellation
+  halts before the remaining suffix without retry/cleanup movement.
+- Verification: 45 focused tests and all 211 warning-enabled native tests passed;
+  Mega 2560 build passed, 41056 flash bytes / 3148 static SRAM bytes (+176/+8).
+  Ten new fake-only terminal checks plus P1/P2/pump host checks (9/10/16) passed.
+  Self-review and diff checks passed. Evidence and reproducible helper snapshots:
+  firmware docs/commissioning/2026-10-09/README.md.
+- Prepared next scopes require NEW readiness and exact approval: P1-only 8
+  commands (HOME V1/V2 -> Waste -> P1 HOME -> 20500 -> HOME -> 1000), and a
+  separate empty-system 16-command V1-V8 HOME -> terminal 5-degree trial with
+  pumps stationary. Isolated dry HOME orders do not authorize wet Recovery.
+- This change has not been uploaded or physically tested. Installed Mega
+  firmware remains 8a5d93c; no Serial connection or queued command remains.
+  Motor power is last confirmed OFF. Upload requires separate approval.
+  Boot 87's failed journal and unproven root cause remain unchanged. P1 full-span
+  HOME/P2 pump acceptance and wet/demo acceptance remain pending.
+- Full production procedure parking through the UI is not activated; complete
+  live profile and safe wet alignment remain prerequisites. Backend/UI code
+  remains independently accepted 1c0e906/7e36cf7. UVP and animation remain deferred.
+  Local firmware/UI documentation commits are retained; GitHub push is deferred.
+
+## Previous checkpoint — final pump HOME signal wait installed, dry recheck pending
 
 - On 2026-10-09 the user requested continuation of supervised testing. Firmware
   `caef934` on `codex/sf-mixer-service-integration` implements the earlier request
@@ -74,8 +112,8 @@
   EEPROM provisioning occurred. Evidence: firmware
   `docs/commissioning/2026-10-09/pump-home-wait-upload-verification.json`.
   No host connection/queued command remains; motor power is last confirmed OFF.
-  NEW dry readiness/approval are required before a proposed seven-command P1-only
-  recheck: HOME V1/V2 -> P1 Waste (V2=180, V1=180) -> P1 HOME -> 20500 -> HOME.
+  NEW dry readiness/approval are required before the current P1-only recheck;
+  its scope now includes final 1000-step parking selected by the user.
   No physical recheck has occurred. Boot 87 journal remains FAILED; root cause
   unproven. P1 full-span HOME/P2 pump acceptance, wet test and demo remain pending.
 - Upload evidence: firmware `docs/commissioning/2026-10-09/upload-verification.json`.
