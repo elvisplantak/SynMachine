@@ -1,12 +1,33 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-10-09
+- Checkpoint date: 2026-10-10
 - Development phase: fresh operator current-input software complete;
   independent review accepted for fake-only scope; physical profile incomplete and live activation gated
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — full supervised dry demo accepted on the machine
+## Current checkpoint — SF-only cable-repair recheck; physical result not accepted
+
+- On 2026-10-10 the user reported yesterday's SF mixer did not rotate due to a
+  damaged motor cable, now repaired. Today's sole scope is this motor recheck;
+  the liquid check is deferred. Yesterday's physical SF acceptance is withdrawn,
+  without changing raw journals/SQL or command-completion results.
+- With fresh empty-SF/free-element/power-ON confirmation, boot96 completed exactly
+  SF STOP -> START -> wait 3 s -> STOP. All 3 durable commands and 2 owned sequences
+  completed, owner idle, exit0, connection closed. Existing DIR=LOW and pulse rate
+  unchanged; pumps/valves/other actuators uncommanded, no upload/API activation.
+- The user reports physical operation was not normal. Test is NOT physically
+  accepted: motor twitched and buzzed with an unpleasant sound. The user switched
+  motor power OFF. Root cause not established; no repeat or further movement
+  attempted. Command confirmation is not measured motor rotation.
+- Forty-four fake-only/ownership checks passed, including required STOP on
+  START/wait failure. Firmware/backend/UI executable code unchanged. Evidence:
+  firmware docs/commissioning/2026-10-10/README.md and its boot96 bundle.
+- Next step is inspect the cable/connections with motor power OFF before any
+  further physical action.
+  Production profile, wet acceptance, UVP and animation remain deferred.
+
+## Previous checkpoint — full dry demo software complete; SF physical observation corrected
 
 - Installed firmware remains e2e9d3c on codex/sf-mixer-service-integration;
   accepted production backend/UI code remains 1c0e906/7e36cf7. No new upload or
@@ -28,9 +49,11 @@
 - Boot 94 full attempt completed all 10 phases, 57 Arduino + 4 SF commands, 6 waits
   and 34 owned sequences in 435.485 s (~7 min 15 s). All journals are COMPLETED and sends
   exactly match checked preview. Its isolated persisted machine is READY/run
-  COMPLETED, owner idle; first failed probe bundle unchanged. The user saw the
-  entire pump/valve/SF mixer/SF bottom/Column/carousel sequence and confirmed
-  normal physical operation without binding or unusual sound. Dry demo accepted.
+  COMPLETED, owner idle; first failed probe bundle unchanged. The user initially
+  confirmed normal physical operation throughout. On 2026-10-10 the user corrected
+  the SF observation: damaged mixer motor cable prevented rotation. Whole-demo
+  physical SF mixing acceptance is withdrawn; original statement kept as history,
+  all software completions and other actuator observations unchanged.
 - Composition reuses owned durable Service bootstrap plus existing
   OwnedOfflineRuntime.start_created_run and ten-phase builders in the same
   SQLite bundle and Arduino session. Initial run state derives only from
@@ -54,7 +77,8 @@
   docs/commissioning/2026-10-09/README.md. Full result events/three SQL exports/JSON:
   full-dry-demo-56594eb7-bbbb-4525-9254-e99d585a01c6/.
 - The user scheduled the liquid check for 2026-10-10. Next scope: consolidated
-  dry-execution review and a separately defined/approved bounded wet check with
+  dry-execution review and, after resolving the SF mixer issue, a separately
+  defined/approved bounded wet check with
   fresh physical readiness; no hardware connection or movement is scheduled automatically. Full physical profile, general wet startup/Recovery HOME
   order, maintenance parameters and measured flow/sealing remain unconfirmed.
   Reactor mixer was OFF/uncommanded; no new wiring/control inferred from
