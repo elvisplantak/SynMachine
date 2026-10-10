@@ -389,7 +389,7 @@ SF identity/state probe succeeded at present_position2573, torque OFF/CLOSED
 within existing tolerance. Its completed result is recorded below.
 
 
-## Whole dry demo completed and physically confirmed — boot 94
+## Whole dry demo software completed — boot 94; SF observation corrected
 
 The explicitly authorized fresh attempt completed in 435.485 seconds (about
 7 minutes 15 seconds), exit 0. All 57 Arduino and 4 SF durable journal entries
@@ -400,9 +400,12 @@ Its persisted offline machine is READY and run COMPLETED; no production
 application was activated. The previous boot93 no-motion probe remains BLOCKED
 and unchanged in its separate original bundle. No automatic retry/replay occurred.
 
-The user subsequently confirmed seeing the entire pump/valve/SF mixer/SF bottom/
-Column/carousel sequence and that all physical motion was normal, without binding
-or unusual sound. This supervised empty-system end-to-end demo is accepted dry.
+The user initially confirmed seeing normal motion throughout the entire sequence.
+On 2026-10-10 the user corrected the SF mixer observation: its damaged motor
+cable prevented rotation. Whole-demo physical SF mixing acceptance is withdrawn;
+other actuator observations and software completions are unchanged. The original
+statement is preserved as history in result-verification.json with a dated
+correction. See ../2026-10-10/README.md for the separate cable-repair recheck.
 Wet flow, sealing, actual delivered volumes and a general startup/Recovery/flush
 procedure remain separate unconfirmed scopes. Reactor mixer was OFF throughout;
 no new Reactor actuation was implemented or tested.

@@ -245,5 +245,16 @@
   "measured_volume_or_wet_acceptance": false,
   "old_no_motion_failure_bundle_unchanged": true,
   "operator_confirmation_recorded_at_utc": "2026-10-09T18:17:06.360167+00:00",
-  "dry_end_to_end_acceptance": true
+  "dry_end_to_end_acceptance": false,
+  "operator_confirmation_superseded_for": [
+    "SF mixer physical rotation"
+  ],
+  "operator_correction": {
+    "recorded_at_utc": "2026-10-10T14:42:51.855409+00:00",
+    "report": "User reports SF mixer did not physically rotate in boot 94 because its motor cable was damaged. User reports cable repaired on 2026-10-10.",
+    "original_confirmation_preserved_as_history": true,
+    "command_results_unchanged": true,
+    "other_actuator_confirmations_withdrawn": false,
+    "full_physical_acceptance": "Not established for SF mixing; separate recheck does not retroactively validate boot 94"
+  }
 }

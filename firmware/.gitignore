@@ -18,3 +18,4 @@ __pycache__/
 /docs/commissioning/**/owner.sqlite3
 /docs/commissioning/**/execution.sqlite3
 /docs/commissioning/**/lifecycle.sqlite3
+/docs/commissioning/**/commands.sqlite3

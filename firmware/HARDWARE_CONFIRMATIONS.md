@@ -1,6 +1,26 @@
 # Hardware confirmations
 
-## Whole supervised empty-system demo accepted — 2026-10-09, boot 94
+## SF mixer cable repair: isolated recheck — 2026-10-10, boot 96
+
+The user reported that SF mixing did not physically occur during boot94 due to
+an observed damaged motor cable, and that the cable was repaired today. This
+supersedes only yesterday's SF physical confirmation, not the durable command
+results or other actuator observations. Raw event journals and SQL remain intact.
+Today is SF-only; the previously proposed liquid check is deferred.
+
+With fresh empty-SF/free-element/motor-power-ON confirmation, the authorized
+STOP -> START -> wait 3 seconds -> STOP completed in boot96. All three durable
+commands and two owned sequences completed; owner idle and connection closed.
+Existing DIR=LOW and 500 pulses/s profile unchanged. No pumps, valves, carousel,
+Reactor, SF bottom adapter, firmware upload or production activation. Forty-four
+fake-only/ownership checks passed. The user reports that physical operation was
+not normal: twitching and buzzing with an unpleasant sound. The user switched
+motor power OFF. This isolated physical test is NOT accepted; root cause is not
+established. No further movement attempted. Software completion
+alone does not confirm rotation or mixing performance.
+Evidence: docs/commissioning/2026-10-10/README.md.
+
+## Whole supervised empty-system demo — 2026-10-09, boot 94; SF observation corrected
 
 Boot93 first handshook Arduino but SF read-only identity probe returned
 There is no status packet. Verified zero actuator commands/phase plans/waits;
@@ -17,8 +37,11 @@ COMPLETED; exit0 and connection closed. About 7 minutes15 seconds elapsed. Scope
 was empty system, nominal10ml (S6/B1 1.6/B2 2.4), Reactor mixer OFF, SF mixing10s,
 settling5s and two5s fractions. Carousel reference1 used fresh user alignment;
 actual move1-to-2 occurred while Column CLOSED. User saw the full sequence and
-confirmed all pumps/valves/SF mixer/SF bottom/Column/carousel operated normally
-without binding or unusual sound. This establishes this dry end-to-end sequence.
+initially confirmed all pumps/valves/SF mixer/SF bottom/Column/carousel operated
+normally. On 2026-10-10 the user corrected the SF mixer observation: its damaged
+motor cable prevented rotation. The original statement remains historical;
+whole-demo physical SF mixing acceptance is withdrawn. Other actuator
+confirmations and all software command completions remain unchanged.
 It does not confirm wet flow/sealing/delivered volume, general startup/Recovery
 HOME orders, production profile, or Reactor mixer control.
 
@@ -56,7 +79,8 @@ that components are connected, and explicitly confirmed carousel aligned at tube
 viewed from motor front. Motor power last confirmed ON; Reactor remains stopped.
 These are fresh operator statements, not sensor readings or generic wet-startup
 approval. No new Reactor mixer control/pins are inferred from connected hardware.
-The full dry demo subsequently completed and was physically confirmed as below.
+The full dry demo subsequently completed; its SF physical observation was later
+corrected as recorded above.
 Production profile, wet acceptance, UVP and animation remain gated.
 
 ## Terminal HOME release request — earlier preparation, 2026-10-09
