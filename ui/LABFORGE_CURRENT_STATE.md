@@ -1,12 +1,18 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-10-11
+- Checkpoint date: 2026-10-12
 - Development phase: command-driven flow animation independently accepted for
-  fake-only software scope; user browser check next; wet acceptance remains gated
+  fake-only software scope; Guided Demo user visual check observed; wet acceptance gated
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
 ## Current checkpoint — command-driven flow animation
+
+- On 2026-10-12 the user reported seeing traveling dashes and changing active
+  branches during the connected Guided Demo fake-only browser check. The sequence
+  appeared fast. The fake launcher uses --command-delay 1; suggested demo waits
+  were shortened for this visual check. This records that observation only, not
+  a manual per-segment direction audit, Recipes visual check or physical flow.
 
 - Independent focused follow-up review CLOSED the prior Low direction finding.
   Critical 0, High 0, Medium 0, Low 0. The complete backend+UI checkpoint is
@@ -72,8 +78,8 @@
 - Accepted UI code checkpoint: `97ca933fd44f3a243f64c148d2140815f611eb45`. The original
   UI implementation was 5bc4aaf; 0125ceb recorded the initial review packet.
   docs/reviews/2026-10-11-command-flow-animation.md records both review outcomes.
-- Next: user browser check of animation with fake transports. Wet demo remains
-  separately deferred and gated.
+- Next: optional user visual check in Recipes with fake transports; choose the
+  next software/physical scope separately. Wet demo remains deferred and gated.
 
 ## Previous checkpoint — recipe browser checks and UI polish
 

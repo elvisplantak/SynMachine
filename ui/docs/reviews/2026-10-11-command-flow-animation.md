@@ -108,3 +108,19 @@ accuracy or physical valve truth and does not authorize real-device execution,
 wet testing, upload, production activation or main merge. Subsequent
 acceptance-recording commits change documentation only; the reviewed code HEADs
 remain the two exact commits above.
+
+
+## User visual observation — 2026-10-12
+
+The user located the configuration controls, then reported seeing traveling
+dashes and changing active branches in the connected Guided Demo. The sequence
+appeared fast. The identified local launcher uses fake transports with existing
+--command-delay 1 pacing; the suggested quick-demo parameters used reaction
+duration 0 minutes, SF mixing 3 seconds, settling 2 seconds and two 5-second
+fractions. These are suggested inputs, not independently read-back settings.
+
+This records the reported visual observation only. It does not assert a manual
+audit of every route/direction, run completion, Recipes browser confirmation or
+physical liquid movement. No code/settings/data change or new execution was
+performed to record this observation. The exact independently accepted code
+commits above remain unchanged.
