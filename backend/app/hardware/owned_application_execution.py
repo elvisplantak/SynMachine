@@ -21,6 +21,7 @@ from app.demo.maintenance_plan import MaintenanceKind
 from app.demo.machine_models import MachineState
 from app.demo.run_models import RunStatus
 from app.hardware.owned_offline_runtime import OwnedOfflineRuntime
+from app.hardware.execution_flow import ExecutionFlowActivity
 from app.hardware.simulated_lifecycle import SimulationLifecycleStore
 from app.hardware.simulated_p1_runner import SimulationBlocked
 from app.hardware.operator_current_input import OperatorCurrentInput, OperatorInputChallenge
@@ -46,6 +47,7 @@ class ApplicationExecutionStatus(BaseModel):
     retained_owner_id: str | None
     run_id: str | None
     automatic_resume_allowed: bool = False
+    flow_activity: ExecutionFlowActivity | None = None
     current_input: OperatorInputChallenge | None = None
     operator_current_input_configured: bool = False
 
@@ -180,6 +182,8 @@ class OwnedApplicationExecution:
                 busy=self._busy, executing=self._executing, operation=self._operation,
                 error=self._error, retained_owner_id=self._owner_id,
                 run_id=self._run_id,
+                flow_activity=(self._runtime._runner.flow.snapshot()
+                               if self._executing and self._error is None else None),
                 operator_current_input_configured=self._operator_input_source is not None,
                 current_input=(None if self._operator_input_source is None
                                else self._operator_input_source.pending()),

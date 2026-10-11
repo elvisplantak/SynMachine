@@ -25,6 +25,7 @@ from app.demo.pausable_wait_plan import PausableWaitPlan
 from app.demo.maintenance_plan import MaintenancePlan, MaintenanceKind
 from app.hardware.prepared_adapter_device import PreparedAdapterDevice
 from app.hardware.durable_arduino import DurableArduinoCommandExecutor
+from app.hardware.execution_flow import ExecutionFlow, flow_for_action
 from app.hardware.owned_hardware import OwnedHardware
 from app.hardware.sequence_ownership import HardwareOwnership, OwnershipBlocked
 from app.hardware.simulated_p1_runner import SimulatedP1Device, SimulationBlocked
@@ -133,6 +134,7 @@ class OwnedTransferRunner:
             raise TypeError("adapter preparation requires an explicit monotonic timer")
         if timer is not None and type(timer) is not MonotonicExecutionTimer:
             raise TypeError("only the bounded monotonic timer or default virtual wait is supported")
+        self.flow = ExecutionFlow()
         self._timer = timer
         self._active_phase = None
         self._session = None
@@ -390,59 +392,60 @@ class OwnedTransferRunner:
                             if self._session is not None and not followup:
                                 self._check_boot(plan.prepared.assumptions.controller_boot_id)
                                 self._session.check_connections()
-                            if isinstance(action, (CollectionWait, PausableWait)):
-                                outcome = self._wait(
-                                    phase_id,
-                                    operation.operation_number,
-                                    action,
-                                    checked_stop,
-                                    wait_control,
-                                )
-                                if outcome is CollectionTimerOutcome.STOP_REQUESTED:
-                                    return outcome
-                            elif isinstance(action, SfBottomValveAction):
-                                if self._session is not None:
-                                    self._session.check_sf()
-                                commands.execute_sf(
-                                    phase_execution_id=phase_id,
-                                    operation_command_id=action.operation_command_id,
-                                    state=action.state,
-                                )
-                                if self._session is not None:
-                                    self._session.check_sf()
-                                    self._session.observe(action)
-                            else:
-                                self._check_boot(plan.prepared.assumptions.controller_boot_id)
-                                mixer_action = action.command == "SF_MIXER_SET_STATE"
-                                if mixer_action:
-                                    self.device.sf_mixer_running = None
-                                carousel_move = action.command in ("CAROUSEL_MOVE_TO_POSITION", "CAROUSEL_SET_REFERENCE")
-                                if carousel_move:
-                                    self._invalidate_carousel(phase_id)
-                                commands.execute(
-                                    phase_execution_id=phase_id,
-                                    operation_command_id=action.operation_command_id,
-                                    command=action.command,
-                                    arguments=dict(action.arguments),
-                                )
-                                self._check_boot(plan.prepared.assumptions.controller_boot_id)
-                                if mixer_action:
-                                    self.device.sf_mixer_running = dict(action.arguments)["running"]
-                                if carousel_move:
-                                    position = dict(action.arguments)["position"]
-                                    if action.command == "CAROUSEL_SET_REFERENCE":
-                                        self._db.execute(
-                                            "INSERT INTO execution_carousel_projection VALUES (?, ?) ON CONFLICT(phase_id) DO UPDATE SET position=excluded.position",
-                                            (phase_id, position),
-                                        )
-                                    else:
-                                        self._db.execute(
-                                            "UPDATE execution_carousel_projection SET position=? WHERE phase_id=?",
-                                            (position, phase_id),
-                                        )
-                                    self.device.carousel_position = position
-                                if self._session is not None:
-                                    self._session.observe(action)
+                            with self.flow.scope(flow_for_action(plan, operation, action, phase_id)):
+                                if isinstance(action, (CollectionWait, PausableWait)):
+                                    outcome = self._wait(
+                                        phase_id,
+                                        operation.operation_number,
+                                        action,
+                                        checked_stop,
+                                        wait_control,
+                                    )
+                                    if outcome is CollectionTimerOutcome.STOP_REQUESTED:
+                                        return outcome
+                                elif isinstance(action, SfBottomValveAction):
+                                    if self._session is not None:
+                                        self._session.check_sf()
+                                    commands.execute_sf(
+                                        phase_execution_id=phase_id,
+                                        operation_command_id=action.operation_command_id,
+                                        state=action.state,
+                                    )
+                                    if self._session is not None:
+                                        self._session.check_sf()
+                                        self._session.observe(action)
+                                else:
+                                    self._check_boot(plan.prepared.assumptions.controller_boot_id)
+                                    mixer_action = action.command == "SF_MIXER_SET_STATE"
+                                    if mixer_action:
+                                        self.device.sf_mixer_running = None
+                                    carousel_move = action.command in ("CAROUSEL_MOVE_TO_POSITION", "CAROUSEL_SET_REFERENCE")
+                                    if carousel_move:
+                                        self._invalidate_carousel(phase_id)
+                                    commands.execute(
+                                        phase_execution_id=phase_id,
+                                        operation_command_id=action.operation_command_id,
+                                        command=action.command,
+                                        arguments=dict(action.arguments),
+                                    )
+                                    self._check_boot(plan.prepared.assumptions.controller_boot_id)
+                                    if mixer_action:
+                                        self.device.sf_mixer_running = dict(action.arguments)["running"]
+                                    if carousel_move:
+                                        position = dict(action.arguments)["position"]
+                                        if action.command == "CAROUSEL_SET_REFERENCE":
+                                            self._db.execute(
+                                                "INSERT INTO execution_carousel_projection VALUES (?, ?) ON CONFLICT(phase_id) DO UPDATE SET position=excluded.position",
+                                                (phase_id, position),
+                                            )
+                                        else:
+                                            self._db.execute(
+                                                "UPDATE execution_carousel_projection SET position=? WHERE phase_id=?",
+                                                (position, phase_id),
+                                            )
+                                        self.device.carousel_position = position
+                                    if self._session is not None:
+                                        self._session.observe(action)
 
                     outcome = self.hardware.run_operation(
                         lease,

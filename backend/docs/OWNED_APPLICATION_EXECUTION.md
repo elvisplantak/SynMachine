@@ -86,7 +86,7 @@ All paths below use `/api/v1`:
 
 | Request | Owned candidate behavior |
 | --- | --- |
-| GET `/execution` | Busy/executing, current operation, error, retained owner; automatic resume false |
+| GET `/execution` | Busy/executing, current operation, error, retained owner, ephemeral flow activity; automatic resume false |
 | GET `/machine`, `/runs/{id}`, `/machine/events`, `/runs/{id}/events` | Persisted observations/history |
 | POST `/machine/initialize` | Explicit initial state from supplied fresh context; no actuator command |
 | POST `/runs`, `/runs/{id}/start` | Persist configuration, then explicitly execute a CREATED run |
@@ -164,3 +164,29 @@ prove cleaning/volume/movement, or commission routes and working margins. SF hos
 scope remains correlation rather than persistent physical trust. Cross-database
 commits remain non-atomic, and advisory locks do not govern unwrapped adapters or
 arbitrary database writers. No firmware or physical device was changed or used.
+
+## Command-driven flow display
+
+GET `/execution` now adds nullable `flow_activity` for ordinary Guided Demo and
+recipe RUN phases. It contains `phase_execution_id`, `run_id`, prepared
+`operation_number`, `operation_command_id`, `kind` (ASPIRATE/DISPENSE/COLLECT),
+and symbolic `route`. Pump activity identifies the exact absolute-move action
+and its separately selected aspiration or dispense route. Collection identifies
+the protected dwell (command ID null), only after OPEN has completed, and clears
+before required CLOSE or carousel movement.
+
+This describes an active runner call including intent persistence, dispatch and
+awaiting the command result. It does **not** assert receipt of controller STARTED,
+sensor-observed flow, delivered volume, liquid presence or valve sealing. Existing
+journals remain the authority for command lifecycle. Display state is immutable,
+protected by a separate short lock, never read from SQLite on a status request,
+and cleared in `finally` for success, Stop and exceptions before protected
+follow-up. There is no new command, route policy, protocol frame, durable schema,
+permission, replay or recovery decision. Restart starts with no activity and
+never reconstructs it from historical plans/positions.
+
+Maintenance/Service/HOME, route switching, passive or paused waits, SF mixing and
+settling expose no flow activity. In particular, expanded maintenance operation
+numbers are not interpreted as ordinary logical operation indices. Unsupported
+paths remain static. An absent field from an older backend is also static in the
+new UI; no whole-phase route is guessed. Tests: `tests/test_execution_flow.py`.

@@ -159,3 +159,14 @@ initialization and old request/credential rejection after restart. UI fake-API
 browser tests cover blank forms, credential clearing, per-request consent,
 unknown recovery references, cancellation/expiration and read-only restoration.
 These new interactions have not yet been manually checked by the user.
+
+## Command-driven animation pacing
+
+For visible fake-command animation, the existing `--command-delay 1` option can
+slow each fake command to one second. The connected Guided Demo and Recipes
+schematics then show aspiration and dispense separately, plus the protected
+Column collection dwell. Shorter commands may fall between UI samples and are
+never replayed or artificially extended to make their paths visible. Keep the
+same marked state directory to preserve recipes and run evidence. This option
+changes only fake test pacing and does not change actuator speed or production
+configuration.
