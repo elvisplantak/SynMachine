@@ -58,7 +58,8 @@ software tests do not establish wet performance or physical authorization.
 
 Review of the pinned commits above (plus documentation-only UI 0125ceb) reported
 Critical 0, High 0, Medium 0, Low 1. Backend 5c99e190 is accepted for fake-only
-observational scope; combined acceptance is pending one display-only correction.
+observational scope; combined acceptance was initially pending the correction.
+The focused closure below supersedes that initial pending status.
 Reported local test commands were not independently rerun by the reviewer.
 
 The Low finding is valid: SF_BOTTOM_TO_P2 must use sf-v8 reverse because the
@@ -72,7 +73,38 @@ ownership, journals or command behavior changed.
 Follow-up evidence: focused flow unit tests 3 passed; full UI 49 passed including
 23 actual headless-browser cases, zero skips; lint, TypeScript/Vite build and
 `git diff --check` passed. JS335.10kB/gzip91.95, CSS53.04/gzip10.58.
-The correction's pinned commit is supplied in the conversational handoff; these
-notes belong to that same commit. This follow-up is self-verified, not yet
-independently accepted. Please focus closure on the mapping and regression diff
-against UI 0125ceb; the accepted backend requires no correction or rereview.
+The correction is pinned at UI `97ca933fd44f3a243f64c148d2140815f611eb45`, against base
+`0125ceb3fb689db81c84880d12b748cfb799c8c3`. Its independent closure is below.
+
+
+## Final independent acceptance — 2026-10-11
+
+The independent focused follow-up reviewed UI
+[`97ca933fd44f3a243f64c148d2140815f611eb45`](https://github.com/elvisplantak/labforge-ui/commit/97ca933fd44f3a243f64c148d2140815f611eb45)
+(`Correct SF outlet aspiration animation direction`) against
+`0125ceb3fb689db81c84880d12b748cfb799c8c3`. The remote feature branch matched the
+reviewed HEAD. The previous Low finding is CLOSED; Critical/High/Medium/Low are
+all zero. No additional software correction is requested.
+
+The complete command-driven flow-animation checkpoint is independently ACCEPTED
+for the declared fake-only software scope at these exact implementation HEADs:
+
+- Backend: `5c99e190e70c234507f3cf44abd66beca0354bd2` (unchanged, previously accepted).
+- UI: `97ca933fd44f3a243f64c148d2140815f611eb45`.
+- Branch in both repositories: `codex/execution-flow-animation`.
+
+The reviewer confirmed sf-v8 reverse, v7-v8 reverse, v3-v7 reverse and v3-p2
+forward, plus the complete unit/browser regression mapping and computed CSS
+checks. SVG geometry and all other route mappings are unchanged. Additional
+follow-up files record documentation only; backend execution, ownership,
+journals, intent-before-bytes, Stop/Pause, protected CLOSE, restart/no-replay,
+route policy, serial protocol, firmware and topology are unchanged.
+
+Reported verification remains UI 49 passed, 23 actual browser cases, zero skipped,
+lint, TypeScript/Vite build and diff check passed. These local commands were not
+independently rerun through the GitHub connector; no combined GitHub status checks
+were present. This acceptance does not establish sensed liquid flow, volume
+accuracy or physical valve truth and does not authorize real-device execution,
+wet testing, upload, production activation or main merge. Subsequent
+acceptance-recording commits change documentation only; the reviewed code HEADs
+remain the two exact commits above.

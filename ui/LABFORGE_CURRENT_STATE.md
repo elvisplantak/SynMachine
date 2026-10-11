@@ -1,18 +1,32 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-10-11
-- Development phase: command-flow backend independently accepted for fake-only scope;
-  UI direction finding corrected and self-verified; focused acceptance pending
+- Development phase: command-driven flow animation independently accepted for
+  fake-only software scope; user browser check next; wet acceptance remains gated
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
 ## Current checkpoint — command-driven flow animation
 
+- Independent focused follow-up review CLOSED the prior Low direction finding.
+  Critical 0, High 0, Medium 0, Low 0. The complete backend+UI checkpoint is
+  independently ACCEPTED for the declared fake-only software scope at:
+  backend `5c99e190e70c234507f3cf44abd66beca0354bd2`;
+  UI `97ca933fd44f3a243f64c148d2140815f611eb45` on `codex/execution-flow-animation`.
+  The remote UI branch matched the reviewed HEAD. Subsequent documentation-only
+  commits record acceptance without extending the reviewed implementation scope.
+- No additional software correction is requested. Reported local checks were
+  inspected but not independently rerun through the GitHub connector; no combined
+  GitHub status checks were present. Acceptance is command-driven observational
+  evidence only, not sensed flow, delivered-volume accuracy or physical valve
+  truth. Real-device execution, wet tests, firmware upload, production activation
+  and main merge retain their separate approval boundaries.
+
 - Independent review at backend `5c99e190e70c234507f3cf44abd66beca0354bd2`
   and UI code `5bc4aaf2c7664f8f38afe0cb5dc7a80c328ad03d` (documentation HEAD
   `0125ceb3fb689db81c84880d12b748cfb799c8c3`) found Critical 0, High 0,
   Medium 0, Low 1. Backend is ACCEPTED for the declared fake-only observational
-  scope. Combined acceptance remains pending the narrow UI correction.
+  scope. Combined acceptance was initially pending the correction, now closed above.
 - The finding is valid: the `sf-v8` SVG path starts at V8.k2 and ends toward
   SF_BOTTOM_OUT, so SF aspiration must animate reverse. The follow-up changes
   only that direction and focused regression coverage. Unit tests check the
@@ -21,7 +35,7 @@
 - Follow-up verification: 49 UI tests passed, 23 actual browser cases, zero skips;
   lint, TypeScript/Vite build and diff check passed. JS 335.10 kB / gzip 91.95 kB;
   CSS 53.04 kB / gzip 10.58 kB. Backend/firmware and local fake recipe data remain
-  unchanged. Follow-up code has not yet been independently accepted.
+  unchanged. The focused independent follow-up accepted this correction as above.
 
 - The user approved adding traveling dashes that reflect backend-executed actions
   after the UVP milestone. Backend and UI are isolated on
@@ -55,11 +69,11 @@
   and all saved definitions were compared before/after restart and are unchanged.
   Latest Test recipe version 3 is still intentionally invalid (ADD 2 / transfer 3).
   Executor is idle, flow null, no error or retained owner. No real hardware action.
-- UI code checkpoint: `5bc4aaf2c7664f8f38afe0cb5dc7a80c328ad03d`. The later
-  documentation-only commit pins both code heads in
-  docs/reviews/2026-10-11-command-flow-animation.md; it adds no executable change.
-- Next: focused independent closure of the corrected sf-v8 direction, then user
-  browser check of animation. Wet demo remains separately deferred and gated.
+- Accepted UI code checkpoint: `97ca933fd44f3a243f64c148d2140815f611eb45`. The original
+  UI implementation was 5bc4aaf; 0125ceb recorded the initial review packet.
+  docs/reviews/2026-10-11-command-flow-animation.md records both review outcomes.
+- Next: user browser check of animation with fake transports. Wet demo remains
+  separately deferred and gated.
 
 ## Previous checkpoint — recipe browser checks and UI polish
 

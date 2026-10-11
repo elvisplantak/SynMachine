@@ -37,8 +37,13 @@ persisted schema, route policy or ownership behavior changed. All 1920 backend
 and 49 UI tests passed (23 actual browser cases, none skipped); lint/build/Ruff
 passed. Independent review accepted the backend at 5c99e190 and found one Low
 UI direction defect: sf-v8 was forward instead of reverse for SF_BOTTOM_TO_P2.
-That UI-only follow-up is corrected and passes 49 tests, lint and build; focused
-independent closure remains pending. Combined acceptance is not yet claimed.
+That UI-only follow-up is corrected and passes 49 tests, lint and build.
+Independent focused follow-up CLOSED the finding, with all severity counts zero.
+The complete command-flow animation checkpoint is independently ACCEPTED for
+fake-only software scope at backend `5c99e190e70c234507f3cf44abd66beca0354bd2` and
+UI `97ca933fd44f3a243f64c148d2140815f611eb45`. Later documentation-only commits record
+acceptance without extending the reviewed code scope. No additional software
+correction is requested; user browser checking of the animation is next.
 The browser fake state and recipes were preserved across its idle restart with
 --command-delay 1 pacing. Physical/wet authorization remains separate.
 
