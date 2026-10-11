@@ -1,4 +1,4 @@
-<!doctype html><html lang="hr"><head><meta charset="UTF-8"><title>UVP fake API regression</title></head>
+<!doctype html><html lang="en"><head><meta charset="UTF-8"><title>UVP fake API regression</title></head>
 <body><div id="root"></div><pre id="result">pending</pre><script type="module">
 import React from "react";
 import { createRoot } from "react-dom/client";
@@ -54,56 +54,74 @@ const click = async (text) => { await wait(() => button(text) && !button(text).m
 const fill = (selector, value) => { const item = document.querySelector(selector); assert(item && !item.matches(":disabled"), `Missing input ${selector}`); const proto = item.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto, "value").set.call(item, value); item.dispatchEvent(new Event("input", { bubbles: true })); };
 const choose = (value) => { const item = document.querySelector('.uvpActions select'); item.value = value; item.dispatchEvent(new Event("change", { bubbles: true })); };
 let root;
-async function mount() { root?.unmount(); await new Promise((r) => setTimeout(r, 50)); root = createRoot(document.getElementById("root")); root.render(React.createElement(App)); await click("UVP · Recepti"); await wait(() => document.querySelector('.uvpEditor')); }
+async function mount() { root?.unmount(); await new Promise((r) => setTimeout(r, 50)); root = createRoot(document.getElementById("root")); root.render(React.createElement(App)); await click("Recipes"); await wait(() => document.querySelector('.uvpEditor')); }
 async function create() {
-  fill('.uvpEditor label input', "Recept za ponavljanje");
-  await click("Dodaj korak"); fill('.uvpStep input', "2");
-  choose("WAIT"); await new Promise((r) => setTimeout(r, 50)); await click("Dodaj korak"); fill('.uvpStep:nth-child(2) input', "3");
-  await click("Dupliciraj");
+  fill('.uvpEditor label input', "Reusable recipe");
+  await click("Add step"); fill('.uvpStep input', "2");
+  choose("WAIT"); await new Promise((r) => setTimeout(r, 50)); await click("Add step"); fill('.uvpStep:nth-child(2) input', "3");
+  await click("Duplicate");
   // First duplicate is ADD, yielding ADD ADD WAIT. Remove it explicitly.
   document.querySelector('.uvpStep:nth-child(2) button:last-child').click(); await new Promise((r) => setTimeout(r, 50));
   if (scenario.startsWith("uvp-collection-")) {
-    choose("COLLECT"); await new Promise((r) => setTimeout(r, 50)); await click("Dodaj korak");
+    choose("COLLECT"); await new Promise((r) => setTimeout(r, 50)); await click("Add step");
     fill('.uvpStep:nth-child(3) input:nth-of-type(1)', "1");
     fill('.uvpStep:nth-child(3) label:last-child input', "1");
   }
-  await click("Spremi recept"); await wait(() => document.body.innerText.includes("Spremljena verzija 1"));
+  await click("Save recipe"); await wait(() => document.body.innerText.includes("Saved version 1"));
   assert(!calls.some((c) => c.path.endsWith("/execute")), "Saving executed a recipe");
-  await click("Provjeri proceduru"); await wait(() => scenario === "uvp-content-mismatch" ? document.body.innerText.includes("Backend nije potvrdio pregled") : document.querySelector('.uvpReview'));
+  await click("Review procedure"); await wait(() => scenario === "uvp-content-mismatch" ? document.body.innerText.includes("The backend did not confirm the procedure review") : document.querySelector('.uvpReview'));
 }
 try {
   await mount(); await create();
   if (scenario === "uvp-content-mismatch") {
     assert(!document.querySelector('.uvpReview') && !calls.some((c) => c.path.endsWith("/execute")), "Mismatched content review enabled execution");
-  } else assert(button("Pokreni pregledanu proceduru").disabled, "Start without fresh readiness");
+  } else assert(button("Start reviewed procedure").disabled, "Start without fresh readiness");
   if (scenario.startsWith("uvp-collection-")) {
     fill('.uvpReview label input', "Fixture operator"); fill('.uvpReview textarea', "Fresh fake-only preparation");
     for (const item of document.querySelectorAll('.uvpReview input[type=checkbox]')) item.click();
     await new Promise((r) => setTimeout(r, 100));
     if (scenario === "uvp-collection-unavailable") {
-      assert(document.body.innerText.includes("Skupljanje frakcija nije dostupno"), "Unavailable collection has no explanation");
-      assert(button("Pokreni pregledanu proceduru").disabled, "Unavailable collection can start");
+      assert(document.body.innerText.includes("Fraction collection is unavailable"), "Unavailable collection has no explanation");
+      assert(button("Start reviewed procedure").disabled, "Unavailable collection can start");
       assert(!calls.some((c) => c.path.endsWith("/execute")), "Unavailable collection dispatched");
     } else {
-      assert(document.body.innerText.includes("svježe reference kolone i karusela"), "Fresh prerequisites hidden");
-      await click("Pokreni pregledanu proceduru");
+      assert(document.body.innerText.includes("Fresh column and carousel references"), "Fresh prerequisites hidden");
+      await click("Start reviewed procedure");
       assert(calls.filter((c) => c.path.endsWith("/execute")).length === 1, "Fresh-input composition cannot start explicit attempt");
     }
+  } else if (scenario.startsWith("uvp-layout-")) {
+    assert(document.querySelector('.uvpHeader h1').textContent === "Procedure Builder", "Procedure heading is not English");
+    assert(document.querySelector('.uvpLibrary h2').textContent === "My Recipes", "Library heading is not English");
+    const labels = [...document.querySelectorAll('.uvpCheck, .ownedDemoFields .ownedDemoCheck')];
+    assert(labels.length === 9, "Preparation or maintenance confirmations missing");
+    for (const label of labels) {
+      const input = label.querySelector('input[type=checkbox]');
+      const text = label.querySelector('span');
+      const box = input.getBoundingClientRect(), words = text.getBoundingClientRect(), row = label.getBoundingClientRect();
+      assert(box.width >= 12 && box.width <= 20, `Checkbox stretched: ${label.textContent}`);
+      assert(Math.abs(box.left - row.left) <= 1, `Checkbox not at row start: ${label.textContent}`);
+      assert(words.left - box.right >= 4 && words.left - box.right <= 12, `Text separated from checkbox: ${label.textContent}`);
+      assert(words.right <= row.right + 1, `Confirmation text overflows its row: ${label.textContent}`);
+      assert(Math.abs(words.top - box.top) <= 6, `Checkbox not aligned with first text line: ${label.textContent}`);
+      text.click(); await wait(() => input.checked);
+      text.click(); await wait(() => !input.checked);
+    }
+    assert(!calls.some((c) => c.path.endsWith("/execute")), "Layout check started execution");
   } else if (scenario === "uvp-editor") {
-    fill('.uvpEditor label input', "Izmijenjeni recept"); await wait(() => !document.querySelector('.uvpReview'));
-    assert(button("Provjeri proceduru").disabled, "Unsaved edit can execute old review");
-    await click("Spremi recept"); await wait(() => recipes[0].revision === 2);
+    fill('.uvpEditor label input', "Edited recipe"); await wait(() => !document.querySelector('.uvpReview'));
+    assert(button("Review procedure").disabled, "Unsaved edit can execute old review");
+    await click("Save recipe"); await wait(() => recipes[0].revision === 2);
     await mount(); await wait(() => document.querySelector('.uvpLibrary li button'));
-    document.querySelector('.uvpLibrary li button').click(); await wait(() => document.querySelector('.uvpEditor input').value === "Izmijenjeni recept");
+    document.querySelector('.uvpLibrary li button').click(); await wait(() => document.querySelector('.uvpEditor input').value === "Edited recipe");
     assert(document.querySelectorAll('.uvpStep').length === 2, "Saved steps did not survive reload");
     assert(!calls.some((c) => c.path.endsWith("/execute")), "Editor or reload moved hardware");
   } else if (scenario === "uvp-retry") {
     run = { run_id: "cancelled-run", status: "CREATED", phase: "READY", configuration: null, execution_settings: null, recipe: recipes[0], recipe_step_index: 0 };
     Object.assign(status, { run_id: run.run_id, error: "operator request cancelled", operator_current_input_configured: true });
-    await wait(() => document.body.innerText.includes("Prethodni UVP pokušaj nije počeo"));
+    await wait(() => document.body.innerText.includes("The previous procedure attempt did not start"));
     fill('.uvpReview label input', "Fixture operator"); fill('.uvpReview textarea', "New preparation after cancellation");
     for (const item of document.querySelectorAll('.uvpReview input[type=checkbox]')) item.click();
-    await click("Pokreni pregledanu proceduru");
+    await click("Start reviewed procedure");
     await wait(() => calls.some((c) => c.path.endsWith("/execute")));
     const attempt = calls.find((c) => c.path.endsWith("/execute"));
     assert(attempt.body.run_id !== "cancelled-run", "Old attempt was resumed automatically");
@@ -111,18 +129,18 @@ try {
   } else if (scenario === "uvp-running") {
     fill('.uvpReview label input', "Fixture operator"); fill('.uvpReview textarea', "Fresh fake-only preparation");
     for (const item of document.querySelectorAll('.uvpReview input[type=checkbox]')) item.click();
-    await click("Pokreni pregledanu proceduru");
-    await wait(() => document.body.innerText.includes("Korak 2: Čekaj 3 s"));
+    await click("Start reviewed procedure");
+    await wait(() => document.body.innerText.includes("Step 2: Wait 3 s"));
     assert(calls.filter((c) => c.path.endsWith("/execute")).length === 1, "Recipe executed more than once");
     await click("Pause wait"); await wait(() => run.status === "PAUSED"); await click("Resume wait");
-    await click("Natrag na početnu"); await wait(() => document.querySelector('[aria-label="Backend execution awareness"]').textContent.includes("BUSY"));
-    await mount(); await wait(() => document.body.innerText.includes("Korak 2: Čekaj 3 s"));
+    await click("Back to home"); await wait(() => document.querySelector('[aria-label="Backend execution awareness"]').textContent.includes("BUSY"));
+    await mount(); await wait(() => document.body.innerText.includes("Step 2: Wait 3 s"));
     assert(calls.filter((c) => c.path.endsWith("/execute")).length === 1, "Navigation replayed execution");
     await click("Stop execution"); await wait(() => document.body.innerText.includes("FLUSH_REQUIRED"));
     assert(!button("Start configured run"), "UVP exposed Guided Demo start");
   } else if (scenario === "uvp-failure") {
-    fail = true; fill('.uvpEditor label input', "Stale edit"); await click("Spremi recept");
-    await wait(() => document.body.innerText.includes("Recept je promijenjen"));
+    fail = true; fill('.uvpEditor label input', "Stale edit"); await click("Save recipe");
+    await wait(() => document.body.innerText.includes("The recipe has changed"));
     assert(!document.querySelector('.uvpReview'), "Failed save retained runnable review");
     assert(recipes[0].revision === 1 && !calls.some((c) => c.path.endsWith("/execute")), "Failed save retried or executed");
   }

@@ -45,24 +45,24 @@ function humanError(detail: unknown): string {
     return detail.map((issue: { loc?: (string | number)[] }) => {
       const loc = issue.loc ?? [];
       const index = loc.indexOf("steps");
-      const prefix = index >= 0 && typeof loc[index + 1] === "number" ? `Korak ${Number(loc[index + 1]) + 1}: ` : "";
+      const prefix = index >= 0 && typeof loc[index + 1] === "number" ? `Step ${Number(loc[index + 1]) + 1}: ` : "";
       const field = String(loc.at(-1));
-      const labels: Record<string, string> = { name: "naziv recepta", volume_ml: "pozitivan volumen u mL", duration_seconds: "pozitivno trajanje u sekundama", fraction_duration_seconds: "pozitivno vrijeme po frakciji", fraction_count: "broj frakcija od 1 do 40", steps: "barem jedan korak procedure" };
-      return `${prefix}Provjeri ${labels[field] ?? "unesene parametre"}.`;
+      const labels: Record<string, string> = { name: "recipe name", volume_ml: "a positive volume in mL", duration_seconds: "a positive duration in seconds", fraction_duration_seconds: "a positive time per fraction", fraction_count: "a fraction count from 1 to 40", steps: "at least one procedure step" };
+      return `${prefix}Check ${labels[field] ?? "the entered parameters"}.`;
     }).join(" ");
   }
-  if (typeof detail !== "string") return "Zahtjev za recept nije uspio.";
-  if (detail.includes("content identity")) return "Sadržaj recepta ne odgovara pregledanoj verziji. Osvježi biblioteku i ponovno provjeri recept.";
-  if (detail.includes("revision changed")) return "Recept je promijenjen. Osvježi biblioteku, otvori recept i ponovno provjeri proceduru.";
-  if (detail.includes("whole steps")) return "Odabrani volumen nije izvediv u sadašnjem profilu pumpe. Odaberi drugi volumen.";
-  if (detail.includes("HOME is not a transfer")) return "Odabrani volumen zahtijeva HOME u sadašnjem profilu. Odaberi drugi volumen za prijenos.";
-  if (detail.includes("not configured")) return "Izvršni sustav nije konfiguriran. Recept možeš spremiti i provjeriti bez pokretanja.";
+  if (typeof detail !== "string") return "The recipe request failed.";
+  if (detail.includes("content identity")) return "Recipe content does not match the reviewed version. Refresh the library and review the recipe again.";
+  if (detail.includes("revision changed")) return "The recipe has changed. Refresh the library, open the recipe and review it again.";
+  if (detail.includes("whole steps")) return "This volume cannot be delivered with the current pump profile. Choose another volume.";
+  if (detail.includes("HOME is not a transfer")) return "This volume requires HOME with the current pump profile. Choose another transfer volume.";
+  if (detail.includes("not configured")) return "The execution system is not configured. You can save and review a recipe without starting it.";
   const step = detail.match(/^Step (\d+): (.*)$/);
   if (step) {
-    const message = step[2].includes("exceeds") ? "Traži se više tekućine nego što je prethodnim koracima zadano u izvornoj posudi."
-      : step[2].includes("final step") ? "Vremensko skupljanje frakcija mora biti posljednji korak."
-      : "Prethodnim koracima prvo treba dodati tekućinu u ovu posudu.";
-    return `Korak ${step[1]}: ${message}`;
+    const message = step[2].includes("exceeds") ? "This transfer requests more liquid than previous steps placed in the source vessel."
+      : step[2].includes("final step") ? "Timed fraction collection must be the last step."
+      : "Earlier steps must first add liquid to this vessel.";
+    return `Step ${step[1]}: ${message}`;
   }
   return detail;
 }
@@ -82,7 +82,7 @@ async function request(path: string, body?: unknown): Promise<unknown> {
 }
 export async function listRecipes(): Promise<SavedRecipe[]> {
   const result = await request("");
-  if (!Array.isArray(result) || !result.every(isRecipe)) throw new Error("Neispravan odgovor biblioteke recepata.");
+  if (!Array.isArray(result) || !result.every(isRecipe)) throw new Error("Invalid recipe library response.");
   return result;
 }
 export async function saveRecipe(definition: RecipeDefinition, previous: SavedRecipe | null): Promise<SavedRecipe> {
@@ -90,7 +90,7 @@ export async function saveRecipe(definition: RecipeDefinition, previous: SavedRe
     definition, expected_revision: previous?.revision ?? 0,
   });
   if (!isRecipe(result) || (previous && (result.recipe_id !== previous.recipe_id || result.revision !== previous.revision + 1))) {
-    throw new Error("Backend nije potvrdio spremanje ove verzije recepta.");
+    throw new Error("The backend did not confirm saving this recipe version.");
   }
   return result;
 }
@@ -105,7 +105,7 @@ export async function previewRecipe(recipe: SavedRecipe): Promise<RecipePreview>
     || result.collection_readiness_required !== definition.steps.some((step) => step.kind === "COLLECT")
     || !(result.collection_readiness_required ? ["STATIC_CONFIRMED", "FRESH_INPUT_REQUIRED", "UNAVAILABLE"] : ["NOT_REQUIRED"]).includes(result.collection_readiness_status)
     || typeof result.calibrations_checked !== "boolean" || result.volumes_are_measured !== false) {
-    throw new Error("Backend nije potvrdio pregled ove procedure.");
+    throw new Error("The backend did not confirm the procedure review.");
   }
   return result;
 }
@@ -114,13 +114,13 @@ export async function executeRecipe(recipe: SavedRecipe, runId: string, readines
     run_id: runId, expected_revision: recipe.revision, expected_content_digest: recipe.content_digest, readiness, occurred_at: new Date().toISOString(),
   }) as { action?: string; operation_id?: string; run_id?: string };
   if (result?.action !== "RUN" || result.run_id !== runId || typeof result.operation_id !== "string" || !result.operation_id) {
-    throw new Error("Backend nije potvrdio izvršavanje ove procedure.");
+    throw new Error("The backend did not confirm executing this procedure.");
   }
   return result;
 }
 export function stepLabel(step: RecipeStep, sources?: RecipeDefinition["sources"]): string {
-  if (step.kind === "ADD") return `Dodaj ${step.volume_ml} mL iz ${step.source}${sources?.[step.source] && sources[step.source] !== step.source ? ` (${sources[step.source]})` : ""} u reaktor`;
-  if (step.kind === "TRANSFER") return `Prenesi ${step.volume_ml} mL: ${step.route === "REACTOR_TO_SF" ? "reaktor → SF" : "SF → kolona"}`;
-  if (step.kind === "COLLECT") return `Skupi ${step.fraction_count} frakcija, ${step.fraction_duration_seconds} s po frakciji`;
-  return `${{ WAIT: "Čekaj", SF_MIX: "Miješaj u SF-u", SF_SETTLE: "Taloži u SF-u" }[step.kind]} ${step.duration_seconds} s`;
+  if (step.kind === "ADD") return `Add ${step.volume_ml} mL from ${step.source}${sources?.[step.source] && sources[step.source] !== step.source ? ` (${sources[step.source]})` : ""} to reactor`;
+  if (step.kind === "TRANSFER") return `Transfer ${step.volume_ml} mL: ${step.route === "REACTOR_TO_SF" ? "reactor → SF" : "SF → column"}`;
+  if (step.kind === "COLLECT") return `Collect ${step.fraction_count} fractions, ${step.fraction_duration_seconds} s per fraction`;
+  return `${{ WAIT: "Wait", SF_MIX: "Mix in SF for", SF_SETTLE: "Settle in SF for" }[step.kind]} ${step.duration_seconds} s`;
 }

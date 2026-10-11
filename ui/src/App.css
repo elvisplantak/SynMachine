@@ -2851,8 +2851,9 @@ body {
 .ownedDemoFields label { display: grid; gap: 6px; margin-bottom: 12px; }
 .ownedDemoFields input, .ownedDemoFields textarea { font: inherit; }
 .ownedDemoFields textarea { min-height: 70px; resize: vertical; }
-.ownedDemoFields .ownedDemoCheck { display: flex; align-items: center; gap: 10px; }
-.ownedDemoCheck input { width: auto; }
+.ownedDemoFields .ownedDemoCheck { display: flex; align-items: flex-start; justify-content: flex-start; gap: 10px; }
+.ownedDemoFields .ownedDemoCheck input[type="checkbox"] { flex: 0 0 1rem; width: 1rem; height: 1rem; padding: 0; margin: .2rem 0 0; }
+.ownedDemoCheck span { min-width: 0; }
 .ownedDemoEvents { padding-left: 20px; max-height: 320px; overflow: auto; }
 .ownedDemoEvents li { padding: 6px 0; }
 .ownedDemoEvents time { display: inline-block; margin-right: 12px; color: #6b7280; }

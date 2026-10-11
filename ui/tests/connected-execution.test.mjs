@@ -34,6 +34,8 @@ after(async () => {
 });
 
 const scenarios = {
+  "uvp-layout-wide": "recipe and maintenance checkboxes stay beside their labels on a wide screen",
+  "uvp-layout-narrow": "recipe and maintenance checkboxes align with wrapping labels on a narrow screen",
   "uvp-content-mismatch": "UVP rejects a review of different content identity",
   "uvp-collection-fresh": "UVP explains fresh collection references and permits an explicit attempt",
   "uvp-collection-unavailable": "UVP blocks collection when no reference acquisition path exists",
@@ -61,6 +63,7 @@ for (const [scenario, title] of Object.entries(scenarios)) {
       const { stdout } = await promisify(execFile)(browser, [
         "--headless", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage",
         "--disable-background-networking", "--no-first-run", "--no-default-browser-check",
+        `--window-size=${scenario === "uvp-layout-narrow" ? "480,900" : "2560,1440"}`,
         `--user-data-dir=${profile}`, "--dump-dom", "--virtual-time-budget=20000",
         `${base}tests/${scenario.startsWith("uvp-") ? "uvp" : "connected-execution"}.fixture.html?scenario=${scenario}`,
       ], { timeout: 40000, maxBuffer: 2 * 1024 * 1024 });

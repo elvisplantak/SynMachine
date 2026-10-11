@@ -29,3 +29,9 @@ UVP regression cases cover recipe edits/version saves/reload without execution,
 review invalidation, stale-save failure, explicit fresh-preparation Start, run
 progress and owned controls across navigation, and cancellation before commands.
 `uvp.fixture.html` intercepts every API request; no real backend or device is used.
+
+Recipe layout cases check all four preparation and five maintenance confirmation
+rows at 2560x1440 and 480x900 requested browser window sizes. They measure that
+checkboxes stay at the left beside the first text line, with no stretched control,
+large text gap or row overflow, and verify that clicking the label text toggles
+the correct checkbox. These cases also check the English recipe page headings.

@@ -11,7 +11,7 @@ const reply = (body, status = 200) => { globalThis.fetch = async () => new Respo
 test("recipe library rejects unknown schema and unsupported operations", async () => {
   assert.equal(isRecipe(saved), true);
   for (const changed of [{ ...saved, content_digest: undefined }, { ...saved, content_digest: "invalid" }, { ...saved, revision: "1" }, { ...saved, definition: { ...definition, schema_version: 2 } }, { ...saved, definition: { ...definition, steps: [{ kind: "HEAT", temperature: 30 }] } }]) {
-    reply([changed]); await assert.rejects(listRecipes(), /Neispravan/);
+    reply([changed]); await assert.rejects(listRecipes(), /Invalid recipe library/);
   }
 });
 test("saving preserves logical parameters and expected revision without executing", async () => {
@@ -28,20 +28,20 @@ test("saving preserves logical parameters and expected revision without executin
 test("a stale save is surfaced without retry or automatic execution", async () => {
   let count = 0;
   globalThis.fetch = async () => { count++; return new Response(JSON.stringify({ detail: "recipe revision changed" }), { status: 409 }); };
-  await assert.rejects(saveRecipe(definition, saved), /Recept je promijenjen/);
+  await assert.rejects(saveRecipe(definition, saved), /The recipe has changed/);
   assert.equal(count, 1);
 });
 test("execution acknowledgement belongs to the exact run", async () => {
   reply({ operation_id: "operation", run_id: "run", action: "RUN" }, 202);
   await executeRecipe(saved, "run", {});
-  await assert.rejects(executeRecipe(saved, "foreign", {}), /nije potvrdio/);
+  await assert.rejects(executeRecipe(saved, "foreign", {}), /did not confirm/);
 });
 test("preview requires the backend to describe all steps and no measured-volume claim", async () => {
   const preview = { content_digest: saved.content_digest, collection_readiness_status: "NOT_REQUIRED", collection_readiness_required: false, steps: [{ step_number: 1, phase: "P1_TRANSFER_FIRST_LIQUID_TO_REACTOR", step: definition.steps[0] }], calibrations_checked: true, volumes_are_measured: false };
   reply(preview); await previewRecipe(saved);
-  reply({ ...preview, volumes_are_measured: true }); await assert.rejects(previewRecipe(saved), /nije potvrdio/);
-  reply({ ...preview, steps: [{ ...preview.steps[0], step: { ...definition.steps[0], source: "B2" } }] }); await assert.rejects(previewRecipe(saved), /nije potvrdio/);
-  reply({ ...preview, steps: [] }); await assert.rejects(previewRecipe(saved), /nije potvrdio/);
+  reply({ ...preview, volumes_are_measured: true }); await assert.rejects(previewRecipe(saved), /did not confirm/);
+  reply({ ...preview, steps: [{ ...preview.steps[0], step: { ...definition.steps[0], source: "B2" } }] }); await assert.rejects(previewRecipe(saved), /did not confirm/);
+  reply({ ...preview, steps: [] }); await assert.rejects(previewRecipe(saved), /did not confirm/);
 });
 test("recipe runs have no invented demo configuration and reject invalid progress", async () => {
   const run = { run_id: "run", status: "RUNNING", phase: "P1_TRANSFER_FIRST_LIQUID_TO_REACTOR", recipe: saved, recipe_step_index: 0, configuration: null, execution_settings: null };
@@ -66,6 +66,6 @@ test("execution sends the reviewed revision and content digest together exactly 
 test("review rejects a different content identity and invalid collection readiness", async () => {
   const preview = { content_digest: saved.content_digest, collection_readiness_status: "NOT_REQUIRED", collection_readiness_required: false, steps: [{ step_number: 1, phase: "P1_TRANSFER_FIRST_LIQUID_TO_REACTOR", step: definition.steps[0] }], calibrations_checked: true, volumes_are_measured: false };
   for (const change of [{ content_digest: "b".repeat(64) }, { content_digest: undefined }, { collection_readiness_status: undefined }, { collection_readiness_status: "FRESH_INPUT_REQUIRED" }, { collection_readiness_required: true }]) {
-    reply({ ...preview, ...change }); await assert.rejects(previewRecipe(saved), /nije potvrdio/);
+    reply({ ...preview, ...change }); await assert.rejects(previewRecipe(saved), /did not confirm/);
   }
 });

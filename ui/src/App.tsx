@@ -1010,7 +1010,7 @@ function TopNavigation({
       >
         Protocol Builder
       </button>
-      <button className="topNavigationItem" type="button" aria-current={activeScreen === "uvp" ? "page" : undefined} onClick={() => onNavigate("uvp")}>UVP · Recepti</button>
+      <button className="topNavigationItem" type="button" aria-current={activeScreen === "uvp" ? "page" : undefined} onClick={() => onNavigate("uvp")}>Recipes</button>
       <button
         className="topNavigationItem"
         type="button"

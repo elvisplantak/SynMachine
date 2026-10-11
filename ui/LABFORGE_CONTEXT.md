@@ -38,6 +38,16 @@ and revision. Recipe library schema v2 rejects prior v1 without migration; logic
 recipe schema remains v1. Physical/profile, production and main-merge boundaries
 remain separately gated. See docs/reviews/2026-10-11-uvp-review-followup.md.
 
+The subsequent user-led browser checks passed recipe persistence/reuse, version
+binding, Pause/Resume, Stop/mandatory flushing and review rejection of an overdraw.
+User-facing names are Recipes / Procedure Builder / My Recipes, in English; UVP
+remains an internal term. Preparation and maintenance confirmations align on the
+left beside their labels on wide and narrow screens. These UI changes do not alter
+logical recipes or backend execution. Saving checks recipe structure; review and
+Start separately validate flow and execution feasibility. The intentionally invalid
+test version remains saved and cannot pass review. Details:
+docs/reviews/2026-10-11-uvp-browser-check.md.
+
 ## Broader LabForge architecture
 
 LabForge is intended to become a software-controlled modular lab automation system.

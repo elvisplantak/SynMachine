@@ -6,7 +6,33 @@
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — UVP software independently accepted
+## Current checkpoint — recipe browser checks and UI polish
+
+- User-led fake-only browser checks on 2026-10-11 passed save/reload, fresh blank
+  preparation on reload, repeating version 1 with a new run ID, immutable run
+  version after saving version 2, WAIT Pause/Resume/completion, Stop/mandatory
+  flushing and overdraw rejection during review. Details:
+  docs/reviews/2026-10-11-uvp-browser-check.md.
+- Recipes / Procedure Builder / My Recipes replace the user-facing internal UVP
+  name; recipe fields, instructions, errors and execution progress are English.
+  Existing identifiers/schema/data remain unchanged. Preparation and maintenance
+  checkboxes now stay at the left beside their labels, including wrapping text.
+- UI verification: 43 passed, including 20 headless browser cases, zero skipped;
+  lint, TypeScript/Vite build and diff checks passed. Layout regressions measure
+  all nine preparation/maintenance confirmation rows and check label toggling at
+  wide/narrow viewports. JS 330.39 kB / gzip 90.71; CSS 52.62 kB / gzip 10.47.
+- Backend remains at accepted 8e22fd5; no backend/firmware change or live device
+  action. Accepted UVP code heads below remain pinned; this later UI polish is
+  self-verified and is not labelled independently accepted.
+- Fake browser state is preserved in /tmp/labforge-uvp-browser-20261011-CCY0PI.
+  Machine READY, executor idle, no retained owner. Latest Test recipe version 3
+  is intentionally invalid (ADD S 2 mL / WAIT 30 s / TRANSFER Reactor to SF 3 mL):
+  saving succeeds, review rejects step 3, no run is started from that version.
+  Next product work: command-driven animation after UVP; wet acceptance remains
+  deferred and requires fresh physical scope/authorization. No animation added
+  by this checkpoint.
+
+## Previous checkpoint — UVP software independently accepted
 
 - Independent focused follow-up review closed both prior Medium findings.
   Critical 0, High 0, Medium 0, Low 0. The complete UVP milestone is independently

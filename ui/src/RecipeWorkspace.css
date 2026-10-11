@@ -25,8 +25,9 @@
 .uvpActions label { margin: 0; }
 .uvpReview { margin: 1rem 0; }
 .uvpReview li { margin: .65rem 0; }
-.uvpWorkspace .uvpCheck { display: flex; align-items: center; font-weight: 400; }
-.uvpCheck input { width: auto; }
+.uvpWorkspace .uvpCheck { display: flex; align-items: flex-start; justify-content: flex-start; gap: .6rem; font-weight: 400; }
+.uvpWorkspace .uvpCheck input[type="checkbox"] { flex: 0 0 1rem; width: 1rem; height: 1rem; padding: 0; margin: .2rem 0 0; }
+.uvpCheck span { min-width: 0; }
 .uvpWorkspace :focus-visible { outline: 2px solid #25cee8; outline-offset: 3px; }
 @media (max-width: 850px) { .uvpLayout { grid-template-columns: 1fr; } .uvpSources { grid-template-columns: 1fr; } .uvpHeader { align-items: start; flex-direction: column; } }
 @media (max-width: 500px) { .uvpStepFields { grid-template-columns: 1fr; } }

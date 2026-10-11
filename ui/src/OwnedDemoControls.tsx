@@ -156,8 +156,8 @@ export function OwnedDemoControls({ configuration, configurationValid, onLock, s
 
   return <section className="ownedDemoControls demoControlTray" aria-label="Backend Guided Demo">
     <section className="demoPanel">
-      <div className="demoSectionHeading"><span>Backend state</span><h2>{run?.recipe ? (run.status === "COMPLETED" ? "Procedura završena" : `Korak ${(run.recipe_step_index ?? 0) + 1}: ${stepLabel(run.recipe.definition.steps[run.recipe_step_index ?? 0], run.recipe.definition.sources)}`) : run ? phaseLabels[run.phase] ?? run.phase : "No run started"}</h2></div>
-      {run?.recipe && <p>{run.recipe.definition.name} · verzija {run.recipe.revision} · korak {Math.min((run.recipe_step_index ?? 0) + 1, run.recipe.definition.steps.length)} / {run.recipe.definition.steps.length}</p>}
+      <div className="demoSectionHeading"><span>Backend state</span><h2>{run?.recipe ? (run.status === "COMPLETED" ? "Procedure completed" : `Step ${(run.recipe_step_index ?? 0) + 1}: ${stepLabel(run.recipe.definition.steps[run.recipe_step_index ?? 0], run.recipe.definition.sources)}`) : run ? phaseLabels[run.phase] ?? run.phase : "No run started"}</h2></div>
+      {run?.recipe && <p>{run.recipe.definition.name} · version {run.recipe.revision} · step {Math.min((run.recipe_step_index ?? 0) + 1, run.recipe.definition.steps.length)} / {run.recipe.definition.steps.length}</p>}
       <dl className="demoReviewSettings">
         <div><dt>Machine</dt><dd>{machine?.state ?? (status ? "Uninitialized" : "Unavailable")}</dd></div>
         <div><dt>Run</dt><dd>{run?.status ?? "None"}</dd></div>
@@ -177,7 +177,7 @@ export function OwnedDemoControls({ configuration, configurationValid, onLock, s
           onClick={() => void command(() => runCommand(runId!, "resume"), "Resume requested for the current wait.")}>Resume wait</button>
       </div>
       {blockReason && <p className="demoLockedNote">{blockReason}</p>}
-      {recipeAttemptNotStarted && <p>Prethodni UVP pokušaj nije počeo. Ponovno provjeri recept i unesi svježe potvrde za novi pokušaj. Prethodni zapis ostaje sačuvan.</p>}
+      {recipeAttemptNotStarted && <p>The previous procedure attempt did not start. Review the recipe again and provide fresh confirmations for a new attempt. The previous record is preserved.</p>}
       {machine?.state === "FLUSH_REQUIRED" && canRecover && !canFlush
         && <p>Flushing requires a successful recovery in the current backend session. Repeat recovery after a backend restart.</p>}
       {(machine === null || machine.state === "STARTING") && <button type="button" disabled={!idle || status.retained_owner_id !== null || status.error !== null}
@@ -213,7 +213,7 @@ export function OwnedDemoControls({ configuration, configurationValid, onLock, s
         <fieldset disabled={active || pending || awaitingRefresh} className="ownedDemoFields">
           <label>Operator<input value={operator} onChange={(e) => setOperator(e.target.value)} /></label>
           <label>Evidence for this attempt<textarea value={evidence} onChange={(e) => setEvidence(e.target.value)} /></label>
-          {(Object.keys(readinessLabels) as ReadinessKey[]).map((key) => <label className="ownedDemoCheck" key={key}><input type="checkbox" checked={checks[key] ?? false} onChange={(e) => setChecks({ ...checks, [key]: e.target.checked })} />{readinessLabels[key]}</label>)}
+          {(Object.keys(readinessLabels) as ReadinessKey[]).map((key) => <label className="ownedDemoCheck" key={key}><input type="checkbox" checked={checks[key] ?? false} onChange={(e) => setChecks({ ...checks, [key]: e.target.checked })} /><span>{readinessLabels[key]}</span></label>)}
         </fieldset>
         <p>These confirmations are operator statements. Each attempt needs fresh confirmations.</p>
         <div className="demoPreviewActions">
