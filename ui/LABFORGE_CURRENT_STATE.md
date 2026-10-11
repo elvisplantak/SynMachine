@@ -1,12 +1,33 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-10-10
+- Checkpoint date: 2026-10-11
 - Development phase: fresh operator current-input software complete;
   independent review accepted for fake-only scope; physical profile incomplete and live activation gated
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — SF-only cable-repair recheck; physical result not accepted
+## Current checkpoint — isolated SF mixer recheck physically accepted
+
+- On 2026-10-11 the user found one motor wire detached from its joint and
+  requested a new SF-only 3-second test. Preparation completed while motor power
+  OFF: 44 fake-only/ownership checks passed, USB port unoccupied. Host then told
+  user to power ON; fresh secured-connection/empty-SF/free-element readiness
+  confirmed before real connection. No firmware/backend/UI executable change.
+- Boot98 completed STOP -> START -> wait 3 s -> STOP: 3 durable commands and
+  2 owned sequences COMPLETED, owner idle, exit0, connection closed. User confirmed
+  normal physical rotation and stop without twitching or unpleasant buzzing.
+  This isolated dry SF start/stop check is accepted; no wet performance claim.
+- Existing D6/D7, DIR=LOW and 500 pulses/s unchanged; installed firmware e2e9d3c.
+  Other actuators uncommanded, no upload/retry/reconnect/API activation.
+  Motor power last confirmed ON; no further motion queued.
+- Evidence: firmware docs/commissioning/2026-10-11/README.md and boot98 bundle.
+  Boot96 failure and boot94 corrected acceptance remain intact; this new test
+  cannot retroactively establish full-demo physical SF mixing. The detached
+  wire is a user finding, not an electrical measurement.
+- Next physical scope remains a separately defined and approved bounded liquid
+  check with fresh readiness. Full wet profile, UVP and animation remain deferred.
+
+## Previous checkpoint — SF-only cable-repair recheck; physical result not accepted
 
 - On 2026-10-10 the user reported yesterday's SF mixer did not rotate due to a
   damaged motor cable, now repaired. Today's sole scope is this motor recheck;
