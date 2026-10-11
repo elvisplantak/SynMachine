@@ -35,9 +35,12 @@ SF mixing/settling and passive/paused waits remain static.
 Both worktrees use codex/execution-flow-animation. No actuator protocol, firmware,
 persisted schema, route policy or ownership behavior changed. All 1920 backend
 and 49 UI tests passed (23 actual browser cases, none skipped); lint/build/Ruff
-passed. This checkpoint is self-verified with fake devices; independent review
-is pending. The browser fake state and recipes were preserved across its idle
-restart with --command-delay 1 pacing. Physical/wet authorization remains separate.
+passed. Independent review accepted the backend at 5c99e190 and found one Low
+UI direction defect: sf-v8 was forward instead of reverse for SF_BOTTOM_TO_P2.
+That UI-only follow-up is corrected and passes 49 tests, lint and build; focused
+independent closure remains pending. Combined acceptance is not yet claimed.
+The browser fake state and recipes were preserved across its idle restart with
+--command-delay 1 pacing. Physical/wet authorization remains separate.
 
 ## Active UVP scope — 2026-10-11
 

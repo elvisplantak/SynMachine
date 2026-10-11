@@ -56,7 +56,7 @@ try {
     ["P1_TO_REACTOR", "DISPENSE", "v1-p1", "reverse", "s-v6", 3],
     ["REACTOR_TO_P2", "ASPIRATE", "v3-p2", "forward", "v7-sf", 2],
     ["P2_TO_SF_TOP", "DISPENSE", "v3-p2", "reverse", "sf-v8", 3],
-    ["SF_BOTTOM_TO_P2", "ASPIRATE", "v7-v8", "reverse", "v5-column", 4],
+    ["SF_BOTTOM_TO_P2", "ASPIRATE", "sf-v8", "reverse", "v5-column", 4],
     ["P2_TO_COLUMN", "DISPENSE", "v3-p2", "reverse", "sf-v8", 5],
     ["COLUMN_TO_FRACTIONS", "COLLECT", "bottom-fractions", "forward", "v5-column", 2],
   ];
@@ -67,6 +67,14 @@ try {
     const path = view().querySelector(`[data-segment="${segment}"] .activePipeFlow`);
     assert(getComputedStyle(path).animationName === "flow", "Dash animation not running");
     assert(getComputedStyle(path).animationDirection === (direction === "reverse" ? "reverse" : "normal"), "Dash direction wrong");
+    if (route === "SF_BOTTOM_TO_P2") {
+      const expected = { "sf-v8": "reverse", "v7-v8": "reverse", "v3-v7": "reverse", "v3-p2": "forward" };
+      assert(active().length === 4 && active().every(([name, actual]) => expected[name] === actual), "SF aspiration segment map wrong");
+      for (const [sfSegment, sfDirection] of Object.entries(expected)) {
+        const sfPath = view().querySelector(`[data-segment="${sfSegment}"] .activePipeFlow`);
+        assert(getComputedStyle(sfPath).animationDirection === (sfDirection === "reverse" ? "reverse" : "normal"), `SF aspiration dash direction wrong: ${sfSegment}`);
+      }
+    }
     status.flow_activity = null;
     await wait(() => active().length === 0);
   }

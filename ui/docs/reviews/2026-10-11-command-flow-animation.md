@@ -53,3 +53,26 @@ Review focus:
 
 Classify any findings by severity and identify the exact pinned source. Passing
 software tests do not establish wet performance or physical authorization.
+
+## Independent outcome and narrow UI follow-up
+
+Review of the pinned commits above (plus documentation-only UI 0125ceb) reported
+Critical 0, High 0, Medium 0, Low 1. Backend 5c99e190 is accepted for fake-only
+observational scope; combined acceptance is pending one display-only correction.
+Reported local test commands were not independently rerun by the reviewer.
+
+The Low finding is valid: SF_BOTTOM_TO_P2 must use sf-v8 reverse because the
+existing SVG path `M 650 -130 L 650 -105` begins at V8.k2 and ends toward the SF
+outlet. The narrow follow-up changes only that mapping and focused tests. Unit
+coverage checks the complete four-segment direction map; fake browser coverage
+checks all four rendered segment attributes and computed CSS directions in both
+Guided Demo and Recipes. No SVG geometry, other routes, backend, firmware,
+ownership, journals or command behavior changed.
+
+Follow-up evidence: focused flow unit tests 3 passed; full UI 49 passed including
+23 actual headless-browser cases, zero skips; lint, TypeScript/Vite build and
+`git diff --check` passed. JS335.10kB/gzip91.95, CSS53.04/gzip10.58.
+The correction's pinned commit is supplied in the conversational handoff; these
+notes belong to that same commit. This follow-up is self-verified, not yet
+independently accepted. Please focus closure on the mapping and regression diff
+against UI 0125ceb; the accepted backend requires no correction or rereview.

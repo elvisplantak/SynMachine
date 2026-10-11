@@ -41,8 +41,10 @@ test("P2 separates reactor aspiration, SF filling, protected SF aspiration and c
   const sfIn = make("P2_TO_SF_TOP", "DISPENSE");
   assert.equal(sfIn["v3-p2"], "reverse"); assert.equal(sfIn["v7-sf"], "forward"); assert.equal(sfIn["sf-v8"], undefined);
   const sfOut = make("SF_BOTTOM_TO_P2", "ASPIRATE");
-  assert.equal(sfOut["sf-v8"], "forward"); assert.equal(sfOut["v7-v8"], "reverse");
-  assert.equal(sfOut["v3-v7"], "reverse"); assert.equal(sfOut["v3-p2"], "forward"); assert.equal(sfOut["v5-column"], undefined);
+  // The sf-v8 SVG path runs from V8.k2 toward the SF outlet, opposite to aspiration.
+  assert.deepEqual(sfOut, {
+    "sf-v8": "reverse", "v7-v8": "reverse", "v3-v7": "reverse", "v3-p2": "forward",
+  });
   const column = make("P2_TO_COLUMN", "DISPENSE");
   assert.equal(column["v3-p2"], "reverse"); assert.equal(column["v7-v8"], "forward"); assert.equal(column["v5-column"], "forward");
   assert.equal(column["sf-v8"], undefined); assert.equal(column["bottom-fractions"], undefined);

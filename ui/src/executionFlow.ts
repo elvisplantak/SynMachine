@@ -14,7 +14,7 @@ const routes = {
   P1_TO_REACTOR: { kind: "DISPENSE", label: "P1 → Reactor", segments: { "v1-p1": "reverse", "v1-v2": "forward", "v2-reactor": "forward" }, valves: { V1: "k1k2", V2: "k1k3" } },
   REACTOR_TO_P2: { kind: "ASPIRATE", label: "Reactor → P2", segments: { "reactor-v3": "forward", "v3-p2": "forward" }, valves: { V3: "k1k3" } },
   P2_TO_SF_TOP: { kind: "DISPENSE", label: "P2 → SF", segments: { "v3-p2": "reverse", "v3-v7": "forward", "v7-sf": "forward" }, valves: { V3: "k1k2", V7: "k1k2" } },
-  SF_BOTTOM_TO_P2: { kind: "ASPIRATE", label: "SF → P2", segments: { "sf-v8": "forward", "v7-v8": "reverse", "v3-v7": "reverse", "v3-p2": "forward" }, valves: { V8: "k1k2", V7: "k1k3", V3: "k1k2" } },
+  SF_BOTTOM_TO_P2: { kind: "ASPIRATE", label: "SF → P2", segments: { "sf-v8": "reverse", "v7-v8": "reverse", "v3-v7": "reverse", "v3-p2": "forward" }, valves: { V8: "k1k2", V7: "k1k3", V3: "k1k2" } },
   P2_TO_COLUMN: { kind: "DISPENSE", label: "P2 → Column", segments: { "v3-p2": "reverse", "v3-v7": "forward", "v7-v8": "forward", "v8-v5": "forward", "v5-column": "forward" }, valves: { V3: "k1k2", V7: "k1k3", V8: "k1k3", V5: "k1k3" } },
   COLUMN_TO_FRACTIONS: { kind: "COLLECT", label: "Column → Fractions", segments: { "column-bottom": "reverse", "bottom-fractions": "forward" }, valves: {} },
 } as const;

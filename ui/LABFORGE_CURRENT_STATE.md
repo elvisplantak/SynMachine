@@ -1,12 +1,27 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-10-11
-- Development phase: command-driven flow animation self-verified for fake-only scope;
-  independent review pending; physical profile and wet acceptance remain gated
+- Development phase: command-flow backend independently accepted for fake-only scope;
+  UI direction finding corrected and self-verified; focused acceptance pending
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
 ## Current checkpoint — command-driven flow animation
+
+- Independent review at backend `5c99e190e70c234507f3cf44abd66beca0354bd2`
+  and UI code `5bc4aaf2c7664f8f38afe0cb5dc7a80c328ad03d` (documentation HEAD
+  `0125ceb3fb689db81c84880d12b748cfb799c8c3`) found Critical 0, High 0,
+  Medium 0, Low 1. Backend is ACCEPTED for the declared fake-only observational
+  scope. Combined acceptance remains pending the narrow UI correction.
+- The finding is valid: the `sf-v8` SVG path starts at V8.k2 and ends toward
+  SF_BOTTOM_OUT, so SF aspiration must animate reverse. The follow-up changes
+  only that direction and focused regression coverage. Unit tests check the
+  exact four-segment SF_BOTTOM_TO_P2 map; browser tests verify all four rendered
+  segment directions and computed CSS in Guided Demo and Recipes.
+- Follow-up verification: 49 UI tests passed, 23 actual browser cases, zero skips;
+  lint, TypeScript/Vite build and diff check passed. JS 335.10 kB / gzip 91.95 kB;
+  CSS 53.04 kB / gzip 10.58 kB. Backend/firmware and local fake recipe data remain
+  unchanged. Follow-up code has not yet been independently accepted.
 
 - The user approved adding traveling dashes that reflect backend-executed actions
   after the UVP milestone. Backend and UI are isolated on
@@ -33,7 +48,7 @@
 - Verification: full backend 1920 passed; focused flow 17 passed; UI 49 passed,
   including 23 actual headless browser cases, zero skipped. Ruff, UI lint,
   TypeScript/Vite build, diff checks and visual inspection passed. JS 335.10 kB /
-  gzip 91.94; CSS 53.04 kB / gzip 10.58. Independent review is pending, not accepted.
+  gzip 91.94; CSS 53.04 kB / gzip 10.58. Initial review outcome is recorded above.
 - Local UI remains http://127.0.0.1:5173/. Only the identified idle fake backend was
   restarted on 8000 using the same marked /tmp/labforge-uvp-browser-20261011-CCY0PI
   state and existing --command-delay 1 test pacing. Exact recipe library identity
@@ -43,7 +58,7 @@
 - UI code checkpoint: `5bc4aaf2c7664f8f38afe0cb5dc7a80c328ad03d`. The later
   documentation-only commit pins both code heads in
   docs/reviews/2026-10-11-command-flow-animation.md; it adds no executable change.
-- Next: independent review of the read-only flow/status integration and user
+- Next: focused independent closure of the corrected sf-v8 direction, then user
   browser check of animation. Wet demo remains separately deferred and gated.
 
 ## Previous checkpoint — recipe browser checks and UI polish
