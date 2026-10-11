@@ -40,6 +40,9 @@
   and all saved definitions were compared before/after restart and are unchanged.
   Latest Test recipe version 3 is still intentionally invalid (ADD 2 / transfer 3).
   Executor is idle, flow null, no error or retained owner. No real hardware action.
+- UI code checkpoint: `5bc4aaf2c7664f8f38afe0cb5dc7a80c328ad03d`. The later
+  documentation-only commit pins both code heads in
+  docs/reviews/2026-10-11-command-flow-animation.md; it adds no executable change.
 - Next: independent review of the read-only flow/status integration and user
   browser check of animation. Wet demo remains separately deferred and gated.
 
