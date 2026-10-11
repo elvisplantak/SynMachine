@@ -19,6 +19,9 @@ from app.demo.machine_lifecycle import MachineTransitionError
 from app.demo.machine_models import MachineSnapshot
 from app.demo.models import DemoConfiguration, DemoExecutionSettings
 from app.demo.run_models import DemoRun
+from app.recipes.models import RecipeDefinition, RecipeReadiness
+from app.recipes.planning import preview_recipe
+from app.recipes.store import RecipeStore, RecipeConflict
 from app.demo.events import DomainEvent
 from app.demo.machine_events import MachineEvent
 from app.demo.maintenance_plan import MaintenanceKind
@@ -70,6 +73,19 @@ class CreateRunRequest(CommandRequest):
         if not value.strip():
             raise ValueError("run_id must not be empty")
         return value
+
+
+class SaveRecipeRequest(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    definition: RecipeDefinition
+    expected_revision: int = Field(default=0, ge=0, strict=True)
+
+
+class ExecuteRecipeRequest(CommandRequest):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    run_id: str = Field(min_length=1)
+    expected_revision: int = Field(ge=1, strict=True)
+    readiness: RecipeReadiness
 
 
 class MaintenanceCommandRequest(CommandRequest):
@@ -235,6 +251,7 @@ def _configured_database_path(database_path: str | Path | None) -> Path:
 def create_app(
     database_path: str | Path | None = None,
     *,
+    recipe_database_path: str | Path | None = None,
     startup_clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     sf_bottom_valve: SfBottomValveControl | None = None,
     arduino_commands: ArduinoCommandExecutor | None = None,
@@ -258,6 +275,8 @@ def create_app(
         sf_bottom_valve = owned_hardware.sf_service
         arduino_commands = owned_hardware.arduino_service
     configured_database_path = _configured_database_path(database_path)
+    recipe_path = (Path(recipe_database_path) if recipe_database_path is not None
+                   else configured_database_path.with_name(configured_database_path.name + ".recipes.sqlite3"))
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
@@ -290,6 +309,7 @@ def create_app(
 
     Store = Annotated[SQLiteStore, Depends(get_store)]
 
+    @application.exception_handler(RecipeConflict)
     @application.exception_handler(GuidedDemoApplicationError)
     @application.exception_handler(LifecycleTransitionError)
     @application.exception_handler(MachineTransitionError)
@@ -307,6 +327,58 @@ def create_app(
             status_code=status.HTTP_409_CONFLICT,
             content={"detail": str(error)},
         )
+
+    def preview_uvp(definition):
+        try:
+            return (application_execution.preview_recipe(definition) if application_execution
+                    else preview_recipe(definition))
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
+    @application.get(f"{API_PREFIX}/recipes")
+    def list_recipes():
+        with RecipeStore(recipe_path) as recipes:
+            return recipes.list()
+
+    @application.post(f"{API_PREFIX}/recipes/preview")
+    def preview_recipe_request(definition: RecipeDefinition):
+        return preview_uvp(definition)
+
+    @application.post(f"{API_PREFIX}/recipes")
+    def create_recipe(command: SaveRecipeRequest):
+        if command.expected_revision != 0:
+            raise RecipeConflict("a new recipe requires expected revision zero")
+        with RecipeStore(recipe_path) as recipes:
+            return recipes.save(command.definition)
+
+    @application.get(f"{API_PREFIX}/recipes/{{recipe_id}}")
+    def read_recipe(recipe_id: str):
+        with RecipeStore(recipe_path) as recipes:
+            recipe = recipes.load(recipe_id)
+        if recipe is None:
+            raise HTTPException(status_code=404, detail="Recipe not found")
+        return recipe
+
+    @application.post(f"{API_PREFIX}/recipes/{{recipe_id}}")
+    def revise_recipe(recipe_id: str, command: SaveRecipeRequest):
+        with RecipeStore(recipe_path) as recipes:
+            if recipes.load(recipe_id) is None:
+                raise HTTPException(status_code=404, detail="Recipe not found")
+            return recipes.save(command.definition, recipe_id=recipe_id,
+                expected_revision=command.expected_revision)
+
+    @application.post(f"{API_PREFIX}/recipes/{{recipe_id}}/execute", status_code=202)
+    def execute_recipe(recipe_id: str, command: ExecuteRecipeRequest):
+        if application_execution is None:
+            raise HTTPException(status_code=503, detail="owned application execution is not configured")
+        recipe = read_recipe(recipe_id)
+        if recipe.revision != command.expected_revision:
+            raise RecipeConflict("recipe revision changed; review the latest version before running")
+        preview_uvp(recipe.definition)
+        application_execution.create_recipe_run(command.run_id, recipe,
+            command.readiness, command.occurred_at)
+        return application_execution.start_run(command.run_id, command.occurred_at,
+            recipe_authorized=True)
 
     def require_domain_mode():
         if application_execution is not None:
@@ -778,6 +850,9 @@ def create_app(
         if application_execution is not None:
             accepted = application_execution.start_run(run_id, command.occurred_at)
             return JSONResponse(status_code=202, content=accepted.model_dump(mode="json"))
+        current = store.load_demo_run(run_id)
+        if current is not None and current.recipe is not None:
+            raise HTTPException(status_code=409, detail="recipe steps require owned application execution")
         result = GuidedDemoApplicationService(store).start_run(run_id, command.occurred_at)
         return RunMachineResponse(run=result.run, machine=result.machine)
 

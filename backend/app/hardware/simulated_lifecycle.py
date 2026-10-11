@@ -224,7 +224,15 @@ class PlanLifecycleCoordinator:
         ):
             raise SimulationBlocked("current calibration does not match prepared assumptions")
         pausable = isinstance(plan.source.plan, PausableWaitPlan)
-        if pausable:
+        if run.recipe is not None:
+            from app.recipes.planning import source_for_recipe_run
+            if type(self.runner) is not OwnedTransferRunner:
+                raise SimulationBlocked("recipe steps require the owned runner")
+            current_source = source_for_recipe_run(run, calibrations, column_readiness)
+            if current_source != plan.source.plan:
+                raise SimulationBlocked("stored recipe plan differs from current step snapshot")
+            operations = current_source.operations
+        elif pausable:
             if type(self.runner) is not OwnedTransferRunner:
                 raise SimulationBlocked("pausable waits require the owned runner")
             current_source = plan_pausable_wait(run)

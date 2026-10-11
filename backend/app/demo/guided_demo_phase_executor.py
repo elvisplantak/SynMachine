@@ -185,6 +185,8 @@ class GuidedDemoPhaseExecutor:
         *,
         column_readiness: ColumnFractionCollectionReadiness | None,
     ) -> tuple[PlannedOperation, ...]:
+        if run.recipe is not None:
+            raise ValueError("recipe steps require the owned application executor")
         if run.phase not in HARDWARE_EXECUTION_PHASES:
             raise UnsupportedGuidedDemoExecutionPhaseError(run.phase)
         if run.phase is RunPhase.P1_TRANSFER_S_TO_REACTOR:

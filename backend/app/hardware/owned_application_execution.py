@@ -238,6 +238,24 @@ class OwnedApplicationExecution:
             ).run
         return self._idle(create)
 
+    def preview_recipe(self, definition):
+        from app.recipes.planning import preview_recipe
+        return preview_recipe(definition, self._calibrations, self._column_readiness)
+
+    def create_recipe_run(self, run_id, recipe, readiness, occurred_at):
+        def create():
+            self._runtime._owner.idle_generation()
+            machine = self._runtime._store.load_machine_snapshot()
+            if machine is not None and machine.state is not MachineState.READY:
+                raise SimulationBlocked("new recipe requires READY")
+            self.preview_recipe(recipe.definition)
+            from app.recipes.models import CollectStep
+            if self._column_readiness is None and any(isinstance(step, CollectStep) for step in recipe.definition.steps):
+                raise SimulationBlocked("independent Column readiness is required")
+            return GuidedDemoApplicationService(self._runtime._store).create_recipe_run(
+                run_id, recipe, readiness, occurred_at)
+        return self._idle(create)
+
     def initialize_machine(self, occurred_at):
         return self._idle(lambda: self._runtime.initialize_fresh_machine(occurred_at))
 
@@ -277,9 +295,11 @@ class OwnedApplicationExecution:
                     self._busy = False
                     self._executing = False
 
-    def start_run(self, run_id, occurred_at):
+    def start_run(self, run_id, occurred_at, *, recipe_authorized=False):
         with self.store() as store:
             run = store.load_demo_run(run_id)
+            if run is not None and run.recipe is not None and not recipe_authorized:
+                raise SimulationBlocked("recipe execution requires fresh UVP readiness")
             machine = store.load_machine_snapshot()
             if run is None or run.status is not RunStatus.CREATED:
                 raise SimulationBlocked("start requires a newly configured CREATED run")

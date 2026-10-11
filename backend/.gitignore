@@ -6,3 +6,9 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+
+# Runtime UVP recipe library
+*.recipes.sqlite3
+*.recipes.sqlite3-journal
+*.recipes.sqlite3-wal
+*.recipes.sqlite3-shm

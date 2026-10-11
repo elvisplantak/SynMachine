@@ -7,6 +7,7 @@ from app.demo.fluid_plan import build_fluid_plan
 from app.demo.models import DemoConfiguration, DemoExecutionSettings
 from app.demo.phases import RunPhase
 from app.demo.run_models import DemoRun, RunStatus
+from app.recipes.models import phase_for_step, validate_recipe_flow
 
 _ACTIVE_PHASES = (
     RunPhase.P1_TRANSFER_S_TO_REACTOR,
@@ -72,7 +73,10 @@ def _result(
     status: RunStatus,
     phase: RunPhase,
     events: tuple[DomainEvent, ...],
+    recipe_step_index: int | None = None,
 ) -> TransitionResult:
+    if recipe_step_index is not None:
+        run = run.model_copy(update={"recipe_step_index": recipe_step_index})
     updated_run = run.model_copy(
         update={"status": status, "phase": phase, "event_sequence": run.event_sequence + len(events)}
     )
@@ -111,10 +115,23 @@ def create_demo_run(
     )
 
 
+def create_recipe_run(run_id, recipe, readiness, occurred_at):
+    if not run_id.strip():
+        raise ValueError("run_id must not be empty")
+    validate_recipe_flow(recipe.definition)
+    run = DemoRun(run_id=run_id, recipe=recipe, recipe_readiness=readiness,
+        recipe_step_index=0, status=RunStatus.CREATED, phase=RunPhase.READY, event_sequence=0)
+    event = _event(run, offset=1, occurred_at=occurred_at,
+        event_type=DomainEventType.RUN_CREATED, status=run.status, phase=run.phase,
+        message=f"UVP recipe {recipe.recipe_id} revision {recipe.revision} created")
+    return _result(run, status=run.status, phase=run.phase, events=(event,))
+
+
 def start_run(run: DemoRun, occurred_at: datetime) -> TransitionResult:
     if run.status is not RunStatus.CREATED or run.phase is not RunPhase.READY:
         raise _reject("start", run, "start is allowed only from CREATED and READY")
 
+    first_phase = phase_for_step(run.recipe.definition.steps[0]) if run.recipe else _ACTIVE_PHASES[0]
     started = _event(
         run,
         offset=1,
@@ -130,13 +147,13 @@ def start_run(run: DemoRun, occurred_at: datetime) -> TransitionResult:
         occurred_at=occurred_at,
         event_type=DomainEventType.PHASE_STARTED,
         status=RunStatus.RUNNING,
-        phase=RunPhase.P1_TRANSFER_S_TO_REACTOR,
-        message="Phase P1_TRANSFER_S_TO_REACTOR started",
+        phase=first_phase,
+        message=f"Phase {first_phase.value} started" + ("; UVP step 1" if run.recipe else ""),
     )
     return _result(
         run,
         status=RunStatus.RUNNING,
-        phase=RunPhase.P1_TRANSFER_S_TO_REACTOR,
+        phase=first_phase,
         events=(started, phase_started),
     )
 
@@ -154,9 +171,11 @@ def complete_current_phase(run: DemoRun, occurred_at: datetime) -> TransitionRes
         event_type=DomainEventType.PHASE_COMPLETED,
         status=RunStatus.RUNNING,
         phase=run.phase,
-        message=f"Phase {run.phase.value} completed",
+        message=f"Phase {run.phase.value} completed" + (f"; UVP step {run.recipe_step_index + 1}" if run.recipe else ""),
     )
-    if run.phase is RunPhase.COLUMN_FRACTION_COLLECTION:
+    next_index = run.recipe_step_index + 1 if run.recipe else None
+    final = next_index == len(run.recipe.definition.steps) if run.recipe else run.phase is RunPhase.COLUMN_FRACTION_COLLECTION
+    if final:
         run_completed = _event(
             run,
             offset=2,
@@ -171,9 +190,11 @@ def complete_current_phase(run: DemoRun, occurred_at: datetime) -> TransitionRes
             status=RunStatus.COMPLETED,
             phase=RunPhase.COMPLETED,
             events=(completed, run_completed),
+            recipe_step_index=next_index,
         )
 
-    next_phase = _ACTIVE_PHASES[_ACTIVE_PHASES.index(run.phase) + 1]
+    next_phase = (phase_for_step(run.recipe.definition.steps[next_index]) if run.recipe
+                  else _ACTIVE_PHASES[_ACTIVE_PHASES.index(run.phase) + 1])
     phase_started = _event(
         run,
         offset=2,
@@ -181,13 +202,14 @@ def complete_current_phase(run: DemoRun, occurred_at: datetime) -> TransitionRes
         event_type=DomainEventType.PHASE_STARTED,
         status=RunStatus.RUNNING,
         phase=next_phase,
-        message=f"Phase {next_phase.value} started",
+        message=f"Phase {next_phase.value} started" + (f"; UVP step {next_index + 1}" if run.recipe else ""),
     )
     return _result(
         run,
         status=RunStatus.RUNNING,
         phase=next_phase,
         events=(completed, phase_started),
+        recipe_step_index=next_index,
     )
 
 

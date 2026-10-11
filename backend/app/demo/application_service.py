@@ -104,6 +104,11 @@ class GuidedDemoApplicationService:
             run_events=result.events,
         )
 
+    def create_recipe_run(self, run_id, recipe, readiness, occurred_at):
+        result = run_lifecycle.create_recipe_run(run_id, recipe, readiness, occurred_at)
+        self._store.persist_run_transition(result.run, result.events)
+        return result.run
+
     def start_run(
         self, run_id: str, occurred_at: datetime
     ) -> GuidedDemoApplicationResult:
@@ -129,7 +134,7 @@ class GuidedDemoApplicationService:
     ) -> GuidedDemoApplicationResult:
         run = self._load_run(run_id)
         machine = self._require_active_machine(run_id)
-        if run.phase in HARDWARE_EXECUTION_PHASES:
+        if run.recipe is not None or run.phase in HARDWARE_EXECUTION_PHASES:
             raise GuidedDemoApplicationError(
                 "hardware phases must be completed through execution-result resolution"
             )

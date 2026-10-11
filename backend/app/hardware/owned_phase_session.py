@@ -34,6 +34,9 @@ from app.hardware.simulated_p1_runner import SimulationBlocked
 
 def source_for_run(run, calibrations, column_readiness):
     """Use the existing phase builders without skipping unsupported phases."""
+    if run.recipe is not None:
+        from app.recipes.planning import source_for_recipe_run
+        return source_for_recipe_run(run, calibrations, column_readiness)
     if run.phase in PAUSABLE_EXECUTION_PHASES:
         return plan_pausable_wait(run)
     if run.phase is RunPhase.P1_TRANSFER_S_TO_REACTOR:

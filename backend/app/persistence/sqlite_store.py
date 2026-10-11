@@ -13,7 +13,7 @@ from app.demo.execution_lifecycle import (
     commit_phase_execution_start as commit_phase_execution_start_transition,
     claim_phase_execution as claim_phase_execution_transition,
 )
-from app.demo.events import DomainEvent
+from app.demo.events import DomainEvent, DomainEventType
 from app.demo.machine_events import MachineEvent, MachineEventType
 from app.demo.machine_models import (
     MachineSnapshot,
@@ -1362,6 +1362,15 @@ class SQLiteStore:
         snapshot: DemoRun | MachineSnapshot,
         events: Sequence[DomainEvent] | Sequence[MachineEvent],
     ) -> None:
+        if aggregate_type == RUN_AGGREGATE:
+            snapshot = DemoRun.model_validate_json(snapshot.model_dump_json())
+            previous = self.load_demo_run(aggregate_id)
+            if previous is not None and (previous.recipe is not None or snapshot.recipe is not None):
+                if previous.recipe != snapshot.recipe or previous.recipe_readiness != snapshot.recipe_readiness:
+                    raise PersistenceConflictError("recipe snapshot and readiness cannot change during a run")
+                completed = sum(event.event_type is DomainEventType.PHASE_COMPLETED for event in events)
+                if snapshot.recipe_step_index != previous.recipe_step_index + completed:
+                    raise PersistenceConflictError("recipe progress must follow completed steps")
         current_sequence = self._current_sequence(aggregate_type, aggregate_id)
         expected_sequences = tuple(
             range(current_sequence + 1, current_sequence + len(events) + 1)
