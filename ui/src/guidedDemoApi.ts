@@ -1,3 +1,5 @@
+import { isFlowActivity } from "./executionFlow.ts";
+import type { FlowActivity } from "./executionFlow";
 import { isRecipe } from "./recipeApi.ts";
 import type { SavedRecipe } from "./recipeApi";
 export type DemoConfiguration = {
@@ -43,6 +45,7 @@ export type ExecutionStatus = {
   retained_owner_id: string | null;
   run_id: string | null;
   automatic_resume_allowed: false;
+  flow_activity?: FlowActivity | null;
   current_input?: OperatorInputChallenge | null;
   operator_current_input_configured?: boolean;
 };
@@ -113,6 +116,9 @@ export async function readExecution(signal?: AbortSignal): Promise<ExecutionStat
   }
   if (data.operator_current_input_configured !== undefined && typeof data.operator_current_input_configured !== "boolean") {
     throw new Error("Backend operator input status is invalid");
+  }
+  if (data.flow_activity !== undefined && data.flow_activity !== null && !isFlowActivity(data.flow_activity)) {
+    throw new Error("Backend flow activity is invalid");
   }
   const current = data.current_input;
   if (current !== undefined && current !== null && (!current || typeof current.request_id !== "string" || !current.request_id.trim()

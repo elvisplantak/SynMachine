@@ -35,3 +35,11 @@ rows at 2560x1440 and 480x900 requested browser window sizes. They measure that
 checkboxes stay at the left beside the first text line, with no stretched control,
 large text gap or row overflow, and verify that clicking the label text toggles
 the correct checkbox. These cases also check the English recipe page headings.
+
+Command-flow browser cases use `execution-flow.fixture.html` with every fetch
+intercepted. Guided Demo and Recipes each exercise all nine supported routes,
+actual SVG dash CSS direction, aspiration/dispense separation, inactive/unknown
+valve symbols and navigation without POSTs. Failure cases cover stalled/late
+responses, loss of connectivity, foreign run identity, malformed/unsupported
+activity, idle/error status and older backends lacking the activity field. Unit
+contracts separately check strict activity parsing and P1/P2 direction mapping.

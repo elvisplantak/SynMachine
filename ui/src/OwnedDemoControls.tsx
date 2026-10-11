@@ -1,3 +1,4 @@
+import { ExecutionFlowView } from "./ExecutionFlowView";
 import { useEffect, useRef, useState } from "react";
 import { OperatorCurrentInput } from "./OperatorCurrentInput";
 import {
@@ -155,6 +156,7 @@ export function OwnedDemoControls({ configuration, configurationValid, onLock, s
   }, `${action === "recovery" ? "Recovery" : "Flushing"} accepted. Completion is reported by the backend.`);
 
   return <section className="ownedDemoControls demoControlTray" aria-label="Backend Guided Demo">
+    {hideDemoSettings && <div className="demoPanel"><ExecutionFlowView /></div>}
     <section className="demoPanel">
       <div className="demoSectionHeading"><span>Backend state</span><h2>{run?.recipe ? (run.status === "COMPLETED" ? "Procedure completed" : `Step ${(run.recipe_step_index ?? 0) + 1}: ${stepLabel(run.recipe.definition.steps[run.recipe_step_index ?? 0], run.recipe.definition.sources)}`) : run ? phaseLabels[run.phase] ?? run.phase : "No run started"}</h2></div>
       {run?.recipe && <p>{run.recipe.definition.name} · version {run.recipe.revision} · step {Math.min((run.recipe_step_index ?? 0) + 1, run.recipe.definition.steps.length)} / {run.recipe.definition.steps.length}</p>}

@@ -14,6 +14,31 @@ Local URL:
 
     http://localhost:5173/
 
+## Active command-flow animation scope — 2026-10-11
+
+After UVP and its user-led fake browser checks, the user approved command-driven
+traveling dashes on the actual schematic for backend Guided Demo and Recipes.
+The existing backend owned runner now exposes ephemeral active aspiration,
+dispense or collection on its existing status query. This is an active command
+scope (including intent/dispatch/awaiting result), not sensed flow or a STARTED
+telemetry assertion. Each syringe stroke is shown separately. Protected collection
+appears only during the post-OPEN dwell and clears before required CLOSE.
+
+The UI reuses the hand-positioned schematic with route-specific dash direction;
+active valve links are symbolic route links, inactive valves are neutral. Vessel
+fill levels remain schematic. The optional field is never inferred from phase,
+old commands or positions. Stalled/failed/late/foreign/malformed reads clear flow;
+older backends remain static. Polling is approximately 200 ms plus response time,
+so very short commands can be missed without replay. HOME, maintenance, Service,
+SF mixing/settling and passive/paused waits remain static.
+
+Both worktrees use codex/execution-flow-animation. No actuator protocol, firmware,
+persisted schema, route policy or ownership behavior changed. All 1920 backend
+and 49 UI tests passed (23 actual browser cases, none skipped); lint/build/Ruff
+passed. This checkpoint is self-verified with fake devices; independent review
+is pending. The browser fake state and recipes were preserved across its idle
+restart with --command-delay 1 pacing. Physical/wet authorization remains separate.
+
 ## Active UVP scope — 2026-10-11
 
 The user approved Unos vlastite procedure (UVP) through the UI and durable recipe

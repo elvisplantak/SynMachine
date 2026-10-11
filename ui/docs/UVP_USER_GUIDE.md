@@ -43,3 +43,22 @@ Biblioteka recepata sada koristi shemu v2 s provjerom integriteta sadržaja. Sta
 shema v1 ostaje sačuvana i odbija se bez automatske migracije ili popravka. Ako je
 već korištena, potrebno je zasebno dogovoriti prijenos sadržaja; nemoj brisati bazu.
 Sam oblik procedure i dalje koristi `schema_version: 1`.
+
+## Prikaz tijekom izvršavanja
+
+Ispod uređivača, uz stanje procedure, prikazuje se postojeća shema stroja.
+Putujuće crtice prate trenutačnu backend naredbu: prvo usisavanje do P1/P2,
+zatim zasebno istiskivanje do odredišta. Kolona → frakcije prikazuje se tijekom
+vremenskog skupljanja nakon otvaranja kolone. Natpis navodi aktualnu radnju.
+
+To je prikaz zadane radnje tijekom slanja/čekanja rezultata, a ne senzorsko
+mjerenje protoka, prisutnosti tekućine ili isporučenog volumena. Nacrtana punjenja
+posuda su simbolična. Tijekom pasivnog čekanja, SF miješanja/taloženja, prebacivanja
+ventila, Servicea i održavanja nema animacije puta tekućine. Pri završetku ili
+pogrešci animacija se gasi. Ako veza zapne, zastarjeli prikaz gasi se najkasnije
+1,5 s od zadnjeg uspješnog očitanja; brže primijećena greška gasi ga odmah.
+
+Prikaz se osvježava očitanjima približno svakih 0,2 s plus vrijeme odgovora.
+Vrlo kratka radnja može proći između dva očitanja; animacija se zato ne ponavlja
+naknadno. Ista shema radi u backend prikazu Guided Demo. Otvaranje sheme ili
+osvježavanje stranice šalje samo upite i ne pokreće proceduru.

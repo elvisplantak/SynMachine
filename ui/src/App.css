@@ -2857,3 +2857,14 @@ body {
 .ownedDemoEvents { padding-left: 20px; max-height: 320px; overflow: auto; }
 .ownedDemoEvents li { padding: 6px 0; }
 .ownedDemoEvents time { display: inline-block; margin-right: 12px; color: #6b7280; }
+
+/* Command-driven visualization retains the existing scheme geometry. */
+.activePipeFlow.reverseFlow { animation-direction: reverse; }
+.executionFlowView { margin: 0; width: 100%; }
+.executionFlowView figcaption { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.5rem 0.8rem; }
+.executionFlowView figcaption span { color: #90b8cc; font-size: 0.85rem; }
+@media (prefers-reduced-motion: reduce) {
+  .executionFlowView .activePipeFlow { animation: none; }
+}
+
+.executionFlowView .schemeCanvas { height: min(43vh, 430px); min-height: 340px; }

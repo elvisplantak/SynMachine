@@ -34,6 +34,9 @@ after(async () => {
 });
 
 const scenarios = {
+  "flow-demo": "Guided Demo animates only each current atomic route with correct direction and no navigation commands",
+  "flow-recipes": "Recipes share the real schematic and current atomic route animation without replay",
+  "flow-stale": "flow animation clears on stale reads, faults, identity mismatch, malformed and legacy status",
   "uvp-layout-wide": "recipe and maintenance checkboxes stay beside their labels on a wide screen",
   "uvp-layout-narrow": "recipe and maintenance checkboxes align with wrapping labels on a narrow screen",
   "uvp-content-mismatch": "UVP rejects a review of different content identity",
@@ -65,7 +68,7 @@ for (const [scenario, title] of Object.entries(scenarios)) {
         "--disable-background-networking", "--no-first-run", "--no-default-browser-check",
         `--window-size=${scenario === "uvp-layout-narrow" ? "480,900" : "2560,1440"}`,
         `--user-data-dir=${profile}`, "--dump-dom", "--virtual-time-budget=20000",
-        `${base}tests/${scenario.startsWith("uvp-") ? "uvp" : "connected-execution"}.fixture.html?scenario=${scenario}`,
+        `${base}tests/${scenario.startsWith("flow-") ? "execution-flow" : scenario.startsWith("uvp-") ? "uvp" : "connected-execution"}.fixture.html?scenario=${scenario}`,
       ], { timeout: 40000, maxBuffer: 2 * 1024 * 1024 });
       const result = stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1];
       assert.equal(result, `PASS:${scenario}`, result ?? "Browser did not run the UI regression fixture");

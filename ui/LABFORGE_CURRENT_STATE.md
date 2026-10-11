@@ -1,12 +1,49 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-10-11
-- Development phase: UVP software independently accepted for fake-only scope;
-  physical profile and wet acceptance remain gated
+- Development phase: command-driven flow animation self-verified for fake-only scope;
+  independent review pending; physical profile and wet acceptance remain gated
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — recipe browser checks and UI polish
+## Current checkpoint — command-driven flow animation
+
+- The user approved adding traveling dashes that reflect backend-executed actions
+  after the UVP milestone. Backend and UI are isolated on
+  `codex/execution-flow-animation`, from backend 8e22fd5 and UI 7edfed0.
+- Backend code commit `5c99e190e70c234507f3cf44abd66beca0354bd2` adds optional/null
+  `flow_activity` on existing GET `/execution`, scoped to the existing prepared
+  runner action. Aspirate/dispense identify separate selected routes and exact
+  command IDs; collection identifies only the protected post-OPEN dwell. No SQL,
+  serial protocol, firmware, routes, permissions or command lifecycle changes.
+- A shared extracted schematic retains every existing path/node coordinate.
+  Backend Guided Demo and Recipes show correctly directed dashes plus current
+  action, symbolic active valve links and neutral inactive valve symbols. UI
+  preview behavior is preserved. Vessel fill levels remain schematic.
+- This is command-in-progress display evidence, including dispatch/awaiting a
+  result, not a controller STARTED event, sensed flow or delivered volume.
+  Passive/paused waits, SF mixing/settling, switching, HOME, Service and maintenance
+  stay static. Exceptions and protected follow-up clear the prior path; restart
+  never replays historical flow. Ordinary Stop respects existing atomic bounds.
+- Read-only sampling uses about 200 ms plus HTTP latency, a 1 s read deadline and
+  1.5 s freshness limit. Failed, late, malformed, foreign-run and legacy responses
+  cannot keep a path active. Short commands can fall between samples; no animation
+  replay or artificial minimum display duration is added. Reduced-motion settings
+  retain static path highlights.
+- Verification: full backend 1920 passed; focused flow 17 passed; UI 49 passed,
+  including 23 actual headless browser cases, zero skipped. Ruff, UI lint,
+  TypeScript/Vite build, diff checks and visual inspection passed. JS 335.10 kB /
+  gzip 91.94; CSS 53.04 kB / gzip 10.58. Independent review is pending, not accepted.
+- Local UI remains http://127.0.0.1:5173/. Only the identified idle fake backend was
+  restarted on 8000 using the same marked /tmp/labforge-uvp-browser-20261011-CCY0PI
+  state and existing --command-delay 1 test pacing. Exact recipe library identity
+  and all saved definitions were compared before/after restart and are unchanged.
+  Latest Test recipe version 3 is still intentionally invalid (ADD 2 / transfer 3).
+  Executor is idle, flow null, no error or retained owner. No real hardware action.
+- Next: independent review of the read-only flow/status integration and user
+  browser check of animation. Wet demo remains separately deferred and gated.
+
+## Previous checkpoint — recipe browser checks and UI polish
 
 - User-led fake-only browser checks on 2026-10-11 passed save/reload, fresh blank
   preparation on reload, repeating version 1 with a new run ID, immutable run
