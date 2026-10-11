@@ -1,0 +1,74 @@
+import io
+import json
+import sqlite3
+import sys
+import pytest
+import labforge_sf_mixer_recheck as check
+from tests.test_prepared_adapter_execution import CommandPort
+from tests.test_arduino_serial import NONCE, Clock
+from tests.test_owned_pausable_demo import Clock as TimerClock
+from app.hardware.arduino_serial import ArduinoSerialClient, ArduinoSerialConfiguration, ArduinoUnavailableError
+
+
+def client():
+    port=CommandPort()
+    c=ArduinoSerialClient(ArduinoSerialConfiguration(port='/dev/fake',command_timeout_seconds=.1),
+        port_factory=lambda _:port,nonce_factory=lambda:NONCE,monotonic=Clock(),sleep=lambda _:None)
+    c.connect()
+    return c,port
+
+
+def states(directory):
+    with sqlite3.connect(directory/'owner.sqlite3') as db:
+        return db.execute('SELECT state FROM hardware_sequences').fetchall()
+
+
+def test_success_exact_scope_durable_intent_and_retained_owner_during_wait(tmp_path):
+    c,port=client();events=[];clock=TimerClock()
+    def before(message):
+        with sqlite3.connect(tmp_path/'commands.sqlite3') as db:
+            assert db.execute('SELECT state FROM arduino_command_journal WHERE operation_command_id=?',
+                (message['operation_command_id'],)).fetchone()==('INTENT_PERSISTED',)
+        assert 'ACTIVE' in [s[0] for s in states(tmp_path)]
+    port.before_command=before
+    clock.hook=lambda: pytest.fail('ownership released during wait') if 'ACTIVE' not in [s[0] for s in states(tmp_path)] else None
+    try:
+        check.run(c,tmp_path,clock.timer(),events.append)
+        sent=[json.loads(w) for w in port.writes if json.loads(w)['type']=='COMMAND']
+        assert [(s['command'],s['arguments']) for s in sent]==[('SF_MIXER_SET_STATE',{'running':v}) for v in (False,True,False)]
+        assert clock.now==3_000_000_000
+        assert states(tmp_path)==[('COMPLETED',),('COMPLETED',)]
+        assert events[-1]['event']=='TEST_COMPLETED'
+    finally:c.close()
+
+
+@pytest.mark.parametrize('failure',['initial_stop','start','wait'])
+def test_failure_stops_progression_required_stop_retains_owner(tmp_path,failure):
+    c,port=client();events=[];clock=TimerClock();count=[]
+    def before(message):
+        count.append(message['arguments']['running'])
+        if (failure=='initial_stop' and len(count)==1) or (failure=='start' and len(count)==2):
+            raise ArduinoUnavailableError('fake transport outcome unknown')
+    port.before_command=before
+    if failure=='wait':
+        def failed_wait():raise RuntimeError('fake wait failure')
+        clock.hook=failed_wait
+    try:
+        with pytest.raises(Exception):check.run(c,tmp_path,clock.timer(),events.append)
+        assert count==([False] if failure=='initial_stop' else [False,True,False])
+        assert states(tmp_path)[-1]==('BLOCKED',)
+        assert not any(e['event']=='TEST_COMPLETED' for e in events)
+    finally:c.close()
+
+
+def test_cancel_before_port_open(monkeypatch):
+    monkeypatch.setattr(sys,'argv',['runner','--execute','--conditions-confirmed'])
+    monkeypatch.setattr(sys,'stdin',io.StringIO('CANCEL\n'))
+    monkeypatch.setattr(check,'ArduinoSerialClient',lambda _:pytest.fail('port construction'))
+    check.main()
+
+
+def test_missing_conditions_before_port_open(monkeypatch):
+    monkeypatch.setattr(sys,'argv',['runner','--execute'])
+    monkeypatch.setattr(check,'ArduinoSerialClient',lambda _:pytest.fail('port construction'))
+    with pytest.raises(SystemExit):check.main()

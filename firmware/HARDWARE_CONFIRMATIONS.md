@@ -1,5 +1,24 @@
 # Hardware confirmations
 
+## SF mixer detached-wire recheck accepted — 2026-10-11, boot 98
+
+The user found one motor wire detached from its joint after the boot96 abnormal
+physical test, requested a new short SF-only test, and asked to keep motor power
+OFF until preparation was finished. With 44 fake/ownership checks passing and
+USB port unoccupied, the host signalled readiness. User confirmed power-ready,
+secured connection, empty SF and free element before any real connection.
+
+STOP -> START -> wait 3 seconds -> STOP completed in boot98: all 3 durable
+commands and 2 owned sequences COMPLETED, owner idle, exit0, connection closed.
+The user confirmed normal physical rotation and stop without twitching or
+unpleasant buzzing. This isolated dry start/stop check is accepted. The detached
+wire is a user-reported finding, not a measured electrical diagnosis.
+Existing D6/D7, DIR=LOW and 500 pulses/s unchanged; firmware still e2e9d3c.
+Other actuators uncommanded, no upload/retry/reconnect/production activation.
+Motor power last confirmed ON; no further motion queued. Boot96 failure and
+boot94 corrected physical acceptance remain unchanged. No wet-performance or
+complete-demo physical mixing claim. Evidence: docs/commissioning/2026-10-11/README.md.
+
 ## SF mixer cable repair: isolated recheck — 2026-10-10, boot 96
 
 The user reported that SF mixing did not physically occur during boot94 due to
