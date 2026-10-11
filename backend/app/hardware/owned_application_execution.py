@@ -60,7 +60,7 @@ class OwnedApplicationExecution:
 
     def __init__(self, bundle, device_factory, calibrations, *, timer_factory,
                  column_readiness=None, recovery_plan=None, flush_plan=None,
-                 operator_input_source=None):
+                 operator_input_source=None, current_context_provider=None):
         if not callable(device_factory) or not callable(timer_factory):
             raise TypeError("explicit device and timer factories are required")
         for plan, kind in ((recovery_plan, MaintenanceKind.RECOVERY), (flush_plan, MaintenanceKind.FLUSH)):
@@ -68,6 +68,11 @@ class OwnedApplicationExecution:
                 raise ValueError("maintenance plan kind/calibration differs from application inputs")
         if operator_input_source is not None and type(operator_input_source) is not OperatorCurrentInput:
             raise TypeError("explicit operator current-input source required")
+        if current_context_provider is not None:
+            from app.hardware.adapter_configuration import AdapterCurrentContextProvider
+            if type(current_context_provider) is not AdapterCurrentContextProvider:
+                raise TypeError("explicit current-context provider required")
+        self._current_context_provider = current_context_provider
         self._operator_input_source = operator_input_source
         self.bundle = bundle
         self._device_factory = device_factory
@@ -240,7 +245,8 @@ class OwnedApplicationExecution:
 
     def preview_recipe(self, definition):
         from app.recipes.planning import preview_recipe
-        return preview_recipe(definition, self._calibrations, self._column_readiness)
+        return preview_recipe(definition, self._calibrations, self._column_readiness,
+                              fresh_collection_context_available=self._current_context_provider is not None)
 
     def create_recipe_run(self, run_id, recipe, readiness, occurred_at):
         def create():
@@ -248,9 +254,8 @@ class OwnedApplicationExecution:
             machine = self._runtime._store.load_machine_snapshot()
             if machine is not None and machine.state is not MachineState.READY:
                 raise SimulationBlocked("new recipe requires READY")
-            self.preview_recipe(recipe.definition)
-            from app.recipes.models import CollectStep
-            if self._column_readiness is None and any(isinstance(step, CollectStep) for step in recipe.definition.steps):
+            preview = self.preview_recipe(recipe.definition)
+            if preview["collection_readiness_status"] == "UNAVAILABLE":
                 raise SimulationBlocked("independent Column readiness is required")
             return GuidedDemoApplicationService(self._runtime._store).create_recipe_run(
                 run_id, recipe, readiness, occurred_at)

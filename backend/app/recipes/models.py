@@ -1,10 +1,12 @@
 """Versioned logical recipes; no firmware details or arbitrary commands."""
 
+import hashlib
+import json
 from decimal import Decimal, localcontext
 from fractions import Fraction
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator, model_validator
 
 from app.demo.phases import RunPhase
 
@@ -85,10 +87,29 @@ class RecipeDefinition(RecipeModel):
         return value.strip()
 
 
+def recipe_content_digest(definition: RecipeDefinition) -> str:
+    """SHA-256 of validated JSON: sorted keys, compact UTF-8, Decimal strings.
+
+    Decimal spelling is preserved (1 and 1.0 may have distinct identities).
+    This detects content changes; it is not an authenticity signature.
+    """
+    definition = RecipeDefinition.model_validate_json(definition.model_dump_json())
+    canonical = json.dumps(definition.model_dump(mode="json"), sort_keys=True,
+                           separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 class SavedRecipe(RecipeModel):
     recipe_id: str = Field(min_length=1)
     revision: StrictInt = Field(ge=1)
     definition: RecipeDefinition
+    content_digest: str = Field(strict=True, pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def validate_content_identity(self):
+        if self.content_digest != recipe_content_digest(self.definition):
+            raise ValueError("recipe content identity mismatch")
+        return self
 
 
 class RecipeReadiness(RecipeModel):

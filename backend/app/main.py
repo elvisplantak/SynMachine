@@ -85,6 +85,7 @@ class ExecuteRecipeRequest(CommandRequest):
     model_config = ConfigDict(frozen=True, extra="forbid")
     run_id: str = Field(min_length=1)
     expected_revision: int = Field(ge=1, strict=True)
+    expected_content_digest: str = Field(strict=True, pattern=r"^[0-9a-f]{64}$")
     readiness: RecipeReadiness
 
 
@@ -374,6 +375,8 @@ def create_app(
         recipe = read_recipe(recipe_id)
         if recipe.revision != command.expected_revision:
             raise RecipeConflict("recipe revision changed; review the latest version before running")
+        if recipe.content_digest != command.expected_content_digest:
+            raise RecipeConflict("recipe content identity changed; review again before running")
         preview_uvp(recipe.definition)
         application_execution.create_recipe_run(command.run_id, recipe,
             command.readiness, command.occurred_at)

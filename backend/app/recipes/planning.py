@@ -33,6 +33,7 @@ from app.recipes.models import (
     WaitStep,
     phase_for_step,
     validate_recipe_flow,
+    recipe_content_digest,
 )
 
 
@@ -129,7 +130,8 @@ def compile_step(step, calibrations, column_readiness=None):
     )
 
 
-def preview_recipe(definition, calibrations=None, column_readiness=None):
+def preview_recipe(definition, calibrations=None, column_readiness=None, *,
+                   fresh_collection_context_available=False):
     amounts = validate_recipe_flow(definition)
     steps = []
     for index, step in enumerate(definition.steps):
@@ -140,13 +142,19 @@ def preview_recipe(definition, calibrations=None, column_readiness=None):
                 plan = compile_step(step, calibrations, column_readiness)
                 item["operation_count"] = len(plan.operations)
         steps.append(item)
+    collection_required = any(isinstance(step, CollectStep) for step in definition.steps)
+    collection_status = (
+        "NOT_REQUIRED" if not collection_required else
+        "FRESH_INPUT_REQUIRED" if fresh_collection_context_available else
+        "STATIC_CONFIRMED" if column_readiness is not None else "UNAVAILABLE"
+    )
     return {
+        "content_digest": recipe_content_digest(definition),
+        "collection_readiness_status": collection_status,
         "steps": steps,
         "configured_contents_ml": amounts,
         "calibrations_checked": calibrations is not None,
-        "collection_readiness_required": any(
-            isinstance(step, CollectStep) for step in definition.steps
-        ),
+        "collection_readiness_required": collection_required,
         "volumes_are_measured": False,
     }
 

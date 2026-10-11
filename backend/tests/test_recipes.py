@@ -13,7 +13,7 @@ from app.demo.phases import RunPhase
 from app.demo.run_models import RunStatus
 from app.main import create_app
 from app.persistence.sqlite_store import PersistenceConflictError
-from app.recipes.models import RecipeDefinition, RecipeReadiness, SavedRecipe, validate_recipe_flow
+from app.recipes.models import RecipeDefinition, RecipeReadiness, SavedRecipe, validate_recipe_flow, recipe_content_digest
 from app.recipes.planning import compile_step, preview_recipe
 from app.recipes.store import RecipeStore, RecipeConflict
 from tests.test_api import ApiClient
@@ -89,6 +89,7 @@ def execute(client, saved, run_id="recipe-run", declaration=None):
         json={
             "run_id": run_id,
             "expected_revision": saved["revision"],
+            "expected_content_digest": saved["content_digest"],
             "readiness": declaration or readiness().model_dump(mode="json"),
             **COMMAND,
         },
@@ -149,7 +150,8 @@ def test_library_revisions_reopen_and_stale_update(tmp_path):
 
 
 def test_repeated_phase_advances_by_step_not_phase_identity():
-    saved = SavedRecipe(recipe_id="saved", revision=1, definition=definition())
+    saved = SavedRecipe(recipe_id="saved", revision=1, definition=definition(),
+                            content_digest=recipe_content_digest(definition()))
     run = lifecycle.create_recipe_run("run", saved, readiness(), NOW).run
     run = lifecycle.start_run(run, NOW).run
     for index, _ in enumerate(saved.definition.steps):
@@ -267,7 +269,8 @@ def test_recipe_stop_retains_ownership_flush_then_allows_new_run(assembly):
 def test_snapshot_and_progress_cannot_be_changed_in_persistence(assembly):
     app, execution, _, _ = assembly
     with ApiClient(app, lifespan="on"):
-        saved = SavedRecipe(recipe_id="saved", revision=1, definition=definition())
+        saved = SavedRecipe(recipe_id="saved", revision=1, definition=definition(),
+                            content_digest=recipe_content_digest(definition()))
         run = execution.create_recipe_run("unstarted", saved, readiness(), NOW)
         with execution.store(read_only=False) as store:
             transition = lifecycle.start_run(run, NOW)
@@ -388,7 +391,8 @@ def test_recipe_real_adapters_fake_transports_intent_before_bytes(bundle, adapte
 def test_legacy_start_cannot_bypass_recipe_preconditions(assembly):
     app, execution, _, _ = assembly
     with ApiClient(app, lifespan="on") as client:
-        saved = SavedRecipe(recipe_id="saved", revision=1, definition=definition())
+        saved = SavedRecipe(recipe_id="saved", revision=1, definition=definition(),
+                            content_digest=recipe_content_digest(definition()))
         execution.create_recipe_run("created-recipe", saved, readiness(), NOW)
         assert client.post(PREFIX + "/runs/created-recipe/start", json=COMMAND).status_code == 409
         assert (
@@ -425,7 +429,7 @@ def test_operator_confirmation_is_exact_boolean(value):
 def test_unknown_schema_is_rejected_without_rewriting_library(tmp_path):
     path = tmp_path / "recipes.db"
     with sqlite3.connect(path) as connection:
-        connection.execute("PRAGMA user_version=2")
+        connection.execute("PRAGMA user_version=99")
     before = path.read_bytes()
     with pytest.raises(RecipeConflict):
         RecipeStore(path)
@@ -483,7 +487,11 @@ def test_unavailable_column_profile_blocks_before_any_send(assembly):
     execution._column_readiness = None
     with ApiClient(app, lifespan="on") as client:
         saved = save(client)
+        preview = client.post(PREFIX + "/recipes/preview", json=saved["definition"]).json()
+        assert preview["calibrations_checked"] is True
+        assert preview["collection_readiness_status"] == "UNAVAILABLE"
         assert execute(client, saved).status_code == 409
+        assert client.get(PREFIX + "/runs/recipe-run").status_code == 404
         assert devices[0].calls == devices[0].sf_calls == []
 
 
@@ -537,3 +545,144 @@ def test_recipe_cancelled_current_input_can_start_new_explicit_attempt(configure
         assert wait_idle(client)["error"] is None
         assert client.get(PREFIX + "/runs/fresh-recipe-attempt").json()["status"] == "COMPLETED"
         assert client.get(PREFIX + "/runs/recipe-run").json()["status"] == "CREATED"
+
+
+
+def test_configured_recipe_collect_uses_fresh_operator_references(configured):
+    import json
+    from tests.test_operator_current_input import source, challenge, declare
+
+    build, ports, sessions, _, _, _ = configured
+    current = source()
+    execution = build(current_state_provider=current, context_clock=current.clock)
+    assert execution._column_readiness is None
+    with ApiClient(create_app(application_execution=execution), lifespan="on") as client:
+        saved = save(client)
+        preview = client.post(PREFIX + "/recipes/preview", json=saved["definition"])
+        assert preview.status_code == 200
+        assert preview.json()["calibrations_checked"] is True
+        assert preview.json()["collection_readiness_status"] == "FRESH_INPUT_REQUIRED"
+        assert preview.json()["content_digest"] == saved["content_digest"]
+        assert execute(client, saved).status_code == 202
+        initialization = challenge(client)
+        assert len(ports[0].writes) == 1 and sessions == []
+        assert declare(client, initialization).status_code == 200
+        run_input = challenge(client)
+        assert run_input["purpose"] == "RUN"
+        assert run_input["request_id"] != initialization["request_id"]
+        assert len(ports[0].writes) == 1 and sessions == []
+        assert declare(client, run_input).status_code == 200
+        assert wait_idle(client)["error"] is None
+        run = client.get(PREFIX + "/runs/recipe-run").json()
+        assert run["status"] == "COMPLETED" and run["recipe_step_index"] == 10
+        assert run["recipe"] == saved
+    commands = [message for value in ports[0].writes
+                if (message := json.loads(value))["type"] == "COMMAND"]
+    assert any(c["command"] == "CAROUSEL_MOVE_TO_POSITION" for c in commands)
+    assert any(c["command"] == "COLUMN_BOTTOM_VALVE_SET_POSITION" for c in commands)
+    assert sessions
+
+
+@pytest.mark.parametrize("missing", ["column", "carousel", "both"])
+def test_configured_recipe_missing_live_collection_references_dispatches_nothing(configured, missing):
+    from tests.test_operator_current_input import source, challenge, declare, references, request, AUTH
+
+    build, ports, sessions, _, _, _ = configured
+    current = source()
+    execution = build(current_state_provider=current, context_clock=current.clock)
+    with ApiClient(create_app(application_execution=execution), lifespan="on") as client:
+        saved = save(client)
+        assert execute(client, saved).status_code == 202
+        assert declare(client, challenge(client)).status_code == 200
+        fresh = challenge(client)
+        data = references(request()).model_dump(mode="json")
+        if missing in ("column", "both"):
+            data["column_position_degrees"] = None
+        if missing in ("carousel", "both"):
+            data["carousel_position"] = None
+        assert client.post(PREFIX + "/execution/current-input/" + fresh["request_id"],
+                           json=data, headers=AUTH).status_code == 200
+        assert "complete independently established current references" in wait_idle(client)["error"]
+        assert len(ports[0].writes) == 1 and sessions == []
+        run = client.get(PREFIX + "/runs/recipe-run").json()
+        assert run["status"] == "CREATED" and run["recipe_step_index"] == 0
+        # The successful initialization receipt cannot replace the rejected RUN input.
+        assert declare(client, fresh).status_code == 409
+        assert len(ports[0].writes) == 1 and sessions == []
+
+
+def test_library_content_mutation_fails_before_run_creation_or_dispatch(assembly, bundle):
+    import json
+
+    app, execution, devices, _ = assembly
+    path = bundle.lifecycle_path.with_name(bundle.lifecycle_path.name + ".recipes.sqlite3")
+    with ApiClient(app, lifespan="on") as client:
+        saved = save(client)
+        assert client.post(PREFIX + "/recipes/preview", json=saved["definition"]).status_code == 200
+        changed = saved["definition"]
+        changed["steps"][0]["volume_ml"] = "10"
+        with sqlite3.connect(path) as db:
+            db.execute("UPDATE recipe_revisions SET payload=? WHERE recipe_id=? AND revision=?",
+                       (json.dumps(changed), saved["recipe_id"], saved["revision"]))
+        before = path.read_bytes()
+        assert client.get(PREFIX + "/recipes").status_code == 409
+        assert client.get(PREFIX + f"/recipes/{saved['recipe_id']}").status_code == 409
+        response = execute(client, saved)
+        assert response.status_code == 409 and "content identity" in response.text
+        assert client.get(PREFIX + "/runs/recipe-run").status_code == 404
+        assert devices[0].calls == devices[0].sf_calls == []
+        assert path.read_bytes() == before
+        with execution.store() as store:
+            assert store.load_demo_run("recipe-run") is None
+
+
+def test_execute_requires_reviewed_digest_even_if_stored_identity_is_consistent(assembly, bundle):
+    app, _, devices, _ = assembly
+    path = bundle.lifecycle_path.with_name(bundle.lifecycle_path.name + ".recipes.sqlite3")
+    with ApiClient(app, lifespan="on") as client:
+        saved = save(client)
+        changed = definition([{"kind": "WAIT", "duration_seconds": "3"}])
+        # Simulate replacement by another source with a valid digest at the same revision.
+        # The old browser review must still fail even though the row is self-consistent.
+        with sqlite3.connect(path) as db:
+            db.execute("UPDATE recipe_revisions SET payload=?, content_digest=? WHERE recipe_id=?",
+                       (changed.model_dump_json(), recipe_content_digest(changed), saved["recipe_id"]))
+        response = execute(client, saved)
+        assert response.status_code == 409 and "content identity changed" in response.text
+        assert client.get(PREFIX + "/runs/recipe-run").status_code == 404
+        assert devices[0].calls == devices[0].sf_calls == []
+        missing = client.post(PREFIX + f"/recipes/{saved['recipe_id']}/execute", json={
+            "run_id": "no-identity", "expected_revision": 1,
+            "readiness": readiness().model_dump(mode="json"), **COMMAND,
+        })
+        assert missing.status_code == 422
+
+
+def test_prior_library_schema_is_rejected_without_migration_or_rewrite(tmp_path):
+    path = tmp_path / "v1.db"
+    with sqlite3.connect(path) as db:
+        db.execute("CREATE TABLE recipe_revisions (recipe_id TEXT NOT NULL, revision INTEGER NOT NULL, "
+                   "payload TEXT NOT NULL, PRIMARY KEY(recipe_id, revision))")
+        db.execute("INSERT INTO recipe_revisions VALUES (?, ?, ?)",
+                   ("old", 1, definition().model_dump_json()))
+        db.execute("PRAGMA user_version=1")
+    before = path.read_bytes()
+    with pytest.raises(RecipeConflict, match="unsupported"):
+        RecipeStore(path)
+    assert path.read_bytes() == before
+
+
+def test_snapshot_digest_validation_and_canonical_json_identity():
+    import hashlib
+    import json
+
+    value = definition().model_copy(update={"name": "Čista procedura"})
+    canonical = json.dumps(value.model_dump(mode="json"), sort_keys=True,
+                           separators=(",", ":"), ensure_ascii=False)
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    assert recipe_content_digest(value) == digest
+    saved = SavedRecipe(recipe_id="identity", revision=1, definition=value, content_digest=digest)
+    data = saved.model_dump(mode="json")
+    data["definition"]["steps"][0]["volume_ml"] = "10"
+    with pytest.raises(ValidationError, match="content identity mismatch"):
+        SavedRecipe.model_validate(data)

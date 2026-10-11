@@ -49,15 +49,38 @@ execution and ownership evidence. Initialization is transactional; unknown schem
 versions, unexpected columns and duplicate payload keys are rejected. No lifecycle
 DB schema migration or changes to production activation are performed.
 
+The recipe library now uses `PRAGMA user_version = 2`: each row stores
+`content_digest` alongside id, revision and payload. `RecipeDefinition` remains
+logical schema v1. The digest is SHA-256 over the validated definition serialized
+as compact JSON with sorted keys, UTF-8 (`ensure_ascii=False`), including defaults
+and Decimal strings. Decimal spelling is preserved, so 1 and 1.0 can have different
+identities. JSON formatting/key order do not affect the identity. Every read
+validates the recorded digest; a mismatch returns 409 without rewriting content.
+This is integrity checking, not an authenticity signature.
+
+Library schema v1 is explicitly unsupported and left unchanged. There is no
+automatic migration, deletion or repair. Retain existing data; selecting a separate
+new library or migrating old content requires an explicit later decision. Earlier
+UVP run snapshots without the required digest also fail validation; they are not
+silently upgraded. Legacy Guided Demo snapshots without recipes remain supported.
+
 - GET `/api/v1/recipes`: latest revisions, including structurally valid drafts.
 - POST `/api/v1/recipes`: save a new recipe (`definition`, expected_revision=0).
 - GET `/api/v1/recipes/{recipe_id}`: latest revision.
 - POST `/api/v1/recipes/{recipe_id}`: append immutable revision using expected_revision.
 - POST `/api/v1/recipes/preview`: validate flow and compile supported steps where a
   profile is available. Preview is metadata-only and supplies no live references.
+  `calibrations_checked` describes static compilation only; collection readiness
+  is separate: `NOT_REQUIRED`, `STATIC_CONFIRMED`, `FRESH_INPUT_REQUIRED` or
+  `UNAVAILABLE`. The UI explains pending fresh references and blocks unavailable
+  collection, independently of calibrations.
 - POST `/api/v1/recipes/{recipe_id}/execute`: require run_id, expected_revision,
-  occurred_at and a fresh RecipeReadiness statement; returns existing RUN acceptance.
+  expected_content_digest, occurred_at and a fresh RecipeReadiness statement; returns existing RUN acceptance.
 
+Preview returns `content_digest`; the UI verifies it matches the saved definition's
+identity before presenting Start. Execute compares both expected revision and
+expected reviewed digest before creating a run. Even a self-consistent replacement
+row with a new valid digest at the same revision cannot satisfy an old review.
 Concurrent stale updates and execution against an outdated revision return 409.
 The UI library displays latest revisions. Older definitions remain in immutable
 library rows and completed-run snapshots; history browsing/import/export are not
@@ -84,6 +107,14 @@ Manual phase completion and ordinary legacy Start cannot execute a recipe.
 RecipeReadiness is a fresh operator statement about bottle contents, empty/prepared
 vessels, waste capacity and collection tubes. It is separate from the secured
 current-reference input required by the adapter profile. Neither is sensor data.
+The configured adapter builder supplies its typed current-context provider to
+owned application composition. COLLECT creation can therefore reach the existing
+fresh RUN input instead of requiring fabricated static readiness. Before any
+COMMAND, the provider still requires known Column/carousel and all other RUN
+references. OwnedPhaseSession derives collection readiness from that acquired
+context, then retains the existing live owned continuity across phases. A static
+composition with no readiness and no provider remains blocked. No stale receipt
+or optimistic readiness substitutes for missing fresh references.
 After cancellation before any command, the prior CREATED attempt is preserved.
 The UI permits only another explicit reviewed recipe attempt with fresh preparation;
 the adapter issues new current-input challenges. Old challenges cannot resume work.
@@ -104,5 +135,11 @@ quantization and HOME boundaries, whole owned execution, Stop, Pause/Resume,
 transport failure/restart/recovery/flush, default-app gating, unavailable column
 profile and fresh operator input after cancellation. Existing adapters are exercised
 with fake serial and fake SF transports, asserting durable intent before bytes.
+New regressions exercise a saved complete recipe including COLLECT through the
+actual configured builder and secured fresh initialization/RUN inputs. Missing
+Column, carousel or both send no COMMAND and leave the attempt CREATED. Additional
+cases detect structurally valid same-revision payload changes before run creation,
+reject a different reviewed digest even when storage is internally consistent,
+preserve prior schema bytes, and validate snapshot content identities.
 UI contract/browser tests intercept every API request. Firmware is unchanged;
 this milestone does not establish wet performance or production readiness.
