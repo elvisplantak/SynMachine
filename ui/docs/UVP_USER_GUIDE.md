@@ -15,7 +15,13 @@ Na početnoj stranici otvori **UVP · Recepti**.
 Za ponavljanje odaberi spremljeni recept iz **Moji recepti**, ponovno provjeri i
 unesi svježe potvrde. **Napravi kopiju recepta** otvara zaseban nacrt; spremi ga da
 postane novi recept. Izmjena parametara uklanja prethodni pregled i potvrde.
-Kod konflikta verzije osvježi biblioteku i ponovno otvori recept.
+Kod konflikta verzije ili sadržaja osvježi biblioteku i ponovno otvori recept.
+Pregled i pokretanje provjeravaju i verziju i identitet sadržaja; izmijenjeni recept
+ne može se pokrenuti kao prethodno pregledani recept.
+Ako skupljanje frakcija traži svježe reference kolone i karusela, pregled to navodi.
+Nakon zasebnog pokretanja ispuni postojeći obrazac za sadašnje reference. Bez
+poznatih referenci procedura neće početi. Ako izvršni sustav nema put za unos tih
+referenci ni potvrđenu spremnost, skupljanje je označeno nedostupnim i Start je blokiran.
 Nespremljeni nacrt nije trajno spremljen i gubi se pri izlasku ili osvježavanju stranice.
 
 Sadašnje radnje: dodavanje B1/B2/S u reaktor, pasivno čekanje, prijenos reaktor→SF,
@@ -28,3 +34,8 @@ Ovaj checkpoint provjeren je softverski s lažnim transportima. Zadana produkcij
 aplikacija ne uključuje izvršni adapter. Postojeći `tests.browser_check` harness
 može prikazati UVP s lažnim transportima. Fizičko izvođenje zahtijeva zasebno
 odobrenje i pripremljeni profil; provjera s tekućinom ostaje odgođena.
+
+Biblioteka recepata sada koristi shemu v2 s provjerom integriteta sadržaja. Starija
+shema v1 ostaje sačuvana i odbija se bez automatske migracije ili popravka. Ako je
+već korištena, potrebno je zasebno dogovoriti prijenos sadržaja; nemoj brisati bazu.
+Sam oblik procedure i dalje koristi `schema_version: 1`.

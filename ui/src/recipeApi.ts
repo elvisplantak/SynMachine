@@ -7,10 +7,12 @@ export type RecipeDefinition = {
   schema_version: 1; name: string; description: string;
   sources: { B1: string; B2: string; S: string }; steps: RecipeStep[];
 };
-export type SavedRecipe = { recipe_id: string; revision: number; definition: RecipeDefinition };
+export type SavedRecipe = { recipe_id: string; revision: number; content_digest: string; definition: RecipeDefinition };
 export type RecipePreview = {
   steps: { step_number: number; phase: string; step: RecipeStep; operation_count?: number }[];
   configured_contents_ml: Record<string, string>; calibrations_checked: boolean;
+  content_digest: string;
+  collection_readiness_status: "NOT_REQUIRED" | "STATIC_CONFIRMED" | "FRESH_INPUT_REQUIRED" | "UNAVAILABLE";
   collection_readiness_required: boolean; volumes_are_measured: false;
 };
 export type RecipeReadiness = {
@@ -23,6 +25,7 @@ export function isRecipe(value: unknown): value is SavedRecipe {
   const recipe = value as SavedRecipe;
   const d = recipe.definition;
   return typeof recipe.recipe_id === "string" && recipe.recipe_id.length > 0
+    && typeof recipe.content_digest === "string" && /^[0-9a-f]{64}$/.test(recipe.content_digest)
     && Number.isInteger(recipe.revision) && recipe.revision > 0 && !!d && d.schema_version === 1
     && typeof d.name === "string" && typeof d.description === "string"
     && !!d.sources && [d.sources.B1, d.sources.B2, d.sources.S].every((s) => typeof s === "string")
@@ -49,6 +52,7 @@ function humanError(detail: unknown): string {
     }).join(" ");
   }
   if (typeof detail !== "string") return "Zahtjev za recept nije uspio.";
+  if (detail.includes("content identity")) return "Sadržaj recepta ne odgovara pregledanoj verziji. Osvježi biblioteku i ponovno provjeri recept.";
   if (detail.includes("revision changed")) return "Recept je promijenjen. Osvježi biblioteku, otvori recept i ponovno provjeri proceduru.";
   if (detail.includes("whole steps")) return "Odabrani volumen nije izvediv u sadašnjem profilu pumpe. Odaberi drugi volumen.";
   if (detail.includes("HOME is not a transfer")) return "Odabrani volumen zahtijeva HOME u sadašnjem profilu. Odaberi drugi volumen za prijenos.";
@@ -90,11 +94,16 @@ export async function saveRecipe(definition: RecipeDefinition, previous: SavedRe
   }
   return result;
 }
-export async function previewRecipe(definition: RecipeDefinition): Promise<RecipePreview> {
+export async function previewRecipe(recipe: SavedRecipe): Promise<RecipePreview> {
+  const definition = recipe.definition;
   const result = await request("/preview", definition) as RecipePreview;
   if (!result || !Array.isArray(result.steps) || result.steps.length !== definition.steps.length
     || result.steps.some((step, i) => step.step_number !== i + 1 || !isStep(step.step)
       || Object.entries(definition.steps[i]).some(([key, value]) => (step.step as unknown as Record<string, unknown>)[key] !== value))
+    || result.content_digest !== recipe.content_digest
+    || typeof result.collection_readiness_required !== "boolean"
+    || result.collection_readiness_required !== definition.steps.some((step) => step.kind === "COLLECT")
+    || !(result.collection_readiness_required ? ["STATIC_CONFIRMED", "FRESH_INPUT_REQUIRED", "UNAVAILABLE"] : ["NOT_REQUIRED"]).includes(result.collection_readiness_status)
     || typeof result.calibrations_checked !== "boolean" || result.volumes_are_measured !== false) {
     throw new Error("Backend nije potvrdio pregled ove procedure.");
   }
@@ -102,7 +111,7 @@ export async function previewRecipe(definition: RecipeDefinition): Promise<Recip
 }
 export async function executeRecipe(recipe: SavedRecipe, runId: string, readiness: RecipeReadiness) {
   const result = await request(`/${encodeURIComponent(recipe.recipe_id)}/execute`, {
-    run_id: runId, expected_revision: recipe.revision, readiness, occurred_at: new Date().toISOString(),
+    run_id: runId, expected_revision: recipe.revision, expected_content_digest: recipe.content_digest, readiness, occurred_at: new Date().toISOString(),
   }) as { action?: string; operation_id?: string; run_id?: string };
   if (result?.action !== "RUN" || result.run_id !== runId || typeof result.operation_id !== "string" || !result.operation_id) {
     throw new Error("Backend nije potvrdio izvršavanje ove procedure.");

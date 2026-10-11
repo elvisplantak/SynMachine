@@ -22,9 +22,10 @@ window.fetch = async (url, options = {}) => {
   } else {
     const data = JSON.parse(options.body);
     if (path.endsWith("/recipes/preview")) {
-      body = { steps: data.steps.map((step, i) => ({ step_number: i + 1, phase: step.kind === "WAIT" ? "REACTION_HOLD" : "P1_TRANSFER_FIRST_LIQUID_TO_REACTOR", step })), configured_contents_ml: { REACTOR: "2", SF: "0", COLUMN: "0" }, calibrations_checked: true, collection_readiness_required: false, volumes_are_measured: false };
+      body = { content_digest: scenario === "uvp-content-mismatch" ? "b".repeat(64) : recipes[0].content_digest, collection_readiness_status: scenario === "uvp-collection-unavailable" ? "UNAVAILABLE" : scenario === "uvp-collection-fresh" ? "FRESH_INPUT_REQUIRED" : "NOT_REQUIRED", steps: data.steps.map((step, i) => ({ step_number: i + 1, phase: step.kind === "WAIT" ? "REACTION_HOLD" : "P1_TRANSFER_FIRST_LIQUID_TO_REACTOR", step })), configured_contents_ml: { REACTOR: "2", SF: "0", COLUMN: "0" }, calibrations_checked: true, collection_readiness_required: scenario.startsWith("uvp-collection-"), volumes_are_measured: false };
     } else if (path.endsWith("/execute")) {
       assert(data.readiness.sources_match_recipe && data.readiness.evidence_note, "Missing current readiness");
+      assert(data.expected_content_digest === recipes[0].content_digest, "Wrong reviewed content identity executed");
       assert(data.expected_revision === recipes[0].revision, "Wrong recipe revision executed");
       run = { run_id: data.run_id, status: "RUNNING", phase: "REACTION_HOLD", configuration: null, execution_settings: null, recipe: structuredClone(recipes[0]), recipe_step_index: 1 };
       Object.assign(status, { run_id: data.run_id, busy: true, executing: true, operation: { operation_id: "recipe-operation", action: "RUN", run_id: data.run_id } });
@@ -39,7 +40,7 @@ window.fetch = async (url, options = {}) => {
     } else if (path.includes("/recipes")) {
       if (fail) { body = { detail: "recipe revision changed; reload before saving or running" }; code = 409; }
       else {
-        const saved = { recipe_id: "saved-recipe", revision: (recipes[0]?.revision ?? 0) + 1, definition: data.definition };
+        const saved = { recipe_id: "saved-recipe", revision: (recipes[0]?.revision ?? 0) + 1, content_digest: "a".repeat(64), definition: data.definition };
         recipes = [saved]; body = saved;
       }
     } else throw new Error(`Unexpected write: ${path}`);
@@ -61,14 +62,34 @@ async function create() {
   await click("Dupliciraj");
   // First duplicate is ADD, yielding ADD ADD WAIT. Remove it explicitly.
   document.querySelector('.uvpStep:nth-child(2) button:last-child').click(); await new Promise((r) => setTimeout(r, 50));
+  if (scenario.startsWith("uvp-collection-")) {
+    choose("COLLECT"); await new Promise((r) => setTimeout(r, 50)); await click("Dodaj korak");
+    fill('.uvpStep:nth-child(3) input:nth-of-type(1)', "1");
+    fill('.uvpStep:nth-child(3) label:last-child input', "1");
+  }
   await click("Spremi recept"); await wait(() => document.body.innerText.includes("Spremljena verzija 1"));
   assert(!calls.some((c) => c.path.endsWith("/execute")), "Saving executed a recipe");
-  await click("Provjeri proceduru"); await wait(() => document.querySelector('.uvpReview'));
+  await click("Provjeri proceduru"); await wait(() => scenario === "uvp-content-mismatch" ? document.body.innerText.includes("Backend nije potvrdio pregled") : document.querySelector('.uvpReview'));
 }
 try {
   await mount(); await create();
-  assert(button("Pokreni pregledanu proceduru").disabled, "Start without fresh readiness");
-  if (scenario === "uvp-editor") {
+  if (scenario === "uvp-content-mismatch") {
+    assert(!document.querySelector('.uvpReview') && !calls.some((c) => c.path.endsWith("/execute")), "Mismatched content review enabled execution");
+  } else assert(button("Pokreni pregledanu proceduru").disabled, "Start without fresh readiness");
+  if (scenario.startsWith("uvp-collection-")) {
+    fill('.uvpReview label input', "Fixture operator"); fill('.uvpReview textarea', "Fresh fake-only preparation");
+    for (const item of document.querySelectorAll('.uvpReview input[type=checkbox]')) item.click();
+    await new Promise((r) => setTimeout(r, 100));
+    if (scenario === "uvp-collection-unavailable") {
+      assert(document.body.innerText.includes("Skupljanje frakcija nije dostupno"), "Unavailable collection has no explanation");
+      assert(button("Pokreni pregledanu proceduru").disabled, "Unavailable collection can start");
+      assert(!calls.some((c) => c.path.endsWith("/execute")), "Unavailable collection dispatched");
+    } else {
+      assert(document.body.innerText.includes("svježe reference kolone i karusela"), "Fresh prerequisites hidden");
+      await click("Pokreni pregledanu proceduru");
+      assert(calls.filter((c) => c.path.endsWith("/execute")).length === 1, "Fresh-input composition cannot start explicit attempt");
+    }
+  } else if (scenario === "uvp-editor") {
     fill('.uvpEditor label input', "Izmijenjeni recept"); await wait(() => !document.querySelector('.uvpReview'));
     assert(button("Provjeri proceduru").disabled, "Unsaved edit can execute old review");
     await click("Spremi recept"); await wait(() => recipes[0].revision === 2);

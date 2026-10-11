@@ -28,6 +28,13 @@ configured, and a recipe library/editor otherwise. This milestone's verification
 uses fake transports only. Default production activation and physical movement
 remain gated. See docs/UVP_USER_GUIDE.md and backend docs/UVP_RECIPES_V1.md.
 
+The consolidated UVP review found two Medium integration/integrity defects;
+neither reviewed UVP HEAD is independently accepted. Follow-up fixes let COLLECT
+reach configured fresh RUN references and bind review/execute to a canonical
+SHA-256 content digest plus revision. Recipe library schema v2 rejects prior v1
+without migration; logical recipe schema remains v1. Verification uses fake
+transports only. See docs/reviews/2026-10-11-uvp-review-followup.md.
+
 ## Broader LabForge architecture
 
 LabForge is intended to become a software-controlled modular lab automation system.

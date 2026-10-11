@@ -95,7 +95,7 @@ export function RecipeWorkspace({ onExit }: { onExit: () => void }) {
           const result = await saveRecipe(draft, saved); setSaved(result); setDraft(result.definition); clearAttempt(); await loadLibrary(); setMessage(`Spremljena verzija ${result.revision}. Stroj nije pokrenut.`);
         })}>Spremi recept</button>
           {saved && <button type="button" onClick={() => { setSaved(null); update({ ...draft, name: `${draft.name} — kopija`.slice(0, 120) }); }}>Napravi kopiju recepta</button>}
-          <button type="button" disabled={dirty} onClick={() => void operation(async () => { setReview(null); setChecks({}); setEvidence(""); setReview(await previewRecipe(saved!.definition)); setMessage("Pregled potvrđen. Izvršavanje traži zaseban klik i svježe potvrde."); })}>Provjeri proceduru</button></div>
+          <button type="button" disabled={dirty} onClick={() => void operation(async () => { setReview(null); setChecks({}); setEvidence(""); setReview(await previewRecipe(saved!)); setMessage("Pregled potvrđen. Izvršavanje traži zaseban klik i svježe potvrde."); })}>Provjeri proceduru</button></div>
       </fieldset>
       <p aria-live="polite">{message}</p>
       {saved && <p>{dirty ? "Postoje nespremljene promjene." : `Spremljena verzija ${saved.revision}.`}</p>}
@@ -104,10 +104,12 @@ export function RecipeWorkspace({ onExit }: { onExit: () => void }) {
       <ol>{review.steps.map((item) => <li key={item.step_number}>{stepLabel(item.step, saved.definition.sources)}</li>)}</ol>
       <p>Volumeni su zadani, bez senzorskog mjerenja. Nakon vremenskog skupljanja ostatak u koloni nije poznat.</p>
       {!review.calibrations_checked && <p>Izvršni profil nije spojen; pregled zasad provjerava samo redoslijed i količine.</p>}
+      {review.collection_readiness_status === "FRESH_INPUT_REQUIRED" && <p>Prije prve radnje zatražit će se svježe reference kolone i karusela. Bez poznatih referenci procedura neće početi.</p>}
+      {review.collection_readiness_status === "UNAVAILABLE" && <p>Skupljanje frakcija nije dostupno: izvršni sustav nema potvrđene reference kolone i karusela niti unos svježih referenci.</p>}
       <fieldset disabled={pending || locked}>
         <legend>Priprema za ovaj pokušaj</legend><label>Operater<input value={operator} onChange={(e) => setOperator(e.target.value)} /></label><label>Bilješka o sadašnjoj pripremi<textarea value={evidence} onChange={(e) => setEvidence(e.target.value)} /></label>
         {Object.entries(preparation).map(([key, label]) => <label key={key} className="uvpCheck"><input type="checkbox" checked={checks[key] ?? false} onChange={(e) => setChecks({ ...checks, [key]: e.target.checked })} />{label}</label>)}
-        <button type="button" disabled={!ready || blockReason !== null || !review.calibrations_checked} onClick={() => void operation(async () => {
+        <button type="button" disabled={!ready || blockReason !== null || !review.calibrations_checked || review.collection_readiness_status === "UNAVAILABLE"} onClick={() => void operation(async () => {
           const statement = { operator, evidence_note: evidence, sources_match_recipe: true as const, reactor_sf_column_empty_clean: true as const, waste_capacity_available: true as const, collection_tubes_ready: true as const };
           setChecks({}); setEvidence(""); setReview(null);
           const accepted = await executeRecipe(saved, crypto.randomUUID(), statement);

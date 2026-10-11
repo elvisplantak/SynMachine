@@ -34,6 +34,9 @@ after(async () => {
 });
 
 const scenarios = {
+  "uvp-content-mismatch": "UVP rejects a review of different content identity",
+  "uvp-collection-fresh": "UVP explains fresh collection references and permits an explicit attempt",
+  "uvp-collection-unavailable": "UVP blocks collection when no reference acquisition path exists",
   "uvp-retry": "UVP cancellation permits only a new explicit attempt with fresh readiness",
   "uvp-editor": "UVP edits, saves immutable versions and reloads recipes without execution",
   "uvp-running": "UVP explicitly starts with fresh readiness and preserves owned controls across navigation",

@@ -1,12 +1,42 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-10-11
-- Development phase: UVP software integrated; consolidated independent review pending;
+- Development phase: two UVP review defects corrected; focused follow-up review pending;
   physical profile and wet acceptance remain gated
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — UVP logical recipes and UI execution integration
+## Current checkpoint — two targeted UVP review corrections
+
+- Independent consolidated review of backend e626097/UI 6a880de reported
+  Critical 0, High 0, Medium 2, Low 0; UVP is NOT YET independently accepted.
+  Codex independently confirmed both findings and completed focused fixes.
+- Backend `8e22fd5d305d46d128f0aedc78bf2a0e36be8fa2` on `codex/uvp-recipes`
+  allows COLLECT creation when the configured typed current-context provider can
+  establish fresh RUN references. No static readiness is fabricated. Missing
+  Column/carousel references stop before COMMAND; static composition without
+  readiness/source remains blocked. OwnedPhaseSession retains reference-derived
+  readiness and protected collection through the existing owned executor.
+- SavedRecipe/library/preview carry canonical SHA-256 `content_digest`; execute
+  requires both expected revision and reviewed digest before run creation.
+  Durable reads and run snapshot validation reject content/digest mismatch.
+  Existing append-only revisions, CAS and duplicate/schema rejection remain.
+- Recipe library schema is explicitly v2; logical definition remains v1.
+  Old library v1 and old UVP snapshots without a digest are unsupported, preserved
+  without automatic migration/deletion/repair. Legacy Guided Demo snapshots remain
+  supported. Any existing UVP data transition needs an explicit later decision.
+- UI compares preview identity with the saved recipe, submits it with Start,
+  explains pending live collection references and blocks unavailable collection.
+- Verification: full backend 1903 passed; focused UVP 45 passed. UI 41 passed,
+  including 18 headless browser cases, zero skipped. Ruff, UI lint/build and
+  diff checks passed. Backend: 8 files, +262/-29; UI change set documented in Git.
+  Tests use fake transports only; no real device, firmware, production or main action.
+- Focused reviewer packet: docs/reviews/2026-10-11-uvp-review-followup.md.
+  Next: review these two fixes, then agree the next UVP/physical or animation scope.
+  Wet demo and animation remain deferred. Both UVP worktrees stay on
+  `codex/uvp-recipes`; the final implementation report pins the full UI HEAD.
+
+## Previous checkpoint — UVP logical recipes and UI execution integration
 
 - User authorized UVP through the UI with durable recipe reuse. Free-text parsing,
   XDL and animation remain deferred. The liquid check is postponed; no hardware,
