@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import "./App.css";
 import { OwnedDemoControls } from "./OwnedDemoControls";
+import { RecipeWorkspace } from "./RecipeWorkspace";
 import { ExecutionAwareness } from "./ExecutionAwareness";
 
 type ValveState = "closed" | "k1k3" | "k1k2";
@@ -392,7 +393,7 @@ type PreRunCheckKey =
   | "reactorEmptyAndClean"
   | "wasteCapacityAvailable";
 type PreRunChecks = Record<PreRunCheckKey, boolean>;
-type Screen = "dashboard" | "protocolBuilder" | "logs" | "service" | "guidedDemo";
+type Screen = "dashboard" | "protocolBuilder" | "logs" | "service" | "guidedDemo" | "uvp";
 type DemoStage = "configure" | "review" | "live";
 type DemoSection = "cockpit" | "log";
 type AdditionOrder = "B1 then B2" | "B2 then B1";
@@ -1009,6 +1010,7 @@ function TopNavigation({
       >
         Protocol Builder
       </button>
+      <button className="topNavigationItem" type="button" aria-current={activeScreen === "uvp" ? "page" : undefined} onClick={() => onNavigate("uvp")}>UVP · Recepti</button>
       <button
         className="topNavigationItem"
         type="button"
@@ -2600,6 +2602,10 @@ export default function App() {
 
   if (activeScreen === "service") {
     return <>{awareness}<ServiceScreen onNavigate={setActiveScreen} /></>;
+  }
+
+  if (activeScreen === "uvp") {
+    return <>{awareness}<RecipeWorkspace onExit={() => setActiveScreen("dashboard")} /></>;
   }
 
   if (activeScreen === "guidedDemo") {

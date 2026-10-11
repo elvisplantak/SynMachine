@@ -1,3 +1,5 @@
+import { isRecipe } from "./recipeApi.ts";
+import type { SavedRecipe } from "./recipeApi";
 export type DemoConfiguration = {
   b1_ratio_percent: string;
   total_mixture_volume_ml: string;
@@ -58,8 +60,10 @@ export type DemoRun = {
   run_id: string;
   status: "CREATED" | "RUNNING" | "PAUSED" | "ABORTING" | "ABORTED" | "COMPLETED" | "FAULTED";
   phase: string;
-  configuration: DemoConfiguration;
-  execution_settings: ExecutionSettings;
+  configuration: DemoConfiguration | null;
+  execution_settings: ExecutionSettings | null;
+  recipe?: SavedRecipe | null;
+  recipe_step_index?: number | null;
 };
 
 export type DemoEvent = { sequence_number: number; occurred_at: string; message: string; event_type: string };
@@ -140,8 +144,15 @@ export async function readMachine(signal?: AbortSignal): Promise<MachineSnapshot
 export async function readRun(runId: string, signal?: AbortSignal): Promise<DemoRun> {
   const data = await request(`/runs/${encodeURIComponent(runId)}`, undefined, signal) as DemoRun;
   if (data.run_id !== runId || !["CREATED", "RUNNING", "PAUSED", "ABORTING", "ABORTED", "COMPLETED", "FAULTED"].includes(data.status)
-    || typeof data.phase !== "string" || !data.configuration || !data.execution_settings) {
+    || typeof data.phase !== "string" || (!data.recipe && (!data.configuration || !data.execution_settings))) {
     throw new Error("Backend run snapshot is invalid or belongs to another run");
+  }
+  if (data.recipe !== undefined && data.recipe !== null && (!isRecipe(data.recipe) || data.configuration !== null || data.execution_settings !== null
+    || !Number.isInteger(data.recipe_step_index) || data.recipe_step_index! < 0
+    || data.recipe_step_index! > data.recipe.definition.steps.length
+    || (data.status === "COMPLETED" ? data.recipe_step_index !== data.recipe.definition.steps.length
+      : data.recipe_step_index! >= data.recipe.definition.steps.length))) {
+    throw new Error("Backend recipe progress is invalid");
   }
   return data;
 }

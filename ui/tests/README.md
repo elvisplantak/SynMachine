@@ -24,3 +24,8 @@ references, cancellation/expiration and read-only restoration. A RUN retry keeps
 the existing CREATED run ID and sends exactly one explicit Start and one
 declaration, with no new run or automatic command replay. Backend tests remain
 the authority for actual eligibility, ownership and durable command behavior.
+
+UVP regression cases cover recipe edits/version saves/reload without execution,
+review invalidation, stale-save failure, explicit fresh-preparation Start, run
+progress and owned controls across navigation, and cancellation before commands.
+`uvp.fixture.html` intercepts every API request; no real backend or device is used.

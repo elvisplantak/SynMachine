@@ -14,6 +14,20 @@ Local URL:
 
     http://localhost:5173/
 
+## Active UVP scope — 2026-10-11
+
+The user approved Unos vlastite procedure (UVP) through the UI and durable recipe
+reuse. UVP v1 uses structured logical operations compiled into the existing owned
+backend execution path. Recipes are schema-versioned, independent of hardware
+bindings, and immutable per run. Future device capabilities may extend the schema
+and compiler with tests; no plugin framework is needed now. No free-text parser,
+XDL or animation is included. Wet demo validation is postponed.
+
+UVP is a real execution request surface when an explicit owned composition is
+configured, and a recipe library/editor otherwise. This milestone's verification
+uses fake transports only. Default production activation and physical movement
+remain gated. See docs/UVP_USER_GUIDE.md and backend docs/UVP_RECIPES_V1.md.
+
 ## Broader LabForge architecture
 
 LabForge is intended to become a software-controlled modular lab automation system.

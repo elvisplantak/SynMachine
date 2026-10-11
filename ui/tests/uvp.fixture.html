@@ -1,0 +1,110 @@
+<!doctype html><html lang="hr"><head><meta charset="UTF-8"><title>UVP fake API regression</title></head>
+<body><div id="root"></div><pre id="result">pending</pre><script type="module">
+import React from "react";
+import { createRoot } from "react-dom/client";
+import App from "/src/App.tsx";
+const scenario = new URL(location.href).searchParams.get("scenario");
+const calls = [];
+let recipes = [], run = null, fail = false;
+const status = { configured: true, busy: false, executing: false, operation: null, error: null, retained_owner_id: null, run_id: null, automatic_resume_allowed: false };
+const machine = { state: "READY", active_run_id: null, interrupted_run_id: null, interrupted_maintenance_id: null, active_execution: null, active_maintenance: null };
+window.fetch = async (url, options = {}) => {
+  const path = new URL(url, location.href).pathname, method = options.method ?? "GET";
+  calls.push({ path, method, body: options.body ? JSON.parse(options.body) : null });
+  let body, code = 200;
+  if (method === "GET") {
+    if (path.endsWith("/execution")) body = status;
+    else if (path.endsWith("/machine")) body = machine;
+    else if (path.endsWith("/events")) body = [];
+    else if (path.includes("/runs/")) body = run;
+    else if (path.endsWith("/recipes")) body = recipes;
+    else throw new Error(`Unexpected read: ${path}`);
+  } else {
+    const data = JSON.parse(options.body);
+    if (path.endsWith("/recipes/preview")) {
+      body = { steps: data.steps.map((step, i) => ({ step_number: i + 1, phase: step.kind === "WAIT" ? "REACTION_HOLD" : "P1_TRANSFER_FIRST_LIQUID_TO_REACTOR", step })), configured_contents_ml: { REACTOR: "2", SF: "0", COLUMN: "0" }, calibrations_checked: true, collection_readiness_required: false, volumes_are_measured: false };
+    } else if (path.endsWith("/execute")) {
+      assert(data.readiness.sources_match_recipe && data.readiness.evidence_note, "Missing current readiness");
+      assert(data.expected_revision === recipes[0].revision, "Wrong recipe revision executed");
+      run = { run_id: data.run_id, status: "RUNNING", phase: "REACTION_HOLD", configuration: null, execution_settings: null, recipe: structuredClone(recipes[0]), recipe_step_index: 1 };
+      Object.assign(status, { run_id: data.run_id, busy: true, executing: true, operation: { operation_id: "recipe-operation", action: "RUN", run_id: data.run_id } });
+      Object.assign(machine, { state: "BUSY", active_run_id: data.run_id, active_execution: { phase: run.phase, start_committed_at: new Date().toISOString() } });
+      body = status.operation; code = 202;
+    } else if (path.endsWith("/pause") || path.endsWith("/resume")) {
+      run.status = path.endsWith("/pause") ? "PAUSED" : "RUNNING"; body = { run };
+    } else if (path.endsWith("/stop")) {
+      run.status = "ABORTED"; status.busy = false; status.executing = false; status.retained_owner_id = "owner";
+      machine.state = "FLUSH_REQUIRED"; machine.active_run_id = null; machine.interrupted_run_id = run.run_id; machine.active_execution = null;
+      body = { operation_id: "recipe-operation", run };
+    } else if (path.includes("/recipes")) {
+      if (fail) { body = { detail: "recipe revision changed; reload before saving or running" }; code = 409; }
+      else {
+        const saved = { recipe_id: "saved-recipe", revision: (recipes[0]?.revision ?? 0) + 1, definition: data.definition };
+        recipes = [saved]; body = saved;
+      }
+    } else throw new Error(`Unexpected write: ${path}`);
+  }
+  return new Response(JSON.stringify(body), { status: code });
+};
+const assert = (condition, message) => { if (!condition) throw new Error(message); };
+const wait = async (condition) => { const end = Date.now() + 9000; while (!condition()) { if (Date.now() > end) throw new Error(`Timeout: ${document.body.innerText}`); await new Promise((r) => setTimeout(r, 50)); } };
+const button = (text) => [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === text);
+const click = async (text) => { await wait(() => button(text) && !button(text).matches(":disabled")); button(text).click(); await new Promise((r) => setTimeout(r, 50)); };
+const fill = (selector, value) => { const item = document.querySelector(selector); assert(item && !item.matches(":disabled"), `Missing input ${selector}`); const proto = item.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto, "value").set.call(item, value); item.dispatchEvent(new Event("input", { bubbles: true })); };
+const choose = (value) => { const item = document.querySelector('.uvpActions select'); item.value = value; item.dispatchEvent(new Event("change", { bubbles: true })); };
+let root;
+async function mount() { root?.unmount(); await new Promise((r) => setTimeout(r, 50)); root = createRoot(document.getElementById("root")); root.render(React.createElement(App)); await click("UVP · Recepti"); await wait(() => document.querySelector('.uvpEditor')); }
+async function create() {
+  fill('.uvpEditor label input', "Recept za ponavljanje");
+  await click("Dodaj korak"); fill('.uvpStep input', "2");
+  choose("WAIT"); await new Promise((r) => setTimeout(r, 50)); await click("Dodaj korak"); fill('.uvpStep:nth-child(2) input', "3");
+  await click("Dupliciraj");
+  // First duplicate is ADD, yielding ADD ADD WAIT. Remove it explicitly.
+  document.querySelector('.uvpStep:nth-child(2) button:last-child').click(); await new Promise((r) => setTimeout(r, 50));
+  await click("Spremi recept"); await wait(() => document.body.innerText.includes("Spremljena verzija 1"));
+  assert(!calls.some((c) => c.path.endsWith("/execute")), "Saving executed a recipe");
+  await click("Provjeri proceduru"); await wait(() => document.querySelector('.uvpReview'));
+}
+try {
+  await mount(); await create();
+  assert(button("Pokreni pregledanu proceduru").disabled, "Start without fresh readiness");
+  if (scenario === "uvp-editor") {
+    fill('.uvpEditor label input', "Izmijenjeni recept"); await wait(() => !document.querySelector('.uvpReview'));
+    assert(button("Provjeri proceduru").disabled, "Unsaved edit can execute old review");
+    await click("Spremi recept"); await wait(() => recipes[0].revision === 2);
+    await mount(); await wait(() => document.querySelector('.uvpLibrary li button'));
+    document.querySelector('.uvpLibrary li button').click(); await wait(() => document.querySelector('.uvpEditor input').value === "Izmijenjeni recept");
+    assert(document.querySelectorAll('.uvpStep').length === 2, "Saved steps did not survive reload");
+    assert(!calls.some((c) => c.path.endsWith("/execute")), "Editor or reload moved hardware");
+  } else if (scenario === "uvp-retry") {
+    run = { run_id: "cancelled-run", status: "CREATED", phase: "READY", configuration: null, execution_settings: null, recipe: recipes[0], recipe_step_index: 0 };
+    Object.assign(status, { run_id: run.run_id, error: "operator request cancelled", operator_current_input_configured: true });
+    await wait(() => document.body.innerText.includes("Prethodni UVP pokušaj nije počeo"));
+    fill('.uvpReview label input', "Fixture operator"); fill('.uvpReview textarea', "New preparation after cancellation");
+    for (const item of document.querySelectorAll('.uvpReview input[type=checkbox]')) item.click();
+    await click("Pokreni pregledanu proceduru");
+    await wait(() => calls.some((c) => c.path.endsWith("/execute")));
+    const attempt = calls.find((c) => c.path.endsWith("/execute"));
+    assert(attempt.body.run_id !== "cancelled-run", "Old attempt was resumed automatically");
+    assert(!calls.some((c) => c.path.endsWith("/runs/cancelled-run/start")), "UVP bypassed fresh preparation");
+  } else if (scenario === "uvp-running") {
+    fill('.uvpReview label input', "Fixture operator"); fill('.uvpReview textarea', "Fresh fake-only preparation");
+    for (const item of document.querySelectorAll('.uvpReview input[type=checkbox]')) item.click();
+    await click("Pokreni pregledanu proceduru");
+    await wait(() => document.body.innerText.includes("Korak 2: Čekaj 3 s"));
+    assert(calls.filter((c) => c.path.endsWith("/execute")).length === 1, "Recipe executed more than once");
+    await click("Pause wait"); await wait(() => run.status === "PAUSED"); await click("Resume wait");
+    await click("Natrag na početnu"); await wait(() => document.querySelector('[aria-label="Backend execution awareness"]').textContent.includes("BUSY"));
+    await mount(); await wait(() => document.body.innerText.includes("Korak 2: Čekaj 3 s"));
+    assert(calls.filter((c) => c.path.endsWith("/execute")).length === 1, "Navigation replayed execution");
+    await click("Stop execution"); await wait(() => document.body.innerText.includes("FLUSH_REQUIRED"));
+    assert(!button("Start configured run"), "UVP exposed Guided Demo start");
+  } else if (scenario === "uvp-failure") {
+    fail = true; fill('.uvpEditor label input', "Stale edit"); await click("Spremi recept");
+    await wait(() => document.body.innerText.includes("Recept je promijenjen"));
+    assert(!document.querySelector('.uvpReview'), "Failed save retained runnable review");
+    assert(recipes[0].revision === 1 && !calls.some((c) => c.path.endsWith("/execute")), "Failed save retried or executed");
+  }
+  document.getElementById("result").textContent = `PASS:${scenario}`;
+} catch (error) { document.getElementById("result").textContent = `FAIL:${scenario}:${error.message}`; }
+</script></body></html>

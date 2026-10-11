@@ -1,0 +1,32 @@
+.uvpWorkspace { color: #cbe9f3; }
+.uvpHeader { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+.uvpHeader h1 { font-size: 1.65rem; margin: .4rem 0; }
+.uvpWorkspace p { color: #92b8ca; line-height: 1.55; }
+.uvpLayout { display: grid; grid-template-columns: minmax(210px, 270px) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.uvpWorkspace .uvpLibrary, .uvpWorkspace .uvpEditor, .uvpWorkspace .uvpReview { padding: 1.2rem; }
+.uvpLibrary ul, .uvpSteps { list-style: none; padding: 0; }
+.uvpLibrary li { margin: .6rem 0; }
+.uvpLibrary li button { width: 100%; text-align: left; }
+.uvpLibrary small { display: block; color: #92b8ca; margin-top: .4rem; }
+.uvpWorkspace button { border: 1px solid #165273; background: #031521; color: #b5e7f8; padding: .65rem .85rem; border-radius: .5rem; cursor: pointer; }
+.uvpWorkspace button:disabled { opacity: .5; cursor: default; }
+.uvpWorkspace button[aria-pressed="true"] { border-color: #25cee8; }
+.uvpWorkspace fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.uvpWorkspace label { display: grid; gap: .4rem; font-weight: 600; margin: .7rem 0; }
+.uvpWorkspace input, .uvpWorkspace select, .uvpWorkspace textarea { box-sizing: border-box; width: 100%; color: #cbe9f3; background: #000710; border: 1px solid #234458; border-radius: .4rem; padding: .7rem; font: inherit; }
+.uvpWorkspace textarea { min-height: 4.5rem; resize: vertical; }
+.uvpSources { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
+.uvpStep { border: 1px solid #1b344b; border-radius: .6rem; padding: 1rem; margin: .8rem 0; background: #030d18; }
+.uvpStepHeading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .4rem; align-items: center; }
+.uvpStepHeading h3 { margin: .2rem 0; font-size: 1rem; }
+.uvpStepHeading button { margin-left: .3rem; }
+.uvpStepFields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.uvpActions { display: flex; flex-wrap: wrap; align-items: end; gap: .6rem; margin: 1rem 0; }
+.uvpActions label { margin: 0; }
+.uvpReview { margin: 1rem 0; }
+.uvpReview li { margin: .65rem 0; }
+.uvpWorkspace .uvpCheck { display: flex; align-items: center; font-weight: 400; }
+.uvpCheck input { width: auto; }
+.uvpWorkspace :focus-visible { outline: 2px solid #25cee8; outline-offset: 3px; }
+@media (max-width: 850px) { .uvpLayout { grid-template-columns: 1fr; } .uvpSources { grid-template-columns: 1fr; } .uvpHeader { align-items: start; flex-direction: column; } }
+@media (max-width: 500px) { .uvpStepFields { grid-template-columns: 1fr; } }

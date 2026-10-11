@@ -9,6 +9,8 @@ import type {
   MachineSnapshot, MaintenanceReadiness,
 } from "./guidedDemoApi";
 
+import { stepLabel } from "./recipeApi";
+
 const phaseLabels: Record<string, string> = {
   READY: "Ready", P1_TRANSFER_S_TO_REACTOR: "Transfer solvent to Reactor",
   P1_TRANSFER_FIRST_LIQUID_TO_REACTOR: "Transfer first liquid to Reactor",
@@ -29,9 +31,10 @@ const readinessLabels = {
 };
 type ReadinessKey = keyof typeof readinessLabels;
 
-export function OwnedDemoControls({ configuration, configurationValid, onLock, showLog }: {
-  configuration: DemoConfiguration; configurationValid: boolean;
+export function OwnedDemoControls({ configuration, configurationValid, onLock, showLog, hideDemoSettings = false, onBlockReason }: {
+  configuration?: DemoConfiguration; configurationValid: boolean;
   onLock: (locked: boolean) => void; showLog: boolean;
+  hideDemoSettings?: boolean; onBlockReason?: (reason: string | null) => void;
 }) {
   const [status, setStatus] = useState<ExecutionStatus | null>(null);
   const [machine, setMachine] = useState<MachineSnapshot | null>(null);
@@ -101,6 +104,12 @@ export function OwnedDemoControls({ configuration, configurationValid, onLock, s
   const unresolvedIntent = machine?.active_execution != null || machine?.active_maintenance != null;
   const canRecover = idle && !!status.retained_owner_id && !unresolvedIntent
     && (!!runId || !!machine?.interrupted_maintenance_id);
+  const recipeAttemptNotStarted = idle && status?.operator_current_input_configured === true
+    && run?.recipe != null && run.status === "CREATED" && status.retained_owner_id === null
+    && !unresolvedIntent && (machine === null || machine.state === "READY");
+  const recipeBlockReason = recipeAttemptNotStarted
+    ? newRunBlockReason({ ...status!, error: null }, machine) : blockReason;
+  useEffect(() => { onBlockReason?.(recipeBlockReason); }, [recipeBlockReason, onBlockReason]);
   const cleanStop = status?.operation?.action === "RUN" && run?.status === "ABORTED" && status.error === null;
   const recovered = status?.operation?.action === "RECOVERY" && status.error === null;
   const canFlush = idle && !unresolvedIntent && (
@@ -125,6 +134,7 @@ export function OwnedDemoControls({ configuration, configurationValid, onLock, s
   };
 
   const start = () => command(async () => {
+    if (!configuration) throw new Error("Guided Demo configuration is missing");
     const id = crypto.randomUUID();
     const executionSettings: ExecutionSettings = {
       sf_mixing_duration_seconds: settings.mixing, sf_settling_duration_seconds: settings.settling,
@@ -146,7 +156,8 @@ export function OwnedDemoControls({ configuration, configurationValid, onLock, s
 
   return <section className="ownedDemoControls demoControlTray" aria-label="Backend Guided Demo">
     <section className="demoPanel">
-      <div className="demoSectionHeading"><span>Backend state</span><h2>{run ? phaseLabels[run.phase] ?? run.phase : "No run started"}</h2></div>
+      <div className="demoSectionHeading"><span>Backend state</span><h2>{run?.recipe ? (run.status === "COMPLETED" ? "Procedura završena" : `Korak ${(run.recipe_step_index ?? 0) + 1}: ${stepLabel(run.recipe.definition.steps[run.recipe_step_index ?? 0], run.recipe.definition.sources)}`) : run ? phaseLabels[run.phase] ?? run.phase : "No run started"}</h2></div>
+      {run?.recipe && <p>{run.recipe.definition.name} · verzija {run.recipe.revision} · korak {Math.min((run.recipe_step_index ?? 0) + 1, run.recipe.definition.steps.length)} / {run.recipe.definition.steps.length}</p>}
       <dl className="demoReviewSettings">
         <div><dt>Machine</dt><dd>{machine?.state ?? (status ? "Uninitialized" : "Unavailable")}</dd></div>
         <div><dt>Run</dt><dd>{run?.status ?? "None"}</dd></div>
@@ -166,13 +177,14 @@ export function OwnedDemoControls({ configuration, configurationValid, onLock, s
           onClick={() => void command(() => runCommand(runId!, "resume"), "Resume requested for the current wait.")}>Resume wait</button>
       </div>
       {blockReason && <p className="demoLockedNote">{blockReason}</p>}
+      {recipeAttemptNotStarted && <p>Prethodni UVP pokušaj nije počeo. Ponovno provjeri recept i unesi svježe potvrde za novi pokušaj. Prethodni zapis ostaje sačuvan.</p>}
       {machine?.state === "FLUSH_REQUIRED" && canRecover && !canFlush
         && <p>Flushing requires a successful recovery in the current backend session. Repeat recovery after a backend restart.</p>}
       {(machine === null || machine.state === "STARTING") && <button type="button" disabled={!idle || status.retained_owner_id !== null || status.error !== null}
         onClick={() => void command(initializeMachine, "Initial backend state confirmed.")}>Initialize configured system</button>}
       {(unresolvedIntent || runUnresolved || (status?.retained_owner_id && !canRecover && machine?.state !== "FLUSH_REQUIRED")) && !active
         && <p>The interrupted operation requires backend restart and reconciliation before recovery.</p>}
-      {status?.operator_current_input_configured && idle && run?.status === "CREATED"
+      {status?.operator_current_input_configured && idle && !run?.recipe && run?.status === "CREATED"
         && status.retained_owner_id === null && !unresolvedIntent && (machine === null || machine.state === "READY")
         && <button type="button" onClick={() => void command(() => runCommand(run.run_id, "start"),
           "Current run requested again with a new confirmation attempt.")}>Retry current run with fresh confirmation</button>}
@@ -183,7 +195,7 @@ export function OwnedDemoControls({ configuration, configurationValid, onLock, s
       key={status.current_input.request_id} challenge={status.current_input} available={true} />}
 
     {!showLog && <>
-      <section className="demoPanel">
+      {!hideDemoSettings && <section className="demoPanel">
         <div className="demoSectionHeading"><span>Before starting</span><h2>Execution settings</h2></div>
         <p>SF mixing duration is applied by the executor using the fixed ON/OFF mixing profile. Stored mixing percentages do not set speed.</p>
         <fieldset disabled={active || pending || awaitingRefresh} className="ownedDemoFields demoMainSettings">
@@ -194,8 +206,8 @@ export function OwnedDemoControls({ configuration, configurationValid, onLock, s
         </fieldset>
         <button className="demoPrimaryButton" type="button" disabled={blockReason !== null || pending || awaitingRefresh || !configurationValid || !settingsValid} onClick={() => void start()}>Start configured run</button>
         {(!settingsValid || !configurationValid) && <p>Review the configured volumes and enter all execution settings before starting.</p>}
-        {run && <p>Started run: total {run.configuration.total_mixture_volume_ml} ml; SF mixing {run.execution_settings.sf_mixing_duration_seconds} s. These are configured values.</p>}
-      </section>
+        {run?.configuration && run.execution_settings && <p>Started run: total {run.configuration.total_mixture_volume_ml} ml; SF mixing {run.execution_settings.sf_mixing_duration_seconds} s. These are configured values.</p>}
+      </section>}
       <section className="demoPanel">
         <div className="demoSectionHeading"><span>Local operator</span><h2>Recovery and Flush system</h2></div>
         <fieldset disabled={active || pending || awaitingRefresh} className="ownedDemoFields">

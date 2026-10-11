@@ -1,12 +1,36 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-10-11
-- Development phase: fresh operator current-input software complete;
-  independent review accepted for fake-only scope; physical profile incomplete and live activation gated
+- Development phase: UVP software integrated; consolidated independent review pending;
+  physical profile and wet acceptance remain gated
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — isolated SF mixer recheck physically accepted
+## Current checkpoint — UVP logical recipes and UI execution integration
+
+- User authorized UVP through the UI with durable recipe reuse. Free-text parsing,
+  XDL and animation remain deferred. The liquid check is postponed; no hardware,
+  firmware upload or production activation is part of this software milestone.
+- Backend and UI isolated on `codex/uvp-recipes`, from accepted production baselines
+  backend 90e136c and UI 881e5bf. Firmware remains 3cc2de2, installed e2e9d3c.
+- UVP editor supports typed steps, bottle descriptions, ordering, duplication,
+  removal, immutable library revisions, copying and review before explicit Start.
+  Saved logical recipes are separate from adapters/profile facts; schema versioning
+  and capability rejection allow later cohesive extension without a plugin framework.
+- Recipe runs use the existing worker/session/plans/journals/owner, with immutable
+  run snapshots and step indices for repeated phases. Stop, pausable waits,
+  restart reconciliation, recovery and mandatory flush retain existing behavior.
+- Default app execution remains gated. Fresh recipe preparation statements and
+  secured current-reference input are separate. Cancellation before commands leaves
+  the CREATED attempt intact and permits a new explicit attempt with fresh inputs.
+- Verification: full backend 1895 passed, focused UVP 37 passed; UI 36 passed
+  with no skips; build/lint/Ruff/diff checks passed. Backend feature commit e626097.
+  Review handoff: docs/reviews/2026-10-11-uvp-handoff.md.
+- See docs/UVP_USER_GUIDE.md and backend docs/UVP_RECIPES_V1.md. Independent review
+  is pending; this checkpoint is not marked independently accepted. Wet acceptance
+  and animation remain later scopes.
+
+## Previous checkpoint — isolated SF mixer recheck physically accepted
 
 - On 2026-10-11 the user found one motor wire detached from its joint and
   requested a new SF-only 3-second test. Preparation completed while motor power
@@ -25,7 +49,7 @@
   cannot retroactively establish full-demo physical SF mixing. The detached
   wire is a user finding, not an electrical measurement.
 - Next physical scope remains a separately defined and approved bounded liquid
-  check with fresh readiness. Full wet profile, UVP and animation remain deferred.
+  check with fresh readiness. Full wet profile and animation remain deferred; the UVP software scope is described above.
 
 ## Previous checkpoint — SF-only cable-repair recheck; physical result not accepted
 

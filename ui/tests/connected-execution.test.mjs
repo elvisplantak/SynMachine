@@ -34,6 +34,10 @@ after(async () => {
 });
 
 const scenarios = {
+  "uvp-retry": "UVP cancellation permits only a new explicit attempt with fresh readiness",
+  "uvp-editor": "UVP edits, saves immutable versions and reloads recipes without execution",
+  "uvp-running": "UVP explicitly starts with fresh readiness and preserves owned controls across navigation",
+  "uvp-failure": "UVP stale save invalidates review without automatic retry or execution",
   "operator-retry": "explicit retry preserves the CREATED run and requests fresh blank RUN references",
   "operator-confirmation": "fresh operator form binds credentials and clears state between attempts without command replay",
   "operator-cancellation": "expired and cancelled operator requests cannot reuse credentials or automatically continue",
@@ -55,7 +59,7 @@ for (const [scenario, title] of Object.entries(scenarios)) {
         "--headless", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage",
         "--disable-background-networking", "--no-first-run", "--no-default-browser-check",
         `--user-data-dir=${profile}`, "--dump-dom", "--virtual-time-budget=20000",
-        `${base}tests/connected-execution.fixture.html?scenario=${scenario}`,
+        `${base}tests/${scenario.startsWith("uvp-") ? "uvp" : "connected-execution"}.fixture.html?scenario=${scenario}`,
       ], { timeout: 40000, maxBuffer: 2 * 1024 * 1024 });
       const result = stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1];
       assert.equal(result, `PASS:${scenario}`, result ?? "Browser did not run the UI regression fixture");
