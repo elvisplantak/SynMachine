@@ -1,16 +1,20 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-10-11
-- Development phase: two UVP review defects corrected; focused follow-up review pending;
+- Development phase: UVP software independently accepted for fake-only scope;
   physical profile and wet acceptance remain gated
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — two targeted UVP review corrections
+## Current checkpoint — UVP software independently accepted
 
-- Independent consolidated review of backend e626097/UI 6a880de reported
-  Critical 0, High 0, Medium 2, Low 0; UVP is NOT YET independently accepted.
-  Codex independently confirmed both findings and completed focused fixes.
+- Independent focused follow-up review closed both prior Medium findings.
+  Critical 0, High 0, Medium 0, Low 0. The complete UVP milestone is independently
+  ACCEPTED for the declared fake-only software scope at these exact checkpoints:
+  backend `8e22fd5d305d46d128f0aedc78bf2a0e36be8fa2`;
+  UI `bf986cbb983b4d664070c6474627a62074d9584a`.
+  Subsequent documentation-only commits record acceptance; they are not additional
+  independently reviewed implementation checkpoints.
 - Backend `8e22fd5d305d46d128f0aedc78bf2a0e36be8fa2` on `codex/uvp-recipes`
   allows COLLECT creation when the configured typed current-context provider can
   establish fresh RUN references. No static readiness is fabricated. Missing
@@ -32,9 +36,13 @@
   diff checks passed. Backend: 8 files, +262/-29; UI change set documented in Git.
   Tests use fake transports only; no real device, firmware, production or main action.
 - Focused reviewer packet: docs/reviews/2026-10-11-uvp-review-followup.md.
-  Next: review these two fixes, then agree the next UVP/physical or animation scope.
-  Wet demo and animation remain deferred. Both UVP worktrees stay on
-  `codex/uvp-recipes`; the final implementation report pins the full UI HEAD.
+  The reviewer requested no additional software correction. Reported tests were
+  inspected but not independently rerun through the GitHub connector; no combined
+  GitHub checks were present on the reviewed HEADs. This closure changes docs only.
+  Next: agree the next UI/integration, animation or physical/profile scope.
+  Wet demo and animation remain deferred. Hardware activation, physical execution,
+  firmware upload, production and main merge require their existing approvals.
+  Both UVP worktrees stay on `codex/uvp-recipes`.
 
 ## Previous checkpoint — UVP logical recipes and UI execution integration
 

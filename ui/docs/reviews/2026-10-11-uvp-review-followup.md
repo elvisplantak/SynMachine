@@ -1,5 +1,34 @@
 # UVP focused review follow-up — 2026-10-11
 
+## Independent review closure — accepted
+
+The user's supplied focused follow-up review independently accepted the complete
+UVP milestone for its declared fake-only software scope, closed both former Medium
+findings, and reported Critical 0, High 0, Medium 0, Low 0. No further software
+correction was requested. Codex checked that the response names the implemented
+fixes and these exact reviewed checkpoints:
+
+- Backend: `8e22fd5d305d46d128f0aedc78bf2a0e36be8fa2`.
+- UI: `bf986cbb983b4d664070c6474627a62074d9584a`.
+- Both feature branches: `codex/uvp-recipes`.
+
+The reviewer inspected the focused diffs, integration code and regressions.
+Implementation-reported verification (1903 backend, 45 focused UVP, 41 UI with
+18 browser cases and zero skips, Ruff/lint/build/diff checks) was not independently
+rerun through the GitHub connector; no combined GitHub checks were present.
+This closure is documentation-only and does not create another accepted code HEAD.
+
+Acceptance does not authorize real-device/Serial activation, physical movement,
+HOME/Recovery/Flush, wet testing, firmware changes/upload, production activation
+or merging to main. Firmware recovery/ remains prohibited. The next integration
+or physical/profile boundary retains the existing approval requirements.
+
+## Original submitted follow-up packet
+
+The packet below records its status at submission; its pending acceptance wording
+is superseded by the closure above. Its UI target is now pinned to
+`bf986cbb983b4d664070c6474627a62074d9584a`.
+
 Please respond in Croatian/BHS. Independently review only the two targeted
 corrections from the consolidated review (Critical 0, High 0, Medium 2, Low 0).
 The reviewed UVP milestone is NOT YET ACCEPTED; implementation verification does

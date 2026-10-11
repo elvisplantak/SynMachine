@@ -28,12 +28,15 @@ configured, and a recipe library/editor otherwise. This milestone's verification
 uses fake transports only. Default production activation and physical movement
 remain gated. See docs/UVP_USER_GUIDE.md and backend docs/UVP_RECIPES_V1.md.
 
-The consolidated UVP review found two Medium integration/integrity defects;
-neither reviewed UVP HEAD is independently accepted. Follow-up fixes let COLLECT
-reach configured fresh RUN references and bind review/execute to a canonical
-SHA-256 content digest plus revision. Recipe library schema v2 rejects prior v1
-without migration; logical recipe schema remains v1. Verification uses fake
-transports only. See docs/reviews/2026-10-11-uvp-review-followup.md.
+The independent focused follow-up review closed both prior Medium findings with
+Critical/High/Medium/Low all zero. The complete UVP software milestone is accepted
+for the declared fake-only scope at backend `8e22fd5d305d46d128f0aedc78bf2a0e36be8fa2`
+and UI `bf986cbb983b4d664070c6474627a62074d9584a`. Later documentation commits record this
+acceptance without extending its reviewed implementation scope. Configured COLLECT
+uses fresh RUN references; review/execute binds canonical SHA-256 content identity
+and revision. Recipe library schema v2 rejects prior v1 without migration; logical
+recipe schema remains v1. Physical/profile, production and main-merge boundaries
+remain separately gated. See docs/reviews/2026-10-11-uvp-review-followup.md.
 
 ## Broader LabForge architecture
 
