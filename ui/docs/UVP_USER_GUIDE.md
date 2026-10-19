@@ -62,3 +62,23 @@ Prikaz se osvježava očitanjima približno svakih 0,2 s plus vrijeme odgovora.
 Vrlo kratka radnja može proći između dva očitanja; animacija se zato ne ponavlja
 naknadno. Ista shema radi u backend prikazu Guided Demo. Otvaranje sheme ili
 osvježavanje stranice šalje samo upite i ne pokreće proceduru.
+
+
+## Stvarni uređaji — priprema 2026-10-19
+
+Postoji zaseban eksplicitni backend ulaz app.live_execution; postupak i profil su
+u backend docs/LIVE_RECIPES.md. Prije unosa/pokretanja Recipes provjeri oznaku
+**Real devices** i identitet profila. **Test devices** znači lažne transporte;
+neidentificiran način rada nije potvrda simulacije. Jedinice u receptima ostaju
+mL i sekunde čekanja/miješanja; apsolutni koraci ostaju u Serviceu.
+
+Prvo povezivanje ne pokreće HOME ili recept. Stvarne reference moraš prethodno
+uspostaviti postojećim Service postupcima i potvrditi za svježi zahtjev. Obrazac
+ne postavlja nulu ni koordinate u firmwareu. Ako položaj nije poznat, ostavi ga
+nepoznatim. Otvaranje USB-a može resetirati Mega i poništiti stare reference.
+
+Pripremljeni nominalni profil nema popunjenu automatsku proceduru Recovery/Flush;
+te su radnje onemogućene. Nakon Stop-a ili greške zahtjev za održavanjem i blokada
+novog runa ostaju. Restart ili nova baza nisu način njihova zaobilaženja. Unos tih
+fizičkih postupaka ostaje zasebna konfiguracija. Softverska priprema nije potvrda
+novog fizičkog pokusa niti mjerene točnosti volumena.

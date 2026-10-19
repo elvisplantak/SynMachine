@@ -1,12 +1,73 @@
 # LabForge Current Development State
 
-- Checkpoint date: 2026-10-12
-- Development phase: command-driven flow animation independently accepted for
-  fake-only software scope; Guided Demo user visual check observed; wet acceptance gated
+- Checkpoint date: 2026-10-19
+- Development phase: user-authorized live Recipes preparation; software self-verified;
+  first real connection/current references and physical execution remain separate
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
-## Current checkpoint — command-driven flow animation
+## Current checkpoint — explicit live Recipes preparation
+
+- The user authorized making Recipes usable on the real machine, reports prior
+  independently successful liquid tests, and explicitly chose existing high-level
+  recipe actions and mL/step-based pump operation. No raw valve/pump script language
+  or seconds-to-volume conversion is added. Hardware report is attributed in
+  firmware HARDWARE_CONFIRMATIONS.md; no new measured calibration is inferred.
+- Backend and UI are isolated on codex/live-recipes-ui from accepted animation
+  backend 5c99e190 and UI documentation HEAD 4d6996f. Firmware branch of the same
+  name records only the user's report, from 3cc2de2; installed code stays e2e9d3c.
+- Backend app.live_execution provides inert validate/provision and explicit
+  localhost serve --connect-real-devices, using existing owned execution and
+  operator input. Separate persistent live state is bound to profile digest and
+  database identities; no fake/foreign/missing journal is adopted or reset.
+  LIVE_RECIPES_PROFILE.json uses confirmed USB identities, existing timing/SF
+  coupling, approved routes and nominal demo calibration. No actuator/protocol
+  or recipe schema change. Real Arduino factory requests exclusive Serial access.
+- Recovery/flush plans are explicitly null because their physical inputs remain
+  unspecified. Absent actions are rejected by the backend and disabled/explained
+  in UI. Stop/fault/restart still retain required maintenance and ownership; no
+  restart/delete/reprovision bypass is supplied. Completed runs can be repeated
+  through existing same-session command continuity and fresh recipe preparation.
+- UI identifies Real devices / Test devices / unidentified connection before
+  recipe entry, with profile identity. Invalid/failed reads clear the label;
+  missing metadata is never assumed fake. Saved recipe operations/digests, dynamic
+  flow display and per-attempt preparation/current-reference forms remain intact.
+- Final verification: complete backend 1937 passed, focused live entry 17 passed;
+  earlier focused configuration/operator/live checks 84 passed. UI 51 passed
+  (24 actual browser cases, no skips), lint/build/Ruff/diff checks passed.
+  JS337.12kB/gzip92.45, CSS53.04/gzip10.58. All tests use fake transports.
+- Live state explicitly provisioned without device access at
+  /home/elvis/.local/state/labforge/recipes-live-v1. Private operator.key is 0600
+  and not logged/committed; existing fake library/state is preserved. UI is
+  running at http://127.0.0.1:5173/. Both configured USB by-id paths were observed
+  present (ttyACM1 and ttyUSB0). User then freshly confirmed stopped machine and
+  motor power OFF, with USBs connected. The explicit live backend started on 8000,
+  PID17990, preserving that same live bundle. Existing HELLO completed; no actuator
+  action or upload. GET execution reports LIVE/profile identity, idle/no error/no
+  owner/flow null, fresh operator source configured, maintenance_actions empty.
+  Machine is uninitialized (GET machine 404), recipe library empty. Read-only SQL
+  confirmed zero Arduino commands, SF actions, prepared plans and waits; owner
+  slot is null. The old fake state/library remains untouched.
+- First connection sends existing HELLO only and may reset Mega. First use needs
+  actual same-session references established via existing supervised Service,
+  not guessed coordinates or old logs. Initialization and first Start request
+  separate fresh operator declarations. No automatic all-device HOME is added.
+- Verified/pushed code: backend 60e04e585fc31a58124b18aa7b5dd145b45b854d;
+  UI b79c878a0cf7dc9d0b89223e8d8e56afd82c32cd; firmware report-only
+  af940d9d3060fc4ae585fc398b6775ff4765692b. Later UI commits record status/review
+  only. Consolidated review packet: docs/reviews/2026-10-19-live-recipes.md.
+- Current local sessions: Vite exec64798, live backend exec55043; server log
+  /tmp/labforge-live-recipes-server.log. No automatic Start, declaration or HOME
+  has been submitted. Motor power last explicitly OFF. Keep this connection for
+  any same-session reference establishment; restart does not restore references.
+- Next: consolidated independent review, user recipe entry and actual current
+  references established through the existing Service path before first Start.
+  Any physical movement still needs fresh motor-power readiness; it has not been
+  performed or approved by the read-only connection check.
+  New live entry point is self-verified, not independently accepted. The previous
+  exact animation acceptance below is unchanged. Details: backend docs/LIVE_RECIPES.md.
+
+## Previous checkpoint — command-driven flow animation
 
 - On 2026-10-12 the user reported seeing traveling dashes and changing active
   branches during the connected Guided Demo fake-only browser check. The sequence

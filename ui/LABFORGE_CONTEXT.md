@@ -14,7 +14,24 @@ Local URL:
 
     http://localhost:5173/
 
-## Active command-flow animation scope — 2026-10-11
+## Active live Recipes preparation — 2026-10-19
+
+The user authorized configuring real-device Recipes execution, retaining existing
+logical operations and mL/step-based pumps. Their independent liquid-test report
+is attributed in firmware HARDWARE_CONFIRMATIONS.md without inventing route,
+volume or current-reference measurements. Branch codex/live-recipes-ui adds the
+explicit backend app.live_execution entry point, confirmed nominal profile,
+profile-bound persistent state and UI transport/profile identification. Default
+legacy app activation is unchanged. Offline validate/provision opens nothing;
+explicit serve performs existing HELLO, with all actuation still through existing
+owned execution and explicit user actions. Existing operator input establishes
+fresh references; historical positions cannot authorize work. Recovery/flush are
+explicitly unavailable until physical procedure inputs are supplied, without
+changing retained ownership or mandatory maintenance. New software is self-verified;
+independent live-entry review/first physical use remain separate. Read current
+state and backend docs/LIVE_RECIPES.md before connecting. No firmware code change.
+
+## Accepted command-flow animation scope — 2026-10-11
 
 After UVP and its user-led fake browser checks, the user approved command-driven
 traveling dashes on the actual schematic for backend Guided Demo and Recipes.
