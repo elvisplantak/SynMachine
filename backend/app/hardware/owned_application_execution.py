@@ -12,6 +12,7 @@ from datetime import datetime
 import os
 import sqlite3
 from threading import Event, RLock
+from typing import Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict
@@ -50,6 +51,9 @@ class ApplicationExecutionStatus(BaseModel):
     flow_activity: ExecutionFlowActivity | None = None
     current_input: OperatorInputChallenge | None = None
     operator_current_input_configured: bool = False
+    transport_mode: Literal["UNSPECIFIED", "FAKE", "LIVE"] = "UNSPECIFIED"
+    profile_id: str | None = None
+    maintenance_actions: tuple[Literal["RECOVERY", "FLUSH"], ...] = ()
 
 
 class OwnedApplicationExecution:
@@ -62,7 +66,8 @@ class OwnedApplicationExecution:
 
     def __init__(self, bundle, device_factory, calibrations, *, timer_factory,
                  column_readiness=None, recovery_plan=None, flush_plan=None,
-                 operator_input_source=None, current_context_provider=None):
+                 operator_input_source=None, current_context_provider=None,
+                 transport_mode="UNSPECIFIED", profile_id=None):
         if not callable(device_factory) or not callable(timer_factory):
             raise TypeError("explicit device and timer factories are required")
         for plan, kind in ((recovery_plan, MaintenanceKind.RECOVERY), (flush_plan, MaintenanceKind.FLUSH)):
@@ -74,6 +79,13 @@ class OwnedApplicationExecution:
             from app.hardware.adapter_configuration import AdapterCurrentContextProvider
             if type(current_context_provider) is not AdapterCurrentContextProvider:
                 raise TypeError("explicit current-context provider required")
+        if transport_mode not in ("UNSPECIFIED", "FAKE", "LIVE"):
+            raise ValueError("explicit supported transport mode required")
+        if profile_id is not None and (type(profile_id) is not str or not profile_id.strip()):
+            raise ValueError("profile identity must be nonempty")
+        if transport_mode == "LIVE" and profile_id is None:
+            raise ValueError("live execution needs a profile identity")
+        self._transport_mode, self._profile_id = transport_mode, profile_id
         self._current_context_provider = current_context_provider
         self._operator_input_source = operator_input_source
         self.bundle = bundle
@@ -185,6 +197,10 @@ class OwnedApplicationExecution:
                 flow_activity=(self._runtime._runner.flow.snapshot()
                                if self._executing and self._error is None else None),
                 operator_current_input_configured=self._operator_input_source is not None,
+                transport_mode=self._transport_mode, profile_id=self._profile_id,
+                maintenance_actions=tuple(kind.value for kind, plan in (
+                    (MaintenanceKind.RECOVERY, self._recovery_plan),
+                    (MaintenanceKind.FLUSH, self._flush_plan)) if plan is not None),
                 current_input=(None if self._operator_input_source is None
                                else self._operator_input_source.pending()),
             )

@@ -117,6 +117,7 @@ def build_profile(directory, *, command_delay=0.15, fault_command=None, operator
             configuration(port="browser-check-fake-sf"), plan(MaintenanceKind.RECOVERY).calibrations,
             context_factory=current_context, sf_mixer_running=False, column_readiness=READINESS,
             recovery_plan=plan(MaintenanceKind.RECOVERY), flush_plan=plan(MaintenanceKind.FLUSH),
+            transport_mode="FAKE", profile_id="browser-check-fake",
             arduino_port_factory=port_factory, arduino_sleep=lambda _: None,
             sf_session_factory=sf_factory, sf_sleep=lambda _: None,
         )
@@ -131,6 +132,7 @@ def build_profile(directory, *, command_delay=0.15, fault_command=None, operator
             bundle, settings, current_state_provider=operator_source,
             context_clock=operator_source.clock, arduino_port_factory=port_factory,
             sf_session_factory=sf_factory, arduino_sleep=lambda _: None, sf_sleep=lambda _: None,
+            transport_mode="FAKE",
         )
     return create_app(application_execution=execution), execution
 

@@ -26,6 +26,7 @@ def build_adapter_application_execution(
     timer_factory=MonotonicExecutionTimer,
     arduino_port_factory=None, arduino_monotonic=monotonic, arduino_sleep=sleep,
     sf_session_factory=None, sf_monotonic=monotonic, sf_sleep=sleep,
+    transport_mode="UNSPECIFIED", profile_id=None,
 ):
     """Prepare a caller-injected application, never connect or activate it here.
 
@@ -93,6 +94,7 @@ def build_adapter_application_execution(
         column_readiness=column_readiness, recovery_plan=recovery_plan,
         flush_plan=flush_plan,
         current_context_provider=current_context_provider,
+        transport_mode=transport_mode, profile_id=profile_id,
         operator_input_source=(None if current_context_provider is None
                                else current_context_provider.operator_input_source),
     )

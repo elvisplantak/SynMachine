@@ -1,0 +1,198 @@
+{
+  "profile_id": "labforge-supervised-recipes-v1",
+  "evidence_note": "Existing installed Arduino/U2D2 identities, SF coupling/profile and nominal demo pump mapping from firmware HARDWARE_CONFIRMATIONS.md and 2026-10-09 commissioning. User requested live Recipes on 2026-10-19 and reports prior independent wet tests. Not measured volume calibration. Fresh current-state and per-run preparation required. Recovery/flush inputs remain unconfirmed and unavailable.",
+  "calibration_scope": "DEMO_NOMINAL",
+  "current_context_timeout_seconds": 600.0,
+  "arduino": {
+    "port": "/dev/serial/by-id/usb-Arduino__www.arduino.cc__0042_14532303532351F0D070-if00",
+    "baud_rate": 115200,
+    "reset_settle_seconds": 2.5,
+    "handshake_timeout_seconds": 2.0,
+    "command_timeout_seconds": 180.0,
+    "read_chunk_size": 64
+  },
+  "sf": {
+    "port": "/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTA2U3CN-if00-port0",
+    "baud_rate": 57600,
+    "device_id": 2,
+    "closed_position": 2559,
+    "open_position": 3697,
+    "profile_velocity": 20,
+    "profile_acceleration": 1,
+    "position_tolerance": 20,
+    "motion_timeout_seconds": 15.0,
+    "poll_interval_seconds": 0.05
+  },
+  "calibrations": {
+    "p1": {
+      "pump_id": "P1",
+      "working_full_chamber_position_steps": 0,
+      "working_empty_chamber_position_steps": 20500,
+      "working_volume_ml": "20"
+    },
+    "p2": {
+      "pump_id": "P2",
+      "working_full_chamber_position_steps": 0,
+      "working_empty_chamber_position_steps": 20500,
+      "working_volume_ml": "20"
+    }
+  },
+  "route_sequences": [
+    {
+      "route_id": "P1_TO_WASTE",
+      "targets": [
+        {
+          "valve": "V2",
+          "position_degrees": 180
+        },
+        {
+          "valve": "V1",
+          "position_degrees": 180
+        }
+      ]
+    },
+    {
+      "route_id": "P2_TO_WASTE",
+      "targets": [
+        {
+          "valve": "V5",
+          "position_degrees": 180
+        },
+        {
+          "valve": "V8",
+          "position_degrees": 90
+        },
+        {
+          "valve": "V7",
+          "position_degrees": 90
+        },
+        {
+          "valve": "V3",
+          "position_degrees": 180
+        }
+      ]
+    },
+    {
+      "route_id": "S_TO_P1",
+      "targets": [
+        {
+          "valve": "V6",
+          "position_degrees": 180
+        },
+        {
+          "valve": "V1",
+          "position_degrees": 90
+        }
+      ]
+    },
+    {
+      "route_id": "B1_TO_P1",
+      "targets": [
+        {
+          "valve": "V4",
+          "position_degrees": 180
+        },
+        {
+          "valve": "V6",
+          "position_degrees": 90
+        },
+        {
+          "valve": "V1",
+          "position_degrees": 90
+        }
+      ]
+    },
+    {
+      "route_id": "B2_TO_P1",
+      "targets": [
+        {
+          "valve": "V4",
+          "position_degrees": 90
+        },
+        {
+          "valve": "V6",
+          "position_degrees": 90
+        },
+        {
+          "valve": "V1",
+          "position_degrees": 90
+        }
+      ]
+    },
+    {
+      "route_id": "P1_TO_REACTOR",
+      "targets": [
+        {
+          "valve": "V2",
+          "position_degrees": 90
+        },
+        {
+          "valve": "V1",
+          "position_degrees": 180
+        }
+      ]
+    },
+    {
+      "route_id": "REACTOR_TO_P2",
+      "targets": [
+        {
+          "valve": "V3",
+          "position_degrees": 90
+        }
+      ]
+    },
+    {
+      "route_id": "P2_TO_SF_TOP",
+      "targets": [
+        {
+          "valve": "V7",
+          "position_degrees": 180
+        },
+        {
+          "valve": "V3",
+          "position_degrees": 180
+        }
+      ]
+    },
+    {
+      "route_id": "SF_BOTTOM_TO_P2",
+      "targets": [
+        {
+          "valve": "V8",
+          "position_degrees": 180
+        },
+        {
+          "valve": "V7",
+          "position_degrees": 90
+        },
+        {
+          "valve": "V3",
+          "position_degrees": 180
+        }
+      ]
+    },
+    {
+      "route_id": "P2_TO_COLUMN",
+      "targets": [
+        {
+          "valve": "V5",
+          "position_degrees": 90
+        },
+        {
+          "valve": "V8",
+          "position_degrees": 90
+        },
+        {
+          "valve": "V7",
+          "position_degrees": 90
+        },
+        {
+          "valve": "V3",
+          "position_degrees": 180
+        }
+      ]
+    }
+  ],
+  "recovery_plan": null,
+  "flush_plan": null
+}

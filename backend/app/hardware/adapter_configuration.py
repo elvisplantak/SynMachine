@@ -87,8 +87,8 @@ class AdapterExecutionConfiguration(PlanningModel):
     sf: SfAdapterSettings
     calibrations: PumpCalibrationSet
     route_sequences: tuple[RouteSequence, ...]
-    recovery_plan: MaintenancePlan
-    flush_plan: MaintenancePlan
+    recovery_plan: MaintenancePlan | None
+    flush_plan: MaintenancePlan | None
 
     @model_validator(mode="after")
     def validate_coherence(self) -> Self:
@@ -101,7 +101,7 @@ class AdapterExecutionConfiguration(PlanningModel):
             raise ValueError("full execution configuration needs each explicit route sequence once")
         for plan, kind in ((self.recovery_plan, MaintenanceKind.RECOVERY),
                            (self.flush_plan, MaintenanceKind.FLUSH)):
-            if plan.kind is not kind or plan.calibrations != self.calibrations:
+            if plan is not None and (plan.kind is not kind or plan.calibrations != self.calibrations):
                 raise ValueError("maintenance kind/calibration differs from configuration")
         for calibration in (self.calibrations.p1, self.calibrations.p2):
             if calibration.working_empty_chamber_position_steps > 20500:
@@ -257,6 +257,8 @@ class AdapterCurrentContextProvider:
                 or state.sf_bottom_valve is not BottomValveState.CLOSED
                 or state.column_position_degrees is None or state.carousel_position is None):
                 raise SimulationBlocked("new run requires complete independently established current references")
+        elif self.configuration.recovery_plan is None:
+            raise SimulationBlocked("recovery is not configured for this profile")
         elif state.carousel_position != self.configuration.recovery_plan.recovery.carousel_position:
             raise SimulationBlocked("current manual alignment differs from recovery plan")
         if self.operator_input_source is not None:
@@ -276,11 +278,12 @@ def build_configured_adapter_application_execution(
     context_clock=monotonic, timer_factory=MonotonicExecutionTimer,
     arduino_monotonic=monotonic, arduino_sleep=sleep,
     sf_monotonic=monotonic, sf_sleep=sleep,
+    transport_mode="UNSPECIFIED",
 ):
-    """Delegate to the existing composition; explicit test transports required.
+    """Delegate to the existing composition; explicit transport factories required.
 
-    This preparation milestone supplies no default real transport factory or
-    production/environment entry point. Callers must not treat a profile as
+    This constructor supplies no default transport factory or environment entry
+    point. The separate live launcher selects real factories explicitly. A profile is not
     permission to activate real ports or execute physical work.
     """
     from app.hardware.adapter_application import build_adapter_application_execution
@@ -299,4 +302,5 @@ def build_configured_adapter_application_execution(
         timer_factory=timer_factory, arduino_port_factory=arduino_port_factory,
         arduino_monotonic=arduino_monotonic, arduino_sleep=arduino_sleep,
         sf_session_factory=sf_session_factory, sf_monotonic=sf_monotonic, sf_sleep=sf_sleep,
+        transport_mode=transport_mode, profile_id=configuration.profile_id,
     )

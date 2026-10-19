@@ -147,3 +147,16 @@ and which demo/working configuration is physically approved. This preparation do
 not authorize live startup, EEPROM changes, firmware upload, physical recovery,
 physical flushing, unattended execution or a main merge. Flow animation remains
 deferred by the user.
+
+
+## Explicit live Recipes extension — 2026-10-19
+
+The user subsequently authorized real-device Recipes preparation with the existing
+logical actions and volume inputs. The explicit `app.live_execution` entry point
+is documented in LIVE_RECIPES.md. It does not activate the legacy default app.
+Configured maintenance fields remain required but now accept explicit null; a
+null plan is unavailable, never inferred. CurrentContextProvider rejects recovery
+without a configured plan. Existing application maintenance refusal, retained
+ownership and mandatory flush policy remain unchanged. Live setup never fills
+maintenance inputs from fixtures. See LIVE_RECIPES_PROFILE.json for the separate
+nominal supervised profile and LIVE_RECIPES.md for reference/connection boundaries.
