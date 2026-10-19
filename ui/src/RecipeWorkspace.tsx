@@ -57,7 +57,7 @@ export function RecipeWorkspace({ onExit }: { onExit: () => void }) {
   const onState = useCallback((reason: string | null) => { setBlockReason(reason); }, []);
   const ready = operator.trim() !== "" && evidence.trim() !== "" && Object.keys(preparation).every((key) => checks[key]);
   return <main className="appShell uvpWorkspace">
-    <header className="uvpHeader"><div><span className="panelEyebrow">LabForge · Recipes</span><h1>Procedure Builder</h1><p>Build the steps, save your recipe and review it before starting.</p></div>
+    <header className="uvpHeader"><div><span className="panelEyebrow">SynMachine · Recipes</span><h1>Procedure Builder</h1><p>Build the steps, save your recipe and review it before starting.</p></div>
       <button type="button" onClick={onExit}>Back to home</button></header>
     <ExecutionEnvironment status={executionStatus} />
     <p>Use the existing demo operations to build your procedure. Each run starts with an empty, prepared reactor, SF and column. Waiting is passive; SF mixing uses a fixed profile.</p>

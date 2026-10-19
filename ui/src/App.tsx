@@ -1879,7 +1879,7 @@ function GuidedDemo({ onExit, backendRequest }: { onExit: () => void; backendReq
   return (
     <main className="appShell guidedDemoShell">
       <header className="guidedDemoHeader">
-        <div><div className="guidedDemoTitleRow"><div className="brand">LabForge Guided Demo</div><span>{backendMode ? "Backend execution view" : "Frontend preview — no hardware control"}</span></div><p>Configure one colored-liquid run and observe its progress</p><button type="button" disabled={executionLocked} onClick={() => { setBackendMode((mode) => !mode); setExecutionLocked(false); setStage("configure"); setPreviewStarted(false); setPhaseIndex(0); }}>{backendMode ? "Return to UI preview" : "Connect to backend"}</button></div>
+        <div><div className="guidedDemoTitleRow"><div className="brand">SynMachine Guided Demo</div><span>{backendMode ? "Backend execution view" : "Frontend preview — no hardware control"}</span></div><p>Configure one colored-liquid run and observe its progress</p><button type="button" disabled={executionLocked} onClick={() => { setBackendMode((mode) => !mode); setExecutionLocked(false); setStage("configure"); setPreviewStarted(false); setPhaseIndex(0); }}>{backendMode ? "Return to UI preview" : "Connect to backend"}</button></div>
         <GuidedDemoNavigation activeSection={demoSection} onNavigate={setDemoSection} onExit={onExit} />
       </header>
 
@@ -2238,7 +2238,7 @@ export default function App() {
     <>{awareness}<main className="appShell">
       <header className="topBar">
         <div>
-          <div className="brand">LABFORGE SCHEME DRAFT</div>
+          <div className="brand">SynMachine Scheme Draft</div>
           <div className="subBrand">
             Ventil verzija 2, portovi označeni, aktivna ruta: B1 → P1
           </div>

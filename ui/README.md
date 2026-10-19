@@ -1,3 +1,16 @@
+# SynMachine UI
+
+SynMachine is the machine's current working name (formerly LabForge). This UI
+provides the schematic, Guided Demo, Recipes / Procedure Builder and Service
+controls. Current execution scope and prerequisites are recorded in
+[the current state](LABFORGE_CURRENT_STATE.md); recipe instructions are in
+[the user guide](docs/UVP_USER_GUIDE.md).
+
+This is a display-name change only. Repository/package names, paths, environment
+variables, profile identities, stored recipes and the `LABFORGE/1` serial protocol
+keep their existing technical names. Historical review and commissioning records
+retain the names and exact commits they originally described.
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.

@@ -1,4 +1,4 @@
-# UVP — unos i ponovno korištenje recepta
+# SynMachine Recipes — unos i ponovno korištenje recepta
 
 Na početnoj stranici otvori **Recipes**. Uređivanje nosi naziv **Procedure Builder**;
 UVP ostaje interni razvojni naziv, a tekstovi aplikacije su na engleskom.

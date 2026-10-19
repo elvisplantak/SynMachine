@@ -1,10 +1,24 @@
-# LabForge Current Development State
+# SynMachine Current Development State
 
 - Checkpoint date: 2026-10-19
 - Development phase: explicit live Recipes software preparation independently accepted;
   no-motion HELLO verified; physical recipe/current-reference preparation remains separate
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
+
+## Visible working name — 2026-10-19
+
+- The user selected SynMachine (formerly LabForge) for current UI headings, the
+  browser title, API/CLI display titles and descriptive documentation.
+- This is a presentation-only follow-up on `codex/synmachine-display-name`.
+  Package/repository names, paths, `LABFORGE_*` variables, `LABFORGE/1`, profile
+  and topology IDs, stored recipes and state bindings retain their technical names.
+  Historical review/commissioning records and exact accepted refs are preserved.
+- The user deferred the next liquid test to another day. No device connection,
+  restart, motion or upload is part of the naming change.
+- Verification: UI 51 passed (24 headless-browser cases, zero skipped), lint
+  and TypeScript/Vite build passed; backend 1937 passed and Ruff passed. Firmware
+  changes are README-only. All three repository diff/whitespace checks passed.
 
 ## Current checkpoint — explicit live Recipes preparation
 

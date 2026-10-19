@@ -1,6 +1,15 @@
-# LabForge UI context
+# SynMachine UI context
 
-This project is a React + Vite + TypeScript frontend mockup for the broader LabForge / chemputer hardware-control project.
+## Working name — 2026-10-19
+
+The user selected SynMachine as the new visible working name, formerly LabForge.
+This changes UI headings, browser title and current descriptive documentation only.
+Technical names remain unchanged: repositories/packages, paths, environment
+variables, protocol `LABFORGE/1`, topology/profile IDs and persistent state bindings.
+Historical review and commissioning records retain their original names and refs.
+No recipe, route, actuator, ownership or execution behavior changes.
+
+This project is a React + Vite + TypeScript frontend mockup for the broader SynMachine / chemputer hardware-control project.
 
 Project folder:
 
@@ -107,14 +116,14 @@ Start separately validate flow and execution feasibility. The intentionally inva
 test version remains saved and cannot pass review. Details:
 docs/reviews/2026-10-11-uvp-browser-check.md.
 
-## Broader LabForge architecture
+## Broader SynMachine architecture
 
-LabForge is intended to become a software-controlled modular lab automation system.
+SynMachine is intended to become a software-controlled modular lab automation system.
 
 Expected architecture:
 
     React frontend
-      -> FastAPI backend + LabForge core
+      -> FastAPI backend + SynMachine core
       -> pyserial
       -> Arduino Mega
       -> valves, syringe pumps, switches, actuators
@@ -133,7 +142,7 @@ Meaning:
 
 ## Main UI goal
 
-Build a dark-mode “instrument panel” UI for LabForge.
+Build a dark-mode “instrument panel” UI for SynMachine.
 
 The UI should feel like:
 
@@ -464,7 +473,7 @@ The user likes the current left-to-right spacing. Do not compress the layout unn
 A possible final UI layout:
 
     +------------------------------------------------------+
-    | LabForge Console            Dashboard Protocols Logs |
+    | SynMachine Console          Dashboard Protocols Logs |
     +------------------------------------------------------+
     |                                                      |
     |  LEFT PANEL       CENTER SVG SCHEME       RIGHT PANEL|
@@ -756,7 +765,7 @@ The current project organization plan uses three neighboring but separate Git re
 - `~/Documents/labforge-backend`
 - `~/Documents/labforge-firmware`
 
-Together they form one LabForge system, but they are not currently planned as one Git repository.
+Together they form one SynMachine system, but they are not currently planned as one Git repository.
 
 ### Current backend planning progress — 2026-07-22
 
@@ -1007,7 +1016,7 @@ The user wants the UI to be understandable to a chemist who is not a programmer.
 
 The user is using Ubuntu 24.04, VS Code, React + Vite + TypeScript.
 
-The user wants this UI to become part of a broader LabForge system for controlling a real lab automation device, not just a static mockup.
+The user wants this UI to become part of a broader SynMachine system for controlling a real lab automation device, not just a static mockup.
 
 ## Things not to do
 
