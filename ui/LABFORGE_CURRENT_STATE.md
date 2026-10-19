@@ -6,6 +6,20 @@
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
+## Public-release preparation — 2026-10-19
+
+- User authorized coordinated repository/history/publication-surface inspection,
+  including reading/searching protected firmware recovery artifacts for this audit.
+- Branch `codex/public-release-preparation` adds ignore guards, an audit report and
+  README discussion drafts. Gitleaks current/history/metadata checks report zero
+  detected secrets across all three repositories; detection is not a guarantee.
+- All existing commits are on origin refs; current feature branches are ahead of
+  and diverged from main. Repositories remain private. No main/default/history or
+  device/runtime change accompanies preparation.
+- Project license/provenance, final README and branch presentation remain open.
+  The user reports PTFE valves/tubing not installed; chemical compatibility is
+  unvalidated. See docs/PUBLIC_RELEASE_PREPARATION.md and PUBLIC_README_DRAFT.md.
+
 ## Visible working name — 2026-10-19
 
 - The user selected SynMachine (formerly LabForge) for current UI headings, the
