@@ -150,7 +150,7 @@ def build_live_app(configuration, bundle, *, operator, credential, arduino_port_
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="LabForge explicit live Recipes setup")
+    parser = argparse.ArgumentParser(description="SynMachine explicit live Recipes setup")
     parser.add_argument("action", choices=("validate", "provision", "serve"))
     parser.add_argument("--profile", type=Path, required=True)
     parser.add_argument("--state-dir", type=Path)

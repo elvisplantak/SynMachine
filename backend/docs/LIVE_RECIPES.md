@@ -1,10 +1,14 @@
-# Explicit live Recipes setup
+# SynMachine — explicit live Recipes setup
 
 Scope: user-authorized preparation on 2026-10-19. Recipes retain their existing
 high-level actions and mL inputs; the backend selects approved routes and executes
 separate syringe aspiration/dispense. No raw actuator recipe language or pump
 seconds-to-volume conversion is added. Firmware and its installed timings do not
 change. The physical module is controlled only by explicit existing UI actions.
+
+SynMachine is the current visible working name. Existing `labforge` paths,
+`LABFORGE_*` variables, `LABFORGE/1`, profile identities and state bindings remain
+unchanged; no state migration or reprovisioning accompanies this naming change.
 
 ## Entry point and profile
 

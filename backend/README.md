@@ -1,6 +1,11 @@
-# LabForge backend
+# SynMachine backend
 
-This repository will contain the LabForge backend and domain core. Its current focus is the Guided Demo and the data needed by Demo Log, separate from the sibling UI and firmware repositories.
+SynMachine is the machine's current working name, formerly LabForge. Repository
+and package names, paths, `LABFORGE_*` environment variables, `LABFORGE/1`, profile
+IDs and persistent state bindings retain their existing technical names. This
+presentation change does not alter execution or previously accepted review refs.
+
+This repository will contain the SynMachine backend and domain core. Its current focus is the Guided Demo and the data needed by Demo Log, separate from the sibling UI and firmware repositories.
 
 The backend contains the Guided Demo domain, persistence and execution boundaries.
 Arduino pin assignments and low-level Arduino motion remain firmware-owned.

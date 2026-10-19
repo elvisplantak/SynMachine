@@ -298,7 +298,7 @@ def create_app(
             if arduino_runtime is not None:
                 arduino_runtime.close()
 
-    application = FastAPI(title="LabForge backend", lifespan=lifespan)
+    application = FastAPI(title="SynMachine backend", lifespan=lifespan)
 
     def get_store() -> Iterator[SQLiteStore]:
         if application_execution is not None:
