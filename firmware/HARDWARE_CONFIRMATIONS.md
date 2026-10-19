@@ -1,5 +1,16 @@
 # Hardware confirmations
 
+## Owner-reported material scope — 2026-10-19
+
+For public documentation preparation, the owner clarified that the present
+project evaluates mechanics, electronics, electrical wiring/power and software.
+PTFE valves and tubing have not yet been installed. Chemical compatibility of
+the complete wetted system has not been established for intended chemistry.
+Prior dry checks and reported liquid checks do not supply that compatibility
+validation. No alternative installed material, reagent list, temperature/pressure
+rating or chemical capability is inferred. No device action accompanies this
+public-documentation clarification.
+
 ## User-reported independent liquid checks — 2026-10-19
 
 The user reports having independently performed liquid tests multiple times and
