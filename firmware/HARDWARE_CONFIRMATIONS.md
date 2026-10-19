@@ -1,5 +1,20 @@
 # Hardware confirmations
 
+## User-reported independent liquid checks — 2026-10-19
+
+The user reports having independently performed liquid tests multiple times and
+that those tests were satisfactory. They requested preparation of the real-device
+Recipes UI, choosing the existing high-level recipe actions and mL/step-based
+pump operation rather than raw valve sequences or time-driven pumping. They will
+perform the next liquid test themselves after preparation.
+
+This records the user's operational report. No specific tested volumes, liquids,
+route list, delivered-volume measurements, HOME entry order, automatic flush
+volumes/drain timing or current device references were supplied. It does not
+change the nominal 1025 steps/mL mapping, actuator wiring/coupling or previous
+commissioning records, and supplies no new command or motion during software
+preparation. Current readiness remains a fresh per-attempt operator declaration.
+
 ## SF mixer detached-wire recheck accepted — 2026-10-11, boot 98
 
 The user found one motor wire detached from its joint after the boot96 abnormal
