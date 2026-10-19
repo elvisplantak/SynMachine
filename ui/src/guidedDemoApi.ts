@@ -48,6 +48,9 @@ export type ExecutionStatus = {
   flow_activity?: FlowActivity | null;
   current_input?: OperatorInputChallenge | null;
   operator_current_input_configured?: boolean;
+  transport_mode?: "UNSPECIFIED" | "FAKE" | "LIVE";
+  profile_id?: string | null;
+  maintenance_actions?: ("RECOVERY" | "FLUSH")[];
 };
 
 export type MachineSnapshot = {
@@ -119,6 +122,14 @@ export async function readExecution(signal?: AbortSignal): Promise<ExecutionStat
   }
   if (data.flow_activity !== undefined && data.flow_activity !== null && !isFlowActivity(data.flow_activity)) {
     throw new Error("Backend flow activity is invalid");
+  }
+  if ((data.transport_mode !== undefined && !["UNSPECIFIED", "FAKE", "LIVE"].includes(data.transport_mode))
+    || (data.profile_id !== undefined && data.profile_id !== null && (typeof data.profile_id !== "string" || !data.profile_id.trim()))
+    || (data.transport_mode === "LIVE" && (typeof data.profile_id !== "string" || !data.profile_id.trim()))
+    || (data.maintenance_actions !== undefined && (!Array.isArray(data.maintenance_actions)
+      || data.maintenance_actions.some((action) => !["RECOVERY", "FLUSH"].includes(action))
+      || new Set(data.maintenance_actions).size !== data.maintenance_actions.length))) {
+    throw new Error("Backend execution connection status is invalid");
   }
   const current = data.current_input;
   if (current !== undefined && current !== null && (!current || typeof current.request_id !== "string" || !current.request_id.trim()

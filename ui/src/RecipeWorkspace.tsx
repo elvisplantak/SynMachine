@@ -1,3 +1,5 @@
+import { ExecutionEnvironment } from "./ExecutionEnvironment";
+import type { ExecutionStatus } from "./guidedDemoApi";
 import { useCallback, useEffect, useState } from "react";
 import { OwnedDemoControls } from "./OwnedDemoControls";
 import { executeRecipe, listRecipes, previewRecipe, saveRecipe, stepLabel } from "./recipeApi";
@@ -19,6 +21,7 @@ const preparation = {
   collection_tubes_ready: "Fraction tubes are ready and the carousel is aligned with tube 1.",
 };
 export function RecipeWorkspace({ onExit }: { onExit: () => void }) {
+  const [executionStatus, setExecutionStatus] = useState<ExecutionStatus | null>(null);
   const [library, setLibrary] = useState<SavedRecipe[]>([]);
   const [draft, setDraft] = useState<RecipeDefinition>(empty);
   const [saved, setSaved] = useState<SavedRecipe | null>(null);
@@ -56,6 +59,7 @@ export function RecipeWorkspace({ onExit }: { onExit: () => void }) {
   return <main className="appShell uvpWorkspace">
     <header className="uvpHeader"><div><span className="panelEyebrow">LabForge · Recipes</span><h1>Procedure Builder</h1><p>Build the steps, save your recipe and review it before starting.</p></div>
       <button type="button" onClick={onExit}>Back to home</button></header>
+    <ExecutionEnvironment status={executionStatus} />
     <p>Use the existing demo operations to build your procedure. Each run starts with an empty, prepared reactor, SF and column. Waiting is passive; SF mixing uses a fixed profile.</p>
     <div className="uvpLayout"><aside className="demoPanel uvpLibrary" aria-label="Saved recipes"><h2>My Recipes</h2>
       <button type="button" disabled={pending} onClick={() => { setSaved(null); update(empty()); }}>New recipe</button>
@@ -117,6 +121,6 @@ export function RecipeWorkspace({ onExit }: { onExit: () => void }) {
         })}>Start reviewed procedure</button>
       </fieldset>{blockReason && <p>{blockReason}</p>}
     </section>}
-    <OwnedDemoControls configurationValid={false} onLock={setLocked} showLog={false} hideDemoSettings={true} onBlockReason={onState} />
+    <OwnedDemoControls configurationValid={false} onLock={setLocked} showLog={false} hideDemoSettings={true} onBlockReason={onState} onStatus={setExecutionStatus} />
   </main>;
 }

@@ -51,3 +51,21 @@ test("P2 separates reactor aspiration, SF filling, protected SF aspiration and c
   assert.deepEqual(Object.keys(make("COLUMN_TO_FRACTIONS", "COLLECT")).sort(), ["column-bottom", "bottom-fractions"].sort());
   assert.deepEqual(flowPresentation(null).segments, {}); assert.deepEqual(flowPresentation(null).valves, {});
 });
+
+
+test("execution connection metadata rejects malformed live identities and unsupported maintenance", async () => {
+  const read = (patch) => {
+    globalThis.fetch = async () => new Response(JSON.stringify({ ...status, ...patch }));
+    return readExecution();
+  };
+  for (const patch of [{ transport_mode: "LIVE", profile_id: "confirmed-profile", maintenance_actions: [] },
+    { transport_mode: "FAKE", profile_id: "test-profile", maintenance_actions: ["RECOVERY", "FLUSH"] }, {}]) {
+    await read(patch);
+  }
+  for (const patch of [{ transport_mode: "live" }, { transport_mode: "LIVE" },
+    { transport_mode: "LIVE", profile_id: "" }, { profile_id: 9 },
+    { maintenance_actions: "FLUSH" }, { maintenance_actions: ["HOME"] },
+    { maintenance_actions: ["FLUSH", "FLUSH"] }]) {
+    await assert.rejects(read(patch), /connection status is invalid/);
+  }
+});

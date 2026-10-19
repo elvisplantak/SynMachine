@@ -7,6 +7,7 @@ const scenario = new URL(location.href).searchParams.get("scenario");
 const calls = [];
 let recipes = [], run = null, fail = false;
 const status = { configured: true, busy: false, executing: false, operation: null, error: null, retained_owner_id: null, run_id: null, automatic_resume_allowed: false };
+if (scenario === "uvp-live-profile") Object.assign(status, { transport_mode: "LIVE", profile_id: "offline-live-fixture", maintenance_actions: [] });
 const machine = { state: "READY", active_run_id: null, interrupted_run_id: null, interrupted_maintenance_id: null, active_execution: null, active_maintenance: null };
 window.fetch = async (url, options = {}) => {
   const path = new URL(url, location.href).pathname, method = options.method ?? "GET";
@@ -76,7 +77,27 @@ try {
   if (scenario === "uvp-content-mismatch") {
     assert(!document.querySelector('.uvpReview') && !calls.some((c) => c.path.endsWith("/execute")), "Mismatched content review enabled execution");
   } else assert(button("Start reviewed procedure").disabled, "Start without fresh readiness");
-  if (scenario.startsWith("uvp-collection-")) {
+  if (scenario === "uvp-live-profile") {
+    const connection = () => document.querySelector('[aria-label="Execution connection"]');
+    await wait(() => connection()?.textContent.includes("Real devices"));
+    assert(connection().textContent.includes("offline-live-fixture"), "Live profile identity hidden");
+    assert(connection().textContent.includes("physical execution"), "Live Start meaning hidden");
+    run = { run_id: "stopped", status: "ABORTED", phase: "REACTION_HOLD", configuration: null, execution_settings: null, recipe: recipes[0], recipe_step_index: 1 };
+    Object.assign(status, { run_id: run.run_id, retained_owner_id: "held", operation: { operation_id: "old-run", action: "RUN", run_id: run.run_id } });
+    Object.assign(machine, { state: "FLUSH_REQUIRED", interrupted_run_id: run.run_id });
+    await wait(() => document.body.innerText.includes("FLUSH_REQUIRED"));
+    fill('.ownedDemoFields label input', "Fixture operator");
+    fill('.ownedDemoFields label textarea', "New fake-only maintenance readiness");
+    for (const item of document.querySelectorAll('.ownedDemoFields input[type=checkbox]')) item.click();
+    await new Promise(r => setTimeout(r, 150));
+    assert(button("Flush system").disabled && button("Start recovery").disabled, "Unconfigured maintenance became available");
+    Object.assign(status, { transport_mode: "FAKE", profile_id: "fake-profile" });
+    await wait(() => connection().textContent.includes("Test devices"));
+    assert(connection().textContent.includes("will not move"), "Fake mode implies real motion");
+    Object.assign(status, { transport_mode: "LIVE", profile_id: "" });
+    await wait(() => connection().textContent.includes("not identified"));
+    assert(!calls.some(c => c.path.endsWith("/execute") || c.path.endsWith("/flush/start") || c.path.endsWith("/recovery/start")), "Connection labels or unavailable controls sent commands");
+  } else if (scenario.startsWith("uvp-collection-")) {
     fill('.uvpReview label input', "Fixture operator"); fill('.uvpReview textarea', "Fresh fake-only preparation");
     for (const item of document.querySelectorAll('.uvpReview input[type=checkbox]')) item.click();
     await new Promise((r) => setTimeout(r, 100));

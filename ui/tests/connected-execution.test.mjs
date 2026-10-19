@@ -34,6 +34,7 @@ after(async () => {
 });
 
 const scenarios = {
+  "uvp-live-profile": "Recipes identify real/test transports and unavailable maintenance without automatic execution",
   "flow-demo": "Guided Demo animates only each current atomic route with correct direction and no navigation commands",
   "flow-recipes": "Recipes share the real schematic and current atomic route animation without replay",
   "flow-stale": "flow animation clears on stale reads, faults, identity mismatch, malformed and legacy status",

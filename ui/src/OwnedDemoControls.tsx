@@ -1,3 +1,4 @@
+import { ExecutionEnvironment } from "./ExecutionEnvironment";
 import { ExecutionFlowView } from "./ExecutionFlowView";
 import { useEffect, useRef, useState } from "react";
 import { OperatorCurrentInput } from "./OperatorCurrentInput";
@@ -32,10 +33,11 @@ const readinessLabels = {
 };
 type ReadinessKey = keyof typeof readinessLabels;
 
-export function OwnedDemoControls({ configuration, configurationValid, onLock, showLog, hideDemoSettings = false, onBlockReason }: {
+export function OwnedDemoControls({ configuration, configurationValid, onLock, showLog, hideDemoSettings = false, onBlockReason, onStatus }: {
   configuration?: DemoConfiguration; configurationValid: boolean;
   onLock: (locked: boolean) => void; showLog: boolean;
   hideDemoSettings?: boolean; onBlockReason?: (reason: string | null) => void;
+  onStatus?: (status: ExecutionStatus | null) => void;
 }) {
   const [status, setStatus] = useState<ExecutionStatus | null>(null);
   const [machine, setMachine] = useState<MachineSnapshot | null>(null);
@@ -88,6 +90,7 @@ export function OwnedDemoControls({ configuration, configurationValid, onLock, s
     return () => { alive = false; abort.abort(); clearTimeout(timeout); };
   }, []);
 
+  useEffect(() => { onStatus?.(connectionError === null ? status : null); }, [status, connectionError, onStatus]);
   const active = status?.busy === true;
   const runUnresolved = run !== null && ["RUNNING", "PAUSED", "ABORTING"].includes(run.status);
   useEffect(() => {
@@ -156,6 +159,7 @@ export function OwnedDemoControls({ configuration, configurationValid, onLock, s
   }, `${action === "recovery" ? "Recovery" : "Flushing"} accepted. Completion is reported by the backend.`);
 
   return <section className="ownedDemoControls demoControlTray" aria-label="Backend Guided Demo">
+    {!hideDemoSettings && <ExecutionEnvironment status={connectionError === null ? status : null} />}
     {hideDemoSettings && <div className="demoPanel"><ExecutionFlowView /></div>}
     <section className="demoPanel">
       <div className="demoSectionHeading"><span>Backend state</span><h2>{run?.recipe ? (run.status === "COMPLETED" ? "Procedure completed" : `Step ${(run.recipe_step_index ?? 0) + 1}: ${stepLabel(run.recipe.definition.steps[run.recipe_step_index ?? 0], run.recipe.definition.sources)}`) : run ? phaseLabels[run.phase] ?? run.phase : "No run started"}</h2></div>
@@ -218,9 +222,10 @@ export function OwnedDemoControls({ configuration, configurationValid, onLock, s
           {(Object.keys(readinessLabels) as ReadinessKey[]).map((key) => <label className="ownedDemoCheck" key={key}><input type="checkbox" checked={checks[key] ?? false} onChange={(e) => setChecks({ ...checks, [key]: e.target.checked })} /><span>{readinessLabels[key]}</span></label>)}
         </fieldset>
         <p>These confirmations are operator statements. Each attempt needs fresh confirmations.</p>
+        {status?.maintenance_actions !== undefined && status.maintenance_actions.length < 2 && <p>Unavailable maintenance actions need an explicitly configured physical procedure. Restarting does not clear the maintenance requirement.</p>}
         <div className="demoPreviewActions">
-          <button type="button" disabled={!canRecover || !readinessValid} onClick={() => void maintain("recovery")}>Start recovery</button>
-          <button type="button" disabled={!canFlush || !readinessValid} onClick={() => void maintain("flush")}>Flush system</button>
+          <button type="button" disabled={!canRecover || !readinessValid || (status?.maintenance_actions !== undefined && !status.maintenance_actions.includes("RECOVERY"))} onClick={() => void maintain("recovery")}>Start recovery</button>
+          <button type="button" disabled={!canFlush || !readinessValid || (status?.maintenance_actions !== undefined && !status.maintenance_actions.includes("FLUSH"))} onClick={() => void maintain("flush")}>Flush system</button>
         </div>
       </section>
     </>}
