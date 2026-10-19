@@ -1,6 +1,11 @@
-# LabForge firmware
+# SynMachine firmware
 
-This repository contains the active LabForge Arduino firmware foundations and
+SynMachine is the machine's current working name, formerly LabForge. Repository
+and package names, paths, `LABFORGE_*` environment variables, `LABFORGE/1`, profile
+IDs and persistent state bindings retain their existing technical names. This
+presentation change does not alter execution or previously accepted review refs.
+
+This repository contains the active SynMachine Arduino firmware foundations and
 historical recovery artifacts. The active firmware remains a no-motion
 LABFORGE/1 protocol foundation, not production actuator firmware.
 
