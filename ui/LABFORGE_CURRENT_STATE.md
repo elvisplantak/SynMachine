@@ -1,12 +1,30 @@
 # LabForge Current Development State
 
 - Checkpoint date: 2026-10-19
-- Development phase: user-authorized live Recipes preparation; software self-verified;
-  first real connection/current references and physical execution remain separate
+- Development phase: explicit live Recipes software preparation independently accepted;
+  no-motion HELLO verified; physical recipe/current-reference preparation remains separate
 - Primary implementation agent: Codex
 - Independent reviewer: ChatGPT
 
 ## Current checkpoint — explicit live Recipes preparation
+
+- Independent review ACCEPTED this declared software-preparation scope, with
+  Critical 0, High 0, Medium 0, Low 0 and no correction requested. Exact reviewed
+  backend HEAD: `60e04e585fc31a58124b18aa7b5dd145b45b854d`;
+  UI implementation: `b79c878a0cf7dc9d0b89223e8d8e56afd82c32cd`;
+  UI documentation: `0d421751f16c0134f2d197cf8d2a3ca4719e2cd6`.
+  Both remote branches matched those reviewed refs at review time. Subsequent
+  documentation-only commits record acceptance without extending reviewed code.
+- Review accepts the inert validate/provision versus explicit live serve split,
+  profile/database integrity binding, private operator credential, fresh current
+  input, existing owned execution path and UI LIVE/FAKE/unidentified distinction.
+  Explicit null Recovery/Flush is accepted fail-closed behavior: after Stop/fault
+  the profile can remain blocked until a deliberately approved maintenance/profile
+  transition. Never delete/reprovision state to bypass retained work.
+- Acceptance does not establish measured pump volume, current safe routes/positions
+  or physical Recipes/wet success, and does not authorize movement/HOME/Recovery/
+  Flush/upload/main merge. Reported 1937 backend / 51 UI checks were not independently
+  rerun through the GitHub connector; no combined GitHub status checks were present.
 
 - The user authorized making Recipes usable on the real machine, reports prior
   independently successful liquid tests, and explicitly chose existing high-level
@@ -60,12 +78,12 @@
   /tmp/labforge-live-recipes-server.log. No automatic Start, declaration or HOME
   has been submitted. Motor power last explicitly OFF. Keep this connection for
   any same-session reference establishment; restart does not restore references.
-- Next: consolidated independent review, user recipe entry and actual current
-  references established through the existing Service path before first Start.
+- Next: user recipe entry and actual current references established through the
+  existing Service path before first Start; review is complete with no fixes.
   Any physical movement still needs fresh motor-power readiness; it has not been
   performed or approved by the read-only connection check.
-  New live entry point is self-verified, not independently accepted. The previous
-  exact animation acceptance below is unchanged. Details: backend docs/LIVE_RECIPES.md.
+  The accepted software scope and the previous exact animation acceptance remain
+  distinct from physical execution. Details: backend docs/LIVE_RECIPES.md.
 
 ## Previous checkpoint — command-driven flow animation
 

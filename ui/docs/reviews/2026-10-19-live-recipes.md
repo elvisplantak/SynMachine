@@ -81,3 +81,41 @@ operator input configured, maintenance_actions empty. Machine remains absent and
 recipe library empty. Read-only SQL confirms Arduino journal0, SF journal0,
 prepared plans0, waits0 and owner slot null. This is a no-motion connection check,
 not physical recipe/wet acceptance. UI runs on 5173; user will enter their recipe.
+
+
+## Independent acceptance — 2026-10-19
+
+Critical 0, High 0, Medium 0, Low 0. The independent reviewer ACCEPTED the explicit
+live Recipes software-preparation checkpoint for its declared scope. No software
+correction is requested. Exact reviewed refs:
+
+- Backend `60e04e585fc31a58124b18aa7b5dd145b45b854d`, base
+  `5c99e190e70c234507f3cf44abd66beca0354bd2`.
+- UI implementation `b79c878a0cf7dc9d0b89223e8d8e56afd82c32cd`, base
+  `4d6996fad903c72a79eaf6c8d4eaac4d8321f0d2`.
+- UI documentation `0d421751f16c0134f2d197cf8d2a3ca4719e2cd6` (documentation only above
+  the UI implementation). The remote branches matched these HEADs at review time.
+
+Review confirmed explicit live selection, inert offline preparation, database and
+complete-profile digest binding, no reset/rebind/repair/replay, private attributed
+operator input, no historical position trust, the existing owned execution path,
+unchanged recipe identity/compiler behavior and UI mode/availability handling.
+Null recovery_plan/flush_plan is accepted intentional fail-closed configuration;
+unavailable maintenance never clears ownership or permits a new run. A future
+maintenance capability needs separately approved physical inputs and a deliberate
+state/profile transition, not deletion or reprovisioning.
+
+The no-motion connection report above is accepted as connection evidence only.
+The nominal calibration remains DEMO_NOMINAL. Prior user wet reports do not prove
+exact delivered volumes, all transient switching, current safe HOME or cleaning.
+Reported verification remains backend 1937 passed, focused live17, earlier
+configuration/operator/live84; UI51 with24 actual browser cases, zero skipped,
+Ruff/lint/build/diff checks passed. These local checks were not independently
+rerun via the GitHub connector; no combined status checks were published.
+
+This acceptance does not authorize physical recipe/wet execution, HOME, physical
+Recovery/Flush, firmware upload or production/main merge. Before physical Recipes
+use, separately establish current safe routes/references and consider nominal
+calibration and deliberately unavailable maintenance after Stop/fault. Later
+acceptance-recording commits change documentation only; they do not extend the
+exact reviewed implementation refs above.

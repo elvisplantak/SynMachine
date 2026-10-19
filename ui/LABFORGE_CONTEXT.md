@@ -27,9 +27,16 @@ explicit serve performs existing HELLO, with all actuation still through existin
 owned execution and explicit user actions. Existing operator input establishes
 fresh references; historical positions cannot authorize work. Recovery/flush are
 explicitly unavailable until physical procedure inputs are supplied, without
-changing retained ownership or mandatory maintenance. New software is self-verified;
-independent live-entry review/first physical use remain separate. Read current
-state and backend docs/LIVE_RECIPES.md before connecting. No firmware code change.
+changing retained ownership or mandatory maintenance. Independent review ACCEPTED
+this software-preparation scope with all severity counts zero and no correction:
+backend `60e04e585fc31a58124b18aa7b5dd145b45b854d`;
+UI implementation `b79c878a0cf7dc9d0b89223e8d8e56afd82c32cd`;
+UI documentation `0d421751f16c0134f2d197cf8d2a3ca4719e2cd6`. Later documentation commits
+record acceptance only. First actual Recipes use/current-reference establishment,
+nominal volume limits and unavailable Recovery/Flush remain separate physical
+preconditions. No physical recipe execution, HOME, maintenance, upload or main
+merge is authorized by review. Read current state and backend docs/LIVE_RECIPES.md
+before connecting. No firmware code change.
 
 ## Accepted command-flow animation scope — 2026-10-11
 
