@@ -42,5 +42,6 @@ integrated into main. The owner confirmed ownership of the old code and decided
 to retain the recovery archive for public access. No new recovery access is
 implied. The README acknowledges inspiration from Professor Lee Cronin and the
 Cronin Group at the University of Glasgow. GitHub presentation and publication
-checks are recorded in PUBLICATION.md; only the final visibility instruction
-remains pending.
+checks are recorded in PUBLICATION.md. The owner explicitly authorized public
+visibility on 2026-10-20; SynMachine is now public and anonymous access was verified.
+Original component repositories remain private; no physical execution is implied.

@@ -85,3 +85,13 @@ The approved README acknowledgment names Professor Lee Cronin and the Cronin
 Group at the University of Glasgow and links to the official group site. This
 follow-up changes documentation only. Publication preparation is complete;
 visibility remains private until the final instruction to make it public.
+
+## Public visibility completed — 2026-10-20
+
+The owner explicitly authorized making `elvisplantak/SynMachine` public. The
+GitHub API confirmed `private: false`, `visibility: public`, default branch main
+and the detected Apache-2.0 license. Unauthenticated HTTPS requests independently
+returned the repository page and public repository API. Anonymous raw requests
+for README, LICENSE and the prototype PNG matched their local bytes exactly.
+The original three repositories were not changed by this operation. No new
+recovery access, source-code change, firmware upload or physical action occurred.

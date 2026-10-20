@@ -1,7 +1,7 @@
 # SynMachine current development state
 
 - Checkpoint date: 2026-10-20
-- Repository: `elvisplantak/SynMachine` (new private consolidated repository)
+- Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Local checkout: `/home/elvis/Documents/SynMachine`
 - Branch: `main` (approved publication preparation integrated);
   imported histories under `history/ui/`, `history/backend/`,
@@ -63,6 +63,10 @@ official group site and describes SynMachine as independent. The recovery
 publication question is resolved without new recovery access or modification.
 
 Only documentation/licensing/image/presentation changed; runtime behavior and
-physical state are unchanged. Publication preparation is complete. Next: the
-owner's final instruction to change visibility. The new repository and original
-repositories remain private. See PUBLICATION.md and PUBLICATION_VERIFICATION.md.
+physical state are unchanged. On 2026-10-20 the owner explicitly authorized public
+visibility; `elvisplantak/SynMachine` is now public. Anonymous repository/API and
+README/LICENSE/photo access were verified, including exact raw-file contents.
+The original component repositories remain private and unchanged. Publication is
+complete; no further publication approval is pending. Future physical/liquid tests
+still require fresh operator readiness and authorization. See PUBLICATION.md and
+PUBLICATION_VERIFICATION.md.

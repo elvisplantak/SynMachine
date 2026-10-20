@@ -22,8 +22,11 @@ Historical review records are preserved.
 
 The README now acknowledges inspiration from Professor Lee Cronin and the Cronin
 Group at the University of Glasgow, with a link to the group's official site.
-The project is described as independent. Preparation is complete; the repository
-remains private pending the owner's final instruction to change visibility.
+The project is described as independent. On 2026-10-20 the owner explicitly
+authorized public visibility and `elvisplantak/SynMachine` was made public.
+Anonymous requests confirmed access to the GitHub repository page/API, README,
+LICENSE and prototype photograph. The public raw files matched the local copies.
+The default branch remains main and GitHub recognizes Apache-2.0.
 
 Final verification and its limits are recorded in
 [PUBLICATION_VERIFICATION.md](PUBLICATION_VERIFICATION.md). GitHub description
