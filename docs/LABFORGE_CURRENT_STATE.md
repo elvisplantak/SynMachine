@@ -3,7 +3,7 @@
 - Checkpoint date: 2026-10-20
 - Repository: `elvisplantak/SynMachine` (new private consolidated repository)
 - Local checkout: `/home/elvis/Documents/SynMachine`
-- Branch: `publication/apache-readme` (approved README/license/photo checkpoint);
+- Branch: `main` (approved publication preparation integrated);
   imported histories under `history/ui/`, `history/backend/`,
   `history/firmware/`.
 
@@ -47,13 +47,16 @@ Migration checks passed: 1937 backend, 51 UI (24 browser), 211 native firmware,
 6 mixer-profile and 1 host-tool unit test; lint/build passed. Mega uses 41056 flash
 and 3148 static SRAM bytes, unchanged. Details: MIGRATION_VERIFICATION.md.
 
-On 2026-10-20 the owner explicitly selected Apache-2.0. The owner approved
-the English README and supplied a prototype photograph, included unchanged near
-the top of README as `docs/images/synmachine-prototype.png`. LICENSE, NOTICE,
-README and current-state documentation form the approved feature-branch
-checkpoint for commit/push. Only documentation/licensing/image files changed;
-runtime behavior and physical state are unchanged. Whitespace, local Markdown
-links and photograph identity were verified; the official Apache license text
-was verified in the preceding draft checkpoint. Next: finish outstanding
-reused-source licensing checks, optionally add more photos/video, and obtain the
-final explicit public-visibility decision. The repo remains private. See PUBLICATION.md.
+On 2026-10-20 the owner selected Apache-2.0, approved the English README and
+provided a prototype photograph. LICENSE, NOTICE, README/photo and dependency
+license/publication verification records are integrated into main. The owner
+confirmed ownership of the old code. GitHub description/topics are configured;
+GitHub Markdown rendering, image identity, local links, ignore rules and redacted
+secret scans passed within the documented scope. No new recovery access was
+performed: the owner requested a separate discussion; prior full-audit and
+unchanged-import evidence remain applicable.
+
+Only documentation/licensing/image/presentation changed; runtime behavior and
+physical state are unchanged. Next: the separate recovery conversation and final
+public-visibility decision. The new repository and original repositories remain
+private. See PUBLICATION.md and PUBLICATION_VERIFICATION.md.

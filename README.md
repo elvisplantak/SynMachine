@@ -141,4 +141,4 @@ Component documentation contains additional setup and verification details.
 The original project software and accompanying documentation are licensed under
 the **Apache License, Version 2.0**. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 Third-party dependencies and any third-party material retain their own license
-terms.
+terms. See the [dependency license inventory](docs/THIRD_PARTY_NOTICES.md).

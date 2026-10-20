@@ -6,6 +6,8 @@
 - [Repository migration](MIGRATION.md)
 - [Historical commit and branch maps](history/README.md)
 - [Publication and license status](PUBLICATION.md)
+- [Publication verification](PUBLICATION_VERIFICATION.md)
+- [Third-party dependency licenses](THIRD_PARTY_NOTICES.md)
 - [Recipe editing guide](../ui/docs/UVP_USER_GUIDE.md)
 - [Explicit live Recipes preparation](../backend/docs/LIVE_RECIPES.md)
 - [Confirmed physical facts](../firmware/HARDWARE_CONFIRMATIONS.md)

@@ -1,29 +1,26 @@
 # Publication and licensing status
 
-The project is consolidated into one repository with corrected author metadata.
-The README describes a colored-liquid mechatronic prototype with silicone tubing
-and medical-plastic valves/syringes, plus planned PTFE/glass material upgrades.
-Historical technical/review records remain intact.
+## Current checkpoint — 2026-10-20
 
-On 2026-10-20 the owner selected Apache-2.0 and requested a README for review
-before committing or pushing it. Branch `publication/apache-readme` contains the
-approved checkpoint: the unmodified official Apache License 2.0 in root LICENSE, project
-attribution in NOTICE, and an English README introducing the prototype, supported
-operations, fake-device setup and contributions. The owner approved the README
-and supplied a prototype photograph, now included near the top of the README as `docs/images/synmachine-prototype.png`. The supplied
-PNG is preserved unchanged. The checkpoint is published through the feature
-branch; public repository visibility is still pending.
+The owner approved the English root README, supplied prototype photograph and
+Apache-2.0 license, then authorized the final preparation and integration into
+main. The README describes the colored-liquid mechatronic prototype, existing
+silicone/medical-plastic parts and planned PTFE/glass material upgrades. The
+supplied photograph is included unchanged near the top of the README.
 
-The grant covers original project software and accompanying documentation.
-Third-party material retains its own terms; confirm licensing rights for any
-reused/recovered source and applicable dependencies before final public release.
-Hardware-design documents may receive a separate explicit license when available.
+The owner confirmed that the old code is their own. The root LICENSE grants
+Apache-2.0 for original project software and accompanying documentation; NOTICE
+records attribution. Dependencies retain upstream terms, documented in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Future hardware design files and
+redistributed binary bundles need their applicable licensing terms recorded.
 
-The new repository remains private. Source histories and publication surfaces
-were previously scanned; final monorepo/current-history scans and verification
-are recorded in MIGRATION_VERIFICATION.md. Detection results are bounded and do
-not guarantee absence of every possible secret. Credentials, live databases and
-dependency/build caches are not imported.
+The new repository remains private while the owner-requested separate recovery
+conversation/final publication decision is pending. No new access to protected
+recovery content was performed in this final pass. Previous audit and unchanged
+migration evidence remain recorded; historical review records are preserved.
 
-A prototype photograph is included; more photos or a short video can be added
-later. Original repositories remain private and preserved; no deletion or archival setting change accompanies consolidation.
+Final verification and its limits are recorded in
+[PUBLICATION_VERIFICATION.md](PUBLICATION_VERIFICATION.md). GitHub description
+and topics are configured. No Actions/release/issue/comment content required
+cleanup; Wiki and Pages are disabled. Original repositories remain private and
+preserved. Additional photos or video can be added later.
