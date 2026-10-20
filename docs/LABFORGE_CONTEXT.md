@@ -35,5 +35,7 @@ Detailed older architecture/topology context is preserved in
 Existing legacy local worktrees and any running sessions are preserved. This new
 checkout has not connected to devices or taken ownership of old runtime state.
 Opening a future live Serial connection needs fresh readiness; historical
-positions cannot be used as present references. Public visibility and the project
-license remain separate decisions.
+positions cannot be used as present references. The owner selected Apache-2.0 on
+2026-10-20 and approved the English README. A supplied prototype photograph is
+included unchanged in the documentation/license/photo feature-branch checkpoint.
+Public visibility remains a separate pending decision.

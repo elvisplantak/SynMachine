@@ -3,7 +3,8 @@
 - Checkpoint date: 2026-10-20
 - Repository: `elvisplantak/SynMachine` (new private consolidated repository)
 - Local checkout: `/home/elvis/Documents/SynMachine`
-- Branch: `main`; imported histories under `history/ui/`, `history/backend/`,
+- Branch: `publication/apache-readme` (approved README/license/photo checkpoint);
+  imported histories under `history/ui/`, `history/backend/`,
   `history/firmware/`.
 
 ## Repository consolidation
@@ -44,6 +45,15 @@ user explicitly resumes it.
 
 Migration checks passed: 1937 backend, 51 UI (24 browser), 211 native firmware,
 6 mixer-profile and 1 host-tool unit test; lint/build passed. Mega uses 41056 flash
-and 3148 static SRAM bytes, unchanged. Details: MIGRATION_VERIFICATION.md. Next: select the project license/confirm reused-source
-rights, optionally add photos/video, and obtain the final explicit public-visibility
-decision. No license or public release is implied by the consolidation approval.
+and 3148 static SRAM bytes, unchanged. Details: MIGRATION_VERIFICATION.md.
+
+On 2026-10-20 the owner explicitly selected Apache-2.0. The owner approved
+the English README and supplied a prototype photograph, included unchanged near
+the top of README as `docs/images/synmachine-prototype.png`. LICENSE, NOTICE,
+README and current-state documentation form the approved feature-branch
+checkpoint for commit/push. Only documentation/licensing/image files changed;
+runtime behavior and physical state are unchanged. Whitespace, local Markdown
+links and photograph identity were verified; the official Apache license text
+was verified in the preceding draft checkpoint. Next: finish outstanding
+reused-source licensing checks, optionally add more photos/video, and obtain the
+final explicit public-visibility decision. The repo remains private. See PUBLICATION.md.

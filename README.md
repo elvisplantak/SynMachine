@@ -1,51 +1,59 @@
 # SynMachine
 
-SynMachine is an experimental mechatronics platform for laboratory automation.
-The project explores mechanical assemblies, electronics, electrical wiring and
-power systems, and the software that coordinates them. Its longer-term goal is
-a modular platform for executing reproducible laboratory procedures.
+An open-source mechatronics platform for exploring laboratory automation.
 
-## Current prototype
+![SynMachine prototype with syringe pumps, reactor, separatory funnel, column and fraction carousel](docs/images/synmachine-prototype.png)
 
-The current prototype is used to develop and test mechatronic integration,
-liquid-transfer paths and automated workflows. It has been tested with colored
-liquids to observe fluid movement and the execution of programmed procedures.
+*The current SynMachine mechatronic prototype.*
 
-This development version uses silicone tubing, medical-plastic valves and
-medical-plastic syringes. The next material-development stage is planned around
-PTFE tubing and valves, plus glass syringes with PTFE plungers, as preparation
-for experiments with actual reagents and solvents. Materials will be selected
-for the particular chemical procedure.
+SynMachine brings together mechanics, electronics, electrical wiring and power
+systems, and software to execute programmed laboratory procedures. The aim is
+to make these parts work together in a platform that can grow with new devices
+and experimental workflows.
 
-## Software and controls
+## The prototype today
 
-- A schematic of the physical machine and command-driven route animation.
-- Recipes / Procedure Builder for composing, saving and reviewing supported
-  procedures, with immutable saved versions and a separate explicit Start.
-- Supported operations include reagent/solvent addition, passive waits,
-  reactor-to-SF transfer, SF mixing and settling, SF-to-column transfer and timed
-  fraction collection.
-- Execution status, command journals and supervised Service controls.
-- A fake-device browser profile for software exploration without physical motion.
+The current prototype has been tested with colored liquids to observe transfers,
+fluid paths and the execution of programmed procedures. This stage focuses on
+mechatronic integration and workflow development.
 
-Volumes in the current demo profile are nominal command inputs. Route animation
-shows commanded actions rather than sensor-measured liquid flow. Physical setup
-and the applicability of a recipe remain separate from a successful software run.
+The machine currently uses silicone tubing, medical-plastic valves and
+medical-plastic syringes. The planned next material stage introduces PTFE tubing
+and valves, together with glass syringes with PTFE plungers, to enable experiments
+with actual reagents and solvents. Materials will be selected for the intended
+chemistry.
 
-## Repository layout
+## What you can do
 
-| Directory | Responsibility |
-| --- | --- |
-| [ui/](ui/README.md) | React interface, schematic, recipes and operator interaction |
-| [backend/](backend/README.md) | Validation, persistence, routing and orchestration |
-| [firmware/](firmware/README.md) | Arduino Mega serial protocol and low-level device execution |
-| [docs/](docs/README.md) | Current state, development workflow and migration records |
-| [hardware/](hardware/README.md) | Reserved for future mechanical/electrical design documentation |
+Use **Recipes / Procedure Builder** to compose a procedure from supported
+operations, save it, review it and run it again. Every save creates a new version;
+each run keeps its own copy of the selected recipe.
 
-## Try the software with fake devices
+Supported operations include:
 
-Use Python 3.12 or newer and Node.js supported by Vite 8 (the migrated UI was
-verified with Node 24). In one terminal:
+- Add a specified volume from a bottle to the reactor.
+- Wait for a specified time.
+- Transfer liquid from the reactor to the separatory funnel (SF).
+- Mix in the SF using the configured motor profile, then allow settling.
+- Transfer liquid from the SF to the column.
+- Collect fractions using timed collection and the carousel.
+
+The interface also provides a machine schematic, animated active routes,
+execution status and supervised service controls. Starting a procedure requires
+a separate explicit action and fresh preparation confirmations.
+
+Route animations follow backend commands; they do not measure liquid flow.
+Volumes in the current demo profile are nominal command values.
+
+## Try it without hardware
+
+The fake-device profile lets you explore the interface and recipe workflow
+without connecting an Arduino or servo.
+
+You need Python 3.12 or newer and a Node.js version supported by Vite 8.
+The current UI was verified with Node.js 24.
+
+From the repository root, start the backend in one terminal:
 
 ```bash
 cd backend
@@ -56,7 +64,7 @@ env -u LABFORGE_ARDUINO_PORT -u LABFORGE_SF_BOTTOM_VALVE_PORT \
   --state-dir /tmp/synmachine-browser-preview --port 8000
 ```
 
-In a second terminal:
+From the repository root, start the UI in a second terminal:
 
 ```bash
 cd ui
@@ -64,21 +72,51 @@ npm ci
 npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ```
 
-Open **http://127.0.0.1:5173/**. The backend terminal identifies this profile as
-`FAKE TRANSPORTS ONLY`; the interface reports `Test devices`. No connected
-Arduino or servo is needed for this profile. Keep fake state separate from any
-real-machine state. An existing incompatible state directory is refused rather
-than repaired or reset.
+Open **http://127.0.0.1:5173/**. The backend terminal displays
+`FAKE TRANSPORTS ONLY`, and the interface reports `Test devices`.
+Keep this test state directory separate from real-machine state. An incompatible
+existing state directory is refused rather than reset.
 
-Real-device preparation is documented separately in
-[backend/docs/LIVE_RECIPES.md](backend/docs/LIVE_RECIPES.md). That explicit path
-requires the actual device setup and fresh operator references. Its nominal live
-profile currently leaves automatic Recovery/Flush unconfigured; a Stop or fault
-can therefore retain mandatory maintenance and block another run.
+For operation with physical devices, see the separate
+[live Recipes guide](backend/docs/LIVE_RECIPES.md). The current nominal live
+profile has no configured automatic Recovery/Flush: a Stop or fault can leave
+maintenance required and block another run.
 
-## Development checks
+## Inside the repository
 
-Run commands from their component directory:
+| Directory | Purpose |
+| --- | --- |
+| [ui/](ui/README.md) | React interface, schematic, recipes and operator controls |
+| [backend/](backend/README.md) | Python/FastAPI validation, storage, routing and orchestration |
+| [firmware/](firmware/README.md) | Arduino Mega communication and low-level device control |
+| [docs/](docs/README.md) | Architecture, development status and project records |
+| [hardware/](hardware/README.md) | Space for future mechanical and electrical design files |
+
+The UI handles interaction and visualization. The backend validates and
+coordinates procedures. Firmware handles pins, motor movement, homing and
+low-level execution. This separation provides a basis for adding devices and
+operations as the project develops.
+
+Some internal names still use `labforge`, including package names,
+`LABFORGE_*` environment variables and the `LABFORGE/1` serial protocol.
+SynMachine is the current project name. Earlier development history is preserved;
+see the [migration record](docs/MIGRATION.md).
+
+## Contributing
+
+Contributions from engineers, chemists, researchers and interested makers are
+welcome. Useful areas include mechanical design, electronics, software,
+interface usability, documentation and reproducible test procedures.
+
+For a substantial change, open an issue first to discuss the goal. For a pull
+request, describe what changed and include the relevant checks or observations.
+Please distinguish software test results from observations made on physical
+hardware. Contributions are submitted under the project's Apache 2.0 license
+unless explicitly stated otherwise.
+
+### Development checks
+
+Run the relevant commands from each component directory:
 
 ```bash
 # ui/
@@ -95,21 +133,12 @@ pio test -e native
 pio run -e megaatmega2560
 ```
 
-The firmware build command compiles only; it does not upload to a device.
-
-## Project history and technical names
-
-This repository combines the former `labforge-ui`, `labforge-backend` and
-`labforge-firmware` repositories. Their development histories are retained under
-component directories and `history/<component>/...` branches. Author email
-metadata was corrected during import; [the migration record](docs/MIGRATION.md)
-and [commit maps](docs/history/README.md) preserve traceability to original
-reviewed commits. Existing `labforge` package names, `LABFORGE_*` variables,
-profile identities and the `LABFORGE/1` protocol remain technical identifiers.
+The firmware command above builds the firmware; it does not upload it.
+Component documentation contains additional setup and verification details.
 
 ## License
 
-A project license has not yet been selected. Publication and licensing are being
-prepared; this repository does not yet grant an open-source license. Third-party
-dependencies retain their respective licenses. See
-[the publication status](docs/PUBLICATION.md).
+The original project software and accompanying documentation are licensed under
+the **Apache License, Version 2.0**. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Third-party dependencies and any third-party material retain their own license
+terms.
