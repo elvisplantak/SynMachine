@@ -74,3 +74,14 @@ needed for this documentation-only checkpoint; no device was connected by it.
 
 The original three repositories and their backups remain private and unchanged.
 Public visibility is a separate remaining action; the current repo stays private.
+
+## Follow-up decision — 2026-10-20
+
+The owner resolved the separate recovery publication question: retain that
+archive for public access. Ownership was already confirmed. No new recovery
+reading, search, modification or execution accompanies this decision.
+
+The approved README acknowledgment names Professor Lee Cronin and the Cronin
+Group at the University of Glasgow and links to the official group site. This
+follow-up changes documentation only. Publication preparation is complete;
+visibility remains private until the final instruction to make it public.

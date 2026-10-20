@@ -56,7 +56,13 @@ secret scans passed within the documented scope. No new recovery access was
 performed: the owner requested a separate discussion; prior full-audit and
 unchanged-import evidence remain applicable.
 
+Follow-up on 2026-10-20: the owner decided to retain the recovery archive for
+public access and approved a README acknowledgment of Professor Lee Cronin and
+the Cronin Group at the University of Glasgow. The acknowledgment links to the
+official group site and describes SynMachine as independent. The recovery
+publication question is resolved without new recovery access or modification.
+
 Only documentation/licensing/image/presentation changed; runtime behavior and
-physical state are unchanged. Next: the separate recovery conversation and final
-public-visibility decision. The new repository and original repositories remain
-private. See PUBLICATION.md and PUBLICATION_VERIFICATION.md.
+physical state are unchanged. Publication preparation is complete. Next: the
+owner's final instruction to change visibility. The new repository and original
+repositories remain private. See PUBLICATION.md and PUBLICATION_VERIFICATION.md.

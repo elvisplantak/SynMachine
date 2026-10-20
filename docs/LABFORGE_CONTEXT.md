@@ -38,7 +38,9 @@ Opening a future live Serial connection needs fresh readiness; historical
 positions cannot be used as present references. The owner selected Apache-2.0 on
 2026-10-20 and approved the English README. A supplied prototype photograph is
 included unchanged in the approved documentation/license/photo checkpoint,
-integrated into main. The owner confirmed ownership of the old code and requested
-a separate recovery discussion. No new recovery access is implied. GitHub
-presentation and final publication checks are recorded in PUBLICATION.md;
-public visibility remains pending that conversation/final decision.
+integrated into main. The owner confirmed ownership of the old code and decided
+to retain the recovery archive for public access. No new recovery access is
+implied. The README acknowledges inspiration from Professor Lee Cronin and the
+Cronin Group at the University of Glasgow. GitHub presentation and publication
+checks are recorded in PUBLICATION.md; only the final visibility instruction
+remains pending.

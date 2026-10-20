@@ -14,10 +14,16 @@ records attribution. Dependencies retain upstream terms, documented in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Future hardware design files and
 redistributed binary bundles need their applicable licensing terms recorded.
 
-The new repository remains private while the owner-requested separate recovery
-conversation/final publication decision is pending. No new access to protected
-recovery content was performed in this final pass. Previous audit and unchanged
-migration evidence remain recorded; historical review records are preserved.
+The owner confirmed that the recovery archive should remain available when the
+repository is made public. This resolves the separate recovery publication
+question. No new access to protected recovery content was performed in this
+follow-up; previous audit and unchanged migration evidence remain recorded.
+Historical review records are preserved.
+
+The README now acknowledges inspiration from Professor Lee Cronin and the Cronin
+Group at the University of Glasgow, with a link to the group's official site.
+The project is described as independent. Preparation is complete; the repository
+remains private pending the owner's final instruction to change visibility.
 
 Final verification and its limits are recorded in
 [PUBLICATION_VERIFICATION.md](PUBLICATION_VERIFICATION.md). GitHub description

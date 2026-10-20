@@ -136,6 +136,12 @@ pio run -e megaatmega2560
 The firmware command above builds the firmware; it does not upload it.
 Component documentation contains additional setup and verification details.
 
+## Inspiration
+
+SynMachine is an independent project inspired by the work of Professor Lee Cronin
+and the [Cronin Group at the University of Glasgow](https://www.chem.gla.ac.uk/cronin/)
+on the Chemputer and programmable chemistry.
+
 ## License
 
 The original project software and accompanying documentation are licensed under
