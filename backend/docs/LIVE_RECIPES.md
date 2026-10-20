@@ -35,15 +35,15 @@ firmware/planner contract; HOME is never substituted automatically.
 
 ## Prepare without connecting
 
-From the active backend worktree:
+From the monorepo `backend/` directory, after creating its virtual environment:
 
 ```bash
 env -u LABFORGE_ARDUINO_PORT -u LABFORGE_SF_BOTTOM_VALVE_PORT \
-  /home/elvis/Documents/labforge-backend/.venv/bin/python -m app.live_execution validate \
+  .venv/bin/python -m app.live_execution validate \
   --profile docs/LIVE_RECIPES_PROFILE.json
 
 env -u LABFORGE_ARDUINO_PORT -u LABFORGE_SF_BOTTOM_VALVE_PORT \
-  /home/elvis/Documents/labforge-backend/.venv/bin/python -m app.live_execution provision \
+  .venv/bin/python -m app.live_execution provision \
   --profile docs/LIVE_RECIPES_PROFILE.json \
   --state-dir /home/elvis/.local/state/labforge/recipes-live-v1
 ```
@@ -66,7 +66,7 @@ After current physical preparation and the applicable operator authorization:
 
 ```bash
 env -u LABFORGE_ARDUINO_PORT -u LABFORGE_SF_BOTTOM_VALVE_PORT \
-  /home/elvis/Documents/labforge-backend/.venv/bin/python -m app.live_execution serve \
+  .venv/bin/python -m app.live_execution serve \
   --profile docs/LIVE_RECIPES_PROFILE.json \
   --state-dir /home/elvis/.local/state/labforge/recipes-live-v1 \
   --operator Elvis --connect-real-devices --port 8000
@@ -121,6 +121,15 @@ Missing plans do not release ownership, claim cleaning or permit another run.
 Adding automatic recovery/flush later requires explicit physically applicable
 inputs and a deliberate profile/state update; the digest binding rejects silent
 changes. Do not delete/reprovision state to unblock execution.
+
+## Repository migration — 2026-10-20
+
+The backend is now the `backend/` component of SynMachine. Run commands from
+that directory; create/install the virtual environment as described in its README.
+The profile JSON and existing state-directory path shown above are intentionally
+unchanged. Consolidation did not start a live server or restore any reference.
+The dated evidence below describes the earlier preparation checkpoint, not a
+current running process; see ../../docs/LABFORGE_CURRENT_STATE.md for current state.
 
 ## Evidence
 

@@ -1,3 +1,7 @@
+> Historical pre-migration preparation document. Current publication state is in
+> [../../docs/PUBLICATION.md](../../docs/PUBLICATION.md) and the current project
+> description is in [../../README.md](../../README.md).
+
 # SynMachine user interface — README discussion draft
 
 Status: proposed wording only; the project owner has not finalized this README

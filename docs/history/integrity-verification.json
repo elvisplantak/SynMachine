@@ -1,0 +1,55 @@
+{
+  "date": "2026-10-20",
+  "components": {
+    "ui": {
+      "original_head": "57a2f5c020ee26240c43cfbea5f548bb2df4ecc1",
+      "imported_head": "3c9cedb4b78f1f54bb7aa5082052d00ac6c7c2c1",
+      "verified_history_commits": 141,
+      "current_files_identical": 58,
+      "documentation_changes": [
+        "AGENTS.md",
+        "LABFORGE_CONTEXT.md",
+        "LABFORGE_CURRENT_STATE.md",
+        "LABFORGE_DEVELOPMENT_GOVERNANCE.md",
+        "README.md",
+        "docs/PUBLIC_README_DRAFT.md",
+        "docs/PUBLIC_RELEASE_PREPARATION.md"
+      ],
+      "recovery_files_identical": 0,
+      "bundle_sha256": "8465e2840de52efb5733634f4dde645cb15e678cfd270ee363215851fad5a093"
+    },
+    "backend": {
+      "original_head": "155d0c597b24c6fe80f6589178b130bb9d4f9918",
+      "imported_head": "6da60322c91b52c11c6d3a455376d954f27256fc",
+      "verified_history_commits": 90,
+      "current_files_identical": 168,
+      "documentation_changes": [
+        "AGENTS.md",
+        "README.md",
+        "docs/LIVE_RECIPES.md",
+        "docs/PUBLIC_README_DRAFT.md",
+        "docs/PUBLIC_RELEASE_PREPARATION.md"
+      ],
+      "recovery_files_identical": 0,
+      "bundle_sha256": "94b0f532686864c0e4b77614b0e126e729bad722876d8cd019b49f7ec02cb00e"
+    },
+    "firmware": {
+      "original_head": "05ad24703f5fec350f04a67f0c14a9bb1b3af90d",
+      "imported_head": "77c7295153fdf3eedc5e4bc9234db713fbc95ab8",
+      "verified_history_commits": 87,
+      "current_files_identical": 205,
+      "documentation_changes": [
+        "AGENTS.md",
+        "HARDWARE_CONFIRMATIONS.md",
+        "README.md",
+        "docs/PUBLIC_README_DRAFT.md",
+        "docs/PUBLIC_RELEASE_PREPARATION.md"
+      ],
+      "recovery_files_identical": 4,
+      "bundle_sha256": "5f8b1b532eeef550d1765c9e9327ac8db72725a070b6ee4fff4203a0f1fd568a"
+    }
+  },
+  "raw_message_matches": 318,
+  "live_profile_sha256": "7eafee27d43855b271cda3c3c9d17834b26182108cffbfda8b866867dc06498f",
+  "checked_new_markdown_files": 20
+}

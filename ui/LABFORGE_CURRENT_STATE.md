@@ -1,3 +1,7 @@
+> Historical component snapshot. Current monorepo context is in
+> [../docs/LABFORGE_CURRENT_STATE.md](../docs/LABFORGE_CURRENT_STATE.md). Session IDs and paths below
+> describe past development sessions, not current runtime state.
+
 # SynMachine Current Development State
 
 - Checkpoint date: 2026-10-19

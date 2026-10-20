@@ -2,9 +2,9 @@
 
 - Communicate with the user in Croatian/BHS. Keep code, identifiers, paths,
   commands, commit messages, and terminal errors in English.
-- Before work, read `../labforge-ui/LABFORGE_DEVELOPMENT_GOVERNANCE.md`,
-  `../labforge-ui/LABFORGE_CURRENT_STATE.md`,
-  `../labforge-ui/LABFORGE_CONTEXT.md`, and local
+- Before work, read `../docs/LABFORGE_DEVELOPMENT_GOVERNANCE.md`,
+  `../docs/LABFORGE_CURRENT_STATE.md`,
+  `../docs/LABFORGE_CONTEXT.md`, and local
   `HARDWARE_CONFIRMATIONS.md`.
 - Before changing serial communication, parsing, sessions, command lifecycle,
   reconnect behavior, or actuator protocol, read

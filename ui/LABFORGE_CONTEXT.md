@@ -1,3 +1,7 @@
+> Historical component snapshot. Current monorepo context is in
+> [../docs/LABFORGE_CONTEXT.md](../docs/LABFORGE_CONTEXT.md). Session IDs and paths below
+> describe past development sessions, not current runtime state.
+
 # SynMachine UI context
 
 ## Working name — 2026-10-19

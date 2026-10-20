@@ -2,9 +2,9 @@
 
 - Communicate with the user in Croatian/BHS. Keep code, identifiers, paths,
   commands, commit messages, and terminal errors in English.
-- Before work, read `../labforge-ui/LABFORGE_DEVELOPMENT_GOVERNANCE.md`,
-  `../labforge-ui/LABFORGE_CURRENT_STATE.md`, and
-  `../labforge-ui/LABFORGE_CONTEXT.md`. Governance overrides older workflow
+- Before work, read `../docs/LABFORGE_DEVELOPMENT_GOVERNANCE.md`,
+  `../docs/LABFORGE_CURRENT_STATE.md`, and
+  `../docs/LABFORGE_CONTEXT.md`. Governance overrides older workflow
   instructions; technical and historical documents remain sources of context.
 - Follow the milestone-scoped autonomous workflow and approval boundaries in
   the governance document.

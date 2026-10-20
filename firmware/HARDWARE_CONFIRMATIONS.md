@@ -1,5 +1,16 @@
 # Hardware confirmations
 
+## Owner clarification: colored-liquid prototype materials — 2026-10-20
+
+The owner clarified that the prototype's intended purpose is mechatronic testing
+with colored liquids. Current tubing is silicone; valves and syringes are described
+by the owner as medical plastic. No exact polymer grade or manufacturer rating is
+inferred. Planned upgrades are PTFE tubing/valves and glass syringes with PTFE
+plungers for progression toward actual reagent/solvent procedures, with materials
+selected for the particular chemistry. These are owner statements/plans, not new
+chemical-compatibility measurements or hardware already installed. Repository
+consolidation performs no physical test, device connection or firmware upload.
+
 ## Owner-reported material scope — 2026-10-19
 
 For public documentation preparation, the owner clarified that the present

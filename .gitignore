@@ -1,0 +1,31 @@
+# Dependencies and generated build products
+node_modules/
+dist/
+build/
+out/
+.venv/
+.venv-*/
+.pio/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+*.tsbuildinfo
+.DS_Store
+
+# Local credentials and runtime data
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+id_rsa
+id_ed25519
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.log

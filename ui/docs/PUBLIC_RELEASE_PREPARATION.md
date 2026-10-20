@@ -1,3 +1,7 @@
+> Historical pre-migration preparation document. Current publication state is in
+> [../../docs/PUBLICATION.md](../../docs/PUBLICATION.md) and the current project
+> description is in [../../README.md](../../README.md).
+
 # SynMachine public-release preparation — 2026-10-19
 
 Status: inspection and protective ignore rules completed; publication decisions
