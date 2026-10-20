@@ -1,0 +1,1 @@
+"""LabForge backend application package."""

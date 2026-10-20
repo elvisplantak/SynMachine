@@ -1,0 +1,301 @@
+{
+  "status": "INCOMPLETE_NOT_ACTIVATABLE",
+  "instructions": "Worksheet only. Nulls are unconfirmed. No loader or production activation. Never fill from test fixtures.",
+  "physical_source": "labforge-firmware/HARDWARE_CONFIRMATIONS.md",
+  "candidate_configuration": {
+    "profile_id": null,
+    "evidence_note": null,
+    "calibration_scope": "DEMO_NOMINAL",
+    "current_context_timeout_seconds": null,
+    "arduino": {
+      "port": null,
+      "baud_rate": null,
+      "reset_settle_seconds": null,
+      "handshake_timeout_seconds": null,
+      "command_timeout_seconds": null,
+      "read_chunk_size": null
+    },
+    "sf": {
+      "port": null,
+      "baud_rate": null,
+      "device_id": null,
+      "closed_position": null,
+      "open_position": null,
+      "profile_velocity": null,
+      "profile_acceleration": null,
+      "position_tolerance": null,
+      "motion_timeout_seconds": null,
+      "poll_interval_seconds": null
+    },
+    "calibrations": {
+      "p1": {
+        "pump_id": "P1",
+        "working_full_chamber_position_steps": 0,
+        "working_empty_chamber_position_steps": 20500,
+        "working_volume_ml": "20"
+      },
+      "p2": {
+        "pump_id": "P2",
+        "working_full_chamber_position_steps": 0,
+        "working_empty_chamber_position_steps": 20500,
+        "working_volume_ml": "20"
+      }
+    },
+    "route_sequences": [
+      {
+        "route_id": "P1_TO_WASTE",
+        "targets": [
+          {
+            "valve": "V2",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V1",
+            "position_degrees": 180
+          }
+        ]
+      },
+      {
+        "route_id": "P2_TO_WASTE",
+        "targets": [
+          {
+            "valve": "V5",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V8",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V7",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V3",
+            "position_degrees": 180
+          }
+        ]
+      },
+      {
+        "route_id": "S_TO_P1",
+        "targets": [
+          {
+            "valve": "V6",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V1",
+            "position_degrees": 90
+          }
+        ]
+      },
+      {
+        "route_id": "B1_TO_P1",
+        "targets": [
+          {
+            "valve": "V4",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V6",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V1",
+            "position_degrees": 90
+          }
+        ]
+      },
+      {
+        "route_id": "B2_TO_P1",
+        "targets": [
+          {
+            "valve": "V4",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V6",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V1",
+            "position_degrees": 90
+          }
+        ]
+      },
+      {
+        "route_id": "P1_TO_REACTOR",
+        "targets": [
+          {
+            "valve": "V2",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V1",
+            "position_degrees": 180
+          }
+        ]
+      },
+      {
+        "route_id": "REACTOR_TO_P2",
+        "targets": [
+          {
+            "valve": "V3",
+            "position_degrees": 90
+          }
+        ]
+      },
+      {
+        "route_id": "P2_TO_SF_TOP",
+        "targets": [
+          {
+            "valve": "V7",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V3",
+            "position_degrees": 180
+          }
+        ]
+      },
+      {
+        "route_id": "SF_BOTTOM_TO_P2",
+        "targets": [
+          {
+            "valve": "V8",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V7",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V3",
+            "position_degrees": 180
+          }
+        ]
+      },
+      {
+        "route_id": "P2_TO_COLUMN",
+        "targets": [
+          {
+            "valve": "V5",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V8",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V7",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V3",
+            "position_degrees": 180
+          }
+        ]
+      }
+    ],
+    "recovery_plan": null,
+    "flush_plan": null
+  },
+  "confirmation_record": {
+    "working_pump_margins_and_volume": {
+      "status": "USER_SELECTED_DEMO_NOMINAL",
+      "recorded_at": "2026-10-06",
+      "position_units": "stepper_steps",
+      "working_volume_units": "ml",
+      "additional_endpoint_reserve_steps": 0,
+      "precise_measured_calibration": "DEFERRED",
+      "source": "HARDWARE_CONFIRMATIONS.md: User-selected nominal demo pump range \u2014 2026-10-06",
+      "scope": "P1/P2 supervised demo only; no new measured-volume or production calibration claim",
+      "command_contract_note": "PUMP_MOVE_ABSOLUTE_STEPS still accepts 1..20500; zero requires PUMP_HOME. A nominal 20 ml ordinary aspiration from 20500 is currently rejected; no implicit HOME substitution."
+    },
+    "safe_ordered_valve_transitions_and_home_routes": {
+      "status": "USER_APPROVED_DESTINATION_ORDERS_HOME_ENTRY_PENDING",
+      "recorded_at": "2026-10-06",
+      "source": "HARDWARE_CONFIRMATIONS.md: User-approved demo destination switching orders - 2026-10-06",
+      "scope": "All ten reviewed demo destination orders; stationary pumps, sequential completed commands, already-reached targets omitted; SF closed during P2 switching and Column closed during filling",
+      "observed_dry_wet_transition_results": "NOT_YET_RECORDED_FOR_THIS_PROCEDURE",
+      "overall_startup_recovery_valve_home_order": "UNCONFIRMED",
+      "physical_execution_authorization": "SEPARATE_PER_TEST"
+    },
+    "recovery_valve_home_order_and_manual_carousel_position": null,
+    "flush_liquid_volume_ml": null,
+    "flush_air_volume_ml": null,
+    "column_drain_seconds": null,
+    "safe_tube_volume_ml": null,
+    "rinse_start_position": null,
+    "installed_adapter_identity_timing_and_sf_coupling": null,
+    "independent_method_for_current_raw_references": null,
+    "operator_identity_and_credential_provisioning": null,
+    "valve_connection_change_behavior": {
+      "status": "USER_CONFIRMED",
+      "recorded_at": "2026-10-06",
+      "valves": [
+        "V1",
+        "V2",
+        "V3",
+        "V4",
+        "V5",
+        "V6",
+        "V7",
+        "V8"
+      ],
+      "scope": "Switching between nominal 90 and 180 degrees",
+      "behavior": "Old connection interrupted before new connection opens",
+      "source": "HARDWARE_CONFIRMATIONS.md: User-confirmed V1-V8 connection change behavior - 2026-10-06",
+      "limits": "No measured timing/sealing/pressure result; ordered route/HOME procedures and physical execution are not approved by this fact"
+    }
+  },
+  "confirmed_reference_facts": {
+    "source": "labforge-firmware/HARDWARE_CONFIRMATIONS.md",
+    "scope": "Recorded mechanical/demo and dry commissioning facts; never current-session references or complete live approval",
+    "p1_and_p2": {
+      "home_coordinate_steps": 0,
+      "approved_maximum_coordinate_steps": 20500,
+      "demo_nominal_steps_per_ml": 1025,
+      "working_margins_status": "DEMO_SELECTED_NO_ADDITIONAL_RESERVE; precise production calibration remains unconfirmed"
+    },
+    "dry_pump_home_waste_route_setups": [
+      {
+        "pump_id": "P1",
+        "recorded_at": "2026-08-08",
+        "recorded_setup_order": [
+          {
+            "valve": "V1",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V2",
+            "position_degrees": 180
+          }
+        ]
+      },
+      {
+        "pump_id": "P2",
+        "recorded_at": "2026-08-08",
+        "recorded_setup_order": [
+          {
+            "valve": "V3",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V7",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V8",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V5",
+            "position_degrees": 180
+          }
+        ]
+      }
+    ],
+    "setup_note": "Each listed valve was homed and moved to its target before the pump HOME in the recorded dry test. This does not establish all transitions between process routes."
+  }
+}
