@@ -1,0 +1,260 @@
+{
+  "recorded_at_utc": "2026-10-09T18:15:35.009500+00:00",
+  "firmware_commit": "e2e9d3c5be17cdf703a684e29a6c9dd4a54ec735",
+  "backend_head": "90e136cc3a8d26b6b212ad3b14a1f739caeb24fd",
+  "controller_boot_id": 94,
+  "scope_sha256": "cee872f2824cbd84c1ef94aa93cb197b2a27905623c75940f308f850ff47333b",
+  "runner_sha256": "fa6b940ecde7eb35e44699ca21779e2ada7ef02e150c4c34d3d41940dc043a3a",
+  "process_exit_code": 0,
+  "elapsed_seconds": 435.485056,
+  "counts": {
+    "completed_owned_sequences": 34,
+    "arduino_completed_commands": 57,
+    "sf_completed_commands": 4,
+    "completed_waits": 6,
+    "prepared_phases": 10
+  },
+  "completed_phases": 10,
+  "offline_bundle_machine_state": "READY",
+  "offline_bundle_run_status": "COMPLETED",
+  "production_activation": false,
+  "final_command_confirmed_state": {
+    "phase_execution_id": "dry-ready",
+    "controller_boot_id": 94,
+    "pumps": [
+      {
+        "calibration": {
+          "pump_id": "P1",
+          "working_full_chamber_position_steps": 0,
+          "working_empty_chamber_position_steps": 20500,
+          "working_volume_ml": "20"
+        },
+        "position_steps": 20500
+      },
+      {
+        "calibration": {
+          "pump_id": "P2",
+          "working_full_chamber_position_steps": 0,
+          "working_empty_chamber_position_steps": 20500,
+          "working_volume_ml": "20"
+        },
+        "position_steps": 20500
+      }
+    ],
+    "valve_positions": [
+      {
+        "valve": "V1",
+        "position_degrees": 180
+      },
+      {
+        "valve": "V2",
+        "position_degrees": 90
+      },
+      {
+        "valve": "V4",
+        "position_degrees": 90
+      },
+      {
+        "valve": "V6",
+        "position_degrees": 90
+      },
+      {
+        "valve": "V3",
+        "position_degrees": 180
+      },
+      {
+        "valve": "V7",
+        "position_degrees": 90
+      },
+      {
+        "valve": "V8",
+        "position_degrees": 90
+      },
+      {
+        "valve": "V5",
+        "position_degrees": 90
+      }
+    ],
+    "route_sequences": [
+      {
+        "route_id": "P1_TO_WASTE",
+        "targets": [
+          {
+            "valve": "V2",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V1",
+            "position_degrees": 180
+          }
+        ]
+      },
+      {
+        "route_id": "P2_TO_WASTE",
+        "targets": [
+          {
+            "valve": "V5",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V8",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V7",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V3",
+            "position_degrees": 180
+          }
+        ]
+      },
+      {
+        "route_id": "S_TO_P1",
+        "targets": [
+          {
+            "valve": "V6",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V1",
+            "position_degrees": 90
+          }
+        ]
+      },
+      {
+        "route_id": "B1_TO_P1",
+        "targets": [
+          {
+            "valve": "V4",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V6",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V1",
+            "position_degrees": 90
+          }
+        ]
+      },
+      {
+        "route_id": "B2_TO_P1",
+        "targets": [
+          {
+            "valve": "V4",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V6",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V1",
+            "position_degrees": 90
+          }
+        ]
+      },
+      {
+        "route_id": "P1_TO_REACTOR",
+        "targets": [
+          {
+            "valve": "V2",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V1",
+            "position_degrees": 180
+          }
+        ]
+      },
+      {
+        "route_id": "REACTOR_TO_P2",
+        "targets": [
+          {
+            "valve": "V3",
+            "position_degrees": 90
+          }
+        ]
+      },
+      {
+        "route_id": "P2_TO_SF_TOP",
+        "targets": [
+          {
+            "valve": "V7",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V3",
+            "position_degrees": 180
+          }
+        ]
+      },
+      {
+        "route_id": "SF_BOTTOM_TO_P2",
+        "targets": [
+          {
+            "valve": "V8",
+            "position_degrees": 180
+          },
+          {
+            "valve": "V7",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V3",
+            "position_degrees": 180
+          }
+        ]
+      },
+      {
+        "route_id": "P2_TO_COLUMN",
+        "targets": [
+          {
+            "valve": "V5",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V8",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V7",
+            "position_degrees": 90
+          },
+          {
+            "valve": "V3",
+            "position_degrees": 180
+          }
+        ]
+      }
+    ],
+    "reactor_mixer_running": false,
+    "sf_bottom_valve": "CLOSED",
+    "column_position_degrees": 4,
+    "carousel_position": 2
+  },
+  "sf_mixer_running": false,
+  "terminal_home_parking_required": false,
+  "connection_closed": true,
+  "retry_or_ad_hoc_cleanup_motion": false,
+  "operator_physical_confirmation": "User saw the whole sequence: pumps/valves, SF mixer, SF bottom valve, Column opening/closing and carousel to tube 2; all normal, no binding or unusual sound",
+  "nominal_volume_ml": 10,
+  "measured_volume_or_wet_acceptance": false,
+  "old_no_motion_failure_bundle_unchanged": true,
+  "operator_confirmation_recorded_at_utc": "2026-10-09T18:17:06.360167+00:00",
+  "dry_end_to_end_acceptance": false,
+  "operator_confirmation_superseded_for": [
+    "SF mixer physical rotation"
+  ],
+  "operator_correction": {
+    "recorded_at_utc": "2026-10-10T14:42:51.855409+00:00",
+    "report": "User reports SF mixer did not physically rotate in boot 94 because its motor cable was damaged. User reports cable repaired on 2026-10-10.",
+    "original_confirmation_preserved_as_history": true,
+    "command_results_unchanged": true,
+    "other_actuator_confirmations_withdrawn": false,
+    "full_physical_acceptance": "Not established for SF mixing; separate recheck does not retroactively validate boot 94"
+  }
+}

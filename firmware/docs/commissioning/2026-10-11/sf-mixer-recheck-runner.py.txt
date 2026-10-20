@@ -1,0 +1,107 @@
+"""One explicitly approved SF-only STOP/START/3-second/STOP cable-repair check.
+
+Reuses Serial, durable commands, shared ownership, timer and required followup.
+No other actuators, reconnect, retry, firmware upload or production activation.
+Default preview never opens a port. RUN_BLOCK gates real execution.
+"""
+import argparse
+from contextlib import closing
+from datetime import UTC, datetime
+from decimal import Decimal
+import json
+import os
+from pathlib import Path
+import sys
+from uuid import uuid4
+
+from app.hardware.arduino_serial import ArduinoSerialClient, ArduinoSerialConfiguration
+from app.hardware.arduino_command_journal import SQLiteArduinoCommandJournal
+from app.hardware.durable_arduino import DurableArduinoCommandExecutor
+from app.hardware.execution_timer import MonotonicExecutionTimer
+from app.hardware.owned_hardware import OwnedHardware
+from app.hardware.sequence_ownership import HardwareOwnership, provision_ownership
+
+PORT = '/dev/serial/by-id/usb-Arduino__www.arduino.cc__0042_14532303532351F0D070-if00'
+ROOT = Path('/home/elvis/Documents/labforge-firmware/docs/commissioning/2026-10-11')
+DURATION = Decimal('3')
+
+
+def run(client, directory, timer, emit):
+    status = client.query_status()
+    if (status.controller_state != 'IDLE' or status.software_state_trust != 'TRUSTED'
+            or status.active_operation_command_id is not None
+            or 'SF_MIXER_SET_STATE' not in client.capabilities):
+        raise RuntimeError('Trusted idle controller and mixer capability required')
+    identity = (client.controller_boot_id, client.backend_session_nonce, client.connection_epoch)
+    owner_path = directory/'owner.sqlite3'
+    owner_id = provision_ownership(owner_path)
+    phase = 'sf-mixer-recheck-' + str(uuid4())
+    with closing(HardwareOwnership(owner_path, owner_id)) as owner:
+        with SQLiteArduinoCommandJournal(directory/'commands.sqlite3') as journal:
+            hardware = OwnedHardware(owner, DurableArduinoCommandExecutor(client, journal), None)
+
+            def send(commands, running):
+                if not client.connected or identity != (client.controller_boot_id, client.backend_session_nonce, client.connection_epoch):
+                    raise RuntimeError('Controller session changed; no reconnect or further send')
+                command_id = str(uuid4())
+                emit({'event':'COMMAND_BEGIN', 'operation_command_id':command_id, 'running':running})
+                entry = commands.execute(phase_execution_id=phase, operation_command_id=command_id,
+                                         command='SF_MIXER_SET_STATE', arguments={'running':running})
+                emit({'event':'COMMAND_RESULT', 'operation_command_id':command_id,
+                      'state':entry.state.value, 'running':running, 'result':entry.result})
+
+            send(hardware.arduino_service, False)
+            lease = owner.claim(phase, phase_execution_id=phase)
+
+            def start_and_wait(commands):
+                send(commands, True)
+                emit({'event':'WAIT_STARTED', 'duration_seconds':str(DURATION)})
+                timer.wait(DURATION, lambda:False)
+                emit({'event':'WAIT_COMPLETED', 'duration_seconds':str(DURATION)})
+
+            hardware.run_operation(lease, start_and_wait,
+                required_followup=lambda commands:send(commands, False))
+            emit({'event':'TEST_COMPLETED', 'commanded_mixer_running':False,
+                  'physical_observation':'Pending operator confirmation'})
+            owner.complete(lease)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--execute', action='store_true')
+    parser.add_argument('--conditions-confirmed', action='store_true')
+    args = parser.parse_args()
+    if not args.execute:
+        print('OFFLINE PREVIEW: SF_MIXER_SET_STATE false -> true -> wait 3 s -> false; all other actuators uncommanded.')
+        return
+    if not args.conditions_confirmed:
+        parser.error('Fresh empty-SF/free-element/power-ready confirmation required')
+    print('WAITING_FOR_RUN_BLOCK: SF mixer only, existing direction/speed, 3 seconds.', flush=True)
+    if sys.stdin.readline().strip() != 'RUN_BLOCK':
+        print('CANCELLED_BEFORE_PORT_OPEN', flush=True)
+        return
+    directory = ROOT/('sf-mixer-recheck-' + str(uuid4()))
+    directory.mkdir(parents=True, exist_ok=False)
+    with (directory/'events.jsonl').open('x') as log:
+        def emit(event):
+            event['observed_at_utc']=datetime.now(UTC).isoformat()
+            line=json.dumps(event)
+            log.write(line+'\n'); log.flush(); os.fsync(log.fileno())
+            print(line, flush=True)
+        client = ArduinoSerialClient(ArduinoSerialConfiguration(port=PORT))
+        try:
+            emit({'event':'OPERATOR_PREREQUISITES', 'empty_sf':True, 'element_free':True,
+                  'motor_power_ready':True, 'existing_direction_safe':True, 'evidence_directory':str(directory)})
+            hello=client.connect()
+            emit({'event':'SESSION', 'hello':hello.model_dump(mode='json')})
+            run(client, directory, MonotonicExecutionTimer(), emit)
+        except BaseException as error:
+            emit({'event':'TEST_ERROR_NO_RETRY', 'error_type':type(error).__name__, 'error':str(error)})
+            raise
+        finally:
+            client.close()
+            emit({'event':'CONNECTION_CLOSED', 'ad_hoc_cleanup_motion':False})
+
+
+if __name__=='__main__':
+    main()

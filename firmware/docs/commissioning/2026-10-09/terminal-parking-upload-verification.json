@@ -1,0 +1,22 @@
+{
+  "recorded_at_utc": "2026-10-09T16:34:34.387251+00:00",
+  "firmware_commit": "e2e9d3c5be17cdf703a684e29a6c9dd4a54ec735",
+  "environment": "megaatmega2560",
+  "port": "/dev/serial/by-id/usb-Arduino__www.arduino.cc__0042_14532303532351F0D070-if00",
+  "resolved_port": "/dev/ttyACM1",
+  "hex_sha256": "93e133bdc130583edfcd27a12ef61cbe396d0a2bf6dd972d913f3447a4745dcf",
+  "flash_bytes_verified": 41056,
+  "static_sram_bytes": 3148,
+  "upload_exit_code": 0,
+  "avrdude_verification": "41056 bytes of flash verified",
+  "operator_motor_power": "OFF",
+  "operator_upload_authorization": "User confirmed motor power OFF and upload of prepared e2e9d3c on 2026-10-09",
+  "actuator_commands_sent": 0,
+  "eeprom_provisioning_performed": false,
+  "physical_terminal_parking_verified": false,
+  "physical_full_span_pump_home_verified": false,
+  "next_powered_check": "NEW readiness and exact approval required; dry P1 Waste setup then HOME -> 20500 -> HOME -> 1000; halt on any failure",
+  "log_file": "terminal-parking-upload.log.txt",
+  "raw_upload_log_sha256": "6d5fdc2be6fe76bfe68946665fee78275454208830a4ab9187cf4247e305622d",
+  "stored_log_trailing_whitespace_normalized": true
+}

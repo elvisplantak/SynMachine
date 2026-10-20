@@ -1,0 +1,122 @@
+"""Fake-only terminal parking checks; never opens a hardware transport."""
+from io import StringIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import unittest
+from unittest.mock import patch
+from app.hardware.command_planning import ArduinoAction
+from app.hardware.arduino_command_journal import SQLiteArduinoCommandJournal
+from app.hardware.arduino_serial import ArduinoUnavailableError, ArduinoCommandFailedError
+from app.hardware.durable_arduino import DurableArduinoCommandExecutor
+from tests.test_durable_arduino import FakeClient
+import labforge_terminal_parking as parking
+import labforge_p2_dry_check as runner
+import labforge_pump_dry_check as pumps
+
+
+def action(command, **arguments):
+    return ('test', ArduinoAction('unused', command, tuple(arguments.items())))
+
+
+class Checks(unittest.TestCase):
+    def trial(self, **guards):
+        return parking.build_all_valve_parking_trial('park-offline', 1,
+            sf_closed=guards.get('sf_closed', True), column_closed=True, reactor_stopped=True)
+
+    def test_trial_has_all_homes_before_all_parks_and_no_other_actuator(self):
+        steps = self.trial()
+        self.assertEqual(len(steps), 16)
+        self.assertTrue(all(a.command == 'VALVE_HOME' for _, a in steps[:8]))
+        self.assertEqual([dict(a.arguments)['valve'] for _, a in steps[:8]],
+                         ['V1', 'V2', 'V4', 'V6', 'V3', 'V7', 'V8', 'V5'])
+        self.assertTrue(all(a.command == 'VALVE_SET_POSITION' and
+                            dict(a.arguments)['position_degrees'] == 5 for _, a in steps[8:]))
+        self.assertEqual(len({a.operation_command_id for _, a in steps}), 16)
+
+    def test_unknown_and_nonhome_positions_are_not_homed_or_parked(self):
+        steps = [action('VALVE_HOME', valve='V1'),
+                 action('VALVE_SET_POSITION', valve='V1', position_degrees=90)]
+        self.assertEqual(parking.with_terminal_parking(steps), steps)
+        self.assertEqual(parking.with_terminal_parking([]), [])
+
+    def test_pump_parking_without_waste_selection_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            parking.with_terminal_parking([action('PUMP_HOME', pump='P1')])
+        with self.assertRaises(RuntimeError):
+            parking.with_terminal_parking([action('PUMP_HOME', pump='P2')])
+
+    def test_both_pumps_park_only_at_end_of_whole_block(self):
+        steps = pumps.build_steps('pumps-offline', 1, sf_closed=True, column_closed=True,
+                                  reactor_stopped=True, full_span_approved=True)
+        self.assertEqual(len(steps), 22)
+        self.assertEqual([(a.command, dict(a.arguments)) for _, a in steps[-2:]], [
+            ('PUMP_MOVE_ABSOLUTE_STEPS', {'pump': 'P1', 'target_steps': 1000}),
+            ('PUMP_MOVE_ABSOLUTE_STEPS', {'pump': 'P2', 'target_steps': 1000})])
+        self.assertEqual(steps[-3][1].command, 'PUMP_HOME')
+        self.assertEqual(dict(steps[-3][1].arguments)['pump'], 'P2')
+
+    def test_column_home_parks_at_existing_closed_offset(self):
+        steps = parking.with_terminal_parking([action('COLUMN_BOTTOM_VALVE_HOME')])
+        self.assertEqual(dict(steps[-1][1].arguments), {'position_degrees': 4})
+        closed = [action('COLUMN_BOTTOM_VALVE_SET_POSITION', position_degrees=4)]
+        self.assertEqual(parking.with_terminal_parking(closed), closed)
+
+    def test_failed_or_unknown_final_home_prevents_every_park(self):
+        for error in (ArduinoUnavailableError('Injected unknown'),
+                      ArduinoCommandFailedError('VALVE_MOTION_TIMEOUT', execution_started=True)):
+            with self.subTest(error=type(error).__name__), TemporaryDirectory() as directory:
+                steps = self.trial()
+                with SQLiteArduinoCommandJournal(Path(directory) / 'journal.sqlite3') as journal:
+                    class FailFinalHome(FakeClient):
+                        def execute(self, **values):
+                            if self.execute_calls == 7:
+                                self.execute_result = error
+                            return super().execute(**values)
+                    client = FailFinalHome(journal)
+                    with self.assertRaises(type(error)):
+                        runner.run_steps(DurableArduinoCommandExecutor(client, journal), 'park-offline',
+                                         steps, StringIO(''), lambda _: None, block_approved=True)
+                    self.assertEqual(client.execute_calls, 8)
+                    self.assertTrue(all(journal.load(a.operation_command_id) is None for _, a in steps[8:]))
+
+    def test_park_failure_halts_without_remaining_cleanup(self):
+        with TemporaryDirectory() as directory:
+            steps = self.trial()
+            with SQLiteArduinoCommandJournal(Path(directory) / 'journal.sqlite3') as journal:
+                class FailPark(FakeClient):
+                    def execute(self, **values):
+                        if self.execute_calls == 8:
+                            self.execute_result = ArduinoCommandFailedError(
+                                'VALVE_HOME_SWITCH_STUCK', execution_started=True)
+                        return super().execute(**values)
+                client = FailPark(journal)
+                with self.assertRaises(ArduinoCommandFailedError):
+                    runner.run_steps(DurableArduinoCommandExecutor(client, journal), 'park-offline',
+                                     steps, StringIO(''), lambda _: None, block_approved=True)
+                self.assertEqual(client.execute_calls, 9)
+                self.assertTrue(all(journal.load(a.operation_command_id) is None for _, a in steps[9:]))
+
+    def test_successful_trial_uses_existing_durable_executor(self):
+        with TemporaryDirectory() as directory:
+            steps = self.trial()
+            with SQLiteArduinoCommandJournal(Path(directory) / 'journal.sqlite3') as journal:
+                client = FakeClient(journal)
+                self.assertTrue(runner.run_steps(DurableArduinoCommandExecutor(client, journal),
+                    'park-offline', steps, StringIO(''), lambda _: None, block_approved=True))
+                self.assertEqual(client.execute_calls, 16)
+
+    def test_missing_prerequisite_rejects_trial(self):
+        with self.assertRaises(RuntimeError):
+            self.trial(sf_closed=False)
+
+    def test_cancel_new_trial_never_opens_serial(self):
+        args = ['runner', '--execute', '--run-block', '--all-valves-parking-trial',
+                '--procedure-approved', '--motor-power-ready', '--conditions-confirmed']
+        with patch.object(runner.sys, 'argv', args), patch.object(runner.sys, 'stdin', StringIO('STOP\n')), \
+             patch.object(runner, 'ArduinoSerialClient') as serial:
+            runner.main()
+        serial.assert_not_called()
+
+
+if __name__ == '__main__':
+    unittest.main()

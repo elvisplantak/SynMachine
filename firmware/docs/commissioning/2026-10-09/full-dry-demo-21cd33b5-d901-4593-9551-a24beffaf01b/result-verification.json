@@ -1,0 +1,21 @@
+{
+  "recorded_at_utc": "2026-10-09T18:05:03.899831+00:00",
+  "firmware_commit": "e2e9d3c5be17cdf703a684e29a6c9dd4a54ec735",
+  "controller_boot_id": 93,
+  "process_exit_code": 1,
+  "result": "READ_ONLY_SF_IDENTITY_PROBE_FAILED_BEFORE_ACTUATION",
+  "error": "[TxRxResult] There is no status packet!",
+  "command_counts": {
+    "arduino_command_journal": 0,
+    "sf_action_journal": 0,
+    "prepared_command_plans": 0,
+    "execution_waits": 0
+  },
+  "hardware_commands_sent": 0,
+  "connection_closed": true,
+  "retry": false,
+  "ad_hoc_cleanup_motion": false,
+  "owner_retained_blocked": true,
+  "physical_demo_completed": false,
+  "operator_followup": "Check separate SF servo power and adapter-to-servo cable; no retry until clarified"
+}

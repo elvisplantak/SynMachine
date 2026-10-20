@@ -1,0 +1,59 @@
+"""Terminal dry-test parking via existing sequential Service commands.
+
+Projection comes only from this test's commands, never historical state. The
+executor must halt on every non-COMPLETED outcome before reaching this suffix.
+This module opens no transports and does not authorize wet execution.
+"""
+from uuid import uuid4
+from app.hardware.command_planning import ArduinoAction
+
+WASTE_TARGETS = {
+    'P1': {'V2': 180, 'V1': 180},
+    'P2': {'V5': 180, 'V8': 90, 'V7': 90, 'V3': 180},
+}
+
+
+def with_terminal_parking(steps):
+    valves = {}
+    pumps = {}
+    column = None
+    for _, action in steps:
+        args = dict(action.arguments)
+        if action.command == 'VALVE_HOME':
+            valves[args['valve']] = 0
+        elif action.command == 'VALVE_SET_POSITION':
+            valves[args['valve']] = args['position_degrees']
+        elif action.command == 'PUMP_HOME':
+            pumps[args['pump']] = 0
+        elif action.command == 'PUMP_MOVE_ABSOLUTE_STEPS':
+            pumps[args['pump']] = args['target_steps']
+        elif action.command == 'COLUMN_BOTTOM_VALVE_HOME':
+            column = 0
+        elif action.command == 'COLUMN_BOTTOM_VALVE_SET_POSITION':
+            column = args['position_degrees']
+    result = list(steps)
+    for pump, position in pumps.items():
+        if position != 0:
+            continue
+        if any(valves.get(v) != target for v, target in WASTE_TARGETS[pump].items()):
+            raise RuntimeError('Dry terminal pump parking requires verified Waste selection')
+        result.append((f'Final {pump} parking to 1000 steps', ArduinoAction(
+            str(uuid4()), 'PUMP_MOVE_ABSOLUTE_STEPS', (('pump', pump), ('target_steps', 1000)))))
+    if column == 0:
+        result.append(('Final Column parking CLOSED', ArduinoAction(
+            str(uuid4()), 'COLUMN_BOTTOM_VALVE_SET_POSITION', (('position_degrees', 4),))))
+    for valve, position in valves.items():
+        if position == 0:
+            result.append((f'Final {valve} parking to nominal 5 degrees', ArduinoAction(
+                str(uuid4()), 'VALVE_SET_POSITION', (('valve', valve), ('position_degrees', 5)))))
+    return result
+
+
+def build_all_valve_parking_trial(phase, boot, *, sf_closed, column_closed, reactor_stopped):
+    if not all(v is True for v in (sf_closed, column_closed, reactor_stopped)):
+        raise RuntimeError('Fresh dry/closed/stopped prerequisites required')
+    # Explicit isolated dry scope. This is not a universal wet HOME order.
+    order = ('V1', 'V2', 'V4', 'V6', 'V3', 'V7', 'V8', 'V5')
+    homes = [(f'HOME {valve}', ArduinoAction(str(uuid4()), 'VALVE_HOME', (('valve', valve),)))
+             for valve in order]
+    return with_terminal_parking(homes)

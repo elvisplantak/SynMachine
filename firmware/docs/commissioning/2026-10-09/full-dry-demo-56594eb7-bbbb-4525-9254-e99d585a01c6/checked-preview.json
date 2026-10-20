@@ -1,0 +1,393 @@
+{
+  "scope_sha256": "cee872f2824cbd84c1ef94aa93cb197b2a27905623c75940f308f850ff47333b",
+  "sends": [
+    {
+      "sf_bottom_valve": "CLOSED"
+    },
+    {
+      "command": "SF_MIXER_SET_STATE",
+      "arguments": {
+        "running": false
+      }
+    },
+    {
+      "command": "COLUMN_BOTTOM_VALVE_HOME",
+      "arguments": {}
+    },
+    {
+      "command": "COLUMN_BOTTOM_VALVE_SET_POSITION",
+      "arguments": {
+        "position_degrees": 4
+      }
+    },
+    {
+      "command": "VALVE_HOME",
+      "arguments": {
+        "valve": "V1"
+      }
+    },
+    {
+      "command": "VALVE_HOME",
+      "arguments": {
+        "valve": "V2"
+      }
+    },
+    {
+      "command": "VALVE_HOME",
+      "arguments": {
+        "valve": "V4"
+      }
+    },
+    {
+      "command": "VALVE_HOME",
+      "arguments": {
+        "valve": "V6"
+      }
+    },
+    {
+      "command": "VALVE_HOME",
+      "arguments": {
+        "valve": "V3"
+      }
+    },
+    {
+      "command": "VALVE_HOME",
+      "arguments": {
+        "valve": "V7"
+      }
+    },
+    {
+      "command": "VALVE_HOME",
+      "arguments": {
+        "valve": "V8"
+      }
+    },
+    {
+      "command": "VALVE_HOME",
+      "arguments": {
+        "valve": "V5"
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V2",
+        "position_degrees": 180
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V1",
+        "position_degrees": 180
+      }
+    },
+    {
+      "command": "PUMP_HOME",
+      "arguments": {
+        "pump": "P1"
+      }
+    },
+    {
+      "command": "PUMP_MOVE_ABSOLUTE_STEPS",
+      "arguments": {
+        "pump": "P1",
+        "target_steps": 20500
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V5",
+        "position_degrees": 180
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V8",
+        "position_degrees": 90
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V7",
+        "position_degrees": 90
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V3",
+        "position_degrees": 180
+      }
+    },
+    {
+      "command": "PUMP_HOME",
+      "arguments": {
+        "pump": "P2"
+      }
+    },
+    {
+      "command": "PUMP_MOVE_ABSOLUTE_STEPS",
+      "arguments": {
+        "pump": "P2",
+        "target_steps": 20500
+      }
+    },
+    {
+      "command": "CAROUSEL_SET_REFERENCE",
+      "arguments": {
+        "position": 1
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V6",
+        "position_degrees": 180
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V1",
+        "position_degrees": 90
+      }
+    },
+    {
+      "command": "PUMP_MOVE_ABSOLUTE_STEPS",
+      "arguments": {
+        "pump": "P1",
+        "target_steps": 14350
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V2",
+        "position_degrees": 90
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V1",
+        "position_degrees": 180
+      }
+    },
+    {
+      "command": "PUMP_MOVE_ABSOLUTE_STEPS",
+      "arguments": {
+        "pump": "P1",
+        "target_steps": 20500
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V4",
+        "position_degrees": 180
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V6",
+        "position_degrees": 90
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V1",
+        "position_degrees": 90
+      }
+    },
+    {
+      "command": "PUMP_MOVE_ABSOLUTE_STEPS",
+      "arguments": {
+        "pump": "P1",
+        "target_steps": 18860
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V1",
+        "position_degrees": 180
+      }
+    },
+    {
+      "command": "PUMP_MOVE_ABSOLUTE_STEPS",
+      "arguments": {
+        "pump": "P1",
+        "target_steps": 20500
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V4",
+        "position_degrees": 90
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V1",
+        "position_degrees": 90
+      }
+    },
+    {
+      "command": "PUMP_MOVE_ABSOLUTE_STEPS",
+      "arguments": {
+        "pump": "P1",
+        "target_steps": 18040
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V1",
+        "position_degrees": 180
+      }
+    },
+    {
+      "command": "PUMP_MOVE_ABSOLUTE_STEPS",
+      "arguments": {
+        "pump": "P1",
+        "target_steps": 20500
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V3",
+        "position_degrees": 90
+      }
+    },
+    {
+      "command": "PUMP_MOVE_ABSOLUTE_STEPS",
+      "arguments": {
+        "pump": "P2",
+        "target_steps": 10250
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V7",
+        "position_degrees": 180
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V3",
+        "position_degrees": 180
+      }
+    },
+    {
+      "command": "PUMP_MOVE_ABSOLUTE_STEPS",
+      "arguments": {
+        "pump": "P2",
+        "target_steps": 20500
+      }
+    },
+    {
+      "command": "SF_MIXER_SET_STATE",
+      "arguments": {
+        "running": true
+      }
+    },
+    {
+      "command": "SF_MIXER_SET_STATE",
+      "arguments": {
+        "running": false
+      }
+    },
+    {
+      "sf_bottom_valve": "CLOSED"
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V8",
+        "position_degrees": 180
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V7",
+        "position_degrees": 90
+      }
+    },
+    {
+      "sf_bottom_valve": "OPEN"
+    },
+    {
+      "command": "PUMP_MOVE_ABSOLUTE_STEPS",
+      "arguments": {
+        "pump": "P2",
+        "target_steps": 10250
+      }
+    },
+    {
+      "sf_bottom_valve": "CLOSED"
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V5",
+        "position_degrees": 90
+      }
+    },
+    {
+      "command": "VALVE_SET_POSITION",
+      "arguments": {
+        "valve": "V8",
+        "position_degrees": 90
+      }
+    },
+    {
+      "command": "PUMP_MOVE_ABSOLUTE_STEPS",
+      "arguments": {
+        "pump": "P2",
+        "target_steps": 20500
+      }
+    },
+    {
+      "command": "COLUMN_BOTTOM_VALVE_SET_POSITION",
+      "arguments": {
+        "position_degrees": 94
+      }
+    },
+    {
+      "command": "COLUMN_BOTTOM_VALVE_SET_POSITION",
+      "arguments": {
+        "position_degrees": 4
+      }
+    },
+    {
+      "command": "CAROUSEL_MOVE_TO_POSITION",
+      "arguments": {
+        "position": 2
+      }
+    },
+    {
+      "command": "COLUMN_BOTTOM_VALVE_SET_POSITION",
+      "arguments": {
+        "position_degrees": 94
+      }
+    },
+    {
+      "command": "COLUMN_BOTTOM_VALVE_SET_POSITION",
+      "arguments": {
+        "position_degrees": 4
+      }
+    }
+  ]
+}

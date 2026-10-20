@@ -1,0 +1,735 @@
+#include <unity.h>
+
+#include "actuator/P1MotionController.h"
+
+using namespace labforge;
+
+void setUp() {}
+void tearDown() {}
+
+namespace {
+
+class FakeIo : public P1MotionIo {
+ public:
+  bool home = false;
+  bool direction = false;
+  bool step = false;
+  unsigned directionWrites = 0;
+  unsigned stepWrites = 0;
+  unsigned risingEdges = 0;
+  unsigned activateHomeAtRisingEdge = 0;
+  uint16_t lastPulseHighUs = 0;
+
+  bool homeActive() const override { return home; }
+  void writeDirection(bool high) override {
+    direction = high;
+    ++directionWrites;
+  }
+  void writeStep(bool high) override {
+    if (high && !step) ++risingEdges;
+    step = high;
+    ++stepWrites;
+  }
+  void pulseStep(uint16_t highUs) override {
+    step = true;
+    ++risingEdges;
+    if (activateHomeAtRisingEdge != 0 &&
+        risingEdges >= activateHomeAtRisingEdge)
+      home = true;
+    ++stepWrites;
+    lastPulseHighUs = highUs;
+    step = false;
+    ++stepWrites;
+  }
+};
+
+void reachFirstRise(uint32_t& nowUs) { nowUs += kP1DirectionSetupUs; }
+
+P1MotionResult runOnePulse(P1MotionController& controller, FakeIo& io,
+                           uint32_t& nowUs) {
+  const unsigned before = io.risingEdges;
+  P1MotionResult result = controller.update(nowUs);
+  TEST_ASSERT_EQUAL_UINT32(before + 1, io.risingEdges);
+  TEST_ASSERT_FALSE(io.step);
+  TEST_ASSERT_EQUAL_UINT16(kP1StepHighUs, io.lastPulseHighUs);
+  nowUs += kP1StepIntervalUs;
+  return result;
+}
+
+void establishHome(P1MotionController& controller, FakeIo& io,
+                   uint32_t& nowUs) {
+  io.home = true;
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::CONFIRMING_HOME_ACTIVE,
+                    controller.state());
+  TEST_ASSERT_FALSE(io.direction);
+  TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+  nowUs += kP1HomeStableUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::COMPLETED, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1PositionTrust::TRUSTED, controller.positionTrust());
+  TEST_ASSERT_EQUAL_UINT16(0, controller.positionSteps());
+}
+
+void test_boot_is_untrusted_and_prepare_has_no_physical_side_effect() {
+  FakeIo io;
+  P1MotionController controller(io);
+  TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED, controller.positionTrust());
+  TEST_ASSERT_EQUAL(P1MotionState::IDLE, controller.state());
+  TEST_ASSERT_EQUAL(P1PrepareResult::POSITION_UNTRUSTED,
+                    controller.prepareMoveAbsolute(100));
+  TEST_ASSERT_EQUAL_UINT32(0, io.directionWrites);
+  TEST_ASSERT_EQUAL_UINT32(0, io.stepWrites);
+
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_EQUAL(P1MotionState::PREPARED_HOME, controller.state());
+  TEST_ASSERT_EQUAL_UINT32(0, io.directionWrites);
+  TEST_ASSERT_EQUAL_UINT32(0, io.stepWrites);
+}
+
+void test_direction_setup_precedes_first_step_rise() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 100;
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  TEST_ASSERT_EQUAL_UINT32(1, io.directionWrites);
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+  nowUs += kP1DirectionSetupUs - 1;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+  ++nowUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL_UINT32(1, io.risingEdges);
+}
+
+void test_home_requires_stable_active_signal_and_rejects_one_sample_glitch() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  reachFirstRise(nowUs);
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, runOnePulse(controller, io, nowUs));
+
+  io.home = true;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::CONFIRMING_HOME_ACTIVE,
+                    controller.state());
+  TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED, controller.positionTrust());
+  io.home = false;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::SEARCHING_HOME, controller.state());
+
+  nowUs += kP1StepIntervalUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, runOnePulse(controller, io, nowUs));
+  io.home = true;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  nowUs += kP1HomeStableUs - 1;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED, controller.positionTrust());
+  ++nowUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::COMPLETED, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1PositionTrust::TRUSTED, controller.positionTrust());
+}
+
+void test_initial_active_home_is_confirmed_without_away_motion() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  establishHome(controller, io, nowUs);
+  TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+  TEST_ASSERT_FALSE(io.step);
+}
+
+void test_trusted_home_releases_then_rehomes_with_stable_transitions() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  establishHome(controller, io, nowUs);
+
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::CONFIRMING_TRUSTED_HOME,
+                    controller.state());
+  TEST_ASSERT_TRUE(io.direction);
+  TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+  nowUs += kP1HomeStableUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::RELEASING_HOME, controller.state());
+  TEST_ASSERT_TRUE(io.direction);
+  nowUs += kP1StepIntervalUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, runOnePulse(controller, io, nowUs));
+  io.home = false;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::CONFIRMING_HOME_RELEASE,
+                    controller.state());
+  nowUs += kP1HomeStableUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::SEARCHING_HOME, controller.state());
+  TEST_ASSERT_FALSE(io.direction);
+
+  io.home = true;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  nowUs += kP1HomeStableUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::COMPLETED, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1PositionTrust::TRUSTED, controller.positionTrust());
+}
+
+void test_trusted_zero_one_sample_low_never_moves_toward_home() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  establishHome(controller, io, nowUs);
+
+  io.home = false;
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::CONFIRMING_TRUSTED_HOME,
+                    controller.state());
+  TEST_ASSERT_TRUE(io.direction);
+  TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+
+  io.home = true;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  nowUs += kP1HomeStableUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::RELEASING_HOME, controller.state());
+  TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+}
+
+void test_trusted_zero_short_low_waits_for_stable_home() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  establishHome(controller, io, nowUs);
+
+  io.home = false;
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  nowUs += kP1HomeStableUs - 1;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::CONFIRMING_TRUSTED_HOME,
+                    controller.state());
+  TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+
+  io.home = true;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  nowUs += kP1HomeStableUs - 1;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+  ++nowUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::RELEASING_HOME, controller.state());
+  TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+}
+
+void test_trusted_zero_persistent_low_fails_without_step_rise() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  establishHome(controller, io, nowUs);
+
+  io.home = false;
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  TEST_ASSERT_TRUE(io.direction);
+  nowUs += kP1HomeStableUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::HOME_SWITCH_UNEXPECTED,
+                    controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::IDLE, controller.state());
+  TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED,
+                    controller.positionTrust());
+  TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+  TEST_ASSERT_FALSE(io.step);
+}
+
+void test_stuck_home_release_fails_closed() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  establishHome(controller, io, nowUs);
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  nowUs += kP1HomeStableUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::RELEASING_HOME, controller.state());
+  nowUs += kP1StepIntervalUs;
+  P1MotionResult result = P1MotionResult::NONE;
+  for (uint16_t i = 0; i < kP1HomeReleaseMaximumSteps; ++i)
+    result = runOnePulse(controller, io, nowUs);
+  TEST_ASSERT_EQUAL(P1MotionResult::HOME_SWITCH_STUCK, result);
+  TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED, controller.positionTrust());
+  TEST_ASSERT_FALSE(io.step);
+}
+
+void test_demo_home_search_is_bounded_to_accepted_full_span() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  reachFirstRise(nowUs);
+  P1MotionResult result = P1MotionResult::NONE;
+  for (uint32_t i = 0; i < kP1MaximumAbsoluteSteps; ++i)
+    result = runOnePulse(controller, io, nowUs);
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, result);
+  TEST_ASSERT_EQUAL(P1MotionState::WAITING_FINAL_HOME_SIGNAL, controller.state());
+  const uint32_t finalPulseUs = nowUs - kP1StepIntervalUs;
+  nowUs = finalPulseUs + kP1HomeStableUs - 1;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  ++nowUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::MOTION_TIMEOUT, controller.update(nowUs));
+  TEST_ASSERT_EQUAL_UINT32(kP1MaximumAbsoluteSteps, io.risingEdges);
+  TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED, controller.positionTrust());
+  TEST_ASSERT_FALSE(io.step);
+}
+
+void test_home_activation_on_final_allowed_pulse_is_confirmed() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  io.activateHomeAtRisingEdge = kP1MaximumAbsoluteSteps;
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  reachFirstRise(nowUs);
+
+  P1MotionResult result = P1MotionResult::NONE;
+  for (uint32_t i = 0; i < kP1MaximumAbsoluteSteps; ++i)
+    result = runOnePulse(controller, io, nowUs);
+
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, result);
+  TEST_ASSERT_EQUAL(P1MotionState::CONFIRMING_HOME_ACTIVE,
+                    controller.state());
+  TEST_ASSERT_EQUAL_UINT32(kP1MaximumAbsoluteSteps, io.risingEdges);
+  nowUs += kP1HomeStableUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::COMPLETED, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1PositionTrust::TRUSTED, controller.positionTrust());
+  TEST_ASSERT_EQUAL_UINT16(0, controller.positionSteps());
+  TEST_ASSERT_EQUAL_UINT32(kP1MaximumAbsoluteSteps, io.risingEdges);
+}
+
+void test_home_signal_after_final_pulse_is_confirmed_without_extra_motion() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  reachFirstRise(nowUs);
+  P1MotionResult result = P1MotionResult::NONE;
+  for (uint32_t i = 0; i < kP1MaximumAbsoluteSteps; ++i)
+    result = runOnePulse(controller, io, nowUs);
+
+  // Mechanical activation can follow the electrical STEP pulse, rather than
+  // occurring inside FakeIo::pulseStep(). No further pulses are permitted.
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, result);
+  TEST_ASSERT_TRUE(controller.busy());
+  TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED, controller.positionTrust());
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  io.home = true;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  nowUs += kP1HomeStableUs - 1;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  ++nowUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::COMPLETED, controller.update(nowUs));
+  TEST_ASSERT_EQUAL_UINT16(0, controller.positionSteps());
+  TEST_ASSERT_EQUAL(P1PositionTrust::TRUSTED, controller.positionTrust());
+  TEST_ASSERT_EQUAL_UINT32(kP1MaximumAbsoluteSteps, io.risingEdges);
+  TEST_ASSERT_FALSE(io.step);
+}
+
+void test_final_pulse_home_glitch_times_out_without_overtravel() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  io.activateHomeAtRisingEdge = kP1MaximumAbsoluteSteps;
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  reachFirstRise(nowUs);
+
+  P1MotionResult result = P1MotionResult::NONE;
+  for (uint32_t i = 0; i < kP1MaximumAbsoluteSteps; ++i)
+    result = runOnePulse(controller, io, nowUs);
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, result);
+  io.home = false;
+  TEST_ASSERT_EQUAL(P1MotionResult::MOTION_TIMEOUT,
+                    controller.update(nowUs));
+  TEST_ASSERT_EQUAL_UINT32(kP1MaximumAbsoluteSteps, io.risingEdges);
+  TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED, controller.positionTrust());
+}
+
+uint32_t exhaustHomeSearch(P1MotionController& controller, FakeIo& io,
+                           uint32_t startUs = 0) {
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(startUs));
+  uint32_t nowUs = startUs + kP1DirectionSetupUs;
+  for (uint32_t i = 0; i < kP1MaximumAbsoluteSteps; ++i)
+    TEST_ASSERT_EQUAL(P1MotionResult::NONE, runOnePulse(controller, io, nowUs));
+  TEST_ASSERT_EQUAL_UINT32(kP1MaximumAbsoluteSteps, io.risingEdges);
+  return nowUs - kP1StepIntervalUs;
+}
+
+void test_final_home_late_signal_requires_full_stability_across_clock_wrap() {
+  FakeIo io;
+  P1MotionController controller(io);
+  const uint32_t startUs = UINT32_MAX - 10000 - kP1DirectionSetupUs -
+                          (kP1MaximumAbsoluteSteps - 1UL) * kP1StepIntervalUs;
+  const uint32_t finalPulseUs = exhaustHomeSearch(controller, io, startUs);
+  const uint32_t arrivalUs = finalPulseUs + kP1HomeStableUs - 1;
+  io.home = true;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(arrivalUs));
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE,
+                    controller.update(arrivalUs + kP1HomeStableUs - 1));
+  TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED, controller.positionTrust());
+  TEST_ASSERT_EQUAL(P1MotionResult::COMPLETED,
+                    controller.update(arrivalUs + kP1HomeStableUs));
+  TEST_ASSERT_EQUAL(P1PositionTrust::TRUSTED, controller.positionTrust());
+  TEST_ASSERT_EQUAL_UINT32(kP1MaximumAbsoluteSteps, io.risingEdges);
+  TEST_ASSERT_FALSE(io.step);
+}
+
+void test_final_home_signal_at_arrival_deadline_cannot_restore_trust() {
+  FakeIo io;
+  P1MotionController controller(io);
+  const uint32_t finalPulseUs = exhaustHomeSearch(controller, io);
+  io.home = true;
+  TEST_ASSERT_EQUAL(P1MotionResult::MOTION_TIMEOUT,
+                    controller.update(finalPulseUs + kP1HomeStableUs));
+  TEST_ASSERT_EQUAL(P1MotionState::IDLE, controller.state());
+  TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED, controller.positionTrust());
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE,
+                    controller.update(finalPulseUs + 3 * kP1HomeStableUs));
+  TEST_ASSERT_EQUAL_UINT32(kP1MaximumAbsoluteSteps, io.risingEdges);
+}
+
+void test_delayed_final_home_glitch_cannot_restart_search_or_extend_wait() {
+  FakeIo io;
+  P1MotionController controller(io);
+  const uint32_t finalPulseUs = exhaustHomeSearch(controller, io);
+  io.home = true;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(finalPulseUs + 100));
+  io.home = false;
+  TEST_ASSERT_EQUAL(P1MotionResult::MOTION_TIMEOUT,
+                    controller.update(finalPulseUs + 200));
+  TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED, controller.positionTrust());
+  io.home = true;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE,
+                    controller.update(finalPulseUs + kP1HomeStableUs));
+  TEST_ASSERT_EQUAL_UINT32(kP1MaximumAbsoluteSteps, io.risingEdges);
+  TEST_ASSERT_FALSE(io.step);
+}
+
+void test_abort_during_final_home_wait_prevents_later_completion() {
+  FakeIo io;
+  P1MotionController controller(io);
+  const uint32_t finalPulseUs = exhaustHomeSearch(controller, io);
+  TEST_ASSERT_TRUE(controller.abort());
+  io.home = true;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE,
+                    controller.update(finalPulseUs + kP1HomeStableUs));
+  TEST_ASSERT_EQUAL(P1MotionState::IDLE, controller.state());
+  TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED, controller.positionTrust());
+  TEST_ASSERT_EQUAL_UINT32(kP1MaximumAbsoluteSteps, io.risingEdges);
+  TEST_ASSERT_FALSE(io.step);
+}
+
+void test_absolute_move_rejects_zero_and_tracks_position() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  establishHome(controller, io, nowUs);
+
+  TEST_ASSERT_EQUAL(P1PrepareResult::TARGET_REQUIRES_HOME,
+                    controller.prepareMoveAbsolute(0));
+  TEST_ASSERT_EQUAL(P1PrepareResult::INVALID_TARGET,
+                    controller.prepareMoveAbsolute(20501));
+  io.home = false;
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareMoveAbsolute(3));
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  reachFirstRise(nowUs);
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, runOnePulse(controller, io, nowUs));
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, runOnePulse(controller, io, nowUs));
+  TEST_ASSERT_EQUAL(P1MotionResult::COMPLETED,
+                    runOnePulse(controller, io, nowUs));
+  TEST_ASSERT_EQUAL_UINT16(3, controller.positionSteps());
+  TEST_ASSERT_EQUAL(P1PositionTrust::TRUSTED, controller.positionTrust());
+}
+
+void test_move_cannot_complete_inside_active_home_release_zone() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  establishHome(controller, io, nowUs);
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY,
+                    controller.prepareMoveAbsolute(100));
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  reachFirstRise(nowUs);
+  P1MotionResult result = P1MotionResult::NONE;
+  for (uint16_t i = 0; i < 100; ++i)
+    result = runOnePulse(controller, io, nowUs);
+  TEST_ASSERT_EQUAL(P1MotionResult::HOME_SWITCH_STUCK, result);
+  TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED, controller.positionTrust());
+  TEST_ASSERT_FALSE(io.step);
+}
+
+void test_move_requires_stable_home_release_and_ignores_one_sample_bounce() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  establishHome(controller, io, nowUs);
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY,
+                    controller.prepareMoveAbsolute(3));
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  reachFirstRise(nowUs);
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, runOnePulse(controller, io, nowUs));
+
+  io.home = false;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::CONFIRMING_MOVE_RELEASE,
+                    controller.state());
+  io.home = true;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::MOVING, controller.state());
+
+  io.home = false;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  nowUs += kP1HomeStableUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  nowUs += kP1StepIntervalUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, runOnePulse(controller, io, nowUs));
+  TEST_ASSERT_EQUAL(P1MotionResult::COMPLETED,
+                    runOnePulse(controller, io, nowUs));
+  TEST_ASSERT_EQUAL_UINT16(3, controller.positionSteps());
+}
+
+void test_move_allows_confirmed_home_release_after_home_release_limit() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  establishHome(controller, io, nowUs);
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY,
+                    controller.prepareMoveAbsolute(600));
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  reachFirstRise(nowUs);
+
+  P1MotionResult result = P1MotionResult::NONE;
+  for (uint16_t i = 0; i < 450; ++i)
+    result = runOnePulse(controller, io, nowUs);
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, result);
+  TEST_ASSERT_EQUAL_UINT16(450, controller.positionSteps());
+
+  io.home = false;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::CONFIRMING_MOVE_RELEASE,
+                    controller.state());
+  nowUs += kP1HomeStableUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+
+  nowUs += kP1StepIntervalUs;
+  for (uint16_t i = 450; i < 600; ++i)
+    result = runOnePulse(controller, io, nowUs);
+  TEST_ASSERT_EQUAL(P1MotionResult::COMPLETED, result);
+  TEST_ASSERT_EQUAL_UINT16(600, controller.positionSteps());
+  TEST_ASSERT_EQUAL(P1PositionTrust::TRUSTED, controller.positionTrust());
+}
+
+void test_unexpected_home_during_absolute_move_invalidates_position() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  establishHome(controller, io, nowUs);
+  io.home = false;
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY,
+                    controller.prepareMoveAbsolute(10));
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  reachFirstRise(nowUs);
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, runOnePulse(controller, io, nowUs));
+  io.home = true;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::CONFIRMING_UNEXPECTED_HOME,
+                    controller.state());
+  TEST_ASSERT_FALSE(io.step);
+  nowUs += kP1HomeStableUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::HOME_SWITCH_UNEXPECTED,
+                    controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED, controller.positionTrust());
+  TEST_ASSERT_FALSE(io.step);
+}
+
+void test_short_unexpected_home_glitch_pauses_then_resumes_without_catch_up() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  establishHome(controller, io, nowUs);
+  io.home = false;
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY,
+                    controller.prepareMoveAbsolute(10));
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  reachFirstRise(nowUs);
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, runOnePulse(controller, io, nowUs));
+  const unsigned risesBeforeGlitch = io.risingEdges;
+
+  io.home = true;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  nowUs += kP1HomeStableUs - 1;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL_UINT32(risesBeforeGlitch, io.risingEdges);
+
+  io.home = false;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL(P1MotionState::MOVING, controller.state());
+  TEST_ASSERT_EQUAL(P1PositionTrust::TRUSTED, controller.positionTrust());
+  TEST_ASSERT_EQUAL_UINT32(risesBeforeGlitch, io.risingEdges);
+  nowUs += kP1StepIntervalUs - 1;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL_UINT32(risesBeforeGlitch, io.risingEdges);
+  ++nowUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL_UINT32(risesBeforeGlitch + 1, io.risingEdges);
+}
+
+void test_abort_during_home_release_search_and_absolute_motion() {
+  {
+    FakeIo io;
+    P1MotionController controller(io);
+    uint32_t nowUs = 0;
+    establishHome(controller, io, nowUs);
+    TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareHome());
+    TEST_ASSERT_TRUE(controller.start(nowUs));
+    TEST_ASSERT_TRUE(controller.abort());
+    TEST_ASSERT_EQUAL(P1MotionState::IDLE, controller.state());
+    TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED,
+                      controller.positionTrust());
+    TEST_ASSERT_FALSE(io.step);
+  }
+  {
+    FakeIo io;
+    P1MotionController controller(io);
+    uint32_t nowUs = 0;
+    TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareHome());
+    TEST_ASSERT_TRUE(controller.start(nowUs));
+    TEST_ASSERT_TRUE(controller.abort());
+    TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED,
+                      controller.positionTrust());
+    TEST_ASSERT_FALSE(io.step);
+  }
+  {
+    FakeIo io;
+    P1MotionController controller(io);
+    uint32_t nowUs = 0;
+    establishHome(controller, io, nowUs);
+    io.home = false;
+    TEST_ASSERT_EQUAL(P1PrepareResult::READY,
+                      controller.prepareMoveAbsolute(10));
+    TEST_ASSERT_TRUE(controller.start(nowUs));
+    TEST_ASSERT_TRUE(controller.abort());
+    TEST_ASSERT_EQUAL_UINT32(0, io.risingEdges);
+    TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED,
+                      controller.positionTrust());
+  }
+}
+
+void test_abort_after_atomic_pulse_keeps_step_low() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  establishHome(controller, io, nowUs);
+  io.home = false;
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY,
+                    controller.prepareMoveAbsolute(10));
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  reachFirstRise(nowUs);
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_FALSE(io.step);
+  TEST_ASSERT_EQUAL_UINT16(kP1StepHighUs, io.lastPulseHighUs);
+  TEST_ASSERT_TRUE(controller.abort());
+  TEST_ASSERT_FALSE(io.step);
+  TEST_ASSERT_EQUAL(P1MotionState::IDLE, controller.state());
+  TEST_ASSERT_EQUAL(P1PositionTrust::UNTRUSTED, controller.positionTrust());
+}
+
+void test_abort_after_completion_does_not_corrupt_trusted_position() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  establishHome(controller, io, nowUs);
+  io.home = false;
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareMoveAbsolute(1));
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  reachFirstRise(nowUs);
+  TEST_ASSERT_EQUAL(P1MotionResult::COMPLETED,
+                    runOnePulse(controller, io, nowUs));
+  TEST_ASSERT_FALSE(controller.abort());
+  TEST_ASSERT_EQUAL(P1PositionTrust::TRUSTED, controller.positionTrust());
+  TEST_ASSERT_EQUAL_UINT16(1, controller.positionSteps());
+}
+
+void test_full_pulse_sequence_crosses_micros_wraparound() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = UINT32_MAX - 2;
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  reachFirstRise(nowUs);
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_FALSE(io.step);
+  nowUs += kP1StepIntervalUs;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_FALSE(io.step);
+  TEST_ASSERT_EQUAL_UINT32(2, io.risingEdges);
+}
+
+void test_delayed_updates_do_not_emit_catch_up_pulses() {
+  FakeIo io;
+  P1MotionController controller(io);
+  uint32_t nowUs = 0;
+  TEST_ASSERT_EQUAL(P1PrepareResult::READY, controller.prepareHome());
+  TEST_ASSERT_TRUE(controller.start(nowUs));
+  nowUs = 100000;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL_UINT32(1, io.risingEdges);
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL_UINT32(1, io.risingEdges);
+  nowUs += 100000;
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_FALSE(io.step);
+  TEST_ASSERT_EQUAL_UINT32(2, io.risingEdges);
+  TEST_ASSERT_EQUAL(P1MotionResult::NONE, controller.update(nowUs));
+  TEST_ASSERT_EQUAL_UINT32(2, io.risingEdges);
+}
+
+}  // namespace
+
+int main(int, char**) {
+  UNITY_BEGIN();
+  RUN_TEST(test_boot_is_untrusted_and_prepare_has_no_physical_side_effect);
+  RUN_TEST(test_direction_setup_precedes_first_step_rise);
+  RUN_TEST(test_home_requires_stable_active_signal_and_rejects_one_sample_glitch);
+  RUN_TEST(test_initial_active_home_is_confirmed_without_away_motion);
+  RUN_TEST(test_trusted_home_releases_then_rehomes_with_stable_transitions);
+  RUN_TEST(test_trusted_zero_one_sample_low_never_moves_toward_home);
+  RUN_TEST(test_trusted_zero_short_low_waits_for_stable_home);
+  RUN_TEST(test_trusted_zero_persistent_low_fails_without_step_rise);
+  RUN_TEST(test_stuck_home_release_fails_closed);
+  RUN_TEST(test_demo_home_search_is_bounded_to_accepted_full_span);
+  RUN_TEST(test_home_activation_on_final_allowed_pulse_is_confirmed);
+  RUN_TEST(test_home_signal_after_final_pulse_is_confirmed_without_extra_motion);
+  RUN_TEST(test_final_pulse_home_glitch_times_out_without_overtravel);
+  RUN_TEST(test_final_home_late_signal_requires_full_stability_across_clock_wrap);
+  RUN_TEST(test_final_home_signal_at_arrival_deadline_cannot_restore_trust);
+  RUN_TEST(test_delayed_final_home_glitch_cannot_restart_search_or_extend_wait);
+  RUN_TEST(test_abort_during_final_home_wait_prevents_later_completion);
+  RUN_TEST(test_absolute_move_rejects_zero_and_tracks_position);
+  RUN_TEST(test_move_cannot_complete_inside_active_home_release_zone);
+  RUN_TEST(test_move_requires_stable_home_release_and_ignores_one_sample_bounce);
+  RUN_TEST(test_move_allows_confirmed_home_release_after_home_release_limit);
+  RUN_TEST(test_unexpected_home_during_absolute_move_invalidates_position);
+  RUN_TEST(test_short_unexpected_home_glitch_pauses_then_resumes_without_catch_up);
+  RUN_TEST(test_abort_during_home_release_search_and_absolute_motion);
+  RUN_TEST(test_abort_after_atomic_pulse_keeps_step_low);
+  RUN_TEST(test_abort_after_completion_does_not_corrupt_trusted_position);
+  RUN_TEST(test_full_pulse_sequence_crosses_micros_wraparound);
+  RUN_TEST(test_delayed_updates_do_not_emit_catch_up_pulses);
+  return UNITY_END();
+}

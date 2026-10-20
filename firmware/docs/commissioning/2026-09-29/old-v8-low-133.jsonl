@@ -1,0 +1,15 @@
+{"time": 1790690080.0058408, "event": "STARTUP", "value": "LABFORGE PIN DISCOVERY; OUTPUTS INACTIVE\r\nPAIR A STEP D34 DIR D35\r\nPAIR B STEP D36 DIR D37\r\nSELECT A|B, DIR LOW|HIGH, ARM, PULSE 1..133, DISARM\r\n"}
+{"time": 1790690080.0075238, "event": "TX", "value": "DISARM"}
+{"time": 1790690080.0136113, "event": "RX", "value": "STATUS OK"}
+{"time": 1790690109.3006449, "event": "START_CHANNEL", "value": "candidate physical old V8, pair B D36/D37, LOW direction to verify"}
+{"time": 1790690109.3016562, "event": "TX", "value": "SELECT B"}
+{"time": 1790690109.3073065, "event": "RX", "value": "STATUS OK"}
+{"time": 1790690109.308107, "event": "TX", "value": "DIR LOW"}
+{"time": 1790690109.3113837, "event": "RX", "value": "STATUS OK"}
+{"time": 1790690109.3121629, "event": "TX", "value": "ARM"}
+{"time": 1790690109.3154352, "event": "RX", "value": "STATUS OK"}
+{"time": 1790690109.3161771, "event": "TX", "value": "PULSE 133"}
+{"time": 1790690110.650804, "event": "RX", "value": "STATUS OK"}
+{"time": 1790690110.651806, "event": "TX", "value": "DISARM"}
+{"time": 1790690110.6548004, "event": "RX", "value": "STATUS OK"}
+{"time": 1790690110.6556273, "event": "TEST_COMPLETE", "value": "133 pulses approx 29.925 degrees; no HOME search or position trust"}

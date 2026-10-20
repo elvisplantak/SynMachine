@@ -1,0 +1,12 @@
+{"event": "OPERATOR_PREREQUISITES", "empty_sf": true, "element_free": true, "motor_power_ready": true, "existing_direction_safe": true, "evidence_directory": "/home/elvis/Documents/labforge-firmware/docs/commissioning/2026-10-11/sf-mixer-recheck-805a29e9-2f84-4184-a736-568e0faec4a9", "observed_at_utc": "2026-10-11T11:57:17.982379+00:00"}
+{"event": "SESSION", "hello": {"protocol": "LABFORGE/1", "backend_session_nonce": "4bcc0f08-c223-44c9-9676-9bb4eb766f40", "controller_boot_id": 98, "controller_state": "IDLE", "software_state_trust": "TRUSTED", "type": "HELLO_OK", "capabilities": ["PUMP_HOME", "PUMP_MOVE_ABSOLUTE_STEPS", "VALVE_HOME", "VALVE_SET_POSITION", "COLUMN_BOTTOM_VALVE_HOME", "COLUMN_BOTTOM_VALVE_SET_POSITION", "CAROUSEL_SET_REFERENCE", "CAROUSEL_MOVE_TO_POSITION", "SF_MIXER_SET_STATE"], "reset_cause": null}, "observed_at_utc": "2026-10-11T11:57:20.584376+00:00"}
+{"event": "COMMAND_BEGIN", "operation_command_id": "cd73e48e-3d56-4d59-8486-779caaba9cac", "running": false, "observed_at_utc": "2026-10-11T11:57:20.701330+00:00"}
+{"event": "COMMAND_RESULT", "operation_command_id": "cd73e48e-3d56-4d59-8486-779caaba9cac", "state": "COMPLETED", "running": false, "result": {}, "observed_at_utc": "2026-10-11T11:57:20.866522+00:00"}
+{"event": "COMMAND_BEGIN", "operation_command_id": "4ec70e4f-1cf2-4b98-9c8e-70b7012d0235", "running": true, "observed_at_utc": "2026-10-11T11:57:20.868910+00:00"}
+{"event": "COMMAND_RESULT", "operation_command_id": "4ec70e4f-1cf2-4b98-9c8e-70b7012d0235", "state": "COMPLETED", "running": true, "result": {}, "observed_at_utc": "2026-10-11T11:57:21.033116+00:00"}
+{"event": "WAIT_STARTED", "duration_seconds": "3", "observed_at_utc": "2026-10-11T11:57:21.034000+00:00"}
+{"event": "WAIT_COMPLETED", "duration_seconds": "3", "observed_at_utc": "2026-10-11T11:57:24.034927+00:00"}
+{"event": "COMMAND_BEGIN", "operation_command_id": "afa094bb-92b6-4f26-a0d6-991c8d13fac5", "running": false, "observed_at_utc": "2026-10-11T11:57:24.035965+00:00"}
+{"event": "COMMAND_RESULT", "operation_command_id": "afa094bb-92b6-4f26-a0d6-991c8d13fac5", "state": "COMPLETED", "running": false, "result": {}, "observed_at_utc": "2026-10-11T11:57:24.198831+00:00"}
+{"event": "TEST_COMPLETED", "commanded_mixer_running": false, "physical_observation": "Pending operator confirmation", "observed_at_utc": "2026-10-11T11:57:24.199716+00:00"}
+{"event": "CONNECTION_CLOSED", "ad_hoc_cleanup_motion": false, "observed_at_utc": "2026-10-11T11:57:24.209852+00:00"}
