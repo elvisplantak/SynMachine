@@ -16,8 +16,23 @@ P1MotionController::P1MotionController(P1MotionIo& io) : io_(io) {}
 
 P1PrepareResult P1MotionController::prepareHome() {
   if (busy()) return P1PrepareResult::BUSY;
+  fullAspiration_ = false;
   state_ = P1MotionState::PREPARED_HOME;
   return P1PrepareResult::READY;
+}
+
+P1PrepareResult P1MotionController::prepareFullAspiration() {
+  if (busy()) return P1PrepareResult::BUSY;
+  if (trust_ != P1PositionTrust::TRUSTED)
+    return P1PrepareResult::POSITION_UNTRUSTED;
+  // Full-stroke aspiration is explicit and starts only at the known empty end.
+  // Reuse bounded switch-confirmed arrival, never ordinary target-zero motion.
+  if (positionSteps_ != kP1MaximumAbsoluteSteps)
+    return P1PrepareResult::INVALID_TARGET;
+  if (io_.homeActive()) return P1PrepareResult::HOME_SWITCH_ACTIVE;
+  const P1PrepareResult result = prepareHome();
+  fullAspiration_ = result == P1PrepareResult::READY;
+  return result;
 }
 
 P1PrepareResult P1MotionController::prepareMoveAbsolute(uint16_t targetSteps) {
@@ -49,7 +64,10 @@ bool P1MotionController::start(uint32_t nowUs) {
     } else if (io_.homeActive()) {
       beginStage(P1MotionState::SEARCHING_HOME,
                  kDirectionTowardHomeHigh, nowUs);
-      pauseForHomeStability(P1MotionState::CONFIRMING_HOME_ACTIVE, nowUs);
+      pauseForHomeStability(fullAspiration_
+                               ? P1MotionState::CONFIRMING_UNEXPECTED_HOME
+                               : P1MotionState::CONFIRMING_HOME_ACTIVE,
+                           nowUs);
     } else {
       beginStage(P1MotionState::SEARCHING_HOME,
                  kDirectionTowardHomeHigh, nowUs);
@@ -140,7 +158,8 @@ P1MotionResult P1MotionController::update(uint32_t nowUs) {
   if (state_ == P1MotionState::CONFIRMING_UNEXPECTED_HOME) {
     if (!io_.homeActive()) {
       resumePulses(nowUs);
-      state_ = P1MotionState::MOVING;
+      state_ = fullAspiration_ ? P1MotionState::SEARCHING_HOME
+                               : P1MotionState::MOVING;
     } else if (timeReached(nowUs, homeStableSinceUs_ + kP1HomeStableUs)) {
       trust_ = P1PositionTrust::UNTRUSTED;
       return finish(P1MotionResult::HOME_SWITCH_UNEXPECTED);
@@ -149,7 +168,14 @@ P1MotionResult P1MotionController::update(uint32_t nowUs) {
   }
 
   if (state_ == P1MotionState::SEARCHING_HOME && io_.homeActive()) {
-    pauseForHomeStability(P1MotionState::CONFIRMING_HOME_ACTIVE, nowUs);
+    // A transfer from a trusted empty coordinate must account for the full
+    // stroke; an early stable switch cannot masquerade as delivered volume.
+    const bool earlyFullStroke = fullAspiration_ &&
+                                 stageSteps_ < kP1MaximumAbsoluteSteps;
+    pauseForHomeStability(earlyFullStroke
+                             ? P1MotionState::CONFIRMING_UNEXPECTED_HOME
+                             : P1MotionState::CONFIRMING_HOME_ACTIVE,
+                         nowUs);
     return P1MotionResult::NONE;
   }
 
@@ -218,11 +244,13 @@ bool P1MotionController::abort() {
   if (!executionStarted) {
     state_ = P1MotionState::IDLE;
     releasingHomeDuringMove_ = false;
+    fullAspiration_ = false;
     return true;
   }
   io_.writeStep(false);
   state_ = P1MotionState::IDLE;
   releasingHomeDuringMove_ = false;
+  fullAspiration_ = false;
   trust_ = P1PositionTrust::UNTRUSTED;
   return true;
 }
@@ -271,6 +299,7 @@ P1MotionResult P1MotionController::finish(P1MotionResult result) {
   io_.writeStep(false);
   state_ = P1MotionState::IDLE;
   releasingHomeDuringMove_ = false;
+  fullAspiration_ = false;
   return result;
 }
 

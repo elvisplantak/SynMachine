@@ -66,6 +66,7 @@ enum class CommandKind : uint8_t {
   CAROUSEL_SET_REFERENCE,
   CAROUSEL_MOVE_TO_POSITION,
   SF_MIXER_SET_STATE,
+  PUMP_ASPIRATE_FULL_STROKE,
 };
 enum class PumpId : uint8_t { NONE, P1, P2 };
 enum class ValveId : uint8_t { NONE, V1, V2, V3, V4, V5, V6, V7, V8 };

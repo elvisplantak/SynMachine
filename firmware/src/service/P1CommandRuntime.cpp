@@ -7,6 +7,7 @@
 #include "protocol/ColumnBottomValveContract.h"
 #include "protocol/ProtocolErrorWriter.h"
 #include "protocol/PumpHomeContract.h"
+#include "protocol/PumpFullAspirationContract.h"
 #include "protocol/PumpMoveAbsoluteStepsContract.h"
 #include "protocol/SfMixerContract.h"
 #include "protocol/ValveHomeContract.h"
@@ -183,6 +184,9 @@ DispatchResult P1CommandRuntime::dispatchCommand(
     return {ParseStatus::VALID_MESSAGE, outputLength};
   }
 
+  PumpFullAspirationCommand fullAspiration{};
+  const PumpHomeContractStatus fullAspirationStatus =
+      parsePumpFullAspiration(message, fullAspiration);
   PumpHomeCommand home{};
   const PumpHomeContractStatus homeStatus = parsePumpHome(message, home);
   PumpMoveAbsoluteStepsCommand move{};
@@ -207,6 +211,8 @@ DispatchResult P1CommandRuntime::dispatchCommand(
   P1PrepareResult prepared = P1PrepareResult::INVALID_TARGET;
   if (homeStatus == PumpHomeContractStatus::VALID) {
     semantic = semanticIdentity(home);
+  } else if (fullAspirationStatus == PumpHomeContractStatus::VALID) {
+    semantic = semanticIdentity(fullAspiration);
   } else if (moveStatus == PumpMoveContractStatus::VALID) {
     semantic = semanticIdentity(move);
   } else if (valveHomeStatus == ValveHomeContractStatus::VALID) {
@@ -222,6 +228,7 @@ DispatchResult P1CommandRuntime::dispatchCommand(
   } else {
     const bool supported =
         homeStatus != PumpHomeContractStatus::UNSUPPORTED_COMMAND ||
+        fullAspirationStatus != PumpHomeContractStatus::UNSUPPORTED_COMMAND ||
         moveStatus != PumpMoveContractStatus::UNSUPPORTED_COMMAND ||
         valveHomeStatus != ValveHomeContractStatus::UNSUPPORTED_COMMAND ||
         valvePositionStatus !=
@@ -275,6 +282,7 @@ DispatchResult P1CommandRuntime::dispatchCommand(
   CarouselMotionController* selectedCarouselController = nullptr;
   SfMixerMotionController* selectedSfMixerController = nullptr;
   if (semantic.command == CommandKind::PUMP_HOME ||
+      semantic.command == CommandKind::PUMP_ASPIRATE_FULL_STROKE ||
       semantic.command == CommandKind::PUMP_MOVE_ABSOLUTE_STEPS) {
     selectedController = controllerFor(semantic.pump);
     if (selectedController == nullptr) {
@@ -282,10 +290,12 @@ DispatchResult P1CommandRuntime::dispatchCommand(
              capacity, outputLength, &semantic);
       return {ParseStatus::VALID_MESSAGE, outputLength};
     }
-    prepared = semantic.command == CommandKind::PUMP_HOME
-                   ? selectedController->prepareHome()
-                   : selectedController->prepareMoveAbsolute(
-                         semantic.targetSteps);
+    if (semantic.command == CommandKind::PUMP_HOME)
+      prepared = selectedController->prepareHome();
+    else if (semantic.command == CommandKind::PUMP_ASPIRATE_FULL_STROKE)
+      prepared = selectedController->prepareFullAspiration();
+    else
+      prepared = selectedController->prepareMoveAbsolute(semantic.targetSteps);
     if (prepared != P1PrepareResult::READY) {
       reject(message, identity, cache, preflightError(prepared), output,
              capacity, outputLength, &semantic);

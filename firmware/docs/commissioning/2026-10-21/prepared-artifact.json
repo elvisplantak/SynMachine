@@ -1,0 +1,18 @@
+{
+  "target": "megaatmega2560",
+  "prepared_hex_sha256": "61feb4425fddee73799191faf5a1bf98bb684db601a598712b30a7fe8a1c0d45",
+  "flash_bytes": 41570,
+  "static_sram_bytes": 3176,
+  "uploaded": false,
+  "real_device_opened": false,
+  "previous_installed_commit": "e2e9d3c5be17cdf703a684e29a6c9dd4a54ec735",
+  "previous_installed_hex_sha256": "93e133bdc130583edfcd27a12ef61cbe396d0a2bf6dd972d913f3447a4745dcf",
+  "native_tests": 220,
+  "mixer_profile_native_tests": 6,
+  "backend_full_suite": 1937,
+  "new_host_regressions": 2,
+  "backend_focused_tests_including_new": 131,
+  "ruff": "passed",
+  "physical_execution": "not performed",
+  "upload_authorization": "pending"
+}

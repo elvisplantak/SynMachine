@@ -61,7 +61,8 @@ bool validError(CommandErrorCode error) {
 }
 
 bool validSemanticIdentity(const CommandSemanticIdentity& identity) {
-  if (identity.command == CommandKind::PUMP_HOME)
+  if (identity.command == CommandKind::PUMP_HOME ||
+      identity.command == CommandKind::PUMP_ASPIRATE_FULL_STROKE)
     return (identity.pump == PumpId::P1 || identity.pump == PumpId::P2) &&
            identity.targetSteps == 0 && identity.valve == ValveId::NONE &&
            identity.targetDegrees == 0 && identity.carouselPosition == 0 &&

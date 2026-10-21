@@ -61,6 +61,7 @@ class P1MotionController {
   explicit P1MotionController(P1MotionIo& io);
 
   P1PrepareResult prepareHome();
+  P1PrepareResult prepareFullAspiration();
   P1PrepareResult prepareMoveAbsolute(uint16_t targetSteps);
   bool start(uint32_t nowUs);
   P1MotionResult update(uint32_t nowUs);
@@ -90,6 +91,7 @@ class P1MotionController {
   bool homeStableLevel_ = false;
   bool directionHigh_ = false;
   bool releasingHomeDuringMove_ = false;
+  bool fullAspiration_ = false;
 };
 
 }  // namespace labforge

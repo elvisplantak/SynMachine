@@ -1,9 +1,9 @@
 # SynMachine current development state
 
-- Checkpoint date: 2026-10-20
+- Checkpoint date: 2026-10-21
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Local checkout: `/home/elvis/Documents/SynMachine`
-- Branch: `main` (approved publication preparation integrated);
+- Branch: `commissioning/full-stroke-wet-test` (software preparation; upload pending);
   imported histories under `history/ui/`, `history/backend/`,
   `history/firmware/`.
 
@@ -70,3 +70,29 @@ The original component repositories remain private and unchanged. Publication is
 complete; no further publication approval is pending. Future physical/liquid tests
 still require fresh operator readiness and authorization. See PUBLICATION.md and
 PUBLICATION_VERIFICATION.md.
+
+## Supervised wet test preparation — 2026-10-21
+
+The owner requested B1 colored water -> Reactor (one nominal full-stroke 20 mL)
+-> SF -> 20 s mixing -> P2 -> Waste, excluding Column/carousel and deferring
+flushing. B2 is ordinary water; S is empty. Two 5 mL S priming cycles were approved,
+but water at S and Reactor-empty readiness remain unresolved. SF empty, mixer
+free, Waste clear and USB connected were reported; motor power is OFF.
+
+On this feature branch, firmware adds explicit PUMP_ASPIRATE_FULL_STROKE only
+from trusted empty20500, with stable HOME, bounded20500 pulse count and early-HOME
+failure. Ordinary move-zero remains invalid; Recipes' ordinary planner remains
+unchanged. SF interval is prepared at1667us (~600 pulses/s), explicitly approved
+as a trial. Host capability limit is10 to accept the updated HELLO, without
+implicit command fallback on older firmware. No live profile/state binding,
+existing journal, installed firmware, device connection or physical motion is
+changed by preparation. Verification:220 native +6 mixer-profile tests,1937
+complete backend tests plus two additional host cases (131 focused), Ruff and
+Mega build passed. Mega41570 flash/3176 SRAM (+514/+28); prepared HEX SHA256
+61feb4425fddee73799191faf5a1bf98bb684db601a598712b30a7fe8a1c0d45.
+Previous installed HEX matched its recorded hash and is preserved separately.
+Next: explicit upload authorization with motor power OFF, then fresh readiness
+and exact wet priming/transition review; S-water/Reactor-empty and P2 prime stroke
+remain unresolved. The wet runner is not yet finalized. Do not treat software
+preparation as physical execution or firmware-upload authorization. Evidence:
+firmware/docs/commissioning/2026-10-21/README.md.

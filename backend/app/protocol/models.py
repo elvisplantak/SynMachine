@@ -111,7 +111,7 @@ class HelloOk(ControllerStateMessage):
     @field_validator("capabilities")
     @classmethod
     def validate_capabilities(cls, value: list[str]) -> list[str]:
-        if len(value) > 9 or any(len(item.encode("ascii")) > 32 for item in value):
+        if len(value) > 10 or any(len(item.encode("ascii")) > 32 for item in value):
             raise ValueError("invalid capabilities")
         return value
 

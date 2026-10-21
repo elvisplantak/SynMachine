@@ -120,9 +120,9 @@ def test_human_message_utf8_byte_limit() -> None:
 
 
 def test_capability_count_and_value_bounds() -> None:
-    message = {**MINIMAL_MESSAGES[1], "capabilities": [f"CAP_{index}" for index in range(9)]}
-    assert len(parse_message(message).capabilities) == 9
-    message["capabilities"] = [f"CAP_{index}" for index in range(10)]
+    message = {**MINIMAL_MESSAGES[1], "capabilities": [f"CAP_{index}" for index in range(10)]}
+    assert len(parse_message(message).capabilities) == 10
+    message["capabilities"] = [f"CAP_{index}" for index in range(11)]
     with pytest.raises(ValidationError):
         parse_message(message)
     message["capabilities"] = ["bad"]

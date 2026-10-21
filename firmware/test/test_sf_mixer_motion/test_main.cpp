@@ -59,6 +59,19 @@ void test_start_waits_for_direction_setup_and_uses_confirmed_profile() {
   TEST_ASSERT_EQUAL_UINT16(kSfMixerStepHighUs, io.pulseWidths[0]);
 }
 
+void test_trial_rate_uses_1667_us_without_early_or_catch_up_pulses() {
+  FakeIo io;
+  SfMixerMotionController controller(io);
+  startMixer(controller);
+  TEST_ASSERT_EQUAL_UINT32(1667, kSfMixerStepIntervalUs);
+  controller.update(105 + 1666);
+  TEST_ASSERT_EQUAL_UINT16(1, io.pulseWidths.size());
+  controller.update(105 + 1667);
+  TEST_ASSERT_EQUAL_UINT16(2, io.pulseWidths.size());
+  controller.update(105 + 1667);
+  TEST_ASSERT_EQUAL_UINT16(2, io.pulseWidths.size());
+}
+
 void test_continuous_update_emits_one_pulse_without_catch_up() {
   FakeIo io;
   SfMixerMotionController controller(io);
@@ -120,6 +133,7 @@ void test_abort_and_force_stop_leave_step_inactive() {
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_start_waits_for_direction_setup_and_uses_confirmed_profile);
+  RUN_TEST(test_trial_rate_uses_1667_us_without_early_or_catch_up_pulses);
   RUN_TEST(test_continuous_update_emits_one_pulse_without_catch_up);
   RUN_TEST(test_set_state_is_idempotent_and_stop_prevents_more_pulses);
   RUN_TEST(test_abort_and_force_stop_leave_step_inactive);

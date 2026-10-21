@@ -113,7 +113,7 @@ fields MUST be rejected in LABFORGE/1. Missing fields are protocol errors.
 | `command` | 1–32 uppercase ASCII bytes; only `A-Z`, `0-9`, `_` |
 | `error_code` | 1–40 uppercase ASCII bytes; only `A-Z`, `0-9`, `_` |
 | Human-readable `message` | Optional; at most 96 UTF-8 bytes |
-| Capability name | 1–32 uppercase ASCII bytes; at most 9 capabilities |
+| Capability name | 1–32 uppercase ASCII bytes; at most 10 capabilities |
 | `arguments` object | At most 8 members; keys are 1–24 ASCII bytes; scalar values only: string, signed 64-bit integer, or boolean; null and floating-point numbers are not allowed; strings at most 64 UTF-8 bytes; no nested object or array |
 | `result` object | Same structural bounds as `arguments`, except future command-specific schemas may explicitly permit selected null values |
 | Any other protocol collection | At most 8 entries unless its schema sets a smaller limit |
@@ -249,7 +249,7 @@ trusted production runtime emits its numeric boot ID, `controller_state`
 `PUMP_HOME`, `PUMP_MOVE_ABSOLUTE_STEPS`, `VALVE_HOME`, and
 `VALVE_SET_POSITION`, the two column-bottom-valve commands,
 `CAROUSEL_SET_REFERENCE` / `CAROUSEL_MOVE_TO_POSITION`, and
-`SF_MIXER_SET_STATE`. The protocol-only writer mode keeps
+`SF_MIXER_SET_STATE` and `PUMP_ASPIRATE_FULL_STROKE`. The protocol-only writer mode keeps
 the empty capability list used by its focused tests. An untrusted identity emits
 `controller_boot_id:null`,
 `controller_state:"IDENTITY_UNTRUSTED"`, and
@@ -290,6 +290,35 @@ confirmed selected-pump DIR write, followed by the configured DIR-to-STEP setup
 interval. The command is connected to the independent Arduino P1 and P2
 adapters. P1 and P2 have each been physically exercised through this runtime at
 separate supervised dry checkpoints.
+
+### Explicit full-stroke aspiration — software preparation 2026-10-21
+
+`PUMP_ASPIRATE_FULL_STROKE` contains exactly one argument, `pump:"P1"` or
+`pump:"P2"`. It requires trusted pump position 20500 and an inactive HOME input
+at preparation. It has no caller-supplied volume, speed, direction or route.
+Backend orchestration must select and verify the intended source route first.
+The command is a separately advertised capability, not an automatic substitution
+of `PUMP_HOME` for a rejected zero-target move.
+
+After the complete STARTED frame is written, the selected pump alone uses the
+existing bounded HOME-direction pulse timing and stable switch arrival. The
+full-stroke operation must account for 20500 pulses: a stably active HOME before
+that bound fails with PUMP_HOME_SWITCH_UNEXPECTED and leaves position untrusted.
+An early transient pauses and resumes the bounded search without catch-up pulses.
+At the final allowed pulse, the existing motionless late-signal/stability window
+applies. Missing HOME fails with PUMP_MOTION_TIMEOUT; no extra search pulse is
+permitted. Success establishes trusted zero. A later separate dispense to 20500
+must verify stable HOME release as before. Abort/failure invalidates position
+trust; duplicate/reconnect/no-replay behavior is unchanged.
+
+This is a nominal full-stroke demo operation, not measured delivered volume.
+The older ordinary `PUMP_MOVE_ABSOLUTE_STEPS` contract still rejects target zero.
+The existing Recipes planner continues to reject zero-target ordinary transfers;
+this separately gated command is prepared for the supervised commissioning test.
+An older firmware without the advertised capability must be refused before send.
+The updated host accepts up to ten capability names; the worst production
+HELLO_OK is 452 bytes including LF and fits the unchanged 464-byte output buffer.
+Upload and physical validation of this new command remain separate approvals.
 
 The approved rotary-valve commands are `VALVE_HOME` and
 `VALVE_SET_POSITION`, supported for `V1` through `V8`. `VALVE_HOME` contains
@@ -391,15 +420,18 @@ caller-supplied pin, direction, RPM, pulse rate, or duration.
 Boot initializes STEP inactive. The complete `STARTED` frame is handed to
 Serial before any mixer DIR or STEP side effect. Starting uses confirmed STEP
 D6, DIR D7, tested DIR logic low, 20 us STEP HIGH, 5 us direction setup, and a
-fixed 2,000 us rising-edge interval (500 pulses/s). `COMPLETED` means firmware
+fixed 1,667 us rising-edge interval (approximately 600 pulses/s). `COMPLETED` means firmware
 applied the requested output state and, for a transition from stopped to
 running, emitted the first STEP pulse. It is not sensor evidence of rotation,
 RPM, torque, mixing, or fluid behavior. Repeating either requested state is a
 valid idempotent set-state command but remains a distinct physical command and
 must not be automatically retried after an ambiguous outcome.
 
-The fixed pulse rate is the bounded rate exercised during supervised pin
-commissioning; it is not a calibrated production mixing speed. While the mixer
+The previous 2,000 us / 500 pulses/s profile was physically commissioned.
+On 2026-10-21 the owner approved a 600 pulses/s trial; integer timing rounds up
+to 1,667 us (approximately 599.88 pulses/s), avoiding a rate above the request.
+This prepared profile is not yet uploaded or physically validated, and is not
+calibrated RPM or a production mixing speed. While the mixer
 is commanded running, firmware rejects every other actuator command with
 `CONTROLLER_BUSY`, but accepts `SF_MIXER_SET_STATE` so an explicit Stop remains
 available. Session replacement follows the general LABFORGE/1 rule and does not
@@ -671,7 +703,7 @@ including `result:{}` for `COMPLETED` and `error_code` plus
 `execution_started` for `FAILED`; optional messages and result payloads are not
 implemented. Querying never mutates the cache, and handshake replacement in the
 same controller boot does not clear it. The maximum implemented mandatory frame
-is 443 bytes including LF, and the shared output capacity is 464 bytes.
+is 452 bytes including LF, and the shared output capacity is 464 bytes.
 
 Cache mutation enforces the normative `ACCEPTED` to `STARTED` to terminal
 ordering, exact idempotent replay, immutable terminal results, and immutable
@@ -756,8 +788,8 @@ repeated-homing release did not clear HOME within 400 pulses, or that an
 absolute move away from zero reached its requested target while HOME was still
 active. The latter release is bounded by the validated absolute target, not by
 the repeated-homing release allowance.
-Expected stable HOME arrival is part of the `PUMP_HOME` contract, not the
-non-homing command contract.
+Expected stable HOME arrival is part of `PUMP_HOME` and the explicit full-stroke
+aspiration contract; ordinary absolute moves retain their non-homing contract.
 
 `COMMAND_ABORTED` means a command that had already crossed `STARTED` was
 deliberately stopped by the local abort path. It is a cached
@@ -819,7 +851,7 @@ their mandatory minimal cached fields.
 | Message | Representative/worst-case bytes |
 |---|---:|
 | `HELLO` | 103 |
-| `HELLO_OK` | 424 |
+| `HELLO_OK` | 452 |
 | `COMMAND` with empty `arguments` | 329 |
 | `REJECTED` | 327 |
 | `ACCEPTED` | 288 |
@@ -932,7 +964,7 @@ volatile manual-reference trust, and a trusted-CLOSED column interlock. Native
 verification is complete at this software checkpoint; firmware upload and
 physical execution through this production path remain separately gated.
 The dispatcher also includes the exact boolean `SF_MIXER_SET_STATE` contract,
-continuous non-catch-up D6/D7 stepping at the supervised commissioning rate,
+continuous non-catch-up D6/D7 stepping at the configured owner-approved trial rate,
 explicit Start/Stop lifecycle handling, and a firmware interlock that blocks
 other actuator commands while the SF mixer is commanded running. Native
 contract/controller/runtime verification is complete; production-path upload

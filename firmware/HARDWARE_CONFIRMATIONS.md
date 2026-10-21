@@ -1,5 +1,22 @@
 # Hardware confirmations
 
+## Requested supervised wet-test preparation — 2026-10-21
+
+The owner requested nominal one-full-stroke 20 mL from B1 colored water into
+Reactor, Reactor-to-SF transfer, SF mixing for 20 seconds, then SF-to-P2-to-Waste.
+Column and carousel are excluded. B2 contains ordinary water; S was reported
+empty. P1 priming is approved as two 5 mL S-to-P1-to-Waste cycles, but S must be
+filled or the preparation explicitly revised before execution. Reactor-empty
+confirmation remains pending; SF empty, free mixing element, clear Waste and
+USB connections were reported. The machine's motor power was reported OFF.
+
+The owner explicitly selected software preparation of full-stroke aspiration
+and approved a 600 pulses/s SF trial (prepared integer interval 1667 us).
+These are requested trial inputs, not confirmed physical results. No new pins,
+direction, volume calibration, route geometry or working limits are inferred.
+Installed firmware remains e2e9d3c until a separately authorized verified upload.
+No real Serial opening or actuator command has occurred for this preparation.
+
 ## Owner clarification: colored-liquid prototype materials — 2026-10-20
 
 The owner clarified that the prototype's intended purpose is mechatronic testing

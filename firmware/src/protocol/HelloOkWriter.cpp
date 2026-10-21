@@ -42,7 +42,7 @@ bool writeHelloOk(const char* nonce, const BootIdentityResult& identity,
                 "\"COLUMN_BOTTOM_VALVE_SET_POSITION\","
                 "\"CAROUSEL_SET_REFERENCE\","
                 "\"CAROUSEL_MOVE_TO_POSITION\","
-                "\"SF_MIXER_SET_STATE\"]}\n"),
+                "\"SF_MIXER_SET_STATE\",\"PUMP_ASPIRATE_FULL_STROKE\"]}\n"),
             nonce, static_cast<unsigned long>(identity.controllerBootId),
             controllerState)
       : identity.trusted

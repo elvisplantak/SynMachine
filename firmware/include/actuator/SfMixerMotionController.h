@@ -4,7 +4,9 @@
 
 namespace labforge {
 
-constexpr uint32_t kSfMixerStepIntervalUs = 2000;
+// Owner-approved 2026-10-21 trial rate: approximately 600 rising edges/s.
+// Integer microseconds round upward, avoiding a rate above the requested trial.
+constexpr uint32_t kSfMixerStepIntervalUs = 1667;
 constexpr uint16_t kSfMixerStepHighUs = 20;
 constexpr uint16_t kSfMixerDirectionSetupUs = 5;
 constexpr bool kSfMixerTestedDirectionHigh = false;
