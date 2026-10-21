@@ -4,11 +4,13 @@
 
 The owner requested nominal one-full-stroke 20 mL from B1 colored water into
 Reactor, Reactor-to-SF transfer, SF mixing for 20 seconds, then SF-to-P2-to-Waste.
-Column and carousel are excluded. B2 contains ordinary water; S was reported
-empty. P1 priming is approved as two 5 mL S-to-P1-to-Waste cycles, but S must be
-filled or the preparation explicitly revised before execution. Reactor-empty
-confirmation remains pending; SF empty, free mixing element, clear Waste and
-USB connections were reported. The machine's motor power was reported OFF.
+Column and carousel are excluded. B2 contains ordinary water. S was initially
+empty; the owner now confirms S filled with ordinary water, its intake submerged
+and Reactor empty. P1 priming is approved as two 5 mL S-to-P1-to-Waste cycles.
+The owner also approved two 5 mL Reactor-to-P2-to-Reactor return-priming cycles
+after Reactor filling. SF empty, free mixing element, clear Waste and USB
+connections were reported. Motor power is last reported OFF; fresh powered
+readiness and final Waste-air-gap/mixer preparation remain pending.
 
 The owner explicitly selected software preparation of full-stroke aspiration
 and approved a 600 pulses/s SF trial (prepared integer interval 1667 us).

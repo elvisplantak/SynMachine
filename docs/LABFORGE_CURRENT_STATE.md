@@ -75,8 +75,9 @@ PUBLICATION_VERIFICATION.md.
 
 The owner requested B1 colored water -> Reactor (one nominal full-stroke 20 mL)
 -> SF -> 20 s mixing -> P2 -> Waste, excluding Column/carousel and deferring
-flushing. B2 is ordinary water; S is empty. Two 5 mL S priming cycles were approved,
-but water at S and Reactor-empty readiness remain unresolved. SF empty, mixer
+flushing. B2 is ordinary water. The owner now confirms S filled, intake submerged
+and Reactor empty, and approves two 5 mL Reactor-to-P2-to-Reactor priming cycles
+after filling, alongside the two approved 5 mL S-to-P1-to-Waste cycles. SF empty, mixer
 free, Waste clear and USB connected were reported; motor power is OFF.
 
 On this feature branch, firmware adds explicit PUMP_ASPIRATE_FULL_STROKE only
@@ -95,7 +96,14 @@ Upload completed with explicit owner approval and motor power OFF: exact
 dc7a53fcdd93315965bf82ba143bf4def17688e7 HEX, signature 0x1e9801, all 41570 flash
 bytes verified, exit 0. No actuator command, application Serial monitor, EEPROM
 provisioning or wet test. New stroke/speed remain physically unverified.
-Next: fresh readiness and exact wet priming/transition review; S-water,
-Reactor-empty readiness and P2 prime stroke remain unresolved. The wet runner is not yet finalized. Do not treat software
-preparation or flash verification as physical test acceptance. Evidence:
+The fixed supervised runner is prepared at backend/app/wet_reactor_sf.py with
+71 fake regressions and unchanged existing live profile/bundle binding. It uses
+a single retained owner and the existing Arduino/SF/wait journals; no Column
+reference is invented. Exact plan, bootstrap, follow-ups and single-use boundary:
+firmware/docs/commissioning/2026-10-21/WET_TEST_PLAN.md. Verification: all 2010
+backend tests passed (71 new), full Ruff check and whitespace checks passed.
+Firmware source/HEX is unchanged since the approved upload. Next: fresh powered readiness, Waste air-gap/free-mixer checks
+and explicit execution approval for this concrete plan. No new application
+connection or actuator command has occurred. Preparation/flash verification
+are not physical test acceptance. Evidence:
 firmware/docs/commissioning/2026-10-21/README.md.

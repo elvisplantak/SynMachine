@@ -11,7 +11,7 @@ Recovery artifacts are not accessed or modified.
 - One nominal full-stroke 20 mL from B1 colored water to Reactor.
 - Reactor -> P2 -> SF; mix for20s at an explicitly approved600 pulses/s trial.
 - SF bottom -> P2 -> Waste. Column and carousel are excluded.
-- P1 priming: two5mL S -> P1 -> Waste cycles approved by the owner.
+- P1 priming: two 5 mL S -> P1 -> Waste cycles approved by the owner.
 - B2 contains ordinary water, S is empty. Filling S or revising the preparation
   remains unresolved; an empty S source must not be treated as successful priming.
 - Owner reports SF empty, mixing element free, Waste clear and USB connected;
@@ -69,7 +69,7 @@ Pump initialization HOME requires the confirmed Waste air-gap route, followed by
 emptying to20500. No pump HOME is substituted into a normal liquid transfer.
 
 Before wet execution, finish S-water/Reactor-empty preparation and the exact
-priming/transition review. P1 priming uses the approved two5mL cycles. The earlier
+priming/transition review. P1 priming uses the approved two 5 mL cycles. The earlier
 P2-priming concept returns liquid Reactor -> P2 -> Reactor twice, but no stroke
 volume for that step was supplied for this test; do not silently invent it or
 omit it when claiming all priming protocols completed. The wet runner/plan still
@@ -99,3 +99,16 @@ Next: finish the wet plan and resolve S-water/Reactor-empty readiness and P2
 priming volume. Obtain fresh powered readiness before execution; keep motor
 power OFF during preparation. Use the updated backend source for the 10-capability
 HELLO; do not reuse old boot references or silently fall back to HOME.
+
+## Wet plan finalized after operator clarification
+
+The owner confirmed S filled/intake submerged and Reactor empty, and approved
+two 5 mL Reactor-to-P2-to-Reactor priming cycles after filling. See the
+[exact wet-test plan](WET_TEST_PLAN.md) for the fixed supervised runner,
+required Close/Stop, existing-bundle exclusion and remaining powered readiness.
+These updates supersede the unresolved preparation items above; physical
+execution has not started.
+
+Verification of the finalized runner: 71 focused and 2010 complete backend
+tests passed, zero skipped; full backend Ruff passed. Firmware source and
+uploaded HEX are unchanged. No real port opened during this preparation.
