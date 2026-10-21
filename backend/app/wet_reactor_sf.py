@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import sqlite3
 from threading import Event
 from uuid import uuid4
 
@@ -27,11 +28,13 @@ from app.hardware.fresh_hardware_observations import observe_current_hardware
 from app.hardware.owned_offline_runtime import OwnedOfflineRuntime
 from app.hardware.prepared_adapter_device import PreparedAdapterDevice
 from app.hardware.sf_bottom_valve import SfBottomValveActuator, SfBottomValveConfiguration
-from app.live_execution import _digest, _exclusive_port, load_bundle, load_profile
+from app.live_execution import _digest, _exclusive_port, _read_json, load_bundle, load_profile
 
 PROFILE = Path(__file__).resolve().parents[1] / "docs/LIVE_RECIPES_PROFILE.json"
 STATE_DIRECTORY = Path.home() / ".local/state/labforge/recipes-live-v1"
 PROFILE_DIGEST = "8035b3f152d782faba75c5760e9c9b0570cb6a2d9dd331660cb2806accb98d51"
+STARTUP_FAILURE_RECORD = (Path(__file__).resolve().parents[2]
+    / "firmware/docs/commissioning/2026-10-21/wet-01-result.json")
 SF_ACTION = "SF_BOTTOM_SET_STATE"
 WAIT_ACTION = "WAIT_SECONDS"
 CAPABILITIES = frozenset({"VALVE_HOME", "VALVE_SET_POSITION", "PUMP_HOME",
@@ -148,12 +151,62 @@ def require_pristine(report):
         raise RuntimeError("wet test requires the existing pristine bundle; no reset or replay")
 
 
-def run(runtime, client, sf, emit, stop_requested):
+def require_startup_timeout(report, bundle):
+    """Deliberate reconciliation of the exact recorded pre-liquid failure only."""
+    proof = _read_json(STARTUP_FAILURE_RECORD)
+    if (report.owner_id != proof["ownership"]["owner_id"] or report.owner_state != "BLOCKED"
+        or report.ownership_generation != 1 or report.machine is not None or report.runs
+        or report.prepared_phase_ids or report.incomplete_wait_operations
+        or proof["failure_command"] != "PUMP_HOME" or proof["failure_pump"] != "P1"
+        or proof["failure"] != "PUMP_MOTION_TIMEOUT"):
+        raise RuntimeError("only the exact recorded startup timeout can be reconciled")
+    with sqlite3.connect(bundle.execution_path.resolve().as_uri() + "?mode=ro", uri=True) as db:
+        db.row_factory = sqlite3.Row
+        arduino = [dict(row) for row in db.execute(
+            "SELECT * FROM arduino_command_journal ORDER BY rowid")]
+        sf = [dict(row) for row in db.execute("SELECT * FROM sf_action_journal ORDER BY rowid")]
+        if (arduino != proof["arduino_command_journal"] or sf != proof["sf_action_journal"]
+            or db.execute("SELECT COUNT(*) FROM execution_waits").fetchone()[0]
+            or db.execute("SELECT COUNT(*) FROM execution_carousel_projection").fetchone()[0]):
+            raise RuntimeError("startup journal changed; no continuation or device opening")
+    expected = [a for b in plan() for a in b.primary + b.required_followup
+                if a.command not in (SF_ACTION, WAIT_ACTION)][:13]
+    if (len(arduino) != 13 or len(sf) != 1 or sf[0]["target"] != "CLOSED"
+        or sf[0]["state"] != "COMPLETED" or sf[0]["phase_id"] != report.owner_id):
+        raise RuntimeError("startup history is outside the approved pre-liquid scope")
+    for index, (record, step) in enumerate(zip(arduino, expected, strict=True)):
+        if (record["command"] != step.command
+            or json.loads(record["arguments_json"]) != dict(step.arguments)
+            or record["phase_execution_id"] != report.owner_id
+            or record["state"] != ("COMPLETED" if index < 12 else "FAILED")
+            or record["execution_started"] != 1):
+            raise RuntimeError("startup journal does not prove the exact failed bootstrap")
+    if arduino[-1]["error_code"] != "PUMP_MOTION_TIMEOUT":
+        raise RuntimeError("unexpected startup error")
+    return proof
+
+
+def reconciliation_record(path, report, bundle):
+    require_startup_timeout(report, bundle)
+    expected = {"purpose": "RECONCILE_RECORDED_STARTUP_TIMEOUT",
+                "retained_owner": report.owner_id, "plan_sha256": plan_digest(),
+                "failure_record_sha256": hashlib.sha256(STARTUP_FAILURE_RECORD.read_bytes()).hexdigest(),
+                "operator_approved": True, "retain_owner_until_separate_flush": True}
+    if json.dumps(_read_json(Path(path)), sort_keys=True) != json.dumps(expected, sort_keys=True):
+        raise RuntimeError("explicit persisted startup reconciliation plan differs")
+    return expected
+
+
+def run(runtime, client, sf, emit, stop_requested, *, startup_reconciliation=None):
     """Run under an already exclusively locked runtime; no port lifecycle here."""
-    require_pristine(runtime.initial_inspection)
+    if startup_reconciliation is None:
+        require_pristine(runtime.initial_inspection)
+    else:
+        reconciliation_record(startup_reconciliation, runtime.initial_inspection, runtime.bundle)
     owner, runner = runtime._owner, runtime._runner
     phase = "wet-reactor-sf-" + str(uuid4())
-    lease = owner.claim(phase, expected_generation=0)
+    lease = (owner.claim(phase, expected_generation=0) if startup_reconciliation is None
+             else owner.begin_maintenance(runtime.initial_inspection.owner_id, phase))
     identity = client.controller_boot_id, client.backend_session_nonce, client.connection_epoch
     wait_numbers = []
     sf_closed = False
@@ -196,6 +249,14 @@ def run(runtime, client, sf, emit, stop_requested):
                 if outcome is not CollectionTimerOutcome.COMPLETED:
                     raise WetTestStopped("operator Stop during SF mixing")
             else:
+                if (startup_reconciliation is not None and step.command == "PUMP_HOME"
+                    and args == {"pump": "P1"}):
+                    status = client.query_status()
+                    check_session()
+                    if (status.p1_home_active is not True or status.controller_state != "IDLE"
+                        or status.active_operation_command_id is not None
+                        or status.software_state_trust != "TRUSTED"):
+                        raise RuntimeError("P1 HOME input inactive; no repeated search is allowed")
                 if step.command in {"VALVE_HOME", "VALVE_SET_POSITION"} and not sf_closed:
                     raise RuntimeError("route switching requires commanded SF CLOSED")
                 entry = commands.execute(phase_execution_id=phase, operation_command_id=command_id,
@@ -221,6 +282,8 @@ def run(runtime, client, sf, emit, stop_requested):
         if (observations.sf_valve.observed_state is not BottomValveState.CLOSED
             or observations.sf_valve.torque_enabled):
             raise RuntimeError("fresh SF observation must be CLOSED and torque disabled")
+        if startup_reconciliation is not None and observations.arduino_status.p1_home_active is not True:
+            raise RuntimeError("P1 HOME input inactive; no startup reconciliation motion")
         emit({"event": "READ_ONLY_PREFLIGHT", "controller_boot_id": identity[0],
               "sf_present_position": observations.sf_valve.present_position,
               "plan_sha256": plan_digest()})
@@ -251,8 +314,12 @@ def run(runtime, client, sf, emit, stop_requested):
                                "WHERE phase_id=? AND operation_number=?", (phase, number))
         emit({"event": "SEQUENCE_COMMANDS_COMPLETED", "phase_id": phase,
               "pumps": pumps, "valves": valves, "sf_bottom": "CLOSED", "mixer": "STOPPED",
-              "physical_observation": "requires separate operator confirmation"})
-        owner.complete(lease)
+              "physical_observation": "requires separate operator confirmation",
+              "owner_retained_for_separate_flush": startup_reconciliation is not None})
+        if startup_reconciliation is None:
+            owner.complete(lease)
+        else:
+            owner.block(lease)  # Prior failure history and mandatory maintenance stay retained.
     except BaseException as error:
         try:
             owner.block(lease)
@@ -262,10 +329,14 @@ def run(runtime, client, sf, emit, stop_requested):
 
 
 @contextmanager
-def connected_device(configuration, bundle, emit):
+def connected_device(configuration, bundle, emit, *, startup_reconciliation=False):
     # Called by OwnedOfflineRuntime only after its existing bundle locks/inspection.
     from app.hardware.owned_startup_inspection import inspect_owned_startup
-    require_pristine(inspect_owned_startup(bundle))
+    report = inspect_owned_startup(bundle)
+    if startup_reconciliation:
+        require_startup_timeout(report, bundle)
+    else:
+        require_pristine(report)
     client = ArduinoSerialClient(ArduinoSerialConfiguration(**configuration.arduino.model_dump()),
                                  port_factory=_exclusive_port)
     device = None
@@ -284,6 +355,7 @@ def connected_device(configuration, bundle, emit):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--reconcile-startup-timeout", action="store_true")
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--procedure-approved", action="store_true")
     parser.add_argument("--conditions-confirmed", action="store_true")
@@ -311,6 +383,24 @@ def main(argv=None):
     args.evidence_dir.mkdir(mode=0o700, parents=True, exist_ok=False)
     (args.evidence_dir / "plan.json").write_text(json.dumps(
         {"sha256": plan_digest(), "blocks": plan_payload()}, indent=2) + "\n")
+    reconciliation = None
+    if args.reconcile_startup_timeout:
+        from app.hardware.owned_startup_inspection import inspect_owned_startup
+        report = inspect_owned_startup(bundle)
+        require_startup_timeout(report, bundle)
+        reconciliation = args.evidence_dir / "startup-reconciliation.json"
+        with reconciliation.open("x") as record:
+            json.dump({"purpose": "RECONCILE_RECORDED_STARTUP_TIMEOUT",
+                       "retained_owner": report.owner_id, "plan_sha256": plan_digest(),
+                       "failure_record_sha256": hashlib.sha256(STARTUP_FAILURE_RECORD.read_bytes()).hexdigest(),
+                       "operator_approved": True, "retain_owner_until_separate_flush": True}, record)
+            record.flush()
+            os.fsync(record.fileno())
+        directory_fd = os.open(args.evidence_dir, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
     stopping = Event()
     previous = {sig: signal.signal(sig, lambda *_: stopping.set())
                 for sig in (signal.SIGINT, signal.SIGTERM)}
@@ -330,10 +420,12 @@ def main(argv=None):
                   "p1_prime_cycles": 2, "p2_return_prime_cycles": 2, "prime_ml": 5,
                   "source": "fresh operator declarations; not sensors", "plan_sha256": plan_digest()})
             with OwnedOfflineRuntime(bundle, timer=MonotonicExecutionTimer(),
-                    device_factory=lambda: connected_device(configuration, bundle, emit)) as runtime:
+                    device_factory=lambda: connected_device(configuration, bundle, emit,
+                        startup_reconciliation=reconciliation is not None)) as runtime:
                 device = runtime._runner.device
                 try:
-                    run(runtime, device._arduino, device._sf_valve, emit, stopping.is_set)
+                    run(runtime, device._arduino, device._sf_valve, emit, stopping.is_set,
+                        startup_reconciliation=reconciliation)
                 except BaseException as error:
                     emit({"event": "STOPPED_NO_RETRY", "error": str(error),
                           "error_type": type(error).__name__})

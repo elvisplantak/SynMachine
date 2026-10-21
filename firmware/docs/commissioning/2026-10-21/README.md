@@ -145,3 +145,27 @@ only HELLO/QUERY_STATUS, closes the port and verifies the bundle observation
 unchanged. It never obtains a motion lease, changes journals, releases the owner
 or creates a position reference. Upload and real observation each need explicit
 authorization; motor power must be OFF. No full-cycle resumption is implied.
+
+## Authorized diagnostic upload and five observations
+
+Motor power OFF was freshly confirmed. Firmware 5d09cb8 flash verified 42062
+bytes. Boot 113 reads P1 HOME=true and P2 HOME=false in five samples; no
+actuator commands or state repair. The blocked owner is unchanged.
+[Upload verification](pump-home-diagnostics-upload-verification.json),
+[upload log](pump-home-diagnostics-upload.log.txt),
+[raw observations](pump-home-observation.json). These supersede pending-upload
+status above. The timeout cause is not inferred from a later raw-input level.
+
+## Narrow continuation prepared
+
+The extra startup-reconciliation entry accepts only the original recorded
+pre-liquid failure, requires current active P1 HOME twice and retains the
+original owner until the later flushing test even on wet-cycle success.
+See [the continuation plan](WET_TEST_PLAN.md#explicit-continuation-after-the-recorded-startup-failure).
+It never clears the old FAILED command, moves with an inactive initial P1
+HOME input or selects a replacement state bundle. No new motion has occurred.
+
+Continuation verification: 12 new fake cases and all 2037 complete backend
+tests passed, Ruff and whitespace checks passed. Installed firmware/HEX is
+unchanged since the verified diagnostic upload. Fresh powered readiness and
+explicit continuation approval remain pending.

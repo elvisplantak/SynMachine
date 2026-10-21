@@ -1,5 +1,15 @@
 # Hardware confirmations
 
+## Read-only pump HOME observation — 2026-10-21, boot 113
+
+With fresh explicit upload/read-only approval and motor power OFF, firmware
+5d09cb8 was uploaded and all 42062 flash bytes verified. Five QUERY_STATUS
+samples each reported P1 HOME active and P2 HOME inactive. No actuator command
+was sent. The blocked owner and all journal observations remained unchanged.
+The port closed and power remains last confirmed OFF. Instantaneous input
+levels do not establish physical contact, a trusted pump zero, or the cause of
+boot 111 timeout. Evidence: docs/commissioning/2026-10-21/pump-home-observation.json.
+
 ## Supervised wet-test startup halted — 2026-10-21, boot 111
 
 Fresh full-block approval and powered readiness preceded the attempt using
@@ -89,7 +99,7 @@ USB port unoccupied, the host signalled readiness. User confirmed power-ready,
 secured connection, empty SF and free element before any real connection.
 
 STOP -> START -> wait 3 seconds -> STOP completed in boot98: all 3 durable
-commands and 2 owned sequences COMPLETED, owner idle, exit0, connection closed.
+commands and 2 owned sequences COMPLETED, owner idle, exit 0, connection closed.
 The user confirmed normal physical rotation and stop without twitching or
 unpleasant buzzing. This isolated dry start/stop check is accepted. The detached
 wire is a user-reported finding, not a measured electrical diagnosis.
@@ -132,7 +142,7 @@ SF adapter read present_position2573, torque OFF, CLOSED within tolerance.
 
 Bootstrap plus all ten existing Guided Demo phases completed normally in one
 Arduino session: 57 Arduino + 4 SF commands, 6 timed waits, all durable entries
-COMPLETED; exit0 and connection closed. About 7 minutes15 seconds elapsed. Scope
+COMPLETED; exit 0 and connection closed. About 7 minutes15 seconds elapsed. Scope
 was empty system, nominal10ml (S6/B1 1.6/B2 2.4), Reactor mixer OFF, SF mixing10s,
 settling5s and two5s fractions. Carousel reference1 used fresh user alignment;
 actual move1-to-2 occurred while Column CLOSED. User saw the full sequence and

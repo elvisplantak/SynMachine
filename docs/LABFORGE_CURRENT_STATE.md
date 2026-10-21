@@ -133,3 +133,28 @@ permission for read-only observation are required before any new real access.
 A subsequent full cycle still needs deliberate reconciliation of the retained
 owner, confirmed HOME/reference and fresh powered readiness; never clear its
 history or select a new bundle to bypass this failed attempt.
+
+## Diagnostic upload and observation completed
+
+Fresh approval with motor power OFF covered 5d09cb8 upload and five read-only
+queries. All42062 flash bytes verified, exit 0, HEX d8478b434439bff45cd05a26e1e9e0628c8c4e4cd1cd7851528cb7a7648538c6.
+In boot 113 all five samples report p1_home_active=true and p2_home_active=false.
+No actuator command, reference establishment, owner release or journal repair.
+Existing bundle observation stayed unchanged; port closed. Motor power is OFF.
+This is current input evidence, not a diagnosis of the preceding timeout.
+The full wet cycle remains outstanding; prepare a narrowly validated startup
+reconciliation against the exact retained failure, then obtain fresh powered
+readiness. Do not treat the old pristine-only runner as a resume mechanism.
+
+## Explicit startup reconciliation prepared
+
+backend/app/wet_reactor_sf.py now has a separately armed startup reconciliation
+mode, matching the exact original 13 Arduino/1 SF rows before connection and
+retaining the same owner under bundle locks. A separately fsync'd approved plan
+precedes begin_maintenance and a new phase; no old lease, journal or bundle is
+reset. Fresh P1 HOME=true is required at preflight and immediately before HOME.
+The unchanged wet plan then runs; its owner stays BLOCKED afterward until the
+separate flushing test. Default pristine-only entry remains unchanged.
+12 new fake cases and all 2037 complete backend tests passed; full Ruff passed. Current
+installed firmware remains 5d09cb8. Fresh powered readiness/continuation approval
+is still required; no new device connection or motion occurred during preparation.

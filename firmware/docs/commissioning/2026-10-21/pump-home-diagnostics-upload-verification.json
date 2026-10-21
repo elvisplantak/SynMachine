@@ -1,0 +1,31 @@
+{
+  "recorded_utc": "2026-10-21T12:29:30.061953+00:00",
+  "firmware_commit": "5d09cb873c19305d1fd8e7574803a2fd941df463",
+  "hex_sha256": "d8478b434439bff45cd05a26e1e9e0628c8c4e4cd1cd7851528cb7a7648538c6",
+  "flash_bytes_verified": 42062,
+  "static_sram_bytes": 3184,
+  "upload_exit_code": 0,
+  "operator_upload_and_read_only_approval": true,
+  "motor_power": "OFF confirmed",
+  "device_signature": "0x1e9801",
+  "observation_boot": 113,
+  "samples": 5,
+  "p1_home_active": [
+    true,
+    true,
+    true,
+    true,
+    true
+  ],
+  "p2_home_active": [
+    false,
+    false,
+    false,
+    false,
+    false
+  ],
+  "actuator_commands": 0,
+  "owner_retained": true,
+  "state_repair_or_provisioning": false,
+  "raw_upload_log_sha256": "ac1bb48ecc8f929a6a6fac1340512fdd47eb223ba10358ca8debec321a4f3c8a"
+}

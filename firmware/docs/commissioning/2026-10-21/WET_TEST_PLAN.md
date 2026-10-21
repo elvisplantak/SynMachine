@@ -86,3 +86,32 @@ interruptions, durable intent before bytes, global owner retention, single-use
 and bundle-lock exclusion. The complete backend suite passed 2010 tests, zero
 skipped, and full Ruff passed. Firmware source/HEX is unchanged. No real
 transport is used by tests.
+
+## Explicit continuation after the recorded startup failure
+
+Boot 111 failed before liquid priming/transfer. The operator requested completion
+of the whole cycle and subsequently approved a diagnostic upload/read-only query
+with motor power OFF. Boot 113 reports P1 HOME active in five samples, without
+claiming a cause for the previous timeout or creating a trusted position.
+
+The additional --reconcile-startup-timeout entry is only for the exact retained
+boot 111 failure. Before a port opens, it compares all 13 Arduino and the one SF
+journal rows against wet-01-result.json; any changed history, different failure,
+run, lifecycle snapshot, wait or prepared plan is refused. Default pristine-only
+execution is unchanged. It persists/fsyncs a separate explicit reconciliation
+plan, including the prior evidence hash and unchanged physical-plan hash. Under
+the existing bundle locks it uses begin_maintenance for the same blocked owner
+and a new local phase; it never deletes a prior record or reconstructs a lease.
+
+Fresh preflight must see p1_home_active=true; it is checked again immediately
+before P1 HOME. False/unsupported/changed input aborts without repeating the P1
+search. The confirmed Waste setup is re-established through fresh valve HOME
+commands before pump initialization. This is an explicitly authorized new
+reference attempt, not automatic retry or resumption of interrupted bytes.
+All original mixer Stop/SF Close, no-reconnect, no-automatic-retry and stop-on-error
+semantics remain. Even after all requested wet commands succeed, this continuation
+retains BLOCKED ownership until the separately prepared flushing test. It does
+not mark the previous failure successful or activate ordinary Recipes execution.
+
+New powered readiness and concrete continuation approval remain pending. No new
+actuator command follows the boot 111 failure during software preparation.
