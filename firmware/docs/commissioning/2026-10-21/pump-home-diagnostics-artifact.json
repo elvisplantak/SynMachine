@@ -1,0 +1,20 @@
+{
+  "prepared_hex_sha256": "d8478b434439bff45cd05a26e1e9e0628c8c4e4cd1cd7851528cb7a7648538c6",
+  "flash_bytes": 42062,
+  "static_sram_bytes": 3184,
+  "flash_delta_from_installed": 492,
+  "sram_delta_from_installed": 8,
+  "status_scratch_capacity_delta_bytes": 66,
+  "focused_native_tests": 8,
+  "complete_native_tests": 224,
+  "mixer_profile_tests": 6,
+  "backend_complete_tests": 2025,
+  "backend_focused_status_tests": 112,
+  "ruff": "passed",
+  "mega_project_source_warnings": 0,
+  "mega_upstream_arduino_unused_parameter_warnings": 4,
+  "uploaded": false,
+  "new_real_connection": false,
+  "installed_hex_sha256": "61feb4425fddee73799191faf5a1bf98bb684db601a598712b30a7fe8a1c0d45",
+  "read_only_probe_source_sha256": "6ab08d45be27fedda34913b501608c74cada9aa58144e06d26b15eae64c27dca"
+}

@@ -972,3 +972,17 @@ and physical execution remain separately gated.
 Fail-closed recovery and provisioning remain unresolved.
 No component is claimed to measure delivered volume or provide exactly-once
 physical execution.
+
+### Read-only pump HOME input observations — 2026-10-21
+
+Production QUERY_STATUS adds optional boolean p1_home_active and p2_home_active
+when the corresponding controller input is available. They are fresh instantaneous
+reads of the existing firmware HOME polarity, not debounced HOME completion,
+position trust, a zero reference, readiness or permission to resume a command.
+Absence in older firmware is unsupported/unknown, never logical false. Only a
+valid trusted session reads these inputs; queries emit no STEP/DIR write, update
+no controller motion state and create no command-cache entry. P1-only assemblies
+omit p2_home_active. No GPIO mapping, homing timing, travel limit or command
+lifecycle changes. Use the updated host model with these fields; an older strict
+host may reject them. The STATUS scratch frame is 514 bytes including LF/NUL;
+the protocol payload remains 512, with complete transactional size checks.

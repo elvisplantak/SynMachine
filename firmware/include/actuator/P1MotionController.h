@@ -70,6 +70,7 @@ class P1MotionController {
   P1MotionState state() const;
   P1PositionTrust positionTrust() const;
   uint16_t positionSteps() const;
+  bool homeActive() const;
   bool busy() const;
 
  private:

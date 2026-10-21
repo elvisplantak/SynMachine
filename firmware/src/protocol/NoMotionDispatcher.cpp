@@ -119,9 +119,16 @@ DispatchResult NoMotionDispatcher::dispatchParsed(
       };
       diagnostics = &columnDiagnostics;
     }
+    PumpHomeStatusDiagnostics pumpDiagnostics{};
+    const PumpHomeStatusDiagnostics* pumpSnapshot = nullptr;
+    if (p1MotionEnabled_ && identity.trusted && p1Controller_ != nullptr) {
+      pumpDiagnostics = {p1Controller_->homeActive(), p2Controller_ != nullptr,
+                         p2Controller_ != nullptr && p2Controller_->homeActive()};
+      pumpSnapshot = &pumpDiagnostics;
+    }
     writeStatus(parsed.message.backendSessionNonce, parsed.message.requestId,
                 identity, output, capacity, outputLength,
-                &commandStatusCache, p1MotionEnabled_, diagnostics);
+                &commandStatusCache, p1MotionEnabled_, diagnostics, pumpSnapshot);
   } else {
     writeCommandStatus(
         parsed.message.backendSessionNonce, parsed.message.requestId,

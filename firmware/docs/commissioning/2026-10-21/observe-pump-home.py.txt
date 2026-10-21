@@ -1,0 +1,54 @@
+"""Explicit read-only diagnosis of the retained boot111 startup failure.
+
+No COMMAND, reference claim, state provisioning/repair, lease adoption or motion.
+Run only after separately approved upload and real read-only Serial authorization,
+with motor power OFF. A USB connection can reset Mega; old references stay invalid.
+"""
+from contextlib import ExitStack
+import fcntl
+import json
+from pathlib import Path
+import sys
+from time import sleep
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "backend"))
+from app.hardware.arduino_serial import ArduinoSerialClient, ArduinoSerialConfiguration
+from app.hardware.owned_startup_inspection import inspect_owned_startup
+from app.live_execution import _digest, _exclusive_port, load_bundle, load_profile
+from app.wet_reactor_sf import PROFILE, PROFILE_DIGEST, STATE_DIRECTORY
+
+configuration = load_profile(PROFILE)
+if _digest(configuration) != PROFILE_DIGEST:
+    raise RuntimeError("unexpected live profile; no device opened")
+bundle = load_bundle(STATE_DIRECTORY, configuration)
+with ExitStack() as resources:
+    for path in sorted((bundle.ownership_path, bundle.execution_path, bundle.lifecycle_path),
+                       key=lambda path: str(path.resolve())):
+        stream = resources.enter_context(path.open("rb"))
+        fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    before = inspect_owned_startup(bundle)
+    if (before.owner_id != "wet-reactor-sf-1b559875-a2df-44b4-831c-21151320acda"
+        or before.owner_state != "BLOCKED" or before.ownership_generation != 1):
+        raise RuntimeError("unexpected retained owner; no device opened")
+    client = ArduinoSerialClient(ArduinoSerialConfiguration(**configuration.arduino.model_dump()),
+                                 port_factory=_exclusive_port)
+    samples = []
+    try:
+        hello = client.connect()
+        for _ in range(5):
+            status = client.query_status()
+            if (type(status.p1_home_active) is not bool or type(status.p2_home_active) is not bool
+                or status.controller_state != "IDLE" or status.software_state_trust != "TRUSTED"
+                or status.active_operation_command_id is not None):
+                raise RuntimeError("fresh raw pump diagnostics absent or controller not idle")
+            samples.append(status.model_dump(mode="json"))
+            sleep(0.1)
+    finally:
+        client.close()
+    after = inspect_owned_startup(bundle)
+    if before != after:
+        raise RuntimeError("retained bundle changed during read-only observation")
+    print(json.dumps({"mode": "READ_ONLY_NO_COMMANDS", "hello": hello.model_dump(mode="json"),
+                      "motor_power": "OFF per fresh operator confirmation",
+                      "samples": samples, "owner_retained": True,
+                      "position_reference_established": False}, indent=2))

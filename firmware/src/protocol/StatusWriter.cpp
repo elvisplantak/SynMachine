@@ -19,7 +19,8 @@ bool writeStatus(const char* nonce, const char* requestId,
                  size_t capacity, size_t& outputLength,
                  const CommandStatusCache* commandStatusCache,
                  bool p1MotionEnabled,
-                 const ColumnValveStatusDiagnostics* columnDiagnostics) {
+                 const ColumnValveStatusDiagnostics* columnDiagnostics,
+                 const PumpHomeStatusDiagnostics* pumpDiagnostics) {
   char frame[kStatusFrameCapacity];
   const CommandStatusEntry* active =
       commandStatusCache == nullptr ? nullptr : commandStatusCache->active();
@@ -87,7 +88,27 @@ bool writeStatus(const char* nonce, const char* requestId,
     }
     written = static_cast<int>(prefixLength) + diagnosticWritten;
   }
-  if (static_cast<size_t>(written) > capacity) {
+  if (pumpDiagnostics != nullptr) {
+    const size_t prefixLength = static_cast<size_t>(written) - 2;
+    const int diagnosticWritten = pumpDiagnostics->hasP2
+        ? LABFORGE_SNPRINTF(
+              frame + prefixLength, sizeof(frame) - prefixLength,
+              LABFORGE_FORMAT(
+                  ",\"p1_home_active\":%s,\"p2_home_active\":%s}\n"),
+              pumpDiagnostics->p1HomeActive ? "true" : "false",
+              pumpDiagnostics->p2HomeActive ? "true" : "false")
+        : LABFORGE_SNPRINTF(
+              frame + prefixLength, sizeof(frame) - prefixLength,
+              LABFORGE_FORMAT(",\"p1_home_active\":%s}\n"),
+              pumpDiagnostics->p1HomeActive ? "true" : "false");
+    if (diagnosticWritten < 0 ||
+        static_cast<size_t>(diagnosticWritten) >= sizeof(frame) - prefixLength)
+      return false;
+    written = static_cast<int>(prefixLength) + diagnosticWritten;
+  }
+  // LF is not part of the 512-byte protocol payload. Never publish a partial frame.
+  if (written < 1 || static_cast<size_t>(written) - 1 > 512 ||
+      static_cast<size_t>(written) > capacity) {
     return false;
   }
   memcpy(output, frame, static_cast<size_t>(written));

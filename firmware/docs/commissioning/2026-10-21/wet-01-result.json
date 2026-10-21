@@ -1,0 +1,206 @@
+{
+  "runner_commit": "87a6afd688e87f8bc1d0acda87b8385cf086e993",
+  "installed_firmware_commit": "dc7a53fcdd93315965bf82ba143bf4def17688e7",
+  "controller_boot_id": 111,
+  "process_exit_code": 1,
+  "state": "BLOCKED",
+  "failure": "PUMP_MOTION_TIMEOUT",
+  "failure_command": "PUMP_HOME",
+  "failure_pump": "P1",
+  "arduino_completed": 12,
+  "arduino_failed": 1,
+  "sf_closed_commands_completed": 1,
+  "pump_priming_started": false,
+  "reactor_filling_started": false,
+  "sf_mixing_started": false,
+  "column_commands": 0,
+  "carousel_commands": 0,
+  "automatic_retry_performed": false,
+  "new_serial_connection_after_failure": false,
+  "state_repair_or_reprovisioning": false,
+  "ownership": {
+    "owner_id": "wet-reactor-sf-1b559875-a2df-44b4-831c-21151320acda",
+    "state": "BLOCKED",
+    "generation": 1
+  },
+  "journals": [
+    {
+      "journal": "arduino_command_journal",
+      "total": 13,
+      "non_successful": [
+        [
+          "a8df143c-eb92-417b-a263-bbedd15e7a1f",
+          "FAILED"
+        ]
+      ]
+    },
+    {
+      "journal": "sf_action_journal",
+      "total": 1,
+      "non_successful": []
+    },
+    {
+      "journal": "execution_waits",
+      "total": 0,
+      "non_successful": []
+    }
+  ],
+  "operator_observation": "Initially reported HOME pressed/power ON; subsequently corrected to possibly only near HOME, then thinks only near. Contact state remains unconfirmed.",
+  "motor_power": "Last confirmed ON; switch-off requested but not yet confirmed.",
+  "events_sha256": "0612dffb7e5859e92c2a4d7b68bd53e7e1443ce5c65e4dc37cab01a9c6fd7a1c",
+  "arduino_command_journal": [
+    {
+      "operation_command_id": "49dfda0f-ef97-426a-a0fa-6f2fec704e07",
+      "phase_execution_id": "wet-reactor-sf-1b559875-a2df-44b4-831c-21151320acda",
+      "controller_boot_id": 111,
+      "command": "SF_MIXER_SET_STATE",
+      "arguments_json": "{\"running\":false}",
+      "state": "COMPLETED",
+      "result_json": "{}",
+      "error_code": null,
+      "execution_started": 1
+    },
+    {
+      "operation_command_id": "1ff6ed0b-0a09-4bdc-87ec-e59b7c82a0e5",
+      "phase_execution_id": "wet-reactor-sf-1b559875-a2df-44b4-831c-21151320acda",
+      "controller_boot_id": 111,
+      "command": "VALVE_HOME",
+      "arguments_json": "{\"valve\":\"V5\"}",
+      "state": "COMPLETED",
+      "result_json": "{}",
+      "error_code": null,
+      "execution_started": 1
+    },
+    {
+      "operation_command_id": "5b9c40d5-106d-42a8-8bbd-a53f09eba803",
+      "phase_execution_id": "wet-reactor-sf-1b559875-a2df-44b4-831c-21151320acda",
+      "controller_boot_id": 111,
+      "command": "VALVE_SET_POSITION",
+      "arguments_json": "{\"position_degrees\":180,\"valve\":\"V5\"}",
+      "state": "COMPLETED",
+      "result_json": "{}",
+      "error_code": null,
+      "execution_started": 1
+    },
+    {
+      "operation_command_id": "e307118a-019f-47a8-88df-a15fae6c7596",
+      "phase_execution_id": "wet-reactor-sf-1b559875-a2df-44b4-831c-21151320acda",
+      "controller_boot_id": 111,
+      "command": "VALVE_HOME",
+      "arguments_json": "{\"valve\":\"V1\"}",
+      "state": "COMPLETED",
+      "result_json": "{}",
+      "error_code": null,
+      "execution_started": 1
+    },
+    {
+      "operation_command_id": "f60b4d42-9347-4c80-bd60-ad3f7dd23847",
+      "phase_execution_id": "wet-reactor-sf-1b559875-a2df-44b4-831c-21151320acda",
+      "controller_boot_id": 111,
+      "command": "VALVE_HOME",
+      "arguments_json": "{\"valve\":\"V2\"}",
+      "state": "COMPLETED",
+      "result_json": "{}",
+      "error_code": null,
+      "execution_started": 1
+    },
+    {
+      "operation_command_id": "8f43f49b-16c0-4ba6-9466-a73e0e230f5e",
+      "phase_execution_id": "wet-reactor-sf-1b559875-a2df-44b4-831c-21151320acda",
+      "controller_boot_id": 111,
+      "command": "VALVE_HOME",
+      "arguments_json": "{\"valve\":\"V4\"}",
+      "state": "COMPLETED",
+      "result_json": "{}",
+      "error_code": null,
+      "execution_started": 1
+    },
+    {
+      "operation_command_id": "4e7b6b89-e17d-4090-a512-578145773858",
+      "phase_execution_id": "wet-reactor-sf-1b559875-a2df-44b4-831c-21151320acda",
+      "controller_boot_id": 111,
+      "command": "VALVE_HOME",
+      "arguments_json": "{\"valve\":\"V6\"}",
+      "state": "COMPLETED",
+      "result_json": "{}",
+      "error_code": null,
+      "execution_started": 1
+    },
+    {
+      "operation_command_id": "b66fec8f-6da1-47f4-8988-70e5c7ada7bb",
+      "phase_execution_id": "wet-reactor-sf-1b559875-a2df-44b4-831c-21151320acda",
+      "controller_boot_id": 111,
+      "command": "VALVE_HOME",
+      "arguments_json": "{\"valve\":\"V3\"}",
+      "state": "COMPLETED",
+      "result_json": "{}",
+      "error_code": null,
+      "execution_started": 1
+    },
+    {
+      "operation_command_id": "e584fea2-c564-49f1-8180-8d035c54dbb8",
+      "phase_execution_id": "wet-reactor-sf-1b559875-a2df-44b4-831c-21151320acda",
+      "controller_boot_id": 111,
+      "command": "VALVE_HOME",
+      "arguments_json": "{\"valve\":\"V7\"}",
+      "state": "COMPLETED",
+      "result_json": "{}",
+      "error_code": null,
+      "execution_started": 1
+    },
+    {
+      "operation_command_id": "01803316-b0c7-440a-87a3-fddf609ca2da",
+      "phase_execution_id": "wet-reactor-sf-1b559875-a2df-44b4-831c-21151320acda",
+      "controller_boot_id": 111,
+      "command": "VALVE_HOME",
+      "arguments_json": "{\"valve\":\"V8\"}",
+      "state": "COMPLETED",
+      "result_json": "{}",
+      "error_code": null,
+      "execution_started": 1
+    },
+    {
+      "operation_command_id": "cf30e0e7-8f4d-46e7-905b-c1e83a6af9bc",
+      "phase_execution_id": "wet-reactor-sf-1b559875-a2df-44b4-831c-21151320acda",
+      "controller_boot_id": 111,
+      "command": "VALVE_SET_POSITION",
+      "arguments_json": "{\"position_degrees\":180,\"valve\":\"V2\"}",
+      "state": "COMPLETED",
+      "result_json": "{}",
+      "error_code": null,
+      "execution_started": 1
+    },
+    {
+      "operation_command_id": "8e5274bb-f818-4b13-af7d-abca75c85c70",
+      "phase_execution_id": "wet-reactor-sf-1b559875-a2df-44b4-831c-21151320acda",
+      "controller_boot_id": 111,
+      "command": "VALVE_SET_POSITION",
+      "arguments_json": "{\"position_degrees\":180,\"valve\":\"V1\"}",
+      "state": "COMPLETED",
+      "result_json": "{}",
+      "error_code": null,
+      "execution_started": 1
+    },
+    {
+      "operation_command_id": "a8df143c-eb92-417b-a263-bbedd15e7a1f",
+      "phase_execution_id": "wet-reactor-sf-1b559875-a2df-44b4-831c-21151320acda",
+      "controller_boot_id": 111,
+      "command": "PUMP_HOME",
+      "arguments_json": "{\"pump\":\"P1\"}",
+      "state": "FAILED",
+      "result_json": null,
+      "error_code": "PUMP_MOTION_TIMEOUT",
+      "execution_started": 1
+    }
+  ],
+  "sf_action_journal": [
+    {
+      "action_id": "5072c3ba-2c7a-4616-9365-fe9a91b759ba",
+      "phase_id": "wet-reactor-sf-1b559875-a2df-44b4-831c-21151320acda",
+      "session_id": "3a66b245-8b0d-4eac-b0ff-9695de316d1d",
+      "target": "CLOSED",
+      "state": "COMPLETED",
+      "error": null
+    }
+  ]
+}

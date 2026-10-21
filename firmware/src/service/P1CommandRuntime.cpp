@@ -82,13 +82,13 @@ ErrorCorrelation commandCorrelation(const InboundMessage& message) {
 }  // namespace
 
 P1CommandRuntime::P1CommandRuntime(P1MotionController& controller)
-    : p1Controller_(controller), protocolDispatcher_(true) {}
+    : p1Controller_(controller), protocolDispatcher_(true, nullptr, &controller) {}
 
 P1CommandRuntime::P1CommandRuntime(P1MotionController& p1Controller,
                                    P1MotionController& p2Controller)
     : p1Controller_(p1Controller),
       p2Controller_(&p2Controller),
-      protocolDispatcher_(true) {}
+      protocolDispatcher_(true, nullptr, &p1Controller, &p2Controller) {}
 
 P1CommandRuntime::P1CommandRuntime(
     P1MotionController& p1Controller, P1MotionController& p2Controller,
@@ -98,7 +98,7 @@ P1CommandRuntime::P1CommandRuntime(
       p2Controller_(&p2Controller),
       valveControllers_(valveControllers),
       valveControllerCount_(valveControllerCount),
-      protocolDispatcher_(true) {}
+      protocolDispatcher_(true, nullptr, &p1Controller, &p2Controller) {}
 
 P1CommandRuntime::P1CommandRuntime(
     P1MotionController& p1Controller, P1MotionController& p2Controller,
@@ -112,7 +112,7 @@ P1CommandRuntime::P1CommandRuntime(
       valveControllerCount_(valveControllerCount),
       columnValveController_(&columnValveController),
       carouselController_(&carouselController),
-      protocolDispatcher_(true, &columnValveController) {}
+      protocolDispatcher_(true, &columnValveController, &p1Controller, &p2Controller) {}
 
 P1CommandRuntime::P1CommandRuntime(
     P1MotionController& p1Controller, P1MotionController& p2Controller,
@@ -128,7 +128,7 @@ P1CommandRuntime::P1CommandRuntime(
       columnValveController_(&columnValveController),
       carouselController_(&carouselController),
       sfMixerController_(&sfMixerController),
-      protocolDispatcher_(true, &columnValveController) {}
+      protocolDispatcher_(true, &columnValveController, &p1Controller, &p2Controller) {}
 
 P1CommandRuntime::P1CommandRuntime(
     P1MotionController& p1Controller, P1MotionController& p2Controller,
@@ -140,7 +140,7 @@ P1CommandRuntime::P1CommandRuntime(
       valveControllers_(valveControllers),
       valveControllerCount_(valveControllerCount),
       columnValveController_(&columnValveController),
-      protocolDispatcher_(true, &columnValveController) {}
+      protocolDispatcher_(true, &columnValveController, &p1Controller, &p2Controller) {}
 
 DispatchResult P1CommandRuntime::dispatch(
     const uint8_t* payload, size_t length, const BootIdentityResult& identity,

@@ -201,6 +201,8 @@ class Status(ControllerStateMessage):
     column_motion_state: Annotated[UpperIdentifier, Field(max_length=40)] | None = None
     column_stage_steps: Annotated[StrictInt, Field(ge=0, le=UINT32_MAX)] | None = None
     column_home_active: StrictBool | None = None
+    p1_home_active: StrictBool | None = None
+    p2_home_active: StrictBool | None = None
 
 
 class QueryCommand(QueryStatus):

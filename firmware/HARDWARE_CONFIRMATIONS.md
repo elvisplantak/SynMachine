@@ -1,5 +1,23 @@
 # Hardware confirmations
 
+## Supervised wet-test startup halted — 2026-10-21, boot 111
+
+Fresh full-block approval and powered readiness preceded the attempt using
+runner 87a6afd and installed firmware dc7a53f. Initial mixer STOP, SF CLOSE,
+V1-V8 HOME and the P1 Waste route completed. P1 ordinary startup PUMP_HOME
+then returned FAILED/PUMP_MOTION_TIMEOUT with execution_started=true. This
+was not PUMP_ASPIRATE_FULL_STROKE. No priming, B1 transfer, P2 command, mixer
+START, Column or carousel command followed. Owner is durably BLOCKED and
+ports are closed; no retry, state reset, new bundle or post-fault movement.
+
+The operator first reported P1 HOME pressed/power ON, then corrected that
+HOME may not be pressed and now thinks P1 is only near the switch. Physical
+HOME contact is unconfirmed; do not preserve the earlier statement as fact.
+Motor power was requested OFF but this is not yet confirmed. No new sensor
+polarity, travel allowance, reference or mechanical fault is inferred.
+Read-only pump HOME diagnostics are being prepared, not uploaded or sampled.
+Evidence: docs/commissioning/2026-10-21/wet-01-result.json.
+
 ## Requested supervised wet-test preparation — 2026-10-21
 
 The owner requested nominal one-full-stroke 20 mL from B1 colored water into

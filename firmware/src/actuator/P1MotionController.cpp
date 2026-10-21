@@ -261,6 +261,8 @@ P1PositionTrust P1MotionController::positionTrust() const { return trust_; }
 
 uint16_t P1MotionController::positionSteps() const { return positionSteps_; }
 
+bool P1MotionController::homeActive() const { return io_.homeActive(); }
+
 bool P1MotionController::busy() const {
   return state_ != P1MotionState::IDLE;
 }

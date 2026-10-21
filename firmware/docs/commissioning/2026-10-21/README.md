@@ -112,3 +112,36 @@ execution has not started.
 Verification of the finalized runner: 71 focused and 2010 complete backend
 tests passed, zero skipped; full backend Ruff passed. Firmware source and
 uploaded HEX are unchanged. No real port opened during this preparation.
+
+## First attempt halted during startup — boot 111
+
+The owner freshly approved the full test and powered readiness. P1 ordinary
+startup HOME failed with PUMP_MOTION_TIMEOUT before priming or liquid transfer.
+No automatic continuation/retry occurred and existing ownership remains BLOCKED.
+[Result and journal snapshot](wet-01-result.json), [events](wet-01-events.jsonl).
+The operator subsequently corrected the HOME-pressed report to possibly only
+near HOME. Read-only input diagnostics are being prepared; no new firmware
+upload, hardware connection or owner release has followed the failure.
+
+## Read-only pump HOME diagnostic firmware prepared
+
+QUERY_STATUS now optionally samples P1/P2 HOME inputs through their existing
+IO read methods. This changes no pin, polarity, motion limit/timing, trust or
+command execution. A sample does not establish a pump zero. The input may be
+false if the mechanism is merely near the switch; the operator's corrected
+observation supersedes the earlier pressed-HOME claim.
+
+Verification: 224 complete native tests (8 focused), 6 mixer-profile tests, 2025
+complete backend tests (112 focused STATUS/Serial), Ruff and Mega passed.
+Mega 42062 flash/3184 static SRAM (+492/+8 versus installed); STATUS scratch
+stack buffer grows 66 bytes. Warning-enabled native build has no warnings; Mega
+reports 4 unused-parameter warnings in upstream Arduino new.cpp, none in project
+source. Exact pending image: [artifact](pump-home-diagnostics-artifact.json).
+The installed artifact remains dc7a53f; no new real port has been opened.
+
+Proposed authorized observation: [five read-only samples](observe-pump-home.py.txt).
+It locks the existing bundle, requires the exact retained BLOCKED owner, sends
+only HELLO/QUERY_STATUS, closes the port and verifies the bundle observation
+unchanged. It never obtains a motion lease, changes journals, releases the owner
+or creates a position reference. Upload and real observation each need explicit
+authorization; motor power must be OFF. No full-cycle resumption is implied.

@@ -3,7 +3,7 @@
 - Checkpoint date: 2026-10-21
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Local checkout: `/home/elvis/Documents/SynMachine`
-- Branch: `commissioning/full-stroke-wet-test` (firmware uploaded; wet test pending);
+- Branch: `commissioning/full-stroke-wet-test` (wet startup failed; owner retained; diagnostics pending);
   imported histories under `history/ui/`, `history/backend/`,
   `history/firmware/`.
 
@@ -107,3 +107,29 @@ and explicit execution approval for this concrete plan. No new application
 connection or actuator command has occurred. Preparation/flash verification
 are not physical test acceptance. Evidence:
 firmware/docs/commissioning/2026-10-21/README.md.
+
+## Wet startup failed; read-only diagnostic preparation
+
+The explicitly approved first attempt in boot 111 stopped on ordinary P1
+PUMP_HOME with PUMP_MOTION_TIMEOUT, execution_started=true: 12 Arduino commands
+completed, 1 failed, SF CLOSE completed. No priming, liquid transfer, P2 motion
+or mixer START occurred. Both ports closed; existing live owner remains
+BLOCKED at generation 1. No retry, re-home, owner release or reprovisioning.
+
+Operator correction: P1 may only be near HOME, replacing the earlier pressed
+assertion. Motor power last confirmed ON; OFF was requested, not confirmed.
+Do not continue the fixed runner or manufacture a trusted pump zero. Exact
+evidence: firmware/docs/commissioning/2026-10-21/wet-01-result.json.
+
+Read-only QUERY_STATUS fields p1_home_active/p2_home_active are prepared to
+distinguish input level from a physical proximity guess. They do not change
+motion limits/timing, HOME semantics or reference trust. Diagnostic firmware
+is not installed; dc7a53f remains installed. Verification passed: 224 native,
+6 mixer-profile, 2025 complete backend (112 focused), Ruff and Mega. Image:
+42062 flash/3184 static SRAM; metadata in commissioning pump-home-diagnostics-artifact.json.
+Mega warnings are 4 upstream Arduino unused parameters, zero project warnings.
+Next: explicit upload approval with motor power OFF and
+permission for read-only observation are required before any new real access.
+A subsequent full cycle still needs deliberate reconciliation of the retained
+owner, confirmed HOME/reference and fresh powered readiness; never clear its
+history or select a new bundle to bypass this failed attempt.
