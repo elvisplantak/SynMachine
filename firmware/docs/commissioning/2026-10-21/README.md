@@ -1,6 +1,7 @@
 # Supervised Reactor/SF wet-test preparation — 2026-10-21
 
-Software preparation only. No real Serial port has been opened, firmware uploaded
+Original software-preparation checkpoint (before the upload recorded below).
+No real Serial port had been opened, firmware uploaded
 or actuator commanded at this checkpoint. Existing live profile/state bindings,
 credentials, journals, ownership and previously installed e2e9d3c remain unchanged.
 Recovery artifacts are not accessed or modified.
@@ -78,3 +79,23 @@ ownership and evidence; no ad hoc retry, re-home, parking or state replacement.
 
 The requested subsequent flushing test remains a separate future task. The live
 profile's null recovery/flush plans must not be replaced to bypass maintenance.
+
+## Authorized upload completed — 2026-10-21
+
+The owner explicitly approved uploading prepared commit
+`dc7a53fcdd93315965bf82ba143bf4def17688e7` with motor power OFF. The exact
+prepared HEX above was written through avrdude to the confirmed Arduino by-id
+port; device signature was `0x1e9801`, and all 41570 flash bytes were verified
+(exit 0). This replaces the previously installed e2e9d3c image.
+
+No application Serial monitor, HOME, actuator command, wet run, EEPROM
+provisioning or fuse write was performed. Motor power remains last reported OFF.
+Full-stroke aspiration and the 600 pulses/s mixing trial are not physically
+verified by this upload. The original preparation JSON remains a historical
+pre-upload snapshot. Current upload evidence is
+[upload-verification.json](upload-verification.json) and [upload.log.txt](upload.log.txt).
+
+Next: finish the wet plan and resolve S-water/Reactor-empty readiness and P2
+priming volume. Obtain fresh powered readiness before execution; keep motor
+power OFF during preparation. Use the updated backend source for the 10-capability
+HELLO; do not reuse old boot references or silently fall back to HOME.

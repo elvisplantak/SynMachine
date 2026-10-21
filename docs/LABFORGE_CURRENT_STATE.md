@@ -3,7 +3,7 @@
 - Checkpoint date: 2026-10-21
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Local checkout: `/home/elvis/Documents/SynMachine`
-- Branch: `commissioning/full-stroke-wet-test` (software preparation; upload pending);
+- Branch: `commissioning/full-stroke-wet-test` (firmware uploaded; wet test pending);
   imported histories under `history/ui/`, `history/backend/`,
   `history/firmware/`.
 
@@ -36,10 +36,10 @@ reprovisioned. The migration does not connect to devices, start or stop an old
 server, initialize references, issue motion, upload firmware or change EEPROM.
 Old UI snapshots contain historical session IDs and are not live-state evidence.
 
-Installed firmware remains the previously recorded e2e9d3c artifact. Physical
+Installed firmware is now the verified dc7a53f artifact recorded below. Physical
 readiness and current references need fresh explicit operator confirmation before
-any future real-device action. The next liquid test remains deferred until the
-user explicitly resumes it.
+any future real-device action. The liquid test has been requested; execution
+awaits completion of the wet plan and fresh operator readiness.
 
 ## Verification and next steps
 
@@ -91,8 +91,11 @@ complete backend tests plus two additional host cases (131 focused), Ruff and
 Mega build passed. Mega41570 flash/3176 SRAM (+514/+28); prepared HEX SHA256
 61feb4425fddee73799191faf5a1bf98bb684db601a598712b30a7fe8a1c0d45.
 Previous installed HEX matched its recorded hash and is preserved separately.
-Next: explicit upload authorization with motor power OFF, then fresh readiness
-and exact wet priming/transition review; S-water/Reactor-empty and P2 prime stroke
-remain unresolved. The wet runner is not yet finalized. Do not treat software
-preparation as physical execution or firmware-upload authorization. Evidence:
+Upload completed with explicit owner approval and motor power OFF: exact
+dc7a53fcdd93315965bf82ba143bf4def17688e7 HEX, signature 0x1e9801, all 41570 flash
+bytes verified, exit 0. No actuator command, application Serial monitor, EEPROM
+provisioning or wet test. New stroke/speed remain physically unverified.
+Next: fresh readiness and exact wet priming/transition review; S-water,
+Reactor-empty readiness and P2 prime stroke remain unresolved. The wet runner is not yet finalized. Do not treat software
+preparation or flash verification as physical test acceptance. Evidence:
 firmware/docs/commissioning/2026-10-21/README.md.

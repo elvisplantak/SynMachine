@@ -14,8 +14,14 @@ The owner explicitly selected software preparation of full-stroke aspiration
 and approved a 600 pulses/s SF trial (prepared integer interval 1667 us).
 These are requested trial inputs, not confirmed physical results. No new pins,
 direction, volume calibration, route geometry or working limits are inferred.
-Installed firmware remains e2e9d3c until a separately authorized verified upload.
-No real Serial opening or actuator command has occurred for this preparation.
+The owner subsequently explicitly approved uploading prepared commit
+`dc7a53fcdd93315965bf82ba143bf4def17688e7` with motor power OFF. The upload
+completed with signature 0x1e9801 and all 41570 flash bytes verified (exit 0); HEX
+SHA256 is 61feb4425fddee73799191faf5a1bf98bb684db601a598712b30a7fe8a1c0d45.
+This is now the installed artifact. No actuator command, application Serial
+monitor, EEPROM provisioning or wet test was performed. Full stroke and 600
+pulses/s mixing remain physically unverified; power is last reported OFF.
+Evidence: docs/commissioning/2026-10-21/upload-verification.json.
 
 ## Owner clarification: colored-liquid prototype materials — 2026-10-20
 
