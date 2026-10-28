@@ -54,8 +54,8 @@ schematic and procedure settings. The camera panels are placeholders in this vie
 
 ## Demo video
 
-[Watch the SynMachine demo video](docs/videos/synmachine-demo.mp4)
-(MP4, approximately 67 seconds).
+[Download the SynMachine demo video](https://raw.githubusercontent.com/elvisplantak/SynMachine/main/docs/videos/synmachine-demo.mp4)
+(MP4, approximately 67 seconds, 38 MB). Download and open it in a video player.
 
 ## Try it without hardware
 
