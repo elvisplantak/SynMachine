@@ -52,6 +52,11 @@ Volumes in the current demo profile are nominal command values.
 *The SynMachine interface in configuration preview, showing the fluid-path
 schematic and procedure settings. The camera panels are placeholders in this view.*
 
+## Demo video
+
+[Watch the SynMachine demo video](docs/videos/synmachine-demo.mp4)
+(MP4, approximately 67 seconds).
+
 ## Try it without hardware
 
 The fake-device profile lets you explore the interface and recipe workflow
