@@ -45,6 +45,13 @@ a separate explicit action and fresh preparation confirmations.
 Route animations follow backend commands; they do not measure liquid flow.
 Volumes in the current demo profile are nominal command values.
 
+## User interface
+
+![SynMachine user interface showing the machine schematic, camera panels and procedure settings](docs/images/synmachine-interface.png)
+
+*The SynMachine interface in configuration preview, showing the fluid-path
+schematic and procedure settings. The camera panels are placeholders in this view.*
+
 ## Try it without hardware
 
 The fake-device profile lets you explore the interface and recipe workflow
