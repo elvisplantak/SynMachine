@@ -155,6 +155,46 @@ November 7 verification: 2057 complete backend tests (20 SiLA cases), full Ruff
 virtualenv. A separate subprocess smoke check exercised launcher HTTP health,
 TLS SiLA discovery/status and orderly shutdown with public-certificate cleanup.
 
+## Independent review acceptance — 2026-11-07
+
+The owner supplied the completed independent review for repository
+`elvisplantak/SynMachine`, branch `feature/sila2-backend-adapter`:
+
+- Reviewed implementation: `222e9e5c163576a706bc32455ad60b8066c946c8`
+  (`Add fake-only SiLA 2 adapter over existing backend execution`).
+- Review base: `ae8c78f062a5fa4fe38049bee82c40597f1606db`.
+- Verdict: **ACCEPTED for the declared fake-only SiLA 2 software integration**.
+- Findings: Critical 0, High 0, Medium 0, Low 0.
+- Requested software corrections: none.
+
+The review covered the complete base-to-HEAD diff, adapter, tests, fake launcher,
+this contract, existing recipe execution API, owned execution and fake browser
+composition, together with repository/backend rules and governance/context.
+It accepted the shared lifecycle/owner/journals, per-operation fake-mode boundary,
+existing revision/content/readiness validation, conservative lost-response and
+duplicate-ID semantics, exact-operation Stop, retained maintenance ownership,
+status/progress semantics, error handling and TLS/listener lifecycle.
+
+Evidence limits remain explicit: the 2057 backend tests (20 SiLA cases), Ruff
+0.15.22, dependency/compilation/whitespace checks and launcher smoke results were
+reported by the implementation session. The reviewer did not independently rerun
+these commands through the GitHub connector and reported no published GitHub
+combined status checks on the reviewed HEAD. No literal network failure was
+injected between backend acceptance and delivery of the gRPC Start response.
+The reviewer accepted the documented caller-owned RunId, durable backend state,
+conflict semantics and diagnostic workflow without exactly-once claims; this
+testing limit was not a finding.
+
+Acceptance applies to the exact implementation commit above. This later
+documentation-only record is not an independently reviewed runtime change. It
+does not authorize production exposure/authentication, real-device execution,
+state repair, physical testing, firmware work, XDL or merging into main. Recipe
+writes, maintenance/Service/operator-input commands, observable subscriptions,
+typed cross-vendor exchange, conformance certification and interoperability with
+untested clients remain outside the accepted slice. Define the next SiLA phase
+separately before introducing any production/live composition; the existing
+blocked wet-test state remains deferred.
+
 ## Before any live integration
 
 This development listener offers local fake control without application-level
