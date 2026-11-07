@@ -24,18 +24,23 @@ The last reviewed live Recipes preparation remains scoped to its original
 accepted implementations; use [the migration map](history/README.md) to resolve
 their original IDs. The live profile remains nominal 1025 steps/mL with the
 existing limits; its Recovery/Flush plans remain null and required maintenance
-cannot be cleared by restart/reprovisioning. Profile IDs/digests, runtime state,
-operator credentials, USB identities and the installed firmware are unchanged.
+cannot be cleared by restart/reprovisioning. The repository migration preserved
+profile IDs/digests, runtime state,
+operator credentials and USB identities. Later commissioning and owner-performed
+standalone uploads supersede the migration-time installed-firmware statement;
+the currently installed Arduino image is unverified. See the immediate checkpoint
+in LABFORGE_CURRENT_STATE.md before resuming any physical work.
 
 Confirmed physical facts: [firmware/HARDWARE_CONFIRMATIONS.md](../firmware/HARDWARE_CONFIRMATIONS.md).
 Serial semantics: [firmware/docs/LABFORGE_SERIAL_PROTOCOL_V1.md](../firmware/docs/LABFORGE_SERIAL_PROTOCOL_V1.md).
 Detailed older architecture/topology context is preserved in
 [the imported UI snapshot](../ui/LABFORGE_CONTEXT.md).
 
-Existing legacy local worktrees and any running sessions are preserved. This new
-checkout has not connected to devices or taken ownership of old runtime state.
-Opening a future live Serial connection needs fresh readiness; historical
-positions cannot be used as present references. The owner selected Apache-2.0 on
+Existing legacy local worktrees and unrelated work remain preserved. The
+migration itself did not connect to devices; later commissioning is recorded in
+LABFORGE_CURRENT_STATE.md. Opening a future live Serial connection needs fresh
+readiness; historical positions cannot be used as present references. The owner
+selected Apache-2.0 on
 2026-10-20 and approved the English README. A supplied prototype photograph is
 included unchanged in the approved documentation/license/photo checkpoint,
 integrated into main. The owner confirmed ownership of the old code and decided
@@ -45,3 +50,12 @@ Cronin Group at the University of Glasgow. GitHub presentation and publication
 checks are recorded in PUBLICATION.md. The owner explicitly authorized public
 visibility on 2026-10-20; SynMachine is now public and anonymous access was verified.
 Original component repositories remain private; no physical execution is implied.
+
+## Next software phase — 2026-11-07
+
+The owner chose SiLA 2 integration next and XDL for a later phase. The proposed
+SiLA layer adapts the existing backend and retains its validation, lifecycle,
+ownership and journals. Neither integration is implemented yet. The live owner
+remains blocked after the earlier wet attempt, and its reconciliation is explicitly
+deferred. Develop against fake devices/separate test state; this phase does not
+authorize real-device access, uploads, state repair or merging into main.

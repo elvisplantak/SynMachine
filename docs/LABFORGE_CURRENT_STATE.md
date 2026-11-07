@@ -1,11 +1,91 @@
 # SynMachine current development state
 
-- Checkpoint date: 2026-10-21
+- Checkpoint date: 2026-11-07
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Local checkout: `/home/elvis/Documents/SynMachine`
-- Branch: `commissioning/full-stroke-wet-test` (wet startup failed; owner retained; diagnostics pending);
-  imported histories under `history/ui/`, `history/backend/`,
-  `history/firmware/`.
+- Handoff branch: `docs/sila2-session-handoff` (documentation only)
+- Execution-code baseline: `commissioning/full-stroke-wet-test` at
+  `1ea4e7a3d98d193ab3c8132aa0ebddf75cd380a6`.
+- Last fetched public `main`: `49b5beb22945e9d55166c9c361a19d81809b5a28`.
+  The owner-approved October 28 UI screenshot, demo MP4 and README links are
+  published there. The commissioning code is on its separate pushed branch;
+  these branches must not be treated as identical or merged implicitly.
+
+## Immediate continuation: SiLA 2, then XDL
+
+The owner chose SiLA 2 integration as the next task in a new session, with XDL
+reserved for a later phase. Neither integration has been implemented. This
+handoff changes documentation only, not execution behavior or authorization.
+
+Proposed direction: add a SiLA 2 adapter to the existing Python backend, sharing
+recipe validation, command journals, lifecycle and ownership with the UI.
+Begin with status/feature discovery; then consider saved recipe access,
+explicit recipe execution, progress and Stop using existing application paths.
+Exact Features, authentication, SDK, supported clients and first implementation
+scope still need design. Do not introduce a separate serial owner or bypass
+maintenance, readiness or existing command identities. Inspect current maintained
+SDKs and their licenses before selecting a dependency; the previously consulted
+`sila2` reference documentation labels that implementation unmaintained.
+
+Read root/component AGENTS, development governance and system context first.
+Select the integration branch/base deliberately: public main and the commissioning
+branch contain different execution code. Preserve both; a new task is not
+approval to merge commissioning into main. Start software verification with
+fake devices and separate temporary state. XDL and real-device execution are
+outside this initial handoff; physical access still needs explicit approval.
+
+## Known live state and preserved local work
+
+- On November 3, read-only inspection found the existing live owner
+  `wet-reactor-sf-1b559875-a2df-44b4-831c-21151320acda` still `BLOCKED` in
+  `/home/elvis/.local/state/labforge/recipes-live-v1/owner.sqlite3`.
+  Ownership, execution, lifecycle and recipe databases passed SQLite quick_check.
+  This is local backend state, not a GitHub or Arduino-resident lock.
+- The owner explicitly deferred unblocking and physical commissioning. The live
+  profile has no configured automatic Recovery/Flush. Do not clear databases,
+  replace the bundle, release ownership or replay the wet runner for SiLA work.
+  Never read or expose the private `operator.key`.
+- After the original startup timeout, the explicitly approved continuation
+  stopped on P1 full-stroke aspiration with PUMP_MOTION_TIMEOUT before Reactor
+  delivery. The owner subsequently reported P1 full of red liquid. That expanded
+  journal is not the pristine/original-13-command state accepted by the narrow
+  startup reconciliation mode. Do not reuse that mode as an unblock shortcut.
+- The owner later self-uploaded standalone Arduino sketches and reported
+  successful P1 dispense and a P2 Reactor-to-SF transfer. These observations do
+  not repair backend journals or establish current references. The currently
+  installed firmware and present fluid contents are unverified; older installed-
+  firmware/power/reference statements below are historical, not current readiness.
+- Six standalone sketch/test packages remain untracked under the legacy
+  `/home/elvis/Documents/labforge-firmware/tools/`: `p1_b1_reactor`,
+  `p1_dispense_once`, `p2_reactor_sf`, `p2_sf_mix`, `reactor_sf_once`,
+  `reactor_sf_simple`. Preserve them; they are not published in SynMachine.
+- The active monorepo also retains the unrelated untracked file
+  `firmware/docs/commissioning/2026-10-21/observe-pump-home-powered.py.txt`.
+- The November 3 check found neither localhost UI nor backend running. Recheck
+  availability when needed; this historical observation does not authorize a
+  real-device connection. Protected `firmware/recovery/` and legacy `recovery/`
+  remain excluded from access without exact action-specific authorization.
+
+## Last complete software check: 2026-11-03
+
+On execution baseline 1ea4e7a: 2037 backend tests; 51 UI tests, zero skipped;
+224 native firmware plus 6 mixer-profile cases; 155 standalone fake-GPIO cases
+and one fake DYNAMIXEL host-tool test passed. Backend Ruff/pip dependency checks,
+UI lint/TypeScript/Vite build and Mega 2560 build passed. No tracked source changes
+were found; local commissioning HEAD matched its GitHub branch. No device access,
+upload, physical motion, state repair or main merge occurred.
+
+Mega: 42062 flash / 3184 static SRAM bytes. Rebuilt HEX SHA256 matched the prior
+artifact: `d8478b434439bff45cd05a26e1e9e0628c8c4e4cd1cd7851528cb7a7648538c6`.
+This establishes a reproducible software build, not the image currently on Arduino.
+Those tests were not rerun for this documentation-only November 7 handoff.
+Temporary check logs may have expired; retain this dated result as historical
+verification and run relevant checks for future executable changes.
+
+## Historical development record through 2026-10-21
+
+The following records preserve their original checkpoint context. Current scope,
+installed-firmware uncertainty and live-state limitations are described above.
 
 ## Repository consolidation
 
