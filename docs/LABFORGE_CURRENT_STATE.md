@@ -3,8 +3,8 @@
 - Checkpoint date: 2026-11-07
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Local checkout: `/home/elvis/Documents/SynMachine`
-- Active integration branch: `feature/sila2-client-interop`, based on accepted
-  checkpoint documentation `a6467e6`; main and commissioning remain separate.
+- Active integration branch: `feature/sila2-access-control`, based on client
+  interoperability `039b70c`; main and commissioning remain separate.
 - Handoff branch: `docs/sila2-session-handoff` (documentation only)
 - Execution-code baseline: `commissioning/full-stroke-wet-test` at
   `1ea4e7a3d98d193ab3c8132aa0ebddf75cd380a6`.
@@ -13,7 +13,50 @@
   published there. The commissioning code is on its separate pushed branch;
   these branches must not be treated as identical or merged implicitly.
 
-## Independent SiLA 2 client interoperability
+## SiLA 2 client access control — fake devices only
+
+The owner approved local client authentication, separate read/control rights and
+attribution. `backend/app/sila2/access.py` now enforces explicit per-client tokens
+over TLS before application RPC decoding/dispatch, with READ_ONLY and CONTROL
+roles, mandatory expiry, enabled flag and in-process revocation on subsequent
+requests. `fake_server()` requires explicit policy/audit configuration and has no
+anonymous application fallback. Token hashes are kept in policy; caller-supplied
+identity names are ignored. Existing readiness/lifecycle/owner/command-journal
+paths remain authoritative. Credential possession identifies the client program,
+separately from the human readiness statement.
+
+The fake launchers issue one-hour reader/controller tokens in private temporary
+files, print paths only and retain `sila-access.sqlite3` alongside the fake bundle.
+The C# client accepts `--token-file`. A selected-field request event precedes each
+backend dispatch and links authenticated client/role/request ID to existing
+run/operation/recipe identities. Tokens, bodies and error detail are not copied.
+Audit failure blocks pre-dispatch requests; a failure after acceptance preserves
+the existing run and unknown-outcome/no-retry semantics. Unknown audit schemas
+are rejected without repair. This is attribution, not a second execution journal
+or a tamper-proof compliance ledger.
+
+Core SiLAService discovery/identity/FDL/display-name metadata remains public;
+application status/recipes/control require authorization. Unused SDK binary
+transfer RPCs are not exposed. This protects the SiLA listener, not the existing
+HTTP/UI routes or local users with access to token files. Stop also requires
+available audit storage in this fake scope. Production-wide identity/provisioning,
+storage/Stop availability and external exposure remain a separate phase.
+
+Verification on November 7: **2080 complete backend tests passed**, zero skipped
+with .NET enabled; all 43 focused SiLA cases passed, including 16 new policy/audit
+cases and an additional independent C# role/attribution case. Full Ruff 0.15.22,
+pip dependency/compilation and whitespace checks passed. C# Release build and
+format verification passed with SDK 10.0.403, zero compiler warnings/errors and
+unchanged locked dependencies. The fake demo showed READ_ONLY Start/Stop rejected,
+CONTROL completion/Stop accepted, retained maintenance and request attribution.
+A launcher smoke test passed authenticated TLS, anonymous denial, mode-0600 token
+files, no token values in logs, cleanup and same-bundle restart with rotated
+credentials. No live state, hardware, firmware, XDL or main merge.
+Contract and scope: `backend/docs/SILA2.md`; client usage:
+`backend/tools/sila2-client/README.md`. Earlier acceptance of `222e9e5` does not
+cover this phase's changes; consolidate independent review at this access boundary.
+
+## Independent SiLA 2 client interoperability — prior checkpoint
 
 After the server review, the owner approved the proposed software-only phase:
 connect an independent program on the same computer, test against fake devices,

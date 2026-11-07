@@ -31,6 +31,7 @@ assembly = shared.assembly
 base_assembly = shared.base_assembly
 bundle = shared.bundle
 tls = shared.tls
+access = shared.access
 
 
 @pytest.fixture
@@ -47,14 +48,15 @@ class ExternalClient:
     def __init__(self, dotnet, dll, directory):
         self.dotnet, self.dll, self.directory = dotnet, dll, directory
 
-    async def launch(self, server, tls, action, *arguments, uuid=None, certificate=None):
+    async def launch(self, server, tls, action, *arguments, uuid=None, certificate=None, token_file="controller.token"):
         identity, cert = tls
         path = self.directory / "public-certificate.pem"
         path.write_bytes(certificate or cert.pem_certificate)
+        auth = [] if token_file is None else ["--token-file", str(self.directory / token_file)]
         return await asyncio.create_subprocess_exec(
             str(self.dotnet), str(self.dll), action,
             "--port", server.address.rsplit(":", 1)[1], "--certificate", str(path),
-            "--server-uuid", uuid or identity, *arguments,
+            "--server-uuid", uuid or identity, *auth, *arguments,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
             env={**os.environ, "DOTNET_CLI_TELEMETRY_OPTOUT": "1"},
         )
@@ -94,7 +96,7 @@ def rejection(response, expected, *, attempted=False):
     assert json.loads(decoded.message)["status"] == expected
 
 
-def test_external_discovery_complete_recipe_and_duplicate(assembly, bundle, tls, external_client):
+def test_external_discovery_complete_recipe_and_duplicate(assembly, bundle, tls, external_client, access):
     app, _, devices, _ = assembly
     identity, cert = tls
     with ApiClient(app, lifespan="on") as api:
@@ -102,7 +104,7 @@ def test_external_discovery_complete_recipe_and_duplicate(assembly, bundle, tls,
 
         async def scenario():
             async with fake_server(app, server_uuid=identity, certificate=cert.pem_certificate,
-                                   private_key=cert.pem_private_key) as server:
+                                   private_key=cert.pem_private_key, access=access) as server:
                 discovered = success(await external_client.call(server, tls, "discover"))
                 assert discovered["server_uuid"] == identity and len(discovered["features"]) == 4
                 status = success(await external_client.call(server, tls, "status"))
@@ -146,7 +148,7 @@ def test_external_demo_rejects_live_environment_before_state(tmp_path, name):
     assert not directory.exists()
 
 
-def test_external_validation_stop_and_retained_owner(assembly, tls, external_client):
+def test_external_validation_stop_and_retained_owner(assembly, tls, external_client, access):
     app, _, devices, _ = assembly
     identity, cert = tls
     entered, release = Event(), Event()
@@ -155,7 +157,7 @@ def test_external_validation_stop_and_retained_owner(assembly, tls, external_cli
 
         async def scenario():
             async with fake_server(app, server_uuid=identity, certificate=cert.pem_certificate,
-                                   private_key=cert.pem_private_key) as server:
+                                   private_key=cert.pem_private_key, access=access) as server:
                 invalid = dict(saved, revision=saved["revision"] + 1)
                 rejection(await external_client.call(server, tls, "start", *external_client.start_arguments(invalid)),
                           409, attempted=True)
@@ -187,7 +189,7 @@ def test_external_validation_stop_and_retained_owner(assembly, tls, external_cli
 
 
 def test_external_client_disconnect_after_acceptance_reconnects_without_replay(
-    assembly, bundle, tls, external_client, monkeypatch,
+    assembly, bundle, tls, external_client, monkeypatch, access,
 ):
     app, _, devices, _ = assembly
     identity, cert = tls
@@ -214,7 +216,7 @@ def test_external_client_disconnect_after_acceptance_reconnects_without_replay(
 
             monkeypatch.setattr(FakeBackend, "start_recipe", lose_response)
             async with fake_server(app, server_uuid=identity, certificate=cert.pem_certificate,
-                                   private_key=cert.pem_private_key) as server:
+                                   private_key=cert.pem_private_key, access=access) as server:
                 process = await external_client.launch(server, tls, "start", *external_client.start_arguments(saved))
                 try:
                     await asyncio.wait_for(accepted.wait(), 15)
@@ -243,7 +245,7 @@ def test_external_client_disconnect_after_acceptance_reconnects_without_replay(
         assert db.execute("SELECT COUNT(*) FROM prepared_command_plans").fetchone()[0] == 10
 
 
-def test_external_identity_tls_and_non_fake_status_reject_before_start(assembly, tls, external_client, monkeypatch):
+def test_external_identity_tls_and_non_fake_status_reject_before_start(assembly, tls, external_client, monkeypatch, access):
     from uuid import uuid4
 
     from sila.server import create_certificate
@@ -264,7 +266,7 @@ def test_external_identity_tls_and_non_fake_status_reject_before_start(assembly,
 
         async def scenario():
             async with fake_server(app, server_uuid=identity, certificate=cert.pem_certificate,
-                                   private_key=cert.pem_private_key) as server:
+                                   private_key=cert.pem_private_key, access=access) as server:
                 args = external_client.start_arguments(saved)
                 wrong_id = await external_client.call(server, tls, "start", *args, uuid=str(uuid4()))
                 assert wrong_id[0] == 2 and "server UUID differs" in wrong_id[2]
@@ -275,3 +277,43 @@ def test_external_identity_tls_and_non_fake_status_reject_before_start(assembly,
                 assert non_fake[0] == 2 and "requires an explicitly FAKE server" in non_fake[2]
                 assert devices[0].calls == devices[0].sf_calls == []
         asyncio.run(scenario())
+
+
+def test_external_reader_permissions_and_authenticated_attribution(assembly, tls, external_client, access):
+    app, _, devices, _ = assembly
+    identity, cert = tls
+    entered, release = Event(), Event()
+    with ApiClient(app, lifespan="on") as api:
+        saved = save(api)
+
+        async def scenario():
+            async with fake_server(app, server_uuid=identity, certificate=cert.pem_certificate,
+                                   private_key=cert.pem_private_key, access=access) as server:
+                missing = await external_client.call(server, tls, "status", token_file=None)
+                assert missing[0] == 2 and json.loads(missing[2].splitlines()[0])["error"] == "Unauthenticated"
+                assert success(await external_client.call(server, tls, "recipes", token_file="reader.token")) == [saved]
+                args = external_client.start_arguments(saved)
+                denied = await external_client.call(server, tls, "start", *args, token_file="reader.token")
+                assert denied[0] == 3 and json.loads(denied[2].splitlines()[0])["error"] == "PermissionDenied"
+                assert devices[0].calls == devices[0].sf_calls == []
+
+                def hold(_):
+                    entered.set()
+                    assert release.wait(30)
+                devices[0].before_send = hold
+                try:
+                    accepted = success(await external_client.call(server, tls, "start", *args))
+                    assert await asyncio.to_thread(entered.wait, 5)
+                    denied_stop = await external_client.call(server, tls, "stop", "--operation-id",
+                                                           accepted["operation_id"], token_file="reader.token")
+                    assert denied_stop[0] == 2 and "PermissionDenied" in denied_stop[2]
+                    assert (await asyncio.to_thread(api.get, "/api/v1/execution")).json()["busy"]
+                    success(await external_client.call(server, tls, "stop", "--operation-id", accepted["operation_id"]))
+                finally:
+                    release.set()
+                assert (await asyncio.to_thread(wait_idle, api))["retained_owner_id"]
+        asyncio.run(scenario())
+    with sqlite3.connect(access.audit.path) as db:
+        assert db.execute("SELECT client_id,role,run_id FROM sila_access_events WHERE event='RESULT' AND rpc_method LIKE '%/StartRecipe'").fetchall() == [
+            ("fake-controller", "CONTROL", "external-run")]
+        assert db.execute("SELECT COUNT(*) FROM sila_access_events WHERE event='FORBIDDEN' AND client_id='fake-reader'").fetchone()[0] == 2

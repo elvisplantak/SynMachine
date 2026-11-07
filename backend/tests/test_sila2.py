@@ -24,6 +24,7 @@ from tests import test_owned_offline_runtime as runtime_tests
 from tests.test_api import ApiClient
 from tests.test_owned_application_api import wait_idle
 from tests.test_recipes import definition, readiness, save
+from tests.sila2_credentials import issue_fake_access
 
 base_assembly = owned_tests.assembly
 bundle = runtime_tests.bundle
@@ -36,19 +37,36 @@ def assembly(base_assembly):
     return base_assembly
 
 
+@pytest.fixture
+def access(tmp_path):
+    return issue_fake_access(tmp_path, tmp_path)[0]
+
+
 @pytest.fixture(scope="module")
 def tls():
     identity = str(uuid4())
     return identity, create_certificate(identity, ip_addresses=["127.0.0.1"])
 
 
-async def connect(server, certificate):
+async def connect(server, certificate, access, token_file="controller.token"):
     client = Client(ClientConfig(
         hostname="127.0.0.1", port=int(server.address.rsplit(":", 1)[1]),
         tls=True, root_certificates=certificate.pem_certificate,
         default_timeout=5000, options={"grpc.enable_retries": False},
     ))
     await client.open()
+    # The pinned Python SDK exposes no bearer option; replace only its channel,
+    # retaining its FDL/types/request machinery. Core discovery above stays public.
+    import grpc.aio
+    token = (access.audit.path.parent / token_file).read_text()
+    credentials = grpc.composite_channel_credentials(
+        grpc.ssl_channel_credentials(root_certificates=certificate.pem_certificate),
+        grpc.access_token_call_credentials(token),
+    )
+    old_channel = client._channel
+    client._channel = grpc.aio.secure_channel(server.address, credentials,
+                                             options=[("grpc.enable_retries", False)])
+    await old_channel.close()
     return client
 
 
@@ -62,7 +80,7 @@ def result(response):
     return json.loads(response.Result)
 
 
-def test_tls_discovery_status_recipes_validation_and_no_device_commands(assembly, tls):
+def test_tls_discovery_status_recipes_validation_and_no_device_commands(assembly, tls, access):
     app, _, devices, _ = assembly
     identity, cert = tls
     with ApiClient(app, lifespan="on") as api:
@@ -70,8 +88,8 @@ def test_tls_discovery_status_recipes_validation_and_no_device_commands(assembly
 
         async def scenario():
             async with fake_server(app, server_uuid=identity,
-                                   certificate=cert.pem_certificate, private_key=cert.pem_private_key) as server:
-                client = await connect(server, cert)
+                                   certificate=cert.pem_certificate, private_key=cert.pem_private_key, access=access) as server:
+                client = await connect(server, cert, access)
                 try:
                     assert await client.get_server_uuid() == identity
                     features = await client.get_implemented_features()
@@ -106,7 +124,7 @@ def test_tls_discovery_status_recipes_validation_and_no_device_commands(assembly
     ({"RecipeId": ".."}, 422),
     ({"RecipeId": "missing"}, 404),
 ])
-def test_rejected_start_sends_no_commands(assembly, tls, change, expected):
+def test_rejected_start_sends_no_commands(assembly, tls, change, expected, access):
     app, _, devices, _ = assembly
     identity, cert = tls
     with ApiClient(app, lifespan="on") as api:
@@ -114,8 +132,8 @@ def test_rejected_start_sends_no_commands(assembly, tls, change, expected):
 
         async def scenario():
             async with fake_server(app, server_uuid=identity,
-                                   certificate=cert.pem_certificate, private_key=cert.pem_private_key) as server:
-                client = await connect(server, cert)
+                                   certificate=cert.pem_certificate, private_key=cert.pem_private_key, access=access) as server:
+                client = await connect(server, cert, access)
                 try:
                     with pytest.raises(DefinedExecutionError) as caught:
                         await client.SynMachineExecution.StartRecipe(**(start_parameters(saved) | change))
@@ -127,7 +145,7 @@ def test_rejected_start_sends_no_commands(assembly, tls, change, expected):
         asyncio.run(scenario())
 
 
-def test_sila_execution_uses_same_run_snapshot_and_command_journal(assembly, bundle, tls):
+def test_sila_execution_uses_same_run_snapshot_and_command_journal(assembly, bundle, tls, access):
     app, _, devices, _ = assembly
     identity, cert = tls
     with ApiClient(app, lifespan="on") as api:
@@ -135,8 +153,8 @@ def test_sila_execution_uses_same_run_snapshot_and_command_journal(assembly, bun
 
         async def scenario():
             async with fake_server(app, server_uuid=identity,
-                                   certificate=cert.pem_certificate, private_key=cert.pem_private_key) as server:
-                client = await connect(server, cert)
+                                   certificate=cert.pem_certificate, private_key=cert.pem_private_key, access=access) as server:
+                client = await connect(server, cert, access)
                 try:
                     accepted = result(await client.SynMachineExecution.StartRecipe(**start_parameters(saved)))
                     assert accepted["action"] == "RUN" and accepted["run_id"] == "sila-run"
@@ -157,7 +175,7 @@ def test_sila_execution_uses_same_run_snapshot_and_command_journal(assembly, bun
         assert db.execute("SELECT COUNT(*) FROM prepared_command_plans").fetchone()[0] == 10
 
 
-def test_concurrent_ui_start_stop_identity_and_retained_maintenance(assembly, tls):
+def test_concurrent_ui_start_stop_identity_and_retained_maintenance(assembly, tls, access):
     app, _, devices, _ = assembly
     identity, cert = tls
     entered, release = Event(), Event()
@@ -172,8 +190,8 @@ def test_concurrent_ui_start_stop_identity_and_retained_maintenance(assembly, tl
 
         async def scenario():
             async with fake_server(app, server_uuid=identity,
-                                   certificate=cert.pem_certificate, private_key=cert.pem_private_key) as server:
-                client = await connect(server, cert)
+                                   certificate=cert.pem_certificate, private_key=cert.pem_private_key, access=access) as server:
+                client = await connect(server, cert, access)
                 try:
                     await client.SynMachineExecution.StartRecipe(**start_parameters(saved))
                     assert await asyncio.to_thread(entered.wait, 5)
@@ -203,7 +221,7 @@ def test_concurrent_ui_start_stop_identity_and_retained_maintenance(assembly, tl
 
 
 @pytest.mark.parametrize("mode", ["LIVE", "UNSPECIFIED"])
-def test_non_fake_backend_rejected_before_listener(assembly, tls, mode):
+def test_non_fake_backend_rejected_before_listener(assembly, tls, mode, access):
     app, execution, devices, _ = assembly
     identity, cert = tls
     execution._transport_mode = mode
@@ -211,7 +229,7 @@ def test_non_fake_backend_rejected_before_listener(assembly, tls, mode):
         async def scenario():
             with pytest.raises(BackendRejected, match="explicitly FAKE"):
                 async with fake_server(app, server_uuid=identity, certificate=cert.pem_certificate,
-                                       private_key=cert.pem_private_key):
+                                       private_key=cert.pem_private_key, access=access):
                     pytest.fail("listener must not start")
         asyncio.run(scenario())
         assert devices[0].calls == devices[0].sf_calls == []
@@ -236,7 +254,7 @@ def test_backend_mode_rechecked_and_invalid_recipe_uses_same_validator(assembly)
         assert devices[0].calls == devices[0].sf_calls == []
 
 
-def test_fake_adapter_transports_and_restart_do_not_replay(assembly, tmp_path, tls):
+def test_fake_adapter_transports_and_restart_do_not_replay(assembly, tmp_path, tls, access):
     import httpx
 
     from tests.browser_check import build_profile
@@ -254,8 +272,8 @@ def test_fake_adapter_transports_and_restart_do_not_replay(assembly, tmp_path, t
                 assert response.status_code == 200
                 saved = response.json()
                 async with fake_server(application, server_uuid=identity,
-                                       certificate=cert.pem_certificate, private_key=cert.pem_private_key) as server:
-                    client = await connect(server, cert)
+                                       certificate=cert.pem_certificate, private_key=cert.pem_private_key, access=access) as server:
+                    client = await connect(server, cert, access)
                     try:
                         await client.SynMachineExecution.StartRecipe(**start_parameters(saved))
                         async with asyncio.timeout(10):
@@ -273,8 +291,8 @@ def test_fake_adapter_transports_and_restart_do_not_replay(assembly, tmp_path, t
         reopened, _ = build_profile(directory, command_delay=0)
         async with reopened.router.lifespan_context(reopened):
             async with fake_server(reopened, server_uuid=identity,
-                                   certificate=cert.pem_certificate, private_key=cert.pem_private_key) as server:
-                client = await connect(server, cert)
+                                   certificate=cert.pem_certificate, private_key=cert.pem_private_key, access=access) as server:
+                client = await connect(server, cert, access)
                 try:
                     assert result(await client.SynMachineExecution.GetProgress(RunId="sila-run")) == run
                     assert json.loads(await client.SynMachineStatus.Status.read())["execution"]["busy"] is False
@@ -286,7 +304,7 @@ def test_fake_adapter_transports_and_restart_do_not_replay(assembly, tmp_path, t
     asyncio.run(scenario())
 
 
-def test_plaintext_connection_cannot_use_tls_server(assembly, tls):
+def test_plaintext_connection_cannot_use_tls_server(assembly, tls, access):
     import grpc.aio
 
     app, _, devices, _ = assembly
@@ -294,7 +312,7 @@ def test_plaintext_connection_cannot_use_tls_server(assembly, tls):
     with ApiClient(app, lifespan="on"):
         async def scenario():
             async with fake_server(app, server_uuid=identity,
-                                   certificate=cert.pem_certificate, private_key=cert.pem_private_key) as server:
+                                   certificate=cert.pem_certificate, private_key=cert.pem_private_key, access=access) as server:
                 async with grpc.aio.insecure_channel(server.address) as channel:
                     call = channel.unary_unary(
                         "/sila2.org.silastandard.core.silaservice.v1.SiLAService/Get_ServerUUID")

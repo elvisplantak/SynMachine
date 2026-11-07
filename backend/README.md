@@ -24,6 +24,9 @@ validation, execution, progress and Stop through the same backend using fake
 devices only. Install `.[dev,sila2]` for its TLS client/server checks and launcher.
 The [independent C# client](tools/sila2-client/README.md) adds a runnable local fake
 demo and interoperability checks using a separate SiLA implementation.
+SiLA application requests now require explicit client tokens with READ_ONLY or
+CONTROL rights and are attributed in a separate request audit. This remains a
+local fake-device scope; existing HTTP/UI authorization is unchanged.
 
 Existing state, operator credentials, stable USB identities and profile digests
 are not migrated or reset by the repository consolidation. The package remains

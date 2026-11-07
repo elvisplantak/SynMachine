@@ -73,9 +73,18 @@ computer with fake devices. `backend/tools/sila2-client/` now provides a separat
 C# client using the official `SiLA2.Client.Dynamic` 10.3.3 implementation, locked
 dependencies and explicit TLS certificate/server-identity checks. The fake demo
 and tests cover recipe execution, progress, exact Stop and reconnect after client
-loss without replay; the accepted Python server code remains unchanged. This new
-work does not inherit the earlier review's acceptance. Production/live composition
-must still be defined as a separate phase; see the client README and CURRENT_STATE.
+loss without replay; that checkpoint left the accepted Python server unchanged. This new
+work does not inherit the earlier review's acceptance.
+
+The owner then approved local SiLA client access control, still fake-only.
+Explicit expiring per-client tokens now enforce READ_ONLY versus CONTROL at
+server RPC admission, with request attribution linked to existing run/operation
+IDs. Launchers issue temporary private token files; the C# client uses
+`--token-file`. Policy checks, selected-field durable audit, audit-failure and
+unknown-outcome behavior are documented in `backend/docs/SILA2.md`. Existing
+HTTP/UI authorization is unchanged; this is not production-wide identity or a
+SiLA AuthenticationService implementation. The earlier review does not accept
+these later changes. Production/live composition must still be defined separately.
 
 The live owner remains blocked after the earlier wet attempt, and its reconciliation
 is explicitly deferred. Develop against fake devices/separate test state; this

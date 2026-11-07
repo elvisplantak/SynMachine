@@ -1,4 +1,5 @@
 using System.Net.Security;
+using System.Net.Http.Headers;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -23,7 +24,7 @@ static async Task<int> Run(string[] args)
     {
         Console.WriteLine("SynMachine fake-only SiLA client (.NET / SiLA2.Client.Dynamic 10.3.3)\n" +
             "Actions: discover, status, recipes, read, validate, start, progress, watch, stop\n" +
-            "Required: --port N --certificate FILE --server-uuid UUID\n" +
+            "Required: --port N --certificate FILE --server-uuid UUID --token-file FILE\n" +
             "read: --recipe-id ID | validate: --definition FILE\n" +
             "start: --recipe FILE --readiness FILE --run-id ID\n" +
             "progress/watch: --run-id ID | stop: --operation-id ID\n" +
@@ -41,7 +42,7 @@ static async Task<int> Run(string[] args)
             throw new ArgumentException("unknown action or incomplete --name value pair; use help");
         var options = new Dictionary<string, string>();
         var names = new HashSet<string> { "--port", "--certificate", "--server-uuid", "--recipe-id",
-            "--definition", "--recipe", "--readiness", "--run-id", "--operation-id", "--watch-seconds" };
+            "--definition", "--recipe", "--readiness", "--run-id", "--operation-id", "--watch-seconds", "--token-file" };
         for (int i = 1; i < args.Length; i += 2)
             if (!names.Contains(args[i]) || !options.TryAdd(args[i], args[i + 1]))
                 throw new ArgumentException("unknown or duplicate option");
@@ -61,6 +62,13 @@ static async Task<int> Run(string[] args)
             CryptographicOperations.FixedTimeEquals(certificate.GetCertHash(HashAlgorithmName.SHA256),
                                                     pinned.GetCertHash(HashAlgorithmName.SHA256));
         using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
+        if (options.TryGetValue("--token-file", out var tokenPath))
+        {
+            var token = File.ReadAllText(tokenPath).Trim();
+            if (!System.Text.RegularExpressions.Regex.IsMatch(token, "\\A[A-Za-z0-9_-]{32,128}\\z"))
+                throw new ArgumentException("client token file has an invalid format");
+            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
         using var channel = GrpcChannel.ForAddress($"https://127.0.0.1:{port}", new GrpcChannelOptions
         {
             HttpClient = http,

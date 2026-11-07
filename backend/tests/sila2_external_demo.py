@@ -25,6 +25,7 @@ async def demonstrate(directory, dotnet, dll):
 
     from app.sila2.server import fake_server
     from tests.browser_check import build_profile
+    from tests.sila2_credentials import issue_fake_access
 
     application, execution = build_profile(directory, command_delay=0)
     identity = execution.bundle.lifecycle_id
@@ -33,6 +34,7 @@ async def demonstrate(directory, dotnet, dll):
         work = Path(temporary)
         cert = work / "public-certificate.pem"
         cert.write_bytes(certificate.pem_certificate)
+        access, tokens = issue_fake_access(directory, work)
         readiness = work / "fake-readiness.json"
         readiness.write_text(json.dumps({
             "operator": "Fake interoperability demo",
@@ -43,11 +45,12 @@ async def demonstrate(directory, dotnet, dll):
         async with application.router.lifespan_context(application):
             async with fake_server(application, server_uuid=identity,
                                    certificate=certificate.pem_certificate,
-                                   private_key=certificate.pem_private_key) as server:
-                async def client(action, *arguments):
+                                   private_key=certificate.pem_private_key, access=access) as server:
+                async def client(action, *arguments, role="controller", denied=None):
                     process = await asyncio.create_subprocess_exec(
                         str(dotnet), str(dll), action, "--port", server.address.rsplit(":", 1)[1],
-                        "--certificate", str(cert), "--server-uuid", identity, *arguments,
+                        "--certificate", str(cert), "--server-uuid", identity,
+                        "--token-file", str(tokens[role]), *arguments,
                         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
                     )
                     try:
@@ -56,6 +59,10 @@ async def demonstrate(directory, dotnet, dll):
                         if process.returncode is None:
                             process.kill()
                             await process.wait()
+                    if denied is not None:
+                        assert process.returncode != 0
+                        assert json.loads(error.decode().splitlines()[0])["error"] == denied
+                        return []
                     if process.returncode:
                         raise RuntimeError(error.decode().strip())
                     return [json.loads(line) for line in output.decode().splitlines()]
@@ -80,8 +87,10 @@ async def demonstrate(directory, dotnet, dll):
                     discovered = (await client("discover"))[0]
                     assert len(discovered["features"]) == 4
                     assert (await client("status"))[0]["execution"]["transport_mode"] == "FAKE"
-                    assert len((await client("recipes"))[0]) == 2
-                    print("PASS: TLS connection, SiLAService discovery, status and recipe library", flush=True)
+                    assert len((await client("recipes", role="reader"))[0]) == 2
+                    await client("start", "--recipe", str(complete_recipe), "--readiness", str(readiness),
+                                 "--run-id", "reader-denied", role="reader", denied="PermissionDenied")
+                    print("PASS: authenticated TLS/discovery; reader can read recipes but cannot Start", flush=True)
                     await client("start", "--recipe", str(complete_recipe), "--readiness", str(readiness),
                                  "--run-id", "external-demo-complete")
                     completed = (await client("watch", "--run-id", "external-demo-complete"))[-1]
@@ -90,11 +99,14 @@ async def demonstrate(directory, dotnet, dll):
                     await client("start", "--recipe", str(stop_recipe), "--readiness", str(readiness),
                                  "--run-id", "external-demo-stop")
                     current = (await client("status"))[0]["execution"]
+                    await client("stop", "--operation-id", current["operation"]["operation_id"],
+                                 role="reader", denied="PermissionDenied")
                     await client("stop", "--operation-id", current["operation"]["operation_id"])
                     stopped = (await client("watch", "--run-id", "external-demo-stop"))[-1]
                     assert stopped["status"] == "ABORTED"
                     assert (await client("status"))[0]["execution"]["retained_owner_id"]
-                    print("PASS: exact-operation Stop; run ABORTED and fake maintenance owner retained", flush=True)
+                    print("PASS: reader Stop denied; controller Stop accepted; ABORTED with fake owner retained", flush=True)
+                    print(f"Request attribution preserved in {access.audit.path}", flush=True)
     print("DONE: listeners/client processes closed; fake state preserved without repair/reset", flush=True)
 
 

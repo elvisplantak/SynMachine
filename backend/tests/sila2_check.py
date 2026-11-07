@@ -17,6 +17,7 @@ async def serve(directory: Path, *, http_port: int, sila_port: int, command_dela
 
     from app.sila2.server import fake_server
     from tests.browser_check import build_profile
+    from tests.sila2_credentials import issue_fake_access
 
     application, execution = build_profile(directory, command_delay=command_delay)
     identity = execution.bundle.lifecycle_id
@@ -26,14 +27,18 @@ async def serve(directory: Path, *, http_port: int, sila_port: int, command_dela
     with TemporaryDirectory(prefix="synmachine-sila2-tls-") as tls_directory:
         certificate_path = Path(tls_directory) / "certificate.pem"
         certificate_path.write_bytes(certificate.pem_certificate)
+        access, token_paths = issue_fake_access(directory, tls_directory)
         async with application.router.lifespan_context(application):
             async with fake_server(
                 application, server_uuid=identity, certificate=certificate.pem_certificate,
                 private_key=certificate.pem_private_key, port=sila_port,
+                access=access,
             ) as server:
                 print(f"FAKE TRANSPORTS ONLY | state={directory.absolute()} | SiLA TLS={server.address}",
                       flush=True)
                 print(f"SiLA UUID={identity} | trust certificate={certificate_path}", flush=True)
+                print(f"READ_ONLY token file={token_paths['reader']} | CONTROL token file={token_paths['controller']}", flush=True)
+                print(f"SiLA access audit={access.audit.path} | client tokens expire in one hour", flush=True)
                 # FastAPI lifespan is already owned above. One process, one executor.
                 await Server(Config(application, host="127.0.0.1", port=http_port,
                                     workers=1, lifespan="off")).serve()

@@ -118,7 +118,9 @@ clients must trust the new certificate. Ctrl+C closes SiLA then the owned app.
 No mDNS advertisement or network-wide discovery is enabled; clients connect to
 the printed address and use SiLAService feature discovery.
 
-Example read-only client (substitute the printed certificate path):
+Example anonymous core-discovery client (substitute the printed certificate path).
+Application status/recipes now require a client token; use the authenticated C#
+example linked below for those requests:
 
 ```python
 import asyncio
@@ -134,8 +136,7 @@ async def main():
     ))
     await client.open()
     try:
-        print(json.loads(await client.SynMachineStatus.Status.read()))
-        print(json.loads(await client.SynMachineRecipes.Recipes.read()))
+        print(await client.get_implemented_features())
     finally:
         await client.close()
 
@@ -238,11 +239,109 @@ full SiLA certification, and demonstrates only the tested SDK/version and Featur
 contract. Production/live composition, authentication/provisioning, firmware,
 wet-state repair, XDL and main merge remain outside this phase.
 
+## Client access control and request attribution — 2026-11-07
+
+The owner approved local client authentication, separate read/control rights and
+request attribution, still with fake devices only. Branch
+`feature/sila2-access-control` starts at `039b70c`; earlier independent acceptance
+of `222e9e5` does not cover these later admission changes.
+
+`fake_server()` now requires an explicit `AccessControl(Policy(...), AuditJournal(...))`.
+There is no anonymous application-mode fallback. Each configured `Credential`
+binds a unique client ID to a role, SHA-256 of a secret token, enabled flag and
+mandatory timezone-aware expiry. Token possession identifies the configured
+program, not a human operator. Policy is in memory; its `revoke(client_id)` applies
+to subsequent requests even on an existing TLS connection. It does not cancel
+already admitted work or stop a run. No credential-management endpoint is exposed.
+
+The transport uses `authorization: Bearer <token>` over TLS, following
+[gRPC's credential/metadata mechanism](https://grpc.io/docs/guides/auth/).
+This is a local application policy, not an implementation of the optional SiLA
+AuthenticationService, AuthorizationService or AuditTrailService Features.
+Those standard Features are described in the
+[SiLA Features Index](https://sila-standard.com/wp-content/uploads/2022/03/SiLA-2-Part-C-Standard-Features-Index-v1.0.pdf).
+No conformance certification or production identity/provisioning claim is made.
+
+| Role | Allowed application operations |
+| --- | --- |
+| `READ_ONLY` | Status, Recipes, ReadRecipe, ValidateRecipe, GetProgress |
+| `CONTROL` | All read operations, plus StartRecipe and exact-operation Stop |
+
+The server checks the token and role **before SDK parameter decoding or backend
+dispatch**, independently of client UI behavior. It wraps the pinned SDK's native
+unary handlers, retaining its protobuf, metadata and cancellation semantics.
+Every application RPC must have an explicit mapping; a missing mapping refuses
+startup. Unused SDK BinaryUpload/BinaryDownload services are removed from this
+adapter: none of its Features has a Binary parameter/response. SiLAService core
+discovery, identity, Feature Definitions and the SDK's ephemeral display-name
+commands remain public; they do not invoke backend execution or change recipes.
+All application status/recipe/control calls are protected.
+
+Missing, malformed, duplicate, unknown, expired, disabled and revoked credentials
+receive gRPC UNAUTHENTICATED. A reader's Start/Stop receives PERMISSION_DENIED.
+Caller-supplied client names are ignored. Existing backend revision/digest,
+readiness, ownership, lifecycle and Stop-ID checks still run after admission.
+A CONTROL client may stop any exact current operation; per-run client ownership
+is not introduced. The human readiness statement is preserved separately from
+the authenticated program identity and is never synthesized from its token.
+
+`sila-access.sqlite3` is a separate append-only request-event API, linked to the
+existing execution records by run/operation IDs. It records generated request ID,
+server UUID, UTC time, authenticated client ID/role, RPC method and selected
+run/operation/recipe/revision/digest fields. It does not copy Authorization headers,
+token files, recipe/readiness bodies or error detail. Existing command journals
+remain the execution evidence; this file is not a second executor, domain journal,
+or a tamper-proof/regulatory audit ledger.
+
+Events distinguish AUTHORIZED, FORBIDDEN, UNAUTHENTICATED, DISPATCH, RESULT and
+BACKEND_REJECTED. RPC_FAILED/CLIENT_DISCONNECTED can occur when no final result
+is available; disconnected work may still later append RESULT. Authorization is
+not backend acceptance, and Start's RESULT still means acceptance only.
+The authenticated request context propagates into SDK background tasks.
+DISPATCH commits with SQLite synchronous FULL **before** the backend call. An
+audit failure before dispatch blocks the request, including Stop in this fake
+slice. If logging fails after backend acceptance, the outcome can be unknown to
+the client: inspect the same RunId, never auto-retry or clear ownership. Unknown
+audit files/schema, extra objects and altered definitions are rejected without
+migration/repair. Existing lifecycle/ownership/execution stores are unchanged.
+
+The manual launcher prints file paths for separate generated `reader.token` and
+`controller.token` credentials, not their values. Token files have mode 0600 in
+a temporary private directory and expire after one hour; policy stores hashes.
+Shutdown removes these temporary credentials. Restart issues fresh credentials
+and reopens the same recognized request audit alongside the retained fake bundle.
+It does not repair the bundle or clear maintenance. Supply the selected file to
+the C# client with `--token-file`; the Python SDK test shim composes gRPC SSL and
+access-token credentials on the pinned SDK's channel after public discovery.
+
+This policy protects the **SiLA listener**. Existing localhost HTTP/UI routes keep
+their current authorization behavior; SiLA roles do not isolate a local process
+that can access those routes or read another client's credential files. Both
+listeners and all device compositions remain local/fake. Production-wide access
+control, credential provisioning/rotation, storage availability/retention and
+emergency-stop policy require a separate phase before any live deployment.
+
+Verification on November 7: 2080 complete backend tests passed, zero skipped with
+the independent .NET client enabled; 43 focused SiLA cases. Added 16 policy/audit
+cases plus a C# role/attribution case cover denial before decoding/dispatch,
+expiry/disable/revocation, reader monitoring without control, exact Stop and
+retained ownership, request/run/operation linkage, secret omission, audit failure
+before/after acceptance, strict schema preservation and unclassified-RPC refusal.
+The prior response-loss/reconnect tests still pass under authenticated access.
+Full Ruff 0.15.22, pip dependency/Python compilation, C# Release build (zero
+warnings/errors), .NET format verification and whitespace checks passed. The
+updated demo passed role denials and accepted control; a separate launcher smoke
+check verified private token files, no secret values in logs, shutdown cleanup
+and reopening the same fake bundle with new credentials and a retained audit.
+Existing backend HTTP/domain/hardware/recipe code and dependency inputs are
+unchanged; production/live activation and independent acceptance remain separate.
+
 ## Before any live integration
 
-This development listener offers local fake control without application-level
-authentication. Production authentication/authorization, certificate provisioning,
-deployment exposure and supported external clients must be deliberately selected
-and independently reviewed before introducing a live composition. This milestone
+This development listener now authenticates local fake SiLA clients and separates
+read/control roles. Production-wide authentication/authorization, certificate and
+credential provisioning, deployment exposure and supported external clients must
+be deliberately selected and independently reviewed before introducing a live
+composition. This milestone
 does not claim full SiLA conformance certification or interoperability with
 untested clients. The existing blocked wet-test owner remains untouched.
