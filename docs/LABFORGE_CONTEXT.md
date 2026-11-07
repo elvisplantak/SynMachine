@@ -66,8 +66,16 @@ separate future work. XDL is unimplemented.
 Independent review accepted implementation commit
 `222e9e5c163576a706bc32455ad60b8066c946c8` for this declared fake-only scope,
 with zero findings at every severity and no requested software corrections.
-The review record and evidence limits are in `backend/docs/SILA2.md`; the next
-SiLA phase must be defined separately before production/live composition.
+The review record and evidence limits are in `backend/docs/SILA2.md`.
+
+The owner subsequently approved independent-client interoperability on the same
+computer with fake devices. `backend/tools/sila2-client/` now provides a separate
+C# client using the official `SiLA2.Client.Dynamic` 10.3.3 implementation, locked
+dependencies and explicit TLS certificate/server-identity checks. The fake demo
+and tests cover recipe execution, progress, exact Stop and reconnect after client
+loss without replay; the accepted Python server code remains unchanged. This new
+work does not inherit the earlier review's acceptance. Production/live composition
+must still be defined as a separate phase; see the client README and CURRENT_STATE.
 
 The live owner remains blocked after the earlier wet attempt, and its reconciliation
 is explicitly deferred. Develop against fake devices/separate test state; this

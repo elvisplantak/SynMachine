@@ -195,6 +195,49 @@ untested clients remain outside the accepted slice. Define the next SiLA phase
 separately before introducing any production/live composition; the existing
 blocked wet-test state remains deferred.
 
+## Independent client interoperability — 2026-11-07
+
+After acceptance of the server checkpoint, the owner approved a separate local
+fake-only client interoperability phase. Branch `feature/sila2-client-interop`
+starts at documentation commit `a6467e6`, retaining accepted server implementation
+`222e9e5` unchanged.
+
+The new [standalone C# client and instructions](../tools/sila2-client/README.md)
+use the independently implemented `SiLA2.Client.Dynamic==10.3.3` SDK (MIT).
+The client discovers FDL over TLS and exercises the existing Draft JSON Features
+in a separate process. It pins the explicitly supplied public certificate,
+requires the expected server UUID and FAKE status, and never retries Start.
+It exposes no backend HTTP, Serial, maintenance, repair or recipe-write path.
+All .NET dependencies and integrity hashes are locked separately from Python.
+
+`python -m tests.sila2_external_demo` prepares explicit fixture recipes in a new
+empty fake bundle, then drives discovery/status/library, completion/progress and
+exact-operation Stop through that C# executable. It preserves the resulting fake
+databases and retained maintenance owner. Existing live state remains untouched.
+
+Twenty-six focused SiLA cases pass, including six new cases for the external
+client/demo. Cross-implementation checks cover full execution, revision/readiness
+rejection, duplicate IDs, exact Stop and retained ownership, standard error
+decoding, certificate/UUID/non-fake rejection and a literal client process/socket
+loss after backend acceptance but before delivery of its Start response. A new
+C# process reads the same durable RunId without another Start or command replay.
+This adds fault-injection evidence beyond the earlier review's reported limits;
+it does not retroactively change what that reviewer tested or accepted.
+
+November 7 verification: 2063 complete backend tests passed with the .NET cases
+enabled and zero skipped; all 26 focused SiLA cases passed. C# Release build had
+zero warnings/errors; locked NuGet restore, .NET format verification, full Ruff
+0.15.22, pip dependency check, Python compilation and whitespace checks passed.
+The standalone fake demo passed completion/Stop and refused reused state with
+all existing fake-file hashes unchanged. SDK 10.0.403 and its CLI/NuGet caches
+were installed only under `/tmp`; no global .NET configuration was changed.
+
+The original independent acceptance remains scoped to `222e9e5`. This later
+client/example work is not independently accepted by that review, does not claim
+full SiLA certification, and demonstrates only the tested SDK/version and Feature
+contract. Production/live composition, authentication/provisioning, firmware,
+wet-state repair, XDL and main merge remain outside this phase.
+
 ## Before any live integration
 
 This development listener offers local fake control without application-level

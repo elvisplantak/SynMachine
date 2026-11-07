@@ -22,6 +22,8 @@ preparation is separate: [docs/LIVE_RECIPES.md](docs/LIVE_RECIPES.md).
 The optional [SiLA 2 adapter](docs/SILA2.md) exposes discovery, status, recipe reads,
 validation, execution, progress and Stop through the same backend using fake
 devices only. Install `.[dev,sila2]` for its TLS client/server checks and launcher.
+The [independent C# client](tools/sila2-client/README.md) adds a runnable local fake
+demo and interoperability checks using a separate SiLA implementation.
 
 Existing state, operator credentials, stable USB identities and profile digests
 are not migrated or reset by the repository consolidation. The package remains

@@ -3,8 +3,8 @@
 - Checkpoint date: 2026-11-07
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Local checkout: `/home/elvis/Documents/SynMachine`
-- Active integration branch: `feature/sila2-backend-adapter`, based on handoff
-  `ae8c78f`; the SiLA changes are isolated from main and commissioning.
+- Active integration branch: `feature/sila2-client-interop`, based on accepted
+  checkpoint documentation `a6467e6`; main and commissioning remain separate.
 - Handoff branch: `docs/sila2-session-handoff` (documentation only)
 - Execution-code baseline: `commissioning/full-stroke-wet-test` at
   `1ea4e7a3d98d193ab3c8132aa0ebddf75cd380a6`.
@@ -13,7 +13,43 @@
   published there. The commissioning code is on its separate pushed branch;
   these branches must not be treated as identical or merged implicitly.
 
-## SiLA 2 integration — fake-device development slice
+## Independent SiLA 2 client interoperability
+
+After the server review, the owner approved the proposed software-only phase:
+connect an independent program on the same computer, test against fake devices,
+and provide a runnable example. Added `backend/tools/sila2-client/`, a separate
+C# CLI using official `SiLA2.Client.Dynamic` 10.3.3 (MIT), with a locked dependency
+graph. No Python server/application/dependency code was changed.
+
+The client uses TLS/loopback, explicit certificate pinning, expected server UUID
+and FAKE status. It supports discovery/status, recipe list/read/validation,
+reviewed recipe Start, progress/watch and exact-operation Stop; no automatic Start
+retry or synthesized readiness. The client communicates only through SiLA.
+`python -m tests.sila2_external_demo` prepares fixture recipes in a new empty fake
+bundle and demonstrates completion and Stop using separate C# client processes.
+It preserves the resulting databases/retained fake maintenance owner and rejects
+live-port settings before application import. User/build instructions and SDK
+selection/license evidence: `backend/tools/sila2-client/README.md`.
+
+Verification on November 7: **2063 complete backend tests passed**, with .NET
+scenarios enabled and zero skipped. All 26 focused SiLA tests passed, including six new external-client/demo
+cases. A C# process is killed after backend acceptance but before the Start reply;
+a fresh C# process reads the same run without replay. Wrong TLS certificate/UUID
+and non-fake status reject before Start. The standalone demo passed with real
+adapters over hardwired fake Serial/DYNAMIXEL transports. C# Release build and
+format verification passed with .NET SDK 10.0.403, zero compiler warnings/errors.
+Locked NuGet restore, full Ruff 0.15.22, pip dependency check, Python compilation
+and whitespace checks passed. Reusing the demo directory was rejected with all
+existing fake-file hashes unchanged.
+Runtime/CLI/NuGet caches are isolated under `/tmp`; no global install was made.
+
+This new client checkpoint does not inherit the earlier server's independent
+acceptance. Next production/live composition, authentication, certificate
+provisioning and external exposure require a separately defined phase. The wet
+block remains deferred; XDL, firmware, device access, state repair and main merge
+remain outside scope.
+
+## SiLA 2 integration — accepted fake-device server slice
 
 Implemented an optional `unitelabs-sila==0.13.0` (MIT) adapter in `backend/app/sila2/`.
 It exposes the SDK's SiLAService discovery plus Draft vendor Features for backend
@@ -56,10 +92,10 @@ checks. This acceptance does not extend to this later documentation commit or
 authorize production/live operation, firmware work, state repair, physical tests,
 XDL or a main merge.
 
-Next: define the next SiLA phase separately, including supported external clients.
-Production authentication/authorization, certificate provisioning and exposure
-require a separate design before live composition is introduced. The blocked
-wet-test state remains deferred.
+The later owner-approved independent-client phase is recorded above; its results
+do not broaden this review's accepted scope. Production authentication/authorization,
+certificate provisioning and exposure require a separate design before live
+composition is introduced. The blocked wet-test state remains deferred.
 
 ## November 7 starting handoff: SiLA 2, then XDL
 
