@@ -3,6 +3,8 @@
 - Checkpoint date: 2026-11-07
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Local checkout: `/home/elvis/Documents/SynMachine`
+- Active integration branch: `feature/sila2-backend-adapter`, based on handoff
+  `ae8c78f`; the SiLA changes are isolated from main and commissioning.
 - Handoff branch: `docs/sila2-session-handoff` (documentation only)
 - Execution-code baseline: `commissioning/full-stroke-wet-test` at
   `1ea4e7a3d98d193ab3c8132aa0ebddf75cd380a6`.
@@ -11,11 +13,48 @@
   published there. The commissioning code is on its separate pushed branch;
   these branches must not be treated as identical or merged implicitly.
 
-## Immediate continuation: SiLA 2, then XDL
+## SiLA 2 integration — fake-device development slice
+
+Implemented an optional `unitelabs-sila==0.13.0` (MIT) adapter in `backend/app/sila2/`.
+It exposes the SDK's SiLAService discovery plus Draft vendor Features for backend
+status, saved recipe list/read, existing recipe preview validation, explicit
+StartRecipe, persisted progress and exact-operation Stop. Requests call the same
+FastAPI routes in-process; there is no second lifecycle, executor or serial owner.
+Existing revision/digest/readiness checks, command journals and retained maintenance
+ownership remain authoritative. API acceptance is not recipe completion.
+
+This first listener is TLS/127.0.0.1 only and rejects LIVE/UNSPECIFIED executors on
+startup and every adapter operation. `python -m tests.sila2_check` shares the
+existing hardwired fake browser composition with the UI and separate fake state;
+it rejects live-port environment settings before importing the application.
+No production activation, operator-credential access, live-state repair, device
+connection, firmware change or main merge occurred. XDL remains unimplemented.
+SDK selection evidence, complete Feature contract and launch/client instructions:
+`backend/docs/SILA2.md`.
+
+Verification on November 7: **2057 backend tests passed**, including 20 new SiLA
+tests for TLS discovery/client calls,
+shared UI exclusion, stale identity/readiness rejection without commands, exact
+Stop and retained ownership, real adapters with fake transports, restart without
+replay and launcher environment guards. Full backend Ruff 0.15.22, pip dependency
+check, Python compilation and whitespace checks passed. A separate launcher smoke
+check passed HTTP health, TLS SiLA discovery/status and orderly Ctrl+C shutdown.
+Checks ran from `backend/` in an isolated `/tmp` virtualenv with temporary fake
+state. Ruff 0.17.4 reports pre-existing repository style issues under its expanded
+rules; no unrelated style rewrite was made. UI/firmware were unchanged and their
+November 3 verification below remains historical.
+
+Next: consolidated independent review of this fake integration boundary and
+selection of supported external clients. Production authentication/authorization,
+certificate provisioning and exposure require a separate design before live
+composition is introduced. The blocked wet-test state remains deferred.
+
+## November 7 starting handoff: SiLA 2, then XDL
 
 The owner chose SiLA 2 integration as the next task in a new session, with XDL
-reserved for a later phase. Neither integration has been implemented. This
-handoff changes documentation only, not execution behavior or authorization.
+reserved for a later phase. Neither integration was implemented at `ae8c78f`.
+That starting handoff changed documentation only, not execution behavior or
+authorization; the new fake-only implementation is recorded above.
 
 Proposed direction: add a SiLA 2 adapter to the existing Python backend, sharing
 recipe validation, command journals, lifecycle and ownership with the UI.

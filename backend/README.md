@@ -19,6 +19,10 @@ automatically enable owned Recipes execution. The fake browser profile is
 documented in [docs/BROWSER_CHECK.md](docs/BROWSER_CHECK.md). Explicit real-device
 preparation is separate: [docs/LIVE_RECIPES.md](docs/LIVE_RECIPES.md).
 
+The optional [SiLA 2 adapter](docs/SILA2.md) exposes discovery, status, recipe reads,
+validation, execution, progress and Stop through the same backend using fake
+devices only. Install `.[dev,sila2]` for its TLS client/server checks and launcher.
+
 Existing state, operator credentials, stable USB identities and profile digests
 are not migrated or reset by the repository consolidation. The package remains
 named `labforge-backend`. Current canonical state is in

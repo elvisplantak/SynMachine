@@ -16,6 +16,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+sila2 = [
+    "unitelabs-sila==0.13.0",
+    "httpx>=0.28,<0.29",
+    "cryptography>=46,<48",
+]
 dev = [
     "pytest",
     "ruff",

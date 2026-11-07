@@ -53,9 +53,19 @@ Original component repositories remain private; no physical execution is implied
 
 ## Next software phase — 2026-11-07
 
-The owner chose SiLA 2 integration next and XDL for a later phase. The proposed
-SiLA layer adapts the existing backend and retains its validation, lifecycle,
-ownership and journals. Neither integration is implemented yet. The live owner
-remains blocked after the earlier wet attempt, and its reconciliation is explicitly
-deferred. Develop against fake devices/separate test state; this phase does not
-authorize real-device access, uploads, state repair or merging into main.
+The owner chose SiLA 2 integration next and XDL for a later phase. The initial
+SiLA development slice now adapts existing FastAPI routes in-process using the
+optional `unitelabs-sila==0.13.0` SDK. It retains existing validation, lifecycle,
+ownership and journals, exposing discovery/status, recipe reads/preview, explicit
+execution, persisted progress and exact-operation Stop. The listener requires TLS,
+binds loopback and permits explicitly FAKE execution only. See
+`backend/docs/SILA2.md` for the Draft Feature contract, dependency decision,
+launcher and limits. Production authentication/exposure and live composition are
+separate future work. XDL is unimplemented.
+
+The live owner remains blocked after the earlier wet attempt, and its reconciliation
+is explicitly deferred. Develop against fake devices/separate test state; this
+phase does not authorize real-device access, uploads, state repair or merging
+into main. The integration branch starts at handoff `ae8c78f` over commissioning
+`1ea4e7a`; public main contains different execution code and is not implicitly
+merged or accepted by this milestone.
