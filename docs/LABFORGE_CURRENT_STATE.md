@@ -1,11 +1,77 @@
 # SynMachine current development state
 
-- Checkpoint date: 2026-10-20
+- Checkpoint date: 2026-11-08
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
-- Local checkout: `/home/elvis/Documents/SynMachine`
-- Branch: `main` (approved publication preparation integrated);
-  imported histories under `history/ui/`, `history/backend/`,
-  `history/firmware/`.
+- Primary checkout: `/home/elvis/Documents/SynMachine`
+- Integration branch: `integration/sila2-main`, isolated worktree
+  `/tmp/synmachine-sila2-main`, based on public main
+  `49b5beb22945e9d55166c9c361a19d81809b5a28`.
+- Preserved SiLA/CI source: `feature/sila2-ci` at
+  `40d8a659c938fd3b14deb9b30f9fae24e427e9dc`.
+- Separate commissioning branch: `commissioning/full-stroke-wet-test` at
+  `1ea4e7a3d98d193ab3c8132aa0ebddf75cd380a6`.
+
+## Initial SiLA 2 software integration on the main baseline
+
+The owner approved preparing the initial fake/local SiLA integration for main.
+Only the SiLA adapter, client, fake tests, optional dependency extra, CI and
+related documentation were transferred from the preserved source branch.
+Existing main backend domain/HTTP/recipe/hardware and protocol code, UI, README
+screenshot/video and firmware are not part of this transfer. Commissioning's
+full-stroke capability/status changes and wet-test/reconciliation runner remain
+on their original branch. The source branches and historical review records
+remain intact. See `backend/docs/SILA2_MAIN_INTEGRATION.md` for exact provenance
+and verification. Final main merge remains an explicit approval boundary.
+
+The adapter uses optional `unitelabs-sila==0.13.0` and exposes TLS/loopback-only
+status, recipe read/preview, explicit Start, progress and exact-operation Stop
+through the existing backend. Only FAKE execution is allowed. READ_ONLY/CONTROL
+client credentials and selected-field request attribution protect SiLA requests
+before decoding/dispatch; HTTP/UI authorization is unchanged. The independent
+C# client uses `SiLA2.Client.Dynamic` 10.3.3 with locked dependencies.
+Contract: `backend/docs/SILA2.md`; use/demo: `backend/tools/sila2-client/README.md`;
+GitHub checks: `backend/docs/CI.md`.
+
+Original independent acceptance applies only to exact server commit `222e9e5`
+and exact narrow admission-correction commit `a10a068`, within their recorded
+fake/local scopes. It is not relabeled as acceptance of this port, the whole
+access-control phase or production/live operation. Tests on this main baseline
+must be reported separately from the earlier commissioning-based 2099-test run.
+
+Verification on this main base: **1999 backend tests passed**, including all
+**62 SiLA cases**, zero skipped. All **51 UI tests** passed, zero skipped; UI
+lint/TypeScript/Vite build, backend Ruff/pip/compilation, Actionlint, locked NuGet
+restore and C# Release build passed (zero compiler warnings/errors). The same CI
+report gate passed. The standalone main-based fake demo also passed completion,
+progress, reader denials and exact Stop with retained fake ownership. Main's
+README/media, UI and existing backend implementation match the pinned main base;
+all 23 transferred backend/workflow paths match the preserved source blobs.
+Hosted CI and the final merge are the remaining integration steps.
+
+The unchanged UI lock reports four high-severity npm audit package alerts in
+existing build/development dependencies. They are recorded with advisory links
+in `backend/docs/SILA2_MAIN_INTEGRATION.md` as separate maintenance work.
+
+## Live state and preserved work
+
+The existing live owner remains BLOCKED after the October wet startup failure.
+Its state reconciliation, physical readiness and flushing are deferred; this
+software task never opens live databases, reads operator credentials, connects
+Serial/DYNAMIXEL devices, moves actuators, uploads firmware or changes EEPROM.
+The owner later reported standalone sketch uploads; the currently installed
+firmware, fluid contents and present references are unverified. Earlier installed-
+firmware statements below are dated history, not current readiness.
+
+Detailed commissioning/failure and prior software evidence remains in the
+[preserved development checkpoint](https://github.com/elvisplantak/SynMachine/blob/40d8a659c938fd3b14deb9b30f9fae24e427e9dc/docs/LABFORGE_CURRENT_STATE.md).
+Protected firmware recovery artifacts require exact action-specific authorization
+and were excluded from this worktree/review. The primary checkout retains the
+unrelated untracked commissioning observation file. No state repair, production
+exposure, XDL or physical test is included in this integration.
+
+## Historical publication/migration record through 2026-10-20
+
+The following records retain their original context and verification scope.
 
 ## Repository consolidation
 
