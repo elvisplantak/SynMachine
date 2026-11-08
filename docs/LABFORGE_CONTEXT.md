@@ -61,7 +61,8 @@ attribution protect the SiLA listener, with admission before request decoding.
 Existing HTTP/UI behavior remains unchanged. GitHub CI exercises fake devices
 and the independent client without deployment.
 
-`integration/sila2-main` ports only the SiLA/CI delta from `feature/sila2-ci`
+PR #1, explicitly approved by the owner and merged as `bc775fa` on November 8,
+ports only the SiLA/CI delta from `feature/sila2-ci`
 at `40d8a65` onto main `49b5beb`. It does not merge commissioning's protocol,
 wet-test or reconciliation changes. Existing main UI, README media and domain
 execution code are preserved. Original source branches/review records remain
@@ -71,5 +72,5 @@ port. See `backend/docs/SILA2_MAIN_INTEGRATION.md` and `backend/docs/SILA2.md`.
 The listener requires an explicitly FAKE backend. Live composition, production
 credentials/certificates, external exposure and operator/emergency-stop policy
 remain separate work, alongside the deferred wet-state reconciliation and
-physical tests. XDL remains unimplemented. Preparing the integration does not
-authorize physical actions or bypass the separate main-merge approval boundary.
+physical tests. XDL remains unimplemented. Approval of the initial main merge
+does not authorize physical actions, live activation or later unrelated main work.

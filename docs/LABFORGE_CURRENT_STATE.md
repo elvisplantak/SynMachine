@@ -3,9 +3,11 @@
 - Checkpoint date: 2026-11-08
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Primary checkout: `/home/elvis/Documents/SynMachine`
-- Integration branch: `integration/sila2-main`, isolated worktree
-  `/tmp/synmachine-sila2-main`, based on public main
-  `49b5beb22945e9d55166c9c361a19d81809b5a28`.
+- Active main checkout: isolated worktree `/tmp/synmachine-sila2-main`.
+- Initial SiLA integration merged to `main` through PR #1 at
+  `bc775fae6e08c5768566536b16055099e67af683`, from approved candidate `18af175`
+  over prior main `49b5beb`. The primary checkout remains on its preserved
+  development branch; the integration and commissioning branches are retained.
 - Preserved SiLA/CI source: `feature/sila2-ci` at
   `40d8a659c938fd3b14deb9b30f9fae24e427e9dc`.
 - Separate commissioning branch: `commissioning/full-stroke-wet-test` at
@@ -13,7 +15,8 @@
 
 ## Initial SiLA 2 software integration on the main baseline
 
-The owner approved preparing the initial fake/local SiLA integration for main.
+The owner explicitly approved merging PR #1 on November 8. The initial fake/local
+SiLA integration is now on main at `bc775fa`.
 Only the SiLA adapter, client, fake tests, optional dependency extra, CI and
 related documentation were transferred from the preserved source branch.
 Existing main backend domain/HTTP/recipe/hardware and protocol code, UI, README
@@ -21,7 +24,7 @@ screenshot/video and firmware are not part of this transfer. Commissioning's
 full-stroke capability/status changes and wet-test/reconciliation runner remain
 on their original branch. The source branches and historical review records
 remain intact. See `backend/docs/SILA2_MAIN_INTEGRATION.md` for exact provenance
-and verification. Final main merge remains an explicit approval boundary.
+and verification. This approval covers the initial software merge only.
 
 The adapter uses optional `unitelabs-sila==0.13.0` and exposes TLS/loopback-only
 status, recipe read/preview, explicit Start, progress and exact-operation Stop
@@ -50,9 +53,19 @@ Hosted CI **also passed** on exact implementation commit
 `e598d58f89df609368c949f39814e0d79bdcf930`:
 [run 42481909369](https://github.com/elvisplantak/SynMachine/actions/runs/42481909369),
 1999 tests in 163.70 seconds, 62 SiLA cases, zero failures/skips and a C# build
-without warnings/errors. [Draft PR #1](https://github.com/elvisplantak/SynMachine/pull/1)
-is prepared without merge conflicts; final main merge awaits explicit owner
-approval. Later documentation-only records do not change this verified code.
+without warnings/errors. [PR #1](https://github.com/elvisplantak/SynMachine/pull/1)
+was merged after the owner's explicit approval, preserving its development
+branches. Later documentation-only records do not change this verified code.
+
+Post-merge **main CI also succeeded** on exact merge commit
+`bc775fae6e08c5768566536b16055099e67af683`:
+[run 42483128655](https://github.com/elvisplantak/SynMachine/actions/runs/42483128655).
+All 1999 tests passed in 165.50 seconds; the report gate confirmed 62 SiLA cases,
+zero failures/skips. Ruff, dependency checks, C# Release build (zero warnings/
+errors), report upload and cache cleanup passed. Total hosted run time was about
+3.5 minutes. The initial fake/local SiLA software integration and CI are now
+published on main. This closure only updates documentation; diff/whitespace/status
+checks passed, with no further runtime change or physical authorization.
 
 The unchanged UI lock reports four high-severity npm audit package alerts in
 existing build/development dependencies. They are recorded with advisory links

@@ -66,8 +66,25 @@ All 1999 backend tests passed in 163.70 seconds; the JUnit gate confirmed 62 SiL
 cases, zero failures and zero skips. Lint, locked restore, C# Release build
 (zero warnings/errors), report upload and cache cleanup all passed. The hosted
 run took about 3.5 minutes including setup. Later documentation-only records do
-not change the verified implementation. [Draft PR #1](https://github.com/elvisplantak/SynMachine/pull/1)
-contains the prepared integration; main merge awaits explicit owner approval.
+not change the verified implementation.
+
+The owner explicitly approved [PR #1](https://github.com/elvisplantak/SynMachine/pull/1)
+on November 8; approved candidate `18af175fa3e427916969077d5bb52ac67501a80c`
+was merged to main as `bc775fae6e08c5768566536b16055099e67af683`.
+No source branch was deleted or shared history rewritten. The merge preserves
+the approved candidate's backend/UI/documentation content exactly; the
+commissioning implementation remains separate. GitHub generated the merge
+commit's account metadata; local repository Git identity remains Elvis and the
+configured owner noreply address, without global setting changes.
+
+The automatic post-merge [main run 42483128655](https://github.com/elvisplantak/SynMachine/actions/runs/42483128655)
+**succeeded** for exact merge commit `bc775fae6e08c5768566536b16055099e67af683`.
+It passed all 1999 backend tests in 165.50 seconds, with all 62 SiLA cases and no
+failures/skips. Lint/dependency checks, C# Release build (zero warnings/errors),
+report upload and cache cleanup also passed. Existing main UI/media and backend
+implementation checks remain valid because the approved candidate's contents
+were preserved. The initial fake/local software integration is complete on main;
+this final record changes only documentation.
 
 The existing main UI lock also produced four high-severity npm audit package
 alerts: Vite, nanoid, PostCSS and source-map-js. They are development/build
@@ -78,7 +95,7 @@ examples: [Vite](https://github.com/advisories/GHSA-9jrq-w75r-8gcw),
 [PostCSS](https://github.com/advisories/GHSA-fxqj-rqcc-2cmp),
 [source-map-js](https://github.com/advisories/GHSA-68fv-2mgg-jv7q).
 
-The final integration is reviewed against the pinned main base. Main merge
-requires explicit user approval under the development governance. Production
+The final integration is reviewed against the pinned main base. Owner approval
+covered this initial main merge under the development governance. Production
 authentication/provisioning/exposure, live composition, wet-state reconciliation,
 firmware, physical tests and XDL remain outside this port.
