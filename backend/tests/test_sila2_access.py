@@ -4,6 +4,7 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 import json
 import sqlite3
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -11,8 +12,10 @@ pytest.importorskip("sila")
 
 import grpc.aio
 from sila.server import DefinedExecutionError
+from sila.framework.data_types import Structure
+from sila.framework.protobuf import DecodeError
 
-from app.sila2.access import AccessControl, AuditJournal, AuditUnavailable, Credential, Policy, Role
+from app.sila2.access import AccessControl, AuditJournal, AuditUnavailable, Credential, METHODS, Policy, Role
 from app.sila2.server import fake_server
 from tests import test_sila2 as shared
 from tests.test_api import ApiClient
@@ -35,14 +38,156 @@ def rows(access):
         return [dict(row) for row in db.execute("SELECT * FROM sila_access_events ORDER BY sequence")]
 
 
-async def raw(server, cert, method=STATUS_RPC, metadata=()):
+async def raw(server, cert, method=STATUS_RPC, metadata=(), payload=b""):
     async with grpc.aio.secure_channel(server.address,
                                       grpc.ssl_channel_credentials(cert.pem_certificate)) as channel:
-        return await channel.unary_unary(method)(b"", metadata=metadata, timeout=3)
+        return await channel.unary_unary(method)(payload, metadata=metadata, timeout=3)
+
+
+@pytest.fixture
+def rpc_boundaries(access, monkeypatch):
+    """Exercise a configured gRPC decoder as well as the SDK's own decoding.
+
+    SDK 0.13.0 application handlers currently have request_deserializer=None;
+    their command behavior decodes bytes later. Install a real SDK wire parser
+    at the optional gRPC seam to prove admission precedes that seam too. Keep
+    bytes as its output so the original SDK behavior retains its input contract.
+    """
+    observed = {}
+    protect = access.protect
+    message = Structure.create(name="AdmissionProbe", elements={})
+
+    def decode_wire(payload):
+        message.decode(payload)
+        return payload
+
+    def instrument(server, identity):
+        observed["sdk_decode"] = AsyncMock(wraps=server.protobuf.decode)
+        monkeypatch.setattr(server.protobuf, "decode", observed["sdk_decode"])
+        for service, handlers in server.protobuf.services.items():
+            for method, handler in tuple(handlers.items()):
+                rpc = f"/{service}/{method}"
+                if rpc in METHODS:
+                    assert handler.request_deserializer is None
+                    decode = Mock(wraps=decode_wire)
+                    behavior = AsyncMock(wraps=handler.unary_unary)
+                    handlers[method] = grpc.unary_unary_rpc_method_handler(
+                        behavior, request_deserializer=decode,
+                        response_serializer=handler.response_serializer,
+                    )
+                    observed[rpc] = (decode, behavior)
+        protect(server, identity)
+
+    monkeypatch.setattr(access, "protect", instrument)
+    return observed
+
+
+@pytest.mark.parametrize("payload", [b"\x80", b"\x0a\x80"], ids=["truncated-tag", "truncated-length"])
+@pytest.mark.parametrize("method,token_file,status,event", [
+    (START_RPC, None, grpc.StatusCode.UNAUTHENTICATED, "UNAUTHENTICATED"),
+    (STATUS_RPC, None, grpc.StatusCode.UNAUTHENTICATED, "UNAUTHENTICATED"),
+    (START_RPC, "reader.token", grpc.StatusCode.PERMISSION_DENIED, "FORBIDDEN"),
+    (STOP_RPC, "reader.token", grpc.StatusCode.PERMISSION_DENIED, "FORBIDDEN"),
+])
+def test_wire_admission_precedes_native_deserialization(
+    assembly, tls, access, rpc_boundaries, method, token_file, status, event, payload,
+):
+    app, _, devices, _ = assembly
+    identity, cert = tls
+    metadata = [] if token_file is None else [
+        ("authorization", "Bearer " + (access.audit.path.parent / token_file).read_text())]
+    with ApiClient(app, lifespan="on"):
+        async def scenario():
+            async with fake_server(app, server_uuid=identity, certificate=cert.pem_certificate,
+                                   private_key=cert.pem_private_key, access=access) as server:
+                with pytest.raises(grpc.aio.AioRpcError) as caught:
+                    await raw(server, cert, method, metadata, payload)
+                assert caught.value.code() is status
+        asyncio.run(scenario())
+        decode, behavior = rpc_boundaries[method]
+        decode.assert_not_called()
+        behavior.assert_not_called()
+        rpc_boundaries["sdk_decode"].assert_not_called()
+        # Prove these bytes are invalid for the actual pinned SDK parser.
+        with pytest.raises(DecodeError):
+            decode(payload)
+        assert devices[0].calls == devices[0].sf_calls == []
+    events = rows(access)
+    assert [row["event"] for row in events] == [event]
+    assert events[0]["client_id"] == (None if token_file is None else "fake-reader")
+
+
+@pytest.mark.parametrize("payload", [b"\x80", b"\x0a\x80"], ids=["truncated-tag", "truncated-length"])
+@pytest.mark.parametrize("method", [START_RPC, STOP_RPC, STATUS_RPC])
+def test_authorized_invalid_wire_uses_native_decoder_without_dispatch(
+    assembly, tls, access, rpc_boundaries, method, payload,
+):
+    app, _, devices, _ = assembly
+    identity, cert = tls
+    token = (access.audit.path.parent / "controller.token").read_text()
+    with ApiClient(app, lifespan="on"):
+        async def scenario():
+            async with fake_server(app, server_uuid=identity, certificate=cert.pem_certificate,
+                                   private_key=cert.pem_private_key, access=access) as server:
+                with pytest.raises(grpc.aio.AioRpcError) as caught:
+                    await raw(server, cert, method, [("authorization", f"Bearer {token}")], payload)
+                # grpc.aio reports uncaught native protobuf DecodeError as UNKNOWN.
+                assert caught.value.code() is grpc.StatusCode.UNKNOWN
+        asyncio.run(scenario())
+        decode, behavior = rpc_boundaries[method]
+        decode.assert_called_once_with(payload)
+        behavior.assert_not_called()
+        rpc_boundaries["sdk_decode"].assert_not_called()
+        assert devices[0].calls == devices[0].sf_calls == []
+    assert [row["event"] for row in rows(access)] == ["AUTHORIZED", "RPC_FAILED"]
+
+
+def test_configured_decoder_preserves_valid_sdk_call_and_response(assembly, tls, access, rpc_boundaries):
+    app, _, devices, _ = assembly
+    identity, cert = tls
+    with ApiClient(app, lifespan="on"):
+        async def scenario():
+            async with fake_server(app, server_uuid=identity, certificate=cert.pem_certificate,
+                                   private_key=cert.pem_private_key, access=access) as server:
+                client = await shared.connect(server, cert, access, "reader.token")
+                try:
+                    state = json.loads(await client.SynMachineStatus.Status.read())
+                    assert state["execution"]["transport_mode"] == "FAKE"
+                finally:
+                    await client.close()
+        asyncio.run(scenario())
+        decode, behavior = rpc_boundaries[STATUS_RPC]
+        decode.assert_called_once_with(b"")
+        assert behavior.await_args.args[0] == b""
+        behavior.assert_awaited_once()
+        assert devices[0].calls == devices[0].sf_calls == []
+    assert [row["event"] for row in rows(access)] == ["AUTHORIZED", "DISPATCH", "RESULT"]
+
+
+@pytest.mark.parametrize("payload", [b"\x80", b"\x0a\x80"], ids=["truncated-tag", "truncated-length"])
+@pytest.mark.parametrize("method", [START_RPC, STOP_RPC])
+def test_native_sdk_decoding_keeps_its_error_semantics(assembly, tls, access, monkeypatch, method, payload):
+    app, _, devices, _ = assembly
+    identity, cert = tls
+    token = (access.audit.path.parent / "controller.token").read_text()
+    with ApiClient(app, lifespan="on"):
+        async def scenario():
+            async with fake_server(app, server_uuid=identity, certificate=cert.pem_certificate,
+                                   private_key=cert.pem_private_key, access=access) as server:
+                decode = AsyncMock(wraps=server.protobuf.decode)
+                monkeypatch.setattr(server.protobuf, "decode", decode)
+                with pytest.raises(grpc.aio.AioRpcError) as caught:
+                    await raw(server, cert, method, [("authorization", f"Bearer {token}")], payload)
+                assert caught.value.code() is grpc.StatusCode.ABORTED
+                decode.assert_awaited_once()
+                assert decode.await_args.args[1] == payload
+        asyncio.run(scenario())
+        assert devices[0].calls == devices[0].sf_calls == []
+    assert [row["event"] for row in rows(access)] == ["AUTHORIZED", "RPC_FAILED"]
 
 
 @pytest.mark.parametrize("kind", ["missing", "unknown", "malformed", "duplicate", "expired", "disabled", "revoked"])
-def test_credentials_reject_before_backend_or_decode(assembly, tls, access, kind):
+def test_credentials_reject_before_backend(assembly, tls, access, kind):
     app, _, devices, _ = assembly
     identity, cert = tls
     token = (access.audit.path.parent / "controller.token").read_text()
@@ -78,7 +223,7 @@ def test_credentials_reject_before_backend_or_decode(assembly, tls, access, kind
 
 
 @pytest.mark.parametrize("method", [START_RPC, STOP_RPC])
-def test_reader_cannot_start_or_stop_even_with_malformed_payload(assembly, tls, access, method):
+def test_reader_cannot_start_or_stop_with_default_payload(assembly, tls, access, method):
     app, _, devices, _ = assembly
     identity, cert = tls
     reader = (access.audit.path.parent / "reader.token").read_text()

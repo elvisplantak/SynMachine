@@ -267,9 +267,14 @@ No conformance certification or production identity/provisioning claim is made.
 | `READ_ONLY` | Status, Recipes, ReadRecipe, ValidateRecipe, GetProgress |
 | `CONTROL` | All read operations, plus StartRecipe and exact-operation Stop |
 
-The server checks the token and role **before SDK parameter decoding or backend
-dispatch**, independently of client UI behavior. It wraps the pinned SDK's native
-unary handlers, retaining its protobuf, metadata and cancellation semantics.
+The server checks the token and role **before request deserialization, SDK
+parameter decoding or backend dispatch**, independently of client UI behavior.
+Its application unary RPC handlers receive raw bytes (`request_deserializer=None`).
+After admission and durable AUTHORIZED audit, the wrapper calls the original
+request deserializer if configured, then the original SDK behavior with the same
+context. The original response serializer remains registered. Decoder exceptions
+and cancellation propagate through the existing audit cleanup to gRPC; no custom
+protobuf parser, SiLA error translation or background executor is introduced.
 Every application RPC must have an explicit mapping; a missing mapping refuses
 startup. Unused SDK BinaryUpload/BinaryDownload services are removed from this
 adapter: none of its Features has a Binary parameter/response. SiLAService core
@@ -323,7 +328,7 @@ emergency-stop policy require a separate phase before any live deployment.
 
 Verification on November 7: 2080 complete backend tests passed, zero skipped with
 the independent .NET client enabled; 43 focused SiLA cases. Added 16 policy/audit
-cases plus a C# role/attribution case cover denial before decoding/dispatch,
+cases plus a C# role/attribution case cover denial before application dispatch,
 expiry/disable/revocation, reader monitoring without control, exact Stop and
 retained ownership, request/run/operation linkage, secret omission, audit failure
 before/after acceptance, strict schema preservation and unclassified-RPC refusal.
@@ -335,6 +340,57 @@ check verified private token files, no secret values in logs, shutdown cleanup
 and reopening the same fake bundle with new credentials and a retained audit.
 Existing backend HTTP/domain/hardware/recipe code and dependency inputs are
 unchanged; production/live activation and independent acceptance remain separate.
+
+## Access-control review and admission correction — 2026-11-08
+
+The owner supplied an independent review of exact HEAD
+`30a7ee3397c29eea3a5d7506e1a974c1e2fabf46` on
+`feature/sila2-access-control`, against base
+`039b70c2bfa26dd62123d889a731c198d8bcc7bc`. Findings: Critical 0, High 0,
+Medium 1, Low 0. **That checkpoint is not independently accepted.**
+The requested correction is limited to admission before gRPC request
+deserialization and associated regressions/documentation. The reviewer accepted
+the remaining declared policy, attribution, audit-failure, exact Stop and retained
+ownership behavior. Reported local checks were not independently rerun through
+the GitHub connector; no combined GitHub status checks were published.
+
+The finding identifies a real omission in the generic handler wrapper: forwarding
+`handler.request_deserializer` to gRPC allows a configured decoder to run before
+the wrapped behavior's authentication. Inspection of the pinned SDK also establishes
+an important limit: its current application handlers register **no** gRPC request
+deserializer. Commands decode inside the SDK behavior; status properties do not
+decode their empty request. The prior implementation therefore protected the
+current SDK's parameter decoding, but did not enforce admission ahead of an
+optional gRPC deserializer. Empty `b""` regression payloads did not prove that
+stronger boundary. The raw admission wrapper described above now enforces both.
+
+New TLS regressions use genuinely invalid protobuf bytes (`80` and `0a 80`, hex).
+At the optional gRPC seam, tests explicitly install the pinned SDK's wire parser
+as a validation/deserialization probe that preserves bytes for the original
+handler. Spies observe that probe, native SDK behavior and SDK parameter decoding:
+anonymous Start/Status and reader Start/Stop return UNAUTHENTICATED/FORBIDDEN
+audit respectively, with gRPC UNAUTHENTICATED/PERMISSION_DENIED, without calling
+any of those boundaries or dispatching to the backend. All eight denial cases
+fail on the original wrapper and pass after correction. Authorized malformed
+requests reach the configured decoder once, retain gRPC's native UNKNOWN failure
+and append RPC_FAILED without dispatch. A valid authenticated status round trip
+preserves the original response. Separate tests without an injected decoder
+retain the pinned SDK's ABORTED errors for malformed Start/Stop parameters.
+
+Public core RPCs, removed binary services, exact method mapping, TLS, per-request
+revocation, audit-before-dispatch, backend validation, exact-operation Stop and
+retained ownership keep their existing contracts. The correction is awaiting
+focused follow-up review; it does not convert the earlier review into acceptance.
+
+Verification on November 8: **2099 complete backend tests passed**, zero skipped
+with the independent .NET client enabled; **62 focused SiLA cases** passed,
+including 19 new decoding-boundary cases. Full Ruff 0.15.22, pip dependency check,
+Python compilation and whitespace checks passed. The unchanged C# client restored
+its locked dependencies and rebuilt with SDK 10.0.403 with zero warnings/errors.
+The existing response-loss/no-replay, revocation, audit-failure, retained-owner
+and independent-client regressions all passed. No SDK/dependency, backend domain,
+HTTP/UI, hardware or firmware changes were made; the previous demo/launcher smoke
+results above remain historical and were not rerun for this narrow correction.
 
 ## Before any live integration
 

@@ -86,6 +86,14 @@ HTTP/UI authorization is unchanged; this is not production-wide identity or a
 SiLA AuthenticationService implementation. The earlier review does not accept
 these later changes. Production/live composition must still be defined separately.
 
+Independent review of access-control commit `30a7ee3` found one Medium issue in
+the generic wrapper's pre-deserialization guarantee; it did not accept that
+checkpoint. The narrow follow-up now admits raw application RPC bytes before
+calling any configured original gRPC deserializer, then retains the SDK handler,
+response serialization and backend path. Malformed-wire regressions explicitly
+exercise that optional seam as well as the pinned SDK's native decoding. The
+correction awaits focused follow-up review; see `backend/docs/SILA2.md`.
+
 The live owner remains blocked after the earlier wet attempt, and its reconciliation
 is explicitly deferred. Develop against fake devices/separate test state; this
 phase does not authorize real-device access, uploads, state repair or merging

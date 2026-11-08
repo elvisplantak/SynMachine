@@ -1,6 +1,6 @@
 # SynMachine current development state
 
-- Checkpoint date: 2026-11-07
+- Checkpoint date: 2026-11-08
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Local checkout: `/home/elvis/Documents/SynMachine`
 - Active integration branch: `feature/sila2-access-control`, based on client
@@ -17,9 +17,9 @@
 
 The owner approved local client authentication, separate read/control rights and
 attribution. `backend/app/sila2/access.py` now enforces explicit per-client tokens
-over TLS before application RPC decoding/dispatch, with READ_ONLY and CONTROL
-roles, mandatory expiry, enabled flag and in-process revocation on subsequent
-requests. `fake_server()` requires explicit policy/audit configuration and has no
+over TLS before application RPC deserialization/decoding/dispatch, with READ_ONLY
+and CONTROL roles, mandatory expiry, enabled flag and in-process revocation on
+subsequent requests. `fake_server()` requires explicit policy/audit configuration and has no
 anonymous application fallback. Token hashes are kept in policy; caller-supplied
 identity names are ignored. Existing readiness/lifecycle/owner/command-journal
 paths remain authoritative. Credential possession identifies the client program,
@@ -54,7 +54,30 @@ files, no token values in logs, cleanup and same-bundle restart with rotated
 credentials. No live state, hardware, firmware, XDL or main merge.
 Contract and scope: `backend/docs/SILA2.md`; client usage:
 `backend/tools/sila2-client/README.md`. Earlier acceptance of `222e9e5` does not
-cover this phase's changes; consolidate independent review at this access boundary.
+cover this phase's changes.
+
+Independent review of exact access-control HEAD
+`30a7ee3397c29eea3a5d7506e1a974c1e2fabf46` against `039b70c` returned
+Critical 0, High 0, Medium 1, Low 0: **not independently accepted**. The wrapper
+forwarded an optional request deserializer to gRPC, allowing it to run ahead of
+authentication. The pinned SDK's current application handlers have no such
+deserializer and decode parameters inside their behavior; nevertheless, the
+stronger boundary needed explicit enforcement and nonempty malformed-wire tests.
+The narrow correction now receives raw bytes, authenticates/authorizes and commits
+AUTHORIZED before invoking any configured original decoder and SDK behavior.
+Original response serialization, SDK errors/cancellation and all backend authority
+remain in place. New regressions cover both configured and native SDK decoding;
+the eight malformed-wire denial cases fail on the original wrapper. Detailed
+review record and scope: `backend/docs/SILA2.md`. A new pinned HEAD requires
+focused follow-up review; this is no expansion into production/live operation.
+
+Correction verification on November 8: **2099 complete backend tests passed**,
+zero skipped with the independent .NET client enabled; **62 focused SiLA cases**
+passed, including 19 new decoding-boundary cases. Full Ruff 0.15.22, pip dependency
+check, Python compilation and whitespace checks passed. The unchanged C# client
+was restored in locked mode and rebuilt with SDK 10.0.403: zero warnings/errors,
+unchanged dependency inputs. Only the SiLA wrapper, tests and documentation changed;
+existing HTTP/UI/domain execution and physical/live state remain untouched.
 
 ## Independent SiLA 2 client interoperability — prior checkpoint
 

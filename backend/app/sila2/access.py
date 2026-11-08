@@ -218,8 +218,8 @@ class AccessControl:
         request.settled = True
 
     def protect(self, server, server_uuid):
-        # Wrap SDK-native unary handlers before start. Preserve its protobuf,
-        # metadata, decoding, cancellation and command-background-task behavior.
+        # Receive raw bytes: admission must precede even a configured gRPC
+        # deserializer, as well as the SDK's decoding inside its native handler.
         for service, handlers in tuple(server.protobuf.services.items()):
             if service in UNUSED_BINARY_SERVICES:
                 # No Feature exposes Binary in this slice. Do not leave an
@@ -233,12 +233,12 @@ class AccessControl:
                 if handler.unary_unary is None or rpc_method not in METHODS:
                     raise ValueError("SiLA application RPC is missing an explicit access policy")
                 handlers[method] = grpc.unary_unary_rpc_method_handler(
-                    self._wrap(handler.unary_unary, rpc_method, server_uuid),
-                    request_deserializer=handler.request_deserializer,
+                    self._wrap(handler, rpc_method, server_uuid),
+                    request_deserializer=None,
                     response_serializer=handler.response_serializer,
                 )
 
-    def _wrap(self, function, method, server_uuid):
+    def _wrap(self, handler, method, server_uuid):
         async def call(payload, context):
             credential = self.policy.authenticate(context.invocation_metadata())
             request = RequestIdentity(self, server_uuid, method, credential)
@@ -254,7 +254,11 @@ class AccessControl:
                 await context.abort(grpc.StatusCode.UNAVAILABLE, "SiLA request audit unavailable")
             token = CURRENT_REQUEST.set(request)
             try:
-                return await function(payload, context)
+                if handler.request_deserializer is not None:
+                    payload = handler.request_deserializer(payload)
+                # Retain the original decoder, behavior, context and response
+                # serializer; let native failures/cancellation propagate to gRPC.
+                return await handler.unary_unary(payload, context)
             except BaseException as error:
                 if not request.settled:
                     event = "CLIENT_DISCONNECTED" if isinstance(error, asyncio.CancelledError) else "RPC_FAILED"
