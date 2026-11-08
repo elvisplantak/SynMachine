@@ -59,6 +59,16 @@ Local verification on November 8, from the integration component directories:
   listeners and temporary credentials closed; the separate fake result bundle
   is `/tmp/synmachine-sila-main-demo-20261108-K6zMkl` (temporary evidence).
 
+Hosted verification also **succeeded** for exact implementation commit
+`e598d58f89df609368c949f39814e0d79bdcf930`:
+[GitHub run 42481909369](https://github.com/elvisplantak/SynMachine/actions/runs/42481909369).
+All 1999 backend tests passed in 163.70 seconds; the JUnit gate confirmed 62 SiLA
+cases, zero failures and zero skips. Lint, locked restore, C# Release build
+(zero warnings/errors), report upload and cache cleanup all passed. The hosted
+run took about 3.5 minutes including setup. Later documentation-only records do
+not change the verified implementation. [Draft PR #1](https://github.com/elvisplantak/SynMachine/pull/1)
+contains the prepared integration; main merge awaits explicit owner approval.
+
 The existing main UI lock also produced four high-severity npm audit package
 alerts: Vite, nanoid, PostCSS and source-map-js. They are development/build
 dependencies already present in the unchanged lock. This port does not update

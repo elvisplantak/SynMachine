@@ -46,7 +46,13 @@ report gate passed. The standalone main-based fake demo also passed completion,
 progress, reader denials and exact Stop with retained fake ownership. Main's
 README/media, UI and existing backend implementation match the pinned main base;
 all 23 transferred backend/workflow paths match the preserved source blobs.
-Hosted CI and the final merge are the remaining integration steps.
+Hosted CI **also passed** on exact implementation commit
+`e598d58f89df609368c949f39814e0d79bdcf930`:
+[run 42481909369](https://github.com/elvisplantak/SynMachine/actions/runs/42481909369),
+1999 tests in 163.70 seconds, 62 SiLA cases, zero failures/skips and a C# build
+without warnings/errors. [Draft PR #1](https://github.com/elvisplantak/SynMachine/pull/1)
+is prepared without merge conflicts; final main merge awaits explicit owner
+approval. Later documentation-only records do not change this verified code.
 
 The unchanged UI lock reports four high-severity npm audit package alerts in
 existing build/development dependencies. They are recorded with advisory links
