@@ -1,0 +1,4 @@
+# Keep CI tooling aligned with the verified backend baseline.
+# Newer Ruff releases change the default rules; upgrade separately from CI setup.
+pytest==9.2.0
+ruff==0.15.22
