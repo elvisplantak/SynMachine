@@ -43,6 +43,27 @@ test/report upload and cache cleanup all succeeded. Total run time was about
 the implementation and acceptance boundaries remain unchanged. This later
 documentation-only record does not need another backend run.
 
+## Standalone SiLA demonstration — 2026-11-08
+
+At the owner's request, ran the existing `python -m tests.sila2_external_demo`
+with the independent C# client on code checkpoint `7179dd8`. All checks passed:
+authenticated TLS/discovery, reader recipe access, reader Start/Stop denials,
+CONTROL Start/progress and exact-operation Stop. The first fixture recipe
+(fake ADD S 1 mL, WAIT 1 s) finished COMPLETED at step index 2. The second
+(WAIT 30 s) was stopped at step index 0 and ended ABORTED, with its fake owner
+retained BLOCKED. No maintenance/owner state was cleared.
+
+Read-only inspection of the separate fake databases confirmed exactly two runs,
+two attributed CONTROL Start results, two reader denials and Stop linked to the
+second run's exact operation. All six fake Arduino journal rows were COMPLETED;
+there were no SF action rows in this example. Server/client processes closed;
+temporary credentials were cleaned up. Fake evidence was preserved at
+`/tmp/synmachine-sila-demo-20261108-qU1lho` and its adjacent `.log` file; those
+temporary paths may expire. No runtime code, real device/state, firmware or main
+change occurred. This records an executed example, not broader independent
+acceptance or physical readiness. Only documentation changed afterward;
+diff/whitespace/status checks passed.
+
 ## SiLA 2 client access control — fake devices only
 
 The owner approved local client authentication, separate read/control rights and
