@@ -3,35 +3,41 @@
 - Checkpoint date: 2026-11-08
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Local checkout: `/home/elvis/Documents/SynMachine`
-- Active integration preparation: `integration/sila2-main` at `18af175`, in
-  `/tmp/synmachine-sila2-main`, based on public main `49b5beb`.
+- Published main: `d8820309971e50ccbbe12ca412252e3609369b84`, after owner-approved
+  PR #1 merge `bc775fa`; main is checked out in `/tmp/synmachine-sila2-main`.
 - Primary checkout remains on `feature/sila2-ci`; commissioning is separate.
 - Handoff branch: `docs/sila2-session-handoff` (documentation only)
-- Execution-code baseline: `commissioning/full-stroke-wet-test` at
+- This preserved checkout's execution-code baseline: `commissioning/full-stroke-wet-test` at
   `1ea4e7a3d98d193ab3c8132aa0ebddf75cd380a6`.
-- Last fetched public `main`: `49b5beb22945e9d55166c9c361a19d81809b5a28`.
+- Latest public main: `d8820309971e50ccbbe12ca412252e3609369b84`.
   The owner-approved October 28 UI screenshot, demo MP4 and README links are
   published there. The commissioning code is on its separate pushed branch;
   these branches must not be treated as identical or merged implicitly.
 
-## Main integration prepared — 2026-11-08
+## Main integration completed — 2026-11-08
 
 The initial fake/local SiLA and CI delta from source checkpoint `40d8a65` is
-prepared on the main baseline, without commissioning protocol/wet-test changes.
+integrated on the main baseline, without commissioning protocol/wet-test changes.
 All 23 transferred backend/workflow paths retain their source identities; main's
 existing backend implementation, UI and README media are preserved. The original
 source branches and this checkout's unrelated commissioning file remain intact.
 
-[Draft PR #1](https://github.com/elvisplantak/SynMachine/pull/1) is prepared and
-mergeable. [Hosted CI](https://github.com/elvisplantak/SynMachine/actions/runs/42481909369)
+[PR #1](https://github.com/elvisplantak/SynMachine/pull/1) was merged as `bc775fa`
+after the owner's explicit approval. [Candidate CI](https://github.com/elvisplantak/SynMachine/actions/runs/42481909369)
 passed for code commit `e598d58`: 1999 backend tests, all 62 SiLA cases, zero skips;
 local UI verification passed all 51 tests plus lint/build. The standalone fake
 demo and other component checks passed. Candidate `18af175` only adds the CI
-documentation record after that verified code. Final main merge awaits explicit
-owner approval. No live operation/state repair, firmware or XDL is included.
-The candidate's `backend/docs/SILA2_MAIN_INTEGRATION.md` records provenance,
+documentation record after that verified code. The automatic
+[post-merge main CI](https://github.com/elvisplantak/SynMachine/actions/runs/42483128655)
+also passed: 1999 backend tests in 165.50 seconds, all 62 SiLA cases, zero
+failures/skips, C# build zero warnings/errors. Main tip `d882030` only updates the
+merge/CI documentation. All development branches are retained. No live
+operation/state repair, firmware or XDL is included.
+Main's `backend/docs/SILA2_MAIN_INTEGRATION.md` records provenance,
 verification and four existing UI dependency audit alerts as separate maintenance.
-Read the candidate's canonical documents before further integration work.
+Read main's canonical documents before further development work. The primary
+checkout deliberately remains on the commissioning-derived source branch;
+main's runtime baseline excludes that separate commissioning implementation.
 
 ## Backend and SiLA GitHub verification
 
