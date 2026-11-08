@@ -3,8 +3,9 @@
 - Checkpoint date: 2026-11-08
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Local checkout: `/home/elvis/Documents/SynMachine`
-- Active development branch: `feature/sila2-ci`, based on access-control review
-  record `6670e8b`; main and commissioning remain separate.
+- Active integration preparation: `integration/sila2-main` at `18af175`, in
+  `/tmp/synmachine-sila2-main`, based on public main `49b5beb`.
+- Primary checkout remains on `feature/sila2-ci`; commissioning is separate.
 - Handoff branch: `docs/sila2-session-handoff` (documentation only)
 - Execution-code baseline: `commissioning/full-stroke-wet-test` at
   `1ea4e7a3d98d193ab3c8132aa0ebddf75cd380a6`.
@@ -12,6 +13,25 @@
   The owner-approved October 28 UI screenshot, demo MP4 and README links are
   published there. The commissioning code is on its separate pushed branch;
   these branches must not be treated as identical or merged implicitly.
+
+## Main integration prepared — 2026-11-08
+
+The initial fake/local SiLA and CI delta from source checkpoint `40d8a65` is
+prepared on the main baseline, without commissioning protocol/wet-test changes.
+All 23 transferred backend/workflow paths retain their source identities; main's
+existing backend implementation, UI and README media are preserved. The original
+source branches and this checkout's unrelated commissioning file remain intact.
+
+[Draft PR #1](https://github.com/elvisplantak/SynMachine/pull/1) is prepared and
+mergeable. [Hosted CI](https://github.com/elvisplantak/SynMachine/actions/runs/42481909369)
+passed for code commit `e598d58`: 1999 backend tests, all 62 SiLA cases, zero skips;
+local UI verification passed all 51 tests plus lint/build. The standalone fake
+demo and other component checks passed. Candidate `18af175` only adds the CI
+documentation record after that verified code. Final main merge awaits explicit
+owner approval. No live operation/state repair, firmware or XDL is included.
+The candidate's `backend/docs/SILA2_MAIN_INTEGRATION.md` records provenance,
+verification and four existing UI dependency audit alerts as separate maintenance.
+Read the candidate's canonical documents before further integration work.
 
 ## Backend and SiLA GitHub verification
 
