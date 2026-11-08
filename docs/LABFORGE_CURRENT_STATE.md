@@ -67,9 +67,19 @@ The narrow correction now receives raw bytes, authenticates/authorizes and commi
 AUTHORIZED before invoking any configured original decoder and SDK behavior.
 Original response serialization, SDK errors/cancellation and all backend authority
 remain in place. New regressions cover both configured and native SDK decoding;
-the eight malformed-wire denial cases fail on the original wrapper. Detailed
-review record and scope: `backend/docs/SILA2.md`. A new pinned HEAD requires
-focused follow-up review; this is no expansion into production/live operation.
+the eight malformed-wire denial cases fail on the original wrapper.
+
+The independent follow-up review **accepted exact correction commit
+`a10a068806697e0125caab90e252b0187fb838db`**, against base `30a7ee3`,
+for the narrow fake/local admission correction only. Findings: Blocker 0, High 0,
+Medium 0, Low 0, Documentation-only 0. The previous Medium finding is resolved;
+no additional correction was requested. This does not independently accept the
+entire preceding integration, this later documentation record or production/live
+operation. Full review scope and evidence limits:
+`backend/docs/SILA2.md#independent-admission-correction-acceptance--2026-11-08`.
+The reviewer did not rerun the local checks and found no published combined CI
+status checks/workflow runs. No runtime tests/build were rerun for this
+documentation-only acceptance record; diff/whitespace/status checks passed.
 
 Correction verification on November 8: **2099 complete backend tests passed**,
 zero skipped with the independent .NET client enabled; **62 focused SiLA cases**

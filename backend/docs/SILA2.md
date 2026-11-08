@@ -379,8 +379,9 @@ retain the pinned SDK's ABORTED errors for malformed Start/Stop parameters.
 
 Public core RPCs, removed binary services, exact method mapping, TLS, per-request
 revocation, audit-before-dispatch, backend validation, exact-operation Stop and
-retained ownership keep their existing contracts. The correction is awaiting
-focused follow-up review; it does not convert the earlier review into acceptance.
+retained ownership keep their existing contracts. The focused follow-up review
+accepted the exact correction commit as recorded below; the original `30a7ee3`
+checkpoint keeps its historical unaccepted verdict.
 
 Verification on November 8: **2099 complete backend tests passed**, zero skipped
 with the independent .NET client enabled; **62 focused SiLA cases** passed,
@@ -391,6 +392,39 @@ The existing response-loss/no-replay, revocation, audit-failure, retained-owner
 and independent-client regressions all passed. No SDK/dependency, backend domain,
 HTTP/UI, hardware or firmware changes were made; the previous demo/launcher smoke
 results above remain historical and were not rerun for this narrow correction.
+
+## Independent admission-correction acceptance — 2026-11-08
+
+The owner supplied the completed independent follow-up review for repository
+`elvisplantak/SynMachine`, branch `feature/sila2-access-control`, exact HEAD
+`a10a068806697e0125caab90e252b0187fb838db` against base
+`30a7ee3397c29eea3a5d7506e1a974c1e2fabf46`.
+**Accepted for the declared narrow fake/local SiLA admission correction.**
+Findings: Blocker 0, High 0, Medium 0, Low 0, Documentation-only 0.
+The previous Medium finding is resolved; no additional software correction was
+requested for it.
+
+The review covered `app/sila2/access.py`, `tests/test_sila2_access.py` and this
+contract, including admission before the optional original gRPC deserializer,
+malformed-wire regressions, native SDK errors/cancellation, audit semantics and
+existing backend authority, exact Stop and retained ownership. It accepted the
+raw-bytes admission boundary, preserved original handler/context/response
+serializer, denied-request exclusion from decoding/dispatch, authorized decoder
+failure as UNKNOWN and the pinned SDK's separate native ABORTED behavior.
+
+Evidence recorded for the reviewed HEAD was 2099 complete backend tests,
+62 focused SiLA cases, passing Ruff and a C# Release build with zero warnings or
+errors. The reviewer did not independently rerun those local commands; the
+reviewed GitHub commit had no published combined CI status checks/workflow runs.
+
+Acceptance applies only to the exact commit and narrow follow-up scope above.
+It does not independently accept this later documentation record or expand to
+the entire earlier access-control/client integration. HTTP/UI authorization,
+production deployment/exposure or credential provisioning, live device execution,
+state repair/reconciliation, firmware changes/upload, XDL and merging into main
+remain outside acceptance and authorization. No executable changes were made
+to record this result; runtime tests/build were not rerun for this documentation-only
+update. Documentation diff/whitespace/status checks were performed.
 
 ## Before any live integration
 

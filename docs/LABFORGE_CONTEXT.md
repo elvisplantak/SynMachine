@@ -91,8 +91,12 @@ the generic wrapper's pre-deserialization guarantee; it did not accept that
 checkpoint. The narrow follow-up now admits raw application RPC bytes before
 calling any configured original gRPC deserializer, then retains the SDK handler,
 response serialization and backend path. Malformed-wire regressions explicitly
-exercise that optional seam as well as the pinned SDK's native decoding. The
-correction awaits focused follow-up review; see `backend/docs/SILA2.md`.
+exercise that optional seam as well as the pinned SDK's native decoding.
+Independent follow-up review accepted exact correction commit
+`a10a068806697e0125caab90e252b0187fb838db` against `30a7ee3`, with zero findings
+and the previous Medium resolved. Acceptance covers only the narrow fake/local
+admission correction, not the entire preceding integration or production/live
+operation. The detailed record and verification limits are in `backend/docs/SILA2.md`.
 
 The live owner remains blocked after the earlier wet attempt, and its reconciliation
 is explicitly deferred. Develop against fake devices/separate test state; this
