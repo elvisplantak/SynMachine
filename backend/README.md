@@ -14,6 +14,10 @@ python3 -m venv .venv
 .venv/bin/ruff check .
 ```
 
+The [GitHub backend/SiLA checks](docs/CI.md) run the full suite with the independent
+C# client for relevant pushes and fork pull requests. CI uses the tool versions in
+`ci-constraints.txt` and `global.json` and rejects skipped tests.
+
 The default API can be started with `.venv/bin/uvicorn app.main:app`; it does not
 automatically enable owned Recipes execution. The fake browser profile is
 documented in [docs/BROWSER_CHECK.md](docs/BROWSER_CHECK.md). Explicit real-device

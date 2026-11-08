@@ -21,7 +21,8 @@ normal Python backend.
 
 ## Build
 
-Requires the .NET 10 SDK and the backend's `.[dev,sila2]` Python extra. From
+Requires .NET SDK 10.0.403 (selected by `backend/global.json`) and the backend's
+`.[dev,sila2]` Python extra. From
 `backend/` (substitute your development Python environment where appropriate):
 
 ```bash
@@ -123,6 +124,10 @@ run ID, even after starting a fresh client process. A failed watch or closed cli
 does not stop a backend run. Stop remains explicit and never clears maintenance.
 
 ## Cross-implementation regression checks
+
+GitHub now runs these scenarios as part of the complete backend suite for
+relevant pushes/fork pull requests, with no skipped tests permitted. See
+[CI.md](../../docs/CI.md) for triggers, tool versions, reports and scope.
 
 From `backend/`, after the locked restore/build:
 

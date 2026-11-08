@@ -98,6 +98,13 @@ and the previous Medium resolved. Acceptance covers only the narrow fake/local
 admission correction, not the entire preceding integration or production/live
 operation. The detailed record and verification limits are in `backend/docs/SILA2.md`.
 
+The owner subsequently approved GitHub automation for the existing fake-only
+backend/SiLA tests. `.github/workflows/backend.yml` runs the complete backend suite
+with the independent C# client after relevant pushes/fork pull requests, rejects
+skipped tests and cancels superseded runs. It uses hosted runners and sparse
+backend/workflow checkout, without deployment or physical-device access. CI does
+not extend independent acceptance or authorize a main merge; see `backend/docs/CI.md`.
+
 The live owner remains blocked after the earlier wet attempt, and its reconciliation
 is explicitly deferred. Develop against fake devices/separate test state; this
 phase does not authorize real-device access, uploads, state repair or merging

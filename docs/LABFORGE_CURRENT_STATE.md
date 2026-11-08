@@ -3,8 +3,8 @@
 - Checkpoint date: 2026-11-08
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Local checkout: `/home/elvis/Documents/SynMachine`
-- Active integration branch: `feature/sila2-access-control`, based on client
-  interoperability `039b70c`; main and commissioning remain separate.
+- Active development branch: `feature/sila2-ci`, based on access-control review
+  record `6670e8b`; main and commissioning remain separate.
 - Handoff branch: `docs/sila2-session-handoff` (documentation only)
 - Execution-code baseline: `commissioning/full-stroke-wet-test` at
   `1ea4e7a3d98d193ab3c8132aa0ebddf75cd380a6`.
@@ -12,6 +12,26 @@
   The owner-approved October 28 UI screenshot, demo MP4 and README links are
   published there. The commissioning code is on its separate pushed branch;
   these branches must not be treated as identical or merged implicitly.
+
+## Backend and SiLA GitHub verification
+
+The owner approved automatic GitHub checks after relevant pushes. The new
+`.github/workflows/backend.yml` runs full backend pytest with the independent C#
+client, Ruff and dependency/build checks on a hosted Ubuntu runner. Missing SiLA
+modules, failed or skipped tests fail the check. Backend Markdown-only and
+unrelated component changes do not trigger it; same-repository PRs reuse push
+checks and newer branch/PR runs cancel older ones. Python 3.12, CI tool constraints
+and .NET 10.0.403/global.json preserve the verified tooling baseline. No runtime
+or device behavior changed. Workflow, usage and report limits: `backend/docs/CI.md`.
+This automation does not extend any prior independent acceptance, authorize live
+operation or merge the integration into main.
+
+Local verification of the exact workflow shell steps on November 8: 2099 backend
+tests, including 62 SiLA cases, passed with zero failures/skips; Ruff 0.15.22,
+pip dependency checks, locked .NET restore and Release build passed (zero
+warnings/errors). Actionlint 1.7.12 passed. The JUnit gate accepted a complete
+report and rejected skipped, missing-SiLA, failed and empty reports. First hosted
+GitHub execution remains to be verified after publication of this workflow.
 
 ## SiLA 2 client access control — fake devices only
 
