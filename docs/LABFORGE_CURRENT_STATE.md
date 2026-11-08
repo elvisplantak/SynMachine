@@ -30,8 +30,18 @@ Local verification of the exact workflow shell steps on November 8: 2099 backend
 tests, including 62 SiLA cases, passed with zero failures/skips; Ruff 0.15.22,
 pip dependency checks, locked .NET restore and Release build passed (zero
 warnings/errors). Actionlint 1.7.12 passed. The JUnit gate accepted a complete
-report and rejected skipped, missing-SiLA, failed and empty reports. First hosted
-GitHub execution remains to be verified after publication of this workflow.
+report and rejected skipped, missing-SiLA, failed and empty reports.
+
+The first automatic GitHub push run **succeeded** for exact workflow commit
+`1da6f3e4c9375fb667eb89e225074b7cb50fc915` on `feature/sila2-ci`:
+[run 42479023480](https://github.com/elvisplantak/SynMachine/actions/runs/42479023480).
+Hosted Python 3.12.16, Ruff 0.15.22 and .NET SDK 10.0.403: all 2099 tests passed
+in 148.52 seconds; the report gate confirmed 62 SiLA cases, zero failures and
+zero skips. Release build had zero warnings/errors. Setup, lint, locked restore,
+test/report upload and cache cleanup all succeeded. Total run time was about
+3 minutes (12:10:53–12:13:55 UTC). The JUnit report is retained for seven days;
+the implementation and acceptance boundaries remain unchanged. This later
+documentation-only record does not need another backend run.
 
 ## SiLA 2 client access control — fake devices only
 
