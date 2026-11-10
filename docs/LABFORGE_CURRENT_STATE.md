@@ -53,6 +53,12 @@ acceptances remain separate. No XDL main merge, production/live activation,
 wet-state repair, firmware, EEPROM or physical action is authorized. This
 checkout's unrelated untracked commissioning observation remains preserved.
 
+Merge preparation is now available as
+[PR #2](https://github.com/elvisplantak/SynMachine/pull/2), targeting unchanged
+main `d882030` from `feature/xdl2-recipe-interop`. The PR records the candidate's
+hosted verification and mergeability; executable behavior matches the accepted
+XDL checkpoint. No merge/automatic merge is enabled; explicit approval is pending.
+
 ## Main integration completed — 2026-11-08
 
 The initial fake/local SiLA and CI delta from source checkpoint `40d8a65` is
