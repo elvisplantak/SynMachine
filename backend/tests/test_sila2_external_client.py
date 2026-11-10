@@ -21,6 +21,7 @@ pytest.importorskip("sila", reason="install .[dev,sila2] for external SiLA check
 from sila.framework import SiLAError
 
 from app.sila2.backend import FakeBackend
+from app.recipes.models import RecipeDefinition
 from app.sila2.server import fake_server
 from tests import test_sila2 as shared
 from tests.test_api import ApiClient
@@ -317,3 +318,33 @@ def test_external_reader_permissions_and_authenticated_attribution(assembly, tls
         assert db.execute("SELECT client_id,role,run_id FROM sila_access_events WHERE event='RESULT' AND rpc_method LIKE '%/StartRecipe'").fetchall() == [
             ("fake-controller", "CONTROL", "external-run")]
         assert db.execute("SELECT COUNT(*) FROM sila_access_events WHERE event='FORBIDDEN' AND client_id='fake-reader'").fetchone()[0] == 2
+
+
+def test_external_client_executes_xdl_import_through_the_shared_recipe_library(assembly, tls, external_client, access):
+    app, _, devices, _ = assembly
+    identity, cert = tls
+    xml = (Path(__file__).parents[1] / 'examples/xdl2/coloured-water.xdl').read_text()
+    with ApiClient(app, lifespan='on') as api:
+        imported = api.post('/api/v1/recipes/xdl/import', json={
+            'xml': xml, 'reagents': {'S':'coloured_water'},
+            'vessels': {'REACTOR':'reaction_vessel'}})
+        assert imported.status_code == 200, imported.text
+        value = imported.json()['definition']
+        assert api.get('/api/v1/recipes').json() == []
+        assert devices[0].calls == devices[0].sf_calls == []
+        saved = save(api, RecipeDefinition.model_validate(value))
+
+        async def scenario():
+            async with fake_server(app, server_uuid=identity, certificate=cert.pem_certificate,
+                                   private_key=cert.pem_private_key, access=access) as server:
+                assert success(await external_client.call(server, tls, 'recipes', token_file='reader.token')) == [saved]
+                success(await external_client.call(server, tls, 'start', *external_client.start_arguments(saved, 'xdl-external-run')))
+                code, output, error = await external_client.call(server, tls, 'watch', '--run-id', 'xdl-external-run')
+                assert code == 0, error
+                completed = json.loads(output.splitlines()[-1])
+                assert completed['status'] == 'COMPLETED' and completed['recipe_step_index'] == 2
+                assert completed['recipe']['content_digest'] == saved['content_digest']
+        asyncio.run(scenario())
+    with sqlite3.connect(access.audit.path) as db:
+        assert db.execute("SELECT client_id,run_id FROM sila_access_events WHERE event='RESULT' AND rpc_method LIKE '%/StartRecipe'").fetchall() == [
+            ('fake-controller', 'xdl-external-run')]

@@ -32,6 +32,12 @@ SiLA application requests now require explicit client tokens with READ_ONLY or
 CONTROL rights and are attributed in a separate request audit. This remains a
 local fake-device scope; existing HTTP/UI authorization is unchanged.
 
+The [XDL 2 interchange profile](docs/XDL2.md) adds bounded import/export of liquid
+Add, Transfer and Wait through the existing Recipes editor and validation path.
+It references public XDL release 2.1.0 (XML format 2.0.0), requires explicit
+reagent/vessel bindings and currently permits FAKE profiles only. Import creates
+an unsaved draft; save, review and Start remain separate actions.
+
 Existing state, operator credentials, stable USB identities and profile digests
 are not migrated or reset by the repository consolidation. The package remains
 named `labforge-backend`. Current canonical state is in

@@ -2,6 +2,7 @@ import { ExecutionEnvironment } from "./ExecutionEnvironment";
 import type { ExecutionStatus } from "./guidedDemoApi";
 import { useCallback, useEffect, useState } from "react";
 import { OwnedDemoControls } from "./OwnedDemoControls";
+import { XdlExchange } from "./XdlExchange";
 import { executeRecipe, listRecipes, previewRecipe, saveRecipe, stepLabel } from "./recipeApi";
 import type { RecipeDefinition, RecipePreview, RecipeStep, SavedRecipe } from "./recipeApi";
 import "./RecipeWorkspace.css";
@@ -103,6 +104,8 @@ export function RecipeWorkspace({ onExit }: { onExit: () => void }) {
       </fieldset>
       <p aria-live="polite">{message}</p>
       {saved && <p>{dirty ? "There are unsaved changes." : `Saved version ${saved.revision}.`}</p>}
+      <XdlExchange definition={draft} fake={executionStatus?.transport_mode === "FAKE"} pending={pending}
+        run={operation} onBegin={clearAttempt} onImport={(definition) => { setSaved(null); update(definition); }} />
     </section></div>
     {review && saved && !dirty && <section className="demoPanel uvpReview" aria-label="Procedure review"><h2>Review: {saved.definition.name} · version {saved.revision}</h2>
       <ol>{review.steps.map((item) => <li key={item.step_number}>{stepLabel(item.step, saved.definition.sources)}</li>)}</ol>

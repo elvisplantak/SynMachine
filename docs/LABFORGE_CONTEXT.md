@@ -72,5 +72,24 @@ port. See `backend/docs/SILA2_MAIN_INTEGRATION.md` and `backend/docs/SILA2.md`.
 The listener requires an explicitly FAKE backend. Live composition, production
 credentials/certificates, external exposure and operator/emergency-stop policy
 remain separate work, alongside the deferred wet-state reconciliation and
-physical tests. XDL remains unimplemented. Approval of the initial main merge
+physical tests. XDL was unimplemented at that checkpoint. Approval of the initial main merge
 does not authorize physical actions, live activation or later unrelated main work.
+
+## XDL 2 recipe interchange — 2026-11-10
+
+The owner approved the next software phase, preferring newer XDL. The public
+reference is release 2.1.0 at `6d60e8da7218a589b9c8715a239956601b17cd07`, whose
+XML declaration remains 2.0.0. An independent bounded reader/writer now adapts
+the supported liquid Add/Transfer/Wait subset into existing Recipes, with explicit
+reagent/bottle and vessel/role bindings, validation, new-draft UI import and XML
+export. No general Chemputer executor or full language conformance is claimed.
+Unsupported operations and behavioral attributes fail explicitly.
+
+The new routes require an explicitly FAKE profile and do not save or start
+anything. Existing recipe save/version/review/readiness and owned execution paths
+remain authoritative, including use of imported recipes through SiLA. XML parsing
+uses defusedxml with document/quantity/structure limits, without external resources
+or expression evaluation. UI selection clears stale readiness and validates UTF-8.
+See `backend/docs/XDL2.md` for API, scope, public-source/dependency decisions and
+the runnable fake example. Main integration, advanced/private XDL, production/live
+composition and the deferred physical/wet-state work remain separate boundaries.

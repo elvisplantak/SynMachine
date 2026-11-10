@@ -1,0 +1,16 @@
+<?xdl version="2.0.0"?>
+<XDL>
+  <Synthesis id="XDL coloured-water example">
+    <Metadata description="Fake-only demonstration: add 1 mL and wait 1 second." />
+    <Hardware>
+      <Component id="reaction_vessel" type="reactor" />
+    </Hardware>
+    <Reagents>
+      <Reagent name="coloured_water" />
+    </Reagents>
+    <Procedure>
+      <Add reagent="coloured_water" vessel="reaction_vessel" volume="1 mL" stir="false" />
+      <Wait time="1 s" />
+    </Procedure>
+  </Synthesis>
+</XDL>

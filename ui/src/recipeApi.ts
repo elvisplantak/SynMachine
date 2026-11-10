@@ -26,7 +26,12 @@ export function isRecipe(value: unknown): value is SavedRecipe {
   const d = recipe.definition;
   return typeof recipe.recipe_id === "string" && recipe.recipe_id.length > 0
     && typeof recipe.content_digest === "string" && /^[0-9a-f]{64}$/.test(recipe.content_digest)
-    && Number.isInteger(recipe.revision) && recipe.revision > 0 && !!d && d.schema_version === 1
+    && Number.isInteger(recipe.revision) && recipe.revision > 0 && isRecipeDefinition(d);
+}
+export function isRecipeDefinition(value: unknown): value is RecipeDefinition {
+  if (typeof value !== "object" || value === null) return false;
+  const d = value as RecipeDefinition;
+  return d.schema_version === 1
     && typeof d.name === "string" && typeof d.description === "string"
     && !!d.sources && [d.sources.B1, d.sources.B2, d.sources.S].every((s) => typeof s === "string")
     && Array.isArray(d.steps) && d.steps.length > 0 && d.steps.every(isStep);
@@ -97,10 +102,13 @@ export async function saveRecipe(definition: RecipeDefinition, previous: SavedRe
 export async function previewRecipe(recipe: SavedRecipe): Promise<RecipePreview> {
   const definition = recipe.definition;
   const result = await request("/preview", definition) as RecipePreview;
+  return confirmedPreview(definition, result, recipe.content_digest);
+}
+function confirmedPreview(definition: RecipeDefinition, result: RecipePreview, digest: string): RecipePreview {
   if (!result || !Array.isArray(result.steps) || result.steps.length !== definition.steps.length
     || result.steps.some((step, i) => step.step_number !== i + 1 || !isStep(step.step)
       || Object.entries(definition.steps[i]).some(([key, value]) => (step.step as unknown as Record<string, unknown>)[key] !== value))
-    || result.content_digest !== recipe.content_digest
+    || result.content_digest !== digest || !/^[0-9a-f]{64}$/.test(digest)
     || typeof result.collection_readiness_required !== "boolean"
     || result.collection_readiness_required !== definition.steps.some((step) => step.kind === "COLLECT")
     || !(result.collection_readiness_required ? ["STATIC_CONFIRMED", "FRESH_INPUT_REQUIRED", "UNAVAILABLE"] : ["NOT_REQUIRED"]).includes(result.collection_readiness_status)
@@ -108,6 +116,38 @@ export async function previewRecipe(recipe: SavedRecipe): Promise<RecipePreview>
     throw new Error("The backend did not confirm the procedure review.");
   }
   return result;
+}
+
+export type XdlInspection = {
+  profile: "synmachine-xdl2-linear-v1"; format_version: "2.0.0"; reference_release: "2.1.0";
+  suggested_name: string; reagents: string[]; vessels: { id: string; type: string }[]; step_count: number;
+};
+export async function inspectXdl(xml: string): Promise<XdlInspection> {
+  const result = await request("/xdl/inspect", { xml }) as XdlInspection;
+  if (!result || result.profile !== "synmachine-xdl2-linear-v1" || result.format_version !== "2.0.0"
+    || result.reference_release !== "2.1.0" || typeof result.suggested_name !== "string"
+    || !Array.isArray(result.reagents) || !result.reagents.every((s) => typeof s === "string" && !!s.trim())
+    || new Set(result.reagents).size !== result.reagents.length
+    || !Array.isArray(result.vessels) || !result.vessels.every((v) => v && typeof v.id === "string" && !!v.id.trim() && typeof v.type === "string")
+    || new Set(result.vessels.map((v) => v.id)).size !== result.vessels.length
+    || !Number.isInteger(result.step_count) || result.step_count < 1 || result.step_count > 100) {
+    throw new Error("The backend did not confirm the XDL document.");
+  }
+  return result;
+}
+export async function importXdl(xml: string, name: string, reagents: Record<string, string>, vessels: Record<string, string>): Promise<RecipeDefinition> {
+  const result = await request("/xdl/import", { xml, name, reagents, vessels }) as { definition: RecipeDefinition; preview: RecipePreview };
+  if (!result || !isRecipeDefinition(result.definition)) throw new Error("Invalid imported recipe.");
+  confirmedPreview(result.definition, result.preview, result.preview?.content_digest);
+  return result.definition;
+}
+export async function exportXdl(definition: RecipeDefinition): Promise<string> {
+  const result = await request("/xdl/export", { definition }) as { profile: string; xml: string; content_digest: string };
+  if (!result || result.profile !== "synmachine-xdl2-linear-v1" || typeof result.xml !== "string"
+    || !result.xml.startsWith('<?xdl version="2.0.0"?>') || !/^[0-9a-f]{64}$/.test(result.content_digest)) {
+    throw new Error("The backend did not confirm XDL export.");
+  }
+  return result.xml;
 }
 export async function executeRecipe(recipe: SavedRecipe, runId: string, readiness: RecipeReadiness) {
   const result = await request(`/${encodeURIComponent(recipe.recipe_id)}/execute`, {
