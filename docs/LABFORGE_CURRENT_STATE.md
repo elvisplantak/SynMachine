@@ -3,8 +3,12 @@
 - Checkpoint date: 2026-11-10
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Primary checkout: `/home/elvis/Documents/SynMachine`
-- Active feature: `feature/xdl2-recipe-interop`, isolated worktree
-  `/tmp/synmachine-xdl2`, based on published main `d882030`.
+- Published main includes the initial XDL integration through PR #2 at
+  `e0fd9590f711b924e42b94ba812c17f158138038`, from approved candidate
+  `29a4674a48da91c361e8f11e1da2dd0591f7a1af` over main `d882030`.
+- Preserved XDL feature: `feature/xdl2-recipe-interop`, worktree
+  `/tmp/synmachine-xdl2`. Main documentation closure is isolated on
+  `docs/xdl2-main-closure` in `/tmp/synmachine-xdl-main-docs`.
 - The previous `/tmp/synmachine-sila2-main` checkout expired; the original primary
   checkout and its commissioning-derived source branch remain preserved.
 - Initial SiLA integration merged to `main` through PR #1 at
@@ -45,8 +49,9 @@ Start → progress/COMPLETED → export/reimport with a new separate fake bundle
 closing its server and preserving evidence under
 `/tmp/synmachine-xdl-demo-20261110-kvDQsl` (temporary). A new independent C# SiLA
 scenario exercises an XDL-imported recipe through the same recipe library.
-Prior SiLA acceptances remain separate from this parser/UI boundary. No new main
-merge, live device access, wet-state repair, firmware or EEPROM action is authorized.
+Prior SiLA acceptances remain separate from this parser/UI boundary. The initial
+XDL main merge was explicitly approved; live device access, wet-state repair,
+firmware and EEPROM actions remain outside that approval.
 
 Local verification on November 10: **2094 complete backend tests passed**, zero
 skipped, including **94 XDL cases** and **63 SiLA cases** (one new XDL-import →
@@ -66,7 +71,7 @@ and 63 SiLA cases, zero failures/skips. Ruff, dependency checks, locked C# build
 (zero warnings/errors), report upload and cleanup succeeded. The hosted run took
 about four minutes. UI verification remains the separate local 55-test run.
 Later documentation-only commits record this evidence without changing the
-verified implementation. Main remains `d882030`; the new XDL scope is not merged.
+verified implementation. The separate main-merge evidence is recorded below.
 
 Independent review **accepted exact HEAD
 `ab7af954ce74ca2572122f9fda808c8465ea4bb1`** against base `d882030`, for the
@@ -78,13 +83,30 @@ or extend acceptance to other commits/scopes. See `backend/docs/XDL2.md`.
 Full XDL, main merge, live/production activation and physical/state/firmware work
 remain outside this acceptance.
 
-Merge preparation is published as
-[PR #2](https://github.com/elvisplantak/SynMachine/pull/2) from
-`feature/xdl2-recipe-interop` to unchanged main `d882030`. The source descends
-directly from that main base, without commissioning changes; executable files
-still match the accepted XDL checkpoint. The final candidate's hosted CI and
-mergeability are tracked on the PR, alongside the original local UI evidence.
-No merge or automatic merge is enabled; explicit owner approval remains required.
+After explicit owner approval, [PR #2](https://github.com/elvisplantak/SynMachine/pull/2)
+was merged on November 10 as `e0fd9590f711b924e42b94ba812c17f158138038`.
+The merge parents are prior main `d882030` and exact approved candidate `29a4674`;
+its root tree is identical to the candidate. The merge author and committer are
+Elvis with the configured GitHub noreply address. Development/commissioning
+branches and unrelated local work remain preserved. No commissioning execution
+delta, live-device action or existing-state change is included.
+
+Exact candidate `29a4674` also passed
+[CI 42818100137](https://github.com/elvisplantak/SynMachine/actions/runs/42818100137):
+2094 backend tests in 174.69 seconds, 94 XDL and 63 SiLA cases, zero failures/skips;
+Ruff/dependency/report checks and C# Release build passed with zero warnings/errors.
+Executable files match the accepted checkpoint; local UI evidence remains the
+separate 55-test result. The merge does not broaden independent acceptance.
+
+Automatic post-merge **main CI also passed** on exact merge `e0fd959`:
+[run 42819905886](https://github.com/elvisplantak/SynMachine/actions/runs/42819905886).
+All 2094 backend tests passed in 175.96 seconds; the report gate confirmed 94 XDL
+and 63 SiLA cases, zero failures/skips. Ruff, dependency checks, C# Release build
+(zero warnings/errors), report upload and cleanup passed. The hosted run took
+about four minutes. This later closure changes documentation only; whitespace/
+status checks passed. Initial FAKE/local XDL software and SiLA are published on
+main, with their exact independent-review scopes retained. No further runtime
+change, live device access or physical authorization is part of this closure.
 
 ## Initial SiLA 2 software integration on the main baseline
 

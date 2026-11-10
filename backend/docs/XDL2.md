@@ -181,3 +181,27 @@ instructions and documentation records do not extend the acceptance. Full XDL,
 live execution, physical/wet testing, inferred hardware topology, existing-state
 repair/migration, firmware/EEPROM, production exposure and main merge remain
 outside it. Earlier SiLA acceptances remain separate.
+
+## Main integration
+
+[PR #2](https://github.com/elvisplantak/SynMachine/pull/2) was merged after explicit
+owner approval on November 10, 2026, as
+`e0fd9590f711b924e42b94ba812c17f158138038`. Its parents are prior main
+`d8820309971e50ccbbe12ca412252e3609369b84` and approved candidate
+`29a4674a48da91c361e8f11e1da2dd0591f7a1af`; the merge tree exactly matches that
+candidate. The existing source/commissioning branches are retained.
+
+Exact candidate [CI 42818100137](https://github.com/elvisplantak/SynMachine/actions/runs/42818100137)
+passed 2094 backend tests in 174.69 seconds, including 94 XDL and 63 SiLA cases,
+zero failures/skips; Ruff, dependency/report checks and the locked C# Release
+build passed with zero warnings/errors. Its executable files match the accepted
+XDL checkpoint. The local 55-test UI verification remains separate.
+
+Automatic post-merge [main CI 42819905886](https://github.com/elvisplantak/SynMachine/actions/runs/42819905886)
+also passed on exact merge `e0fd9590f711b924e42b94ba812c17f158138038`: all 2094
+backend tests in 175.96 seconds, 94 XDL and 63 SiLA cases, zero failures/skips.
+Ruff, dependency checks and the locked C# Release build passed with zero warnings/
+errors. This subsequent documentation-only closure preserves that verified code.
+
+The software merge does not extend independent acceptance or authorize live,
+production, physical/wet, state-repair or firmware/EEPROM work.

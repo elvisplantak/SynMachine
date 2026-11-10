@@ -91,11 +91,18 @@ remain authoritative, including use of imported recipes through SiLA. XML parsin
 uses defusedxml with document/quantity/structure limits, without external resources
 or expression evaluation. UI selection clears stale readiness and validates UTF-8.
 See `backend/docs/XDL2.md` for API, scope, public-source/dependency decisions and
-the runnable fake example. Main integration, advanced/private XDL, production/live
-composition and the deferred physical/wet-state work remain separate boundaries.
+the runnable fake example. Advanced/private XDL, production/live composition and
+the deferred physical/wet-state work remain separate boundaries.
 
 Independent review accepted exact XDL HEAD
 `ab7af954ce74ca2572122f9fda808c8465ea4bb1` for this bounded FAKE/local scope,
 with zero findings and no requested correction. The acceptance record and exact
 base/implementation are in `backend/docs/XDL2.md`; acceptance does not authorize
 main merge or extend to full XDL, live execution, physical tests or state repair.
+
+The owner separately approved PR #2's main merge on November 10. It is merged as
+`e0fd9590f711b924e42b94ba812c17f158138038` from exact candidate `29a4674`
+over prior main `d882030`, with the candidate tree preserved. The initial bounded
+fake-only XDL interchange is now on main alongside SiLA; commissioning remains
+separate. This software approval does not authorize full XDL, live/production
+activation, physical/wet testing, existing-state repair or firmware/EEPROM work.
