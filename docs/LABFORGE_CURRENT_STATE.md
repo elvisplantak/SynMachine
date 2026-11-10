@@ -45,9 +45,8 @@ Start → progress/COMPLETED → export/reimport with a new separate fake bundle
 closing its server and preserving evidence under
 `/tmp/synmachine-xdl-demo-20261110-kvDQsl` (temporary). A new independent C# SiLA
 scenario exercises an XDL-imported recipe through the same recipe library.
-Prior SiLA acceptances do not accept this parser/UI boundary. Consolidated
-independent review is appropriate before any main merge; no new main merge,
-live device access, wet-state repair, firmware or EEPROM action is authorized.
+Prior SiLA acceptances remain separate from this parser/UI boundary. No new main
+merge, live device access, wet-state repair, firmware or EEPROM action is authorized.
 
 Local verification on November 10: **2094 complete backend tests passed**, zero
 skipped, including **94 XDL cases** and **63 SiLA cases** (one new XDL-import →
@@ -67,8 +66,17 @@ and 63 SiLA cases, zero failures/skips. Ruff, dependency checks, locked C# build
 (zero warnings/errors), report upload and cleanup succeeded. The hosted run took
 about four minutes. UI verification remains the separate local 55-test run.
 Later documentation-only commits record this evidence without changing the
-verified implementation. Main remains `d882030`; the new XDL scope is not merged
-or independently accepted yet.
+verified implementation. Main remains `d882030`; the new XDL scope is not merged.
+
+Independent review **accepted exact HEAD
+`ab7af954ce74ca2572122f9fda808c8465ea4bb1`** against base `d882030`, for the
+declared bounded FAKE/local XDL 2 recipe-interchange scope, with zero findings
+at every severity and no requested correction. The review verified the hosted
+CI evidence and retained the local UI evidence distinction. The following project
+instruction change and this acceptance record do not alter executable behavior
+or extend acceptance to other commits/scopes. See `backend/docs/XDL2.md`.
+Full XDL, main merge, live/production activation and physical/state/firmware work
+remain outside this acceptance.
 
 ## Initial SiLA 2 software integration on the main baseline
 

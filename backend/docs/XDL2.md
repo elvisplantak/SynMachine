@@ -160,6 +160,24 @@ bundle, closes all resources and preserves the resulting databases/XML. It
 refuses reused state and live-port environment settings before application import.
 Temporary evidence is not a substitute for physical readiness or state repair.
 
-Main merge, production/live XDL use, unsupported language features and any
-physical test remain separate decisions. Earlier SiLA acceptances do not accept
-this new parser/UI boundary.
+## Independent review
+
+Independent review accepted exact HEAD
+`ab7af954ce74ca2572122f9fda808c8465ea4bb1` against base
+`d8820309971e50ccbbe12ca412252e3609369b84` for the declared narrow FAKE/local
+XDL 2 recipe-interchange scope. The implementation is
+`6ac42df9c8aeddbb85f373a813541f3d7bc05e72`; the reviewed HEAD only adds its CI
+documentation record. Findings: zero Blocker, High, Medium, Low and
+documentation-only findings. No software correction was requested.
+
+The review confirmed bounded fail-closed parsing/export, explicit bindings,
+deterministic Add/Transfer/Wait translation, the existing validation/execution
+authority, new-draft/save/review/fresh-readiness/Start separation and server-side
+FAKE admission. It verified hosted run 42812048926 and the distinction between
+hosted backend evidence and the separately recorded local UI verification.
+
+Acceptance applies only to that exact reviewed commit and scope. Later project
+instructions and documentation records do not extend the acceptance. Full XDL,
+live execution, physical/wet testing, inferred hardware topology, existing-state
+repair/migration, firmware/EEPROM, production exposure and main merge remain
+outside it. Earlier SiLA acceptances remain separate.

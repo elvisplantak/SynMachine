@@ -93,3 +93,9 @@ or expression evaluation. UI selection clears stale readiness and validates UTF-
 See `backend/docs/XDL2.md` for API, scope, public-source/dependency decisions and
 the runnable fake example. Main integration, advanced/private XDL, production/live
 composition and the deferred physical/wet-state work remain separate boundaries.
+
+Independent review accepted exact XDL HEAD
+`ab7af954ce74ca2572122f9fda808c8465ea4bb1` for this bounded FAKE/local scope,
+with zero findings and no requested correction. The acceptance record and exact
+base/implementation are in `backend/docs/XDL2.md`; acceptance does not authorize
+main merge or extend to full XDL, live execution, physical tests or state repair.
