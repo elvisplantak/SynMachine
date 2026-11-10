@@ -43,10 +43,15 @@ also passed on exact implementation `6ac42df`: 2094 backend tests in 179.93 seco
 94 XDL and 63 SiLA cases, zero failures/skips, C# build zero warnings/errors.
 Later feature-branch documentation records this evidence without changing code.
 
-The new parser/UI boundary is ready for consolidated independent review; earlier
-SiLA acceptance does not cover it. No XDL main merge, production/live activation,
-wet-state repair, firmware, EEPROM or physical action is authorized. This checkout's
-unrelated untracked commissioning observation remains preserved.
+Independent review accepted exact XDL HEAD
+`ab7af954ce74ca2572122f9fda808c8465ea4bb1` against base `d882030`, for the
+declared bounded FAKE/local recipe-interchange scope, with zero findings and no
+requested correction. The detailed record is on the XDL branch in
+`backend/docs/XDL2.md`. Later instruction/documentation changes do not alter the
+verified implementation or broaden the exact-commit acceptance. Prior SiLA
+acceptances remain separate. No XDL main merge, production/live activation,
+wet-state repair, firmware, EEPROM or physical action is authorized. This
+checkout's unrelated untracked commissioning observation remains preserved.
 
 ## Main integration completed — 2026-11-08
 
