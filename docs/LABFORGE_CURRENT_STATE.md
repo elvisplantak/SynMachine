@@ -1,10 +1,10 @@
 # SynMachine current development state
 
-- Checkpoint date: 2026-11-08
+- Checkpoint date: 2026-11-10
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Local checkout: `/home/elvis/Documents/SynMachine`
 - Published main: `d8820309971e50ccbbe12ca412252e3609369b84`, after owner-approved
-  PR #1 merge `bc775fa`; main is checked out in `/tmp/synmachine-sila2-main`.
+  PR #1 merge `bc775fa`; the earlier `/tmp/synmachine-sila2-main` checkout expired.
 - Primary checkout remains on `feature/sila2-ci`; commissioning is separate.
 - Handoff branch: `docs/sila2-session-handoff` (documentation only)
 - This preserved checkout's execution-code baseline: `commissioning/full-stroke-wet-test` at
@@ -13,6 +13,40 @@
   The owner-approved October 28 UI screenshot, demo MP4 and README links are
   published there. The commissioning code is on its separate pushed branch;
   these branches must not be treated as identical or merged implicitly.
+
+## Active XDL phase — separate main-based feature
+
+The owner approved newer-generation XDL software integration on November 10.
+Work is isolated on published branch `feature/xdl2-recipe-interop`, worktree
+`/tmp/synmachine-xdl2`, based on published main
+`d8820309971e50ccbbe12ca412252e3609369b84`. Implementation commit:
+`6ac42df9c8aeddbb85f373a813541f3d7bc05e72`. This primary checkout deliberately
+retains its commissioning-derived code; do not run its code as the XDL candidate.
+Read the XDL branch's canonical documents and `backend/docs/XDL2.md` for continuation.
+
+The bounded independent XDL 2 reader/writer follows newest public SDK tag 2.1.0,
+whose XML declaration is 2.0.0. It supports liquid Add, existing Transfer routes
+and passive Wait, with explicit reagent/bottle and vessel/role bindings. Recipes
+now has file import/export; import creates an unsaved draft. Existing save/review,
+fresh readiness, execution, progress, ownership, exact Stop and SiLA remain the
+authority. Unsupported features fail explicitly. The new HTTP/UI interchange
+requires an explicitly FAKE executor; no upstream Chemputer SDK is installed.
+
+Local main-based verification: 2094 backend tests, including 94 XDL and 63 SiLA
+cases, zero skips; 55 UI tests, lint/build, Ruff, dependency/compilation checks,
+locked C# restore/Release build and Actionlint passed. The standalone XDL fake
+demo completed import → save/review/explicit Start → progress/completion →
+export/reimport in its own new fake bundle. These are separate from the older
+commissioning-based 2099-test results below. Hosted
+[GitHub CI 42812048926](https://github.com/elvisplantak/SynMachine/actions/runs/42812048926)
+also passed on exact implementation `6ac42df`: 2094 backend tests in 179.93 seconds,
+94 XDL and 63 SiLA cases, zero failures/skips, C# build zero warnings/errors.
+Later feature-branch documentation records this evidence without changing code.
+
+The new parser/UI boundary is ready for consolidated independent review; earlier
+SiLA acceptance does not cover it. No XDL main merge, production/live activation,
+wet-state repair, firmware, EEPROM or physical action is authorized. This checkout's
+unrelated untracked commissioning observation remains preserved.
 
 ## Main integration completed — 2026-11-08
 
