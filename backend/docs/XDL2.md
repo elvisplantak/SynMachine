@@ -137,6 +137,12 @@ dependency/compilation checks, UI lint/TypeScript/Vite build, locked NuGet
 restore/C# Release build (zero warnings/errors) and Actionlint passed. The exact
 CI report gate accepted the full report and rejected missing XDL coverage.
 
+Hosted [GitHub run 42812048926](https://github.com/elvisplantak/SynMachine/actions/runs/42812048926)
+also passed on implementation commit `6ac42df9c8aeddbb85f373a813541f3d7bc05e72`:
+2094 backend tests in 179.93 seconds, including 94 XDL and 63 SiLA cases,
+zero failures/skips, with successful Ruff/dependency checks and a C# build
+without warnings/errors. UI checks above are local, not a new hosted UI job.
+
 ## Runnable fake demonstration
 
 From `backend/`, after installing `.[dev]` in a development environment:

@@ -59,6 +59,17 @@ accepted the full report and rejected a report with XDL coverage removed.
 Existing execution/domain/protocol/SiLA implementations and the UI dependency
 lock are unchanged; the new boundary is recipe interchange and its UI/tests.
 
+Published implementation commit `6ac42df9c8aeddbb85f373a813541f3d7bc05e72` also
+passed hosted GitHub CI:
+[run 42812048926](https://github.com/elvisplantak/SynMachine/actions/runs/42812048926).
+All 2094 backend tests passed in 179.93 seconds; the report gate confirmed 94 XDL
+and 63 SiLA cases, zero failures/skips. Ruff, dependency checks, locked C# build
+(zero warnings/errors), report upload and cleanup succeeded. The hosted run took
+about four minutes. UI verification remains the separate local 55-test run.
+Later documentation-only commits record this evidence without changing the
+verified implementation. Main remains `d882030`; the new XDL scope is not merged
+or independently accepted yet.
+
 ## Initial SiLA 2 software integration on the main baseline
 
 The owner explicitly approved merging PR #1 on November 8. The initial fake/local
