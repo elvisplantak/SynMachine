@@ -78,6 +78,14 @@ or extend acceptance to other commits/scopes. See `backend/docs/XDL2.md`.
 Full XDL, main merge, live/production activation and physical/state/firmware work
 remain outside this acceptance.
 
+Merge preparation is published as
+[PR #2](https://github.com/elvisplantak/SynMachine/pull/2) from
+`feature/xdl2-recipe-interop` to unchanged main `d882030`. The source descends
+directly from that main base, without commissioning changes; executable files
+still match the accepted XDL checkpoint. The final candidate's hosted CI and
+mergeability are tracked on the PR, alongside the original local UI evidence.
+No merge or automatic merge is enabled; explicit owner approval remains required.
+
 ## Initial SiLA 2 software integration on the main baseline
 
 The owner explicitly approved merging PR #1 on November 8. The initial fake/local
