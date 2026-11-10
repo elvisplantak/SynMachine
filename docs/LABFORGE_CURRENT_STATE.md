@@ -1,9 +1,12 @@
 # SynMachine current development state
 
-- Checkpoint date: 2026-11-08
+- Checkpoint date: 2026-11-10
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Primary checkout: `/home/elvis/Documents/SynMachine`
-- Active main checkout: isolated worktree `/tmp/synmachine-sila2-main`.
+- Active feature: `feature/xdl2-recipe-interop`, isolated worktree
+  `/tmp/synmachine-xdl2`, based on published main `d882030`.
+- The previous `/tmp/synmachine-sila2-main` checkout expired; the original primary
+  checkout and its commissioning-derived source branch remain preserved.
 - Initial SiLA integration merged to `main` through PR #1 at
   `bc775fae6e08c5768566536b16055099e67af683`, from approved candidate `18af175`
   over prior main `49b5beb`. The primary checkout remains on its preserved
@@ -12,6 +15,76 @@
   `40d8a659c938fd3b14deb9b30f9fae24e427e9dc`.
 - Separate commissioning branch: `commissioning/full-stroke-wet-test` at
   `1ea4e7a3d98d193ab3c8132aa0ebddf75cd380a6`.
+
+## Initial XDL 2 recipe interchange — fake profiles only
+
+The owner approved XDL integration and requested the newer generation. Direct
+verification of the official public tag list found newest public release 2.1.0,
+commit `6d60e8da7218a589b9c8715a239956601b17cd07`, marked as the last before
+private development. That package still emits XML format version 2.0.0. The
+implemented independent interchange profile follows that public interface;
+the old 0.5 language and unknown later private versions are not claimed.
+
+Recipes now has inspect/import/export HTTP routes plus UI file selection,
+explicit reagent/bottle and vessel/role binding and a new-draft workflow. Liquid
+Add, supported Transfer and passive Wait map to existing RecipeDefinition steps.
+Unsupported steps/attributes are rejected; fixed-profile SF mixing, timed
+collection, mass/temperature control, parameters, loops and blueprints are not
+silently approximated. There is no new executor or XDL Start route. Save/review,
+fresh readiness, immutable recipe versions, progress, exact Stop, ownership and
+command journals remain on their existing paths.
+
+All new interchange routes and UI controls require an explicitly FAKE executor.
+XML limits, hardened defusedxml parsing, strict semantics and UTF-8 file checks
+are documented in `backend/docs/XDL2.md`. The upstream Chemputer SDK is not a
+runtime dependency; no upstream implementation/fixtures are vendored. The one
+new dependency is PSF-licensed defusedxml 0.7.1. HTTP/UI authorization is unchanged.
+
+The standalone `python -m tests.xdl_demo` completed import → explicit save/review/
+Start → progress/COMPLETED → export/reimport with a new separate fake bundle,
+closing its server and preserving evidence under
+`/tmp/synmachine-xdl-demo-20261110-kvDQsl` (temporary). A new independent C# SiLA
+scenario exercises an XDL-imported recipe through the same recipe library.
+Prior SiLA acceptances remain separate from this parser/UI boundary. No new main
+merge, live device access, wet-state repair, firmware or EEPROM action is authorized.
+
+Local verification on November 10: **2094 complete backend tests passed**, zero
+skipped, including **94 XDL cases** and **63 SiLA cases** (one new XDL-import →
+independent C# SiLA execution scenario). All **55 UI tests passed**, zero skipped,
+including four new browser cases. Backend Ruff 0.15.22, pip dependency/compilation,
+UI lint/TypeScript/Vite build, locked C# restore/Release build (zero warnings/
+errors), Actionlint 1.7.12 and whitespace checks passed. The exact CI report gate
+accepted the full report and rejected a report with XDL coverage removed.
+Existing execution/domain/protocol/SiLA implementations and the UI dependency
+lock are unchanged; the new boundary is recipe interchange and its UI/tests.
+
+Published implementation commit `6ac42df9c8aeddbb85f373a813541f3d7bc05e72` also
+passed hosted GitHub CI:
+[run 42812048926](https://github.com/elvisplantak/SynMachine/actions/runs/42812048926).
+All 2094 backend tests passed in 179.93 seconds; the report gate confirmed 94 XDL
+and 63 SiLA cases, zero failures/skips. Ruff, dependency checks, locked C# build
+(zero warnings/errors), report upload and cleanup succeeded. The hosted run took
+about four minutes. UI verification remains the separate local 55-test run.
+Later documentation-only commits record this evidence without changing the
+verified implementation. Main remains `d882030`; the new XDL scope is not merged.
+
+Independent review **accepted exact HEAD
+`ab7af954ce74ca2572122f9fda808c8465ea4bb1`** against base `d882030`, for the
+declared bounded FAKE/local XDL 2 recipe-interchange scope, with zero findings
+at every severity and no requested correction. The review verified the hosted
+CI evidence and retained the local UI evidence distinction. The following project
+instruction change and this acceptance record do not alter executable behavior
+or extend acceptance to other commits/scopes. See `backend/docs/XDL2.md`.
+Full XDL, main merge, live/production activation and physical/state/firmware work
+remain outside this acceptance.
+
+Merge preparation is published as
+[PR #2](https://github.com/elvisplantak/SynMachine/pull/2) from
+`feature/xdl2-recipe-interop` to unchanged main `d882030`. The source descends
+directly from that main base, without commissioning changes; executable files
+still match the accepted XDL checkpoint. The final candidate's hosted CI and
+mergeability are tracked on the PR, alongside the original local UI evidence.
+No merge or automatic merge is enabled; explicit owner approval remains required.
 
 ## Initial SiLA 2 software integration on the main baseline
 
@@ -86,7 +159,7 @@ Detailed commissioning/failure and prior software evidence remains in the
 Protected firmware recovery artifacts require exact action-specific authorization
 and were excluded from this worktree/review. The primary checkout retains the
 unrelated untracked commissioning observation file. No state repair, production
-exposure, XDL or physical test is included in this integration.
+exposure or physical test is included in these software integrations.
 
 ## Historical publication/migration record through 2026-10-20
 

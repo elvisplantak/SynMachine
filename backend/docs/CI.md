@@ -18,7 +18,7 @@ It does not deploy or connect to physical devices.
   Each job has a 15-minute timeout.
 
 Results are visible under
-[Actions → Backend and SiLA (fake devices)](https://github.com/elvisplantak/SynMachine/actions/workflows/backend.yml)
+[Actions → Backend, SiLA and XDL (fake devices)](https://github.com/elvisplantak/SynMachine/actions/workflows/backend.yml)
 and as checks on the tested commit. Existing runs can be rerun from Actions.
 `workflow_dispatch` is also declared, but GitHub requires the workflow to exist
 on the default branch before offering that manual trigger. Adding this workflow
@@ -35,7 +35,7 @@ to a feature branch does not merge it into main or configure required branch che
 3. Supply the built client and actual dotnet executable explicitly, then run
    `python -m pytest -q -ra` once for the entire backend. The SiLA cases are part
    of that suite; the focused subset is not run a second time in CI.
-4. Check the JUnit report: all three SiLA test modules must be represented, with
+4. Check the JUnit report: all three SiLA modules and `tests.test_xdl` must be represented, with
    no skipped or failed tests. Missing optional SDKs or a silently skipped
    independent-client fixture cannot produce a successful check.
 

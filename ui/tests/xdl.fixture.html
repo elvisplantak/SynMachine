@@ -1,0 +1,111 @@
+<!doctype html><html lang="en"><head><meta charset="UTF-8"><title>XDL fake API regression</title></head>
+<body><div id="root"></div><pre id="result">pending</pre><script type="module">
+import React from "react";
+import { createRoot } from "react-dom/client";
+import App from "/src/App.tsx";
+const scenario = new URL(location.href).searchParams.get("scenario");
+const calls = [];
+const profile = "synmachine-xdl2-linear-v1";
+const draft = { schema_version: 1, name: "Imported water", description: "Fake XDL",
+  sources: { B1: "B1", B2: "B2", S: "Water" },
+  steps: [{kind: "ADD", source: "S", volume_ml: "1"}, {kind: "WAIT", duration_seconds: "1"}] };
+const saved = { recipe_id: "old", revision: 1, content_digest: "a".repeat(64), definition: {...draft, name: "Old recipe"} };
+let recipes = ["xdl-reject", "xdl-encoding"].includes(scenario) ? [saved] : [];
+let exported = null;
+let selectedName = null;
+let run = null;
+const status = { configured: true, busy: false, executing: false, operation: null, error: null,
+  retained_owner_id: null, run_id: null, automatic_resume_allowed: false,
+  transport_mode: scenario === "xdl-live" ? "LIVE" : "FAKE", profile_id: "fixture" };
+const machine = { state: "READY", active_run_id: null, interrupted_run_id: null, interrupted_maintenance_id: null,
+  active_execution: null, active_maintenance: null };
+const preview = (d) => ({content_digest: "a".repeat(64), collection_readiness_status: "NOT_REQUIRED",
+  steps: d.steps.map((step,i)=>({step_number:i+1,phase:step.kind === "WAIT" ? "REACTION_HOLD" : "P1_TRANSFER_S_TO_REACTOR",step})),
+  configured_contents_ml:{REACTOR:"1",SF:"0",COLUMN:"0"},calibrations_checked:true,
+  collection_readiness_required:false,volumes_are_measured:false});
+const assert=(v,m)=>{if(!v)throw new Error(m);};
+window.fetch = async (url, options={}) => {
+  const path = new URL(url,location.href).pathname, method=options.method ?? "GET";
+  const data=options.body ? JSON.parse(options.body) : null;
+  calls.push({path,method,data});
+  let body, code=200;
+  if(method === "GET") {
+    if(path.endsWith('/execution')) body=status;
+    else if(path.endsWith('/machine')) body=machine;
+    else if(path.endsWith('/events')) body=[];
+    else if(path.endsWith('/recipes')) body=recipes;
+    else if(path.includes('/runs/')) body=run;
+    else throw new Error(`Unexpected GET ${path}`);
+  } else if(path.endsWith('/xdl/inspect')) {
+    if(scenario === 'xdl-reject') {code=422;body={detail:'XDL step 1: operation HeatChill is unsupported'};}
+    else body={profile,format_version:'2.0.0',reference_release:'2.1.0',suggested_name:'Imported water',
+      reagents:['Water'],vessels:[{id:'r',type:'reactor'}],step_count:2};
+  } else if(path.endsWith('/xdl/import')) {
+    assert(data.reagents.S === 'Water' && data.vessels.REACTOR === 'r', 'Explicit XDL bindings missing');
+    assert(!('readiness' in data) && !('run_id' in data), 'Import fabricated execution consent');
+    body={definition:draft,preview:preview(draft)};
+  } else if(path.endsWith('/xdl/export')) {
+    assert(data.definition.name === 'Imported water', 'Export used stale recipe');
+    body={profile,content_digest:'a'.repeat(64),xml:'<?xdl version="2.0.0"?>\n<XDL><Synthesis/></XDL>\n'};
+  } else if(path.endsWith('/recipes/preview')) body=preview(data);
+  else if(path.endsWith('/execute')) {
+    assert(data.expected_revision === 1 && data.expected_content_digest === 'a'.repeat(64), 'Wrong reviewed recipe executed');
+    assert(data.readiness.evidence_note === 'Fresh fake statement' && data.readiness.sources_match_recipe === true, 'Missing explicit readiness');
+    run={run_id:data.run_id,status:'RUNNING',phase:'REACTION_HOLD',configuration:null,execution_settings:null,
+      recipe:recipes[0],recipe_step_index:1};
+    Object.assign(status,{busy:true,executing:true,run_id:data.run_id,operation:{operation_id:'xdl-op',action:'RUN',run_id:data.run_id}});
+    Object.assign(machine,{state:'BUSY',active_run_id:data.run_id,active_execution:{phase:'REACTION_HOLD',start_committed_at:new Date().toISOString()}});
+    body=status.operation;code=202;
+  } else if(path.endsWith('/recipes')) {
+    assert(data.expected_revision === 0, 'Import overwrote an existing recipe');
+    recipes=[{recipe_id:'new-xdl',revision:1,content_digest:'a'.repeat(64),definition:data.definition}];body=recipes[0];
+  } else throw new Error(`Unexpected POST ${path}`);
+  return new Response(JSON.stringify(body),{status:code});
+};
+const originalCreate = URL.createObjectURL.bind(URL);
+URL.createObjectURL = (blob) => {exported=blob;return originalCreate(blob);};
+HTMLAnchorElement.prototype.click = function(){selectedName=this.download;};
+const wait=async(condition)=>{const end=Date.now()+9000;while(!condition()){if(Date.now()>end)throw new Error(`Timeout: ${document.body.innerText}`);await new Promise(r=>setTimeout(r,40));}};
+const button=(name)=>[...document.querySelectorAll('button')].find(x=>x.textContent.trim()===name || x.textContent.startsWith(name));
+const click=async(name)=>{await wait(()=>button(name)&&!button(name).matches(':disabled'));button(name).click();await new Promise(r=>setTimeout(r,60));};
+const fill=(selector,value)=>{const e=document.querySelector(selector);assert(e,'Missing '+selector);const proto=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(e,value);e.dispatchEvent(new Event('input',{bubbles:true}));};
+const choose=(text,value)=>{const label=[...document.querySelectorAll('.uvpXdl label')].find(x=>x.textContent.startsWith(text));const e=label?.querySelector('select');assert(e,'Missing mapping '+text);e.value=value;e.dispatchEvent(new Event('change',{bubbles:true}));};
+const load=async()=>{const e=document.querySelector('.uvpXdl input[type=file]');const dt=new DataTransfer();dt.items.add(new File([scenario==='xdl-encoding'?new Uint8Array([255,254]):'<XDL/>'],'demo.xdl',{type:'application/xml'}));e.files=dt.files;e.dispatchEvent(new Event('change',{bubbles:true}));await new Promise(r=>setTimeout(r,80));};
+try {
+  createRoot(document.getElementById('root')).render(React.createElement(App));
+  await click('Recipes');await wait(()=>document.querySelector('.uvpXdl'));
+  document.querySelector('.uvpXdl').open=true;
+  await wait(()=>document.body.innerText.includes(scenario==='xdl-live'?'Real devices':'Test devices'));
+  if(scenario==='xdl-live') {
+    assert(document.querySelector('.uvpXdl input[type=file]').matches(':disabled'), 'Live XDL input enabled');
+    assert(button('Export draft as XDL').matches(':disabled'), 'Live XDL export enabled');
+    assert(!calls.some(c=>c.method==='POST'),'Live XDL sent requests');
+  } else if(['xdl-reject','xdl-encoding'].includes(scenario)) {
+    await click('Old recipe');await click('Review procedure');await wait(()=>document.querySelector('.uvpReview'));
+    fill('.uvpReview label input','Operator');fill('.uvpReview textarea','Old readiness');
+    for(const e of document.querySelectorAll('.uvpReview input[type=checkbox]'))e.click();
+    await load();await wait(()=>document.body.innerText.includes(scenario==='xdl-encoding'?'valid UTF-8 XML':'HeatChill is unsupported'));
+    assert(!document.querySelector('.uvpReview'),'Failed import retained old execution consent');
+    assert(document.querySelector('.uvpEditor input').value === 'Old recipe','Failed import replaced draft');
+    assert(!calls.some(c=>c.path.endsWith('/execute')||c.path.endsWith('/xdl/import')||c.path.endsWith('/recipes')&&c.method==='POST'),'Failed import saved or executed');
+    if(scenario==='xdl-encoding') assert(!calls.some(c=>c.path.endsWith('/xdl/inspect')),'Invalid UTF-8 was uploaded');
+  } else {
+    await load();await wait(()=>button('Import as new draft'));
+    choose('XDL reagent for S','Water');choose('XDL vessel for REACTOR','r');
+    await click('Import as new draft');await wait(()=>document.querySelectorAll('.uvpStep').length===2);
+    assert(document.querySelector('.uvpEditor input').value==='Imported water','Draft missing');
+    assert(button('Review procedure').disabled,'Unsaved import enabled review');
+    assert(!calls.some(c=>c.path.endsWith('/execute')||c.path.endsWith('/recipes')&&c.method==='POST'),'Import saved or executed automatically');
+    await click('Export draft as XDL');await wait(()=>exported);
+    assert((await exported.text()).startsWith('<?xdl version="2.0.0"?>'),'Wrong XDL download');
+    assert(selectedName==='synmachine-recipe.xdl','Missing XDL filename');
+    await click('Save recipe');await click('Review procedure');await wait(()=>document.querySelector('.uvpReview'));
+    assert(button('Start reviewed procedure').disabled,'Imported recipe started without fresh readiness');
+    fill('.uvpReview label input','Operator');fill('.uvpReview textarea','Fresh fake statement');
+    for(const e of document.querySelectorAll('.uvpReview input[type=checkbox]'))e.click();
+    await click('Start reviewed procedure');
+    assert(calls.filter(c=>c.path.endsWith('/execute')).length===1,'Explicit Start count differs from one');
+  }
+  document.getElementById('result').textContent=`PASS:${scenario}`;
+}catch(e){document.getElementById('result').textContent=`FAIL:${e.stack??e}`;}
+</script></body></html>

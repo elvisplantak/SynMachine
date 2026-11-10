@@ -34,6 +34,10 @@ after(async () => {
 });
 
 const scenarios = {
+  "xdl-roundtrip": "XDL import uses explicit bindings and a new draft before save review and explicit Start; export downloads XML",
+  "xdl-reject": "rejected XDL preserves the draft and clears old readiness without saving or executing",
+  "xdl-encoding": "invalid UTF-8 XDL is rejected before upload and clears old execution readiness",
+  "xdl-live": "XDL interchange remains disabled for a live execution profile",
   "uvp-live-profile": "Recipes identify real/test transports and unavailable maintenance without automatic execution",
   "flow-demo": "Guided Demo animates only each current atomic route with correct direction and no navigation commands",
   "flow-recipes": "Recipes share the real schematic and current atomic route animation without replay",
@@ -69,7 +73,7 @@ for (const [scenario, title] of Object.entries(scenarios)) {
         "--disable-background-networking", "--no-first-run", "--no-default-browser-check",
         `--window-size=${scenario === "uvp-layout-narrow" ? "480,900" : "2560,1440"}`,
         `--user-data-dir=${profile}`, "--dump-dom", "--virtual-time-budget=20000",
-        `${base}tests/${scenario.startsWith("flow-") ? "execution-flow" : scenario.startsWith("uvp-") ? "uvp" : "connected-execution"}.fixture.html?scenario=${scenario}`,
+        `${base}tests/${scenario.startsWith("xdl-") ? "xdl" : scenario.startsWith("flow-") ? "execution-flow" : scenario.startsWith("uvp-") ? "uvp" : "connected-execution"}.fixture.html?scenario=${scenario}`,
       ], { timeout: 40000, maxBuffer: 2 * 1024 * 1024 });
       const result = stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1];
       assert.equal(result, `PASS:${scenario}`, result ?? "Browser did not run the UI regression fixture");

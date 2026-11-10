@@ -21,6 +21,7 @@ from app.demo.models import DemoConfiguration, DemoExecutionSettings
 from app.demo.run_models import DemoRun
 from app.recipes.models import RecipeDefinition, RecipeReadiness
 from app.recipes.planning import preview_recipe
+from app.recipes.xdl import XdlError, XdlExportRequest, XdlImportRequest, XdlRequest, export_xdl, import_xdl, inspect_xdl
 from app.recipes.store import RecipeStore, RecipeConflict
 from app.demo.events import DomainEvent
 from app.demo.machine_events import MachineEvent
@@ -344,6 +345,37 @@ def create_app(
     @application.post(f"{API_PREFIX}/recipes/preview")
     def preview_recipe_request(definition: RecipeDefinition):
         return preview_uvp(definition)
+
+    def require_fake_xdl():
+        if application_execution is None or application_execution.status().transport_mode != "FAKE":
+            raise HTTPException(status_code=503, detail="XDL interchange requires an explicitly FAKE execution profile")
+
+    @application.post(f"{API_PREFIX}/recipes/xdl/inspect")
+    def inspect_xdl_request(command: XdlRequest):
+        require_fake_xdl()
+        try:
+            return inspect_xdl(command.xml)
+        except XdlError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
+    @application.post(f"{API_PREFIX}/recipes/xdl/import")
+    def import_xdl_request(command: XdlImportRequest):
+        require_fake_xdl()
+        try:
+            definition = import_xdl(command)
+            return {"definition": definition, "preview": preview_uvp(definition)}
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
+    @application.post(f"{API_PREFIX}/recipes/xdl/export")
+    def export_xdl_request(command: XdlExportRequest):
+        require_fake_xdl()
+        try:
+            result = export_xdl(command.definition)
+            preview_uvp(command.definition)
+            return result
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
 
     @application.post(f"{API_PREFIX}/recipes")
     def create_recipe(command: SaveRecipeRequest):

@@ -1,4 +1,4 @@
-name: Backend and SiLA (fake devices)
+name: Backend, SiLA and XDL (fake devices)
 
 on:
   push:
@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   backend:
-    name: Backend, SiLA and independent C# client
+    name: Backend, XDL, SiLA and independent C# client
     # Same-repository PR commits already receive the push check; test forks on PR.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-24.04
@@ -91,7 +91,7 @@ jobs:
           python -m pytest -q -ra --junitxml="$RUNNER_TEMP/backend-tests.xml" \
             -o junit_logging=no -o junit_log_passing_tests=false
 
-      - name: Require complete SiLA coverage without skipped tests
+      - name: Require complete SiLA and XDL coverage without skipped tests
         if: always() && !cancelled() && steps.tests.outcome != 'skipped'
         run: |
           python - <<'PY'
@@ -101,17 +101,19 @@ jobs:
 
           report = Path(os.environ['RUNNER_TEMP']) / 'backend-tests.xml'
           cases = ET.parse(report).getroot().findall('.//testcase')
-          required = {'tests.test_sila2', 'tests.test_sila2_access', 'tests.test_sila2_external_client'}
+          sila_modules = {'tests.test_sila2', 'tests.test_sila2_access', 'tests.test_sila2_external_client'}
+          required = sila_modules | {'tests.test_xdl'}
           present = {case.get('classname') for case in cases}
           skipped = sum(case.find('skipped') is not None for case in cases)
           failed = sum(case.find('failure') is not None or case.find('error') is not None for case in cases)
-          sila = sum(case.get('classname') in required for case in cases)
-          summary = f'Backend: {len(cases)} cases; SiLA: {sila}; failed: {failed}; skipped: {skipped}.\n'
+          sila = sum(case.get('classname') in sila_modules for case in cases)
+          xdl = sum(case.get('classname') == 'tests.test_xdl' for case in cases)
+          summary = f'Backend: {len(cases)} cases; SiLA: {sila}; XDL: {xdl}; failed: {failed}; skipped: {skipped}.\n'
           print(summary, end='')
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
               stream.write(summary)
           if not cases or required - present or skipped or failed:
-              raise SystemExit('Incomplete or failed backend/SiLA verification; inspect the test report.')
+              raise SystemExit('Incomplete or failed backend/SiLA/XDL verification; inspect the test report.')
           PY
 
       - name: Retain test report
