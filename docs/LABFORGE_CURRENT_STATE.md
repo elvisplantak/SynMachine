@@ -3,21 +3,21 @@
 - Checkpoint date: 2026-11-10
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Local checkout: `/home/elvis/Documents/SynMachine`
-- Published main: `d8820309971e50ccbbe12ca412252e3609369b84`, after owner-approved
-  PR #1 merge `bc775fa`; the earlier `/tmp/synmachine-sila2-main` checkout expired.
+- Published main includes XDL PR #2 merge `e0fd9590f711b924e42b94ba812c17f158138038`,
+  after explicit approval; the earlier `/tmp/synmachine-sila2-main` checkout expired.
 - Primary checkout remains on `feature/sila2-ci`; commissioning is separate.
 - Handoff branch: `docs/sila2-session-handoff` (documentation only)
 - This preserved checkout's execution-code baseline: `commissioning/full-stroke-wet-test` at
   `1ea4e7a3d98d193ab3c8132aa0ebddf75cd380a6`.
-- Latest public main: `d8820309971e50ccbbe12ca412252e3609369b84`.
+- Latest implementation on public main: `e0fd9590f711b924e42b94ba812c17f158138038`.
   The owner-approved October 28 UI screenshot, demo MP4 and README links are
   published there. The commissioning code is on its separate pushed branch;
   these branches must not be treated as identical or merged implicitly.
 
-## Active XDL phase — separate main-based feature
+## Initial XDL software integration completed on main
 
 The owner approved newer-generation XDL software integration on November 10.
-Work is isolated on published branch `feature/xdl2-recipe-interop`, worktree
+Development is preserved on published branch `feature/xdl2-recipe-interop`, worktree
 `/tmp/synmachine-xdl2`, based on published main
 `d8820309971e50ccbbe12ca412252e3609369b84`. Implementation commit:
 `6ac42df9c8aeddbb85f373a813541f3d7bc05e72`. This primary checkout deliberately
@@ -49,15 +49,30 @@ declared bounded FAKE/local recipe-interchange scope, with zero findings and no
 requested correction. The detailed record is on the XDL branch in
 `backend/docs/XDL2.md`. Later instruction/documentation changes do not alter the
 verified implementation or broaden the exact-commit acceptance. Prior SiLA
-acceptances remain separate. No XDL main merge, production/live activation,
-wet-state repair, firmware, EEPROM or physical action is authorized. This
+acceptances remain separate. The initial XDL main merge was separately approved;
+production/live activation, wet-state repair, firmware, EEPROM and physical actions
+remain outside that approval. This
 checkout's unrelated untracked commissioning observation remains preserved.
 
-Merge preparation is now available as
-[PR #2](https://github.com/elvisplantak/SynMachine/pull/2), targeting unchanged
-main `d882030` from `feature/xdl2-recipe-interop`. The PR records the candidate's
-hosted verification and mergeability; executable behavior matches the accepted
-XDL checkpoint. No merge/automatic merge is enabled; explicit approval is pending.
+After explicit approval, [PR #2](https://github.com/elvisplantak/SynMachine/pull/2)
+was merged as `e0fd959` from exact candidate `29a4674` over prior main `d882030`.
+The merge tree exactly matches the approved candidate; both merge identities are
+Elvis with the GitHub noreply address. Exact candidate
+[CI 42818100137](https://github.com/elvisplantak/SynMachine/actions/runs/42818100137)
+passed 2094 tests in 174.69 seconds, with 94 XDL and 63 SiLA cases, zero failures/
+skips and C# build zero warnings/errors. Main's published documentation closure
+`23fcf8e` is preserved on `docs/xdl2-main-closure` in
+`/tmp/synmachine-xdl-main-docs`. Existing branches
+and this commissioning-derived checkout remain preserved; read main's canonical
+documents before new development.
+
+Automatic post-merge main
+[CI 42819905886](https://github.com/elvisplantak/SynMachine/actions/runs/42819905886)
+also passed on exact merge `e0fd959`: 2094 backend tests in 175.96 seconds,
+94 XDL and 63 SiLA cases, zero failures/skips; Ruff/dependency/report checks and
+C# build passed with zero warnings/errors. The following closure updates only
+documentation. Initial FAKE/local XDL and SiLA are now published on main;
+physical/live, wet-state and firmware work remain deferred.
 
 ## Main integration completed — 2026-11-08
 
