@@ -3,24 +3,25 @@
 - Checkpoint date: 2026-11-12
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Local checkout: `/home/elvis/Documents/SynMachine`
-- Published main includes XDL PR #2 merge `e0fd9590f711b924e42b94ba812c17f158138038`,
-  after explicit approval; the earlier `/tmp/synmachine-sila2-main` checkout expired.
+- Published main includes UI PR #3 merge `2d0fda2f201e8b90ea2b5ca07414586f33e28271`
+  and XDL PR #2 merge `e0fd959`; both were explicitly approved. The earlier
+  `/tmp/synmachine-sila2-main` checkout expired.
 - Primary checkout remains on `feature/sila2-ci`; commissioning is separate.
 - Handoff branch: `docs/sila2-session-handoff` (documentation only)
 - This preserved checkout's execution-code baseline: `commissioning/full-stroke-wet-test` at
   `1ea4e7a3d98d193ab3c8132aa0ebddf75cd380a6`.
-- Latest implementation on public main: `e0fd9590f711b924e42b94ba812c17f158138038`.
+- Latest integration on public main: `2d0fda2f201e8b90ea2b5ca07414586f33e28271`.
   The owner-approved October 28 UI screenshot, demo MP4 and README links are
   published there. The commissioning code is on its separate pushed branch;
   these branches must not be treated as identical or merged implicitly.
 
-## Active UI verification automation
+## UI verification automation completed on main
 
-UI automation is isolated on `feature/ui-ci` in `/tmp/synmachine-ui-ci`, based on
+UI automation is preserved on `feature/ui-ci` in `/tmp/synmachine-ui-ci`, based on
 published main `23fcf8ec9622771c7ab95ee53b9841a80677888b`; implementation
 `fb4387ad4890380b943803fc514db5520c1a82c4`.
-[PR #3](https://github.com/elvisplantak/SynMachine/pull/3) prepares the change for
-separate main-merge approval. The previous XDL temporary worktrees expired;
+[PR #3](https://github.com/elvisplantak/SynMachine/pull/3) was merged after separate
+explicit approval. The previous XDL temporary worktrees expired;
 their branches and this commissioning-derived checkout remain preserved.
 
 The UI-only hosted workflow runs existing lint/build and all 55 test cases,
@@ -34,9 +35,24 @@ continuing. Hosted
 [run 43212406428](https://github.com/elvisplantak/SynMachine/actions/runs/43212406428)
 passed on exact implementation `fb4387a`: 55 tests in 59.48 seconds, 28 browser
 cases, zero failures/skips, lint/build/report/upload/cache steps successful.
-The later feature documentation record does not change the workflow; the final
-candidate check is on PR #3. Main remains `23fcf8e`. No new main merge or
-physical/live/state/firmware work is authorized.
+Exact candidate `01e16ae` also passed
+[CI 43212831618](https://github.com/elvisplantak/SynMachine/actions/runs/43212831618):
+55 tests in 50.57 seconds, 28 browser cases, zero failures/skips and successful
+lint/build/report/upload/cache steps. PR #3 was merged as `2d0fda2` over main
+`23fcf8e`; its root tree equals the candidate, with both merge identities set to
+Elvis and the configured GitHub noreply address. Main documentation closure
+`5bd043b` is published and preserved on `docs/ui-ci-main-closure` in
+`/tmp/synmachine-ui-ci-main-docs`.
+Branches and unrelated local work remain preserved. No application/test/dependency/
+backend behavior changes or physical/live/state/firmware actions are included.
+
+Automatic post-merge main UI
+[CI 43222449682](https://github.com/elvisplantak/SynMachine/actions/runs/43222449682)
+also passed on exact merge `2d0fda2`: 55 tests in 51.55 seconds, 28 browser cases,
+zero failures/skips, lint/build/report/upload/cache successful. The complete
+hosted run took about 75 seconds. The following closure is documentation-only;
+both backend and UI verification are now published on main. Prior acceptance and
+physical/live/state/firmware boundaries remain unchanged.
 
 ## Initial XDL software integration completed on main
 
