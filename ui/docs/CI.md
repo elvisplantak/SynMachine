@@ -72,6 +72,21 @@ Hosted [run 43212406428](https://github.com/elvisplantak/SynMachine/actions/runs
 passed on implementation `fb4387ad4890380b943803fc514db5520c1a82c4` for
 [PR #3](https://github.com/elvisplantak/SynMachine/pull/3): 55 tests in 59.48 seconds,
 28 browser cases, zero failures/skips, Node 24.18.0/Chrome 156.0.8078.79.
-Lint/build, report verification/upload and cache cleanup passed. The latest
-candidate's check is tracked on that PR; later documentation-only records do not
-change the verified workflow or application/test code. Main merge remains pending.
+Lint/build, report verification/upload and cache cleanup passed. Exact approved
+candidate `01e16aedc6fad04400336f0a6b925b311170c858` also passed
+[CI 43212831618](https://github.com/elvisplantak/SynMachine/actions/runs/43212831618):
+55 tests in 50.57 seconds, 28 browser cases, zero failures/skips and successful
+lint/build/report/upload/cache steps. Later documentation-only records do not
+change the verified workflow or application/test code.
+
+PR #3 was merged after explicit approval on November 12 as
+`2d0fda2f201e8b90ea2b5ca07414586f33e28271`, with parents prior main
+`23fcf8ec9622771c7ab95ee53b9841a80677888b` and candidate `01e16ae`.
+The merge tree exactly matches the approved candidate. The source/commissioning
+branches are preserved; UI verification is now on main alongside backend CI.
+
+Automatic post-merge [main run 43222449682](https://github.com/elvisplantak/SynMachine/actions/runs/43222449682)
+also passed on exact merge `2d0fda2`: 55 tests in 51.55 seconds, including 28 browser
+cases, zero failures/skips. Lint/build, report verification/upload and cache
+cleanup passed; total hosted run time was about 75 seconds. This subsequent
+documentation-only closure leaves the verified workflow and application unchanged.

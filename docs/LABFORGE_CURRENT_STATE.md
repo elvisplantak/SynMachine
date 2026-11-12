@@ -3,8 +3,12 @@
 - Checkpoint date: 2026-11-12
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Primary checkout: `/home/elvis/Documents/SynMachine`
-- Active feature: `feature/ui-ci`, worktree `/tmp/synmachine-ui-ci`, based on
-  published main `23fcf8ec9622771c7ab95ee53b9841a80677888b`.
+- Published main includes UI verification through PR #3 merge
+  `2d0fda2f201e8b90ea2b5ca07414586f33e28271`, from approved candidate
+  `01e16aedc6fad04400336f0a6b925b311170c858` over main `23fcf8e`.
+- Preserved UI feature: `feature/ui-ci`, worktree `/tmp/synmachine-ui-ci`.
+  Main documentation closure is on `docs/ui-ci-main-closure` in
+  `/tmp/synmachine-ui-ci-main-docs`.
 - Published main includes the initial XDL integration through PR #2 at
   `e0fd9590f711b924e42b94ba812c17f158138038`, from approved candidate
   `29a4674a48da91c361e8f11e1da2dd0591f7a1af` over main `d882030`.
@@ -43,7 +47,7 @@ browser cases**, zero failures/skips, in 15.06 seconds. UI lint/build and Action
 failed, errored, missing-browser-module, empty, missing and malformed reports.
 Application/test code, dependencies/lockfile and existing backend CI are unchanged.
 Hosted evidence is tracked on the feature branch's Actions runs and pull request;
-main merge requires separate approval. Prior SiLA/XDL acceptances retain their
+the main merge was separately approved. Prior SiLA/XDL acceptances retain their
 exact scopes, and deferred physical/wet-state work remains deferred.
 
 Hosted [PR #3](https://github.com/elvisplantak/SynMachine/pull/3) verification also
@@ -52,8 +56,25 @@ passed on exact implementation `fb4387ad4890380b943803fc514db5520c1a82c4`:
 All 55 tests passed in 59.48 seconds; the report gate confirmed 28 browser cases
 and zero failures/skips. Hosted Node 24.18.0 and Chrome 156.0.8078.79 completed
 lint/build, report upload and cache cleanup successfully. The full job took
-under two minutes. Later documentation-only records retain that workflow/code;
-the final candidate's check is tracked on PR #3. Main is unchanged at `23fcf8e`.
+under two minutes. Later documentation-only records retain that workflow/code.
+
+Exact approved candidate `01e16ae` passed
+[CI 43212831618](https://github.com/elvisplantak/SynMachine/actions/runs/43212831618):
+55 tests in 50.57 seconds, 28 browser cases, zero failures/skips, with successful
+lint/build/report/upload/cache steps. After explicit approval, PR #3 was merged
+on November 12 as `2d0fda2f201e8b90ea2b5ca07414586f33e28271`. The merge parents
+are prior main `23fcf8e` and candidate `01e16ae`; the root tree exactly matches
+the candidate. Both merge identities are Elvis with the configured GitHub noreply
+address. All development/commissioning branches and unrelated local work remain
+preserved. No application/test/dependency/backend/hardware behavior changes.
+
+Automatic post-merge **main UI CI also passed** on exact merge `2d0fda2`:
+[run 43222449682](https://github.com/elvisplantak/SynMachine/actions/runs/43222449682).
+All 55 tests passed in 51.55 seconds; the gate confirmed 28 browser cases and
+zero failures/skips. Lint/build, report upload and cache cleanup passed; the
+hosted run took about 75 seconds. This later closure updates documentation only;
+whitespace/status checks passed. Backend and UI checks are now both automated
+on main, with application behavior and prior review/physical boundaries unchanged.
 
 ## Initial XDL 2 recipe interchange — fake profiles only
 

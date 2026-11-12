@@ -115,3 +115,9 @@ gate requires all current test modules, at least 55 cases including 28 browser
 cases, and no skipped/failed cases. See `ui/docs/CI.md` for execution, triggers,
 retention and limitations. Application behavior and prior execution-review scopes
 are unchanged; this feature adds no deployment, device access or physical authority.
+
+PR #3 was separately approved and merged into main on November 12 as
+`2d0fda2f201e8b90ea2b5ca07414586f33e28271`, from exact candidate `01e16ae`
+over main `23fcf8e`, preserving the candidate tree and development branches.
+Both UI and backend verification are now automated. Prior independent acceptance
+scopes and the deferred physical/live/wet-state boundaries remain unchanged.
