@@ -1,14 +1,16 @@
 # SynMachine current development state
 
-- Checkpoint date: 2026-11-10
+- Checkpoint date: 2026-11-12
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Primary checkout: `/home/elvis/Documents/SynMachine`
+- Active feature: `feature/ui-ci`, worktree `/tmp/synmachine-ui-ci`, based on
+  published main `23fcf8ec9622771c7ab95ee53b9841a80677888b`.
 - Published main includes the initial XDL integration through PR #2 at
   `e0fd9590f711b924e42b94ba812c17f158138038`, from approved candidate
   `29a4674a48da91c361e8f11e1da2dd0591f7a1af` over main `d882030`.
-- Preserved XDL feature: `feature/xdl2-recipe-interop`, worktree
-  `/tmp/synmachine-xdl2`. Main documentation closure is isolated on
-  `docs/xdl2-main-closure` in `/tmp/synmachine-xdl-main-docs`.
+- Preserved XDL feature: `feature/xdl2-recipe-interop`; published main closure
+  `23fcf8e` is retained on `docs/xdl2-main-closure`. Their earlier temporary
+  worktrees expired by November 12; the branches remain preserved.
 - The previous `/tmp/synmachine-sila2-main` checkout expired; the original primary
   checkout and its commissioning-derived source branch remain preserved.
 - Initial SiLA integration merged to `main` through PR #1 at
@@ -19,6 +21,39 @@
   `40d8a659c938fd3b14deb9b30f9fae24e427e9dc`.
 - Separate commissioning branch: `commissioning/full-stroke-wet-test` at
   `1ea4e7a3d98d193ab3c8132aa0ebddf75cd380a6`.
+
+## UI GitHub verification — fake API only
+
+`.github/workflows/ui.yml` automates existing UI lint, TypeScript/Vite build and
+Node API/browser regressions on hosted Ubuntu 24.04 with pinned Node.js 24.18.0.
+Action commits are pinned, checkout is sparse/read-only, and npm uses the existing
+lockfile/cache. UI code/fixture/configuration and workflow changes trigger push/
+PR checks. Same-source branch concurrency supersedes an older running check;
+forks have separate groups. See `ui/docs/CI.md` for triggers and report limits.
+
+Hosted verification requires installed Chrome, all four test modules, at least
+55 cases including 28 browser cases, and zero failures/skips. Native JUnit output
+is retained for seven days; missing/malformed reports also fail. Local `npm test`
+behavior is unchanged. Fixtures intercept API requests and block fallthrough;
+there is no backend/device connection, deployment or physical execution.
+
+Local verification on November 12 passed all **55 UI tests**, including **28
+browser cases**, zero failures/skips, in 15.06 seconds. UI lint/build and Actionlint
+1.7.12 passed. The exact report gate accepted that report and rejected skipped,
+failed, errored, missing-browser-module, empty, missing and malformed reports.
+Application/test code, dependencies/lockfile and existing backend CI are unchanged.
+Hosted evidence is tracked on the feature branch's Actions runs and pull request;
+main merge requires separate approval. Prior SiLA/XDL acceptances retain their
+exact scopes, and deferred physical/wet-state work remains deferred.
+
+Hosted [PR #3](https://github.com/elvisplantak/SynMachine/pull/3) verification also
+passed on exact implementation `fb4387ad4890380b943803fc514db5520c1a82c4`:
+[run 43212406428](https://github.com/elvisplantak/SynMachine/actions/runs/43212406428).
+All 55 tests passed in 59.48 seconds; the report gate confirmed 28 browser cases
+and zero failures/skips. Hosted Node 24.18.0 and Chrome 156.0.8078.79 completed
+lint/build, report upload and cache cleanup successfully. The full job took
+under two minutes. Later documentation-only records retain that workflow/code;
+the final candidate's check is tracked on PR #3. Main is unchanged at `23fcf8e`.
 
 ## Initial XDL 2 recipe interchange — fake profiles only
 

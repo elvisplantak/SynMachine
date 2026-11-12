@@ -6,6 +6,11 @@ Browser cases require Chrome/Chromium. The default executable is
 path if needed. If no executable is present, browser cases are explicitly skipped;
 passing API tests alone does not claim browser coverage.
 
+[GitHub UI verification](../docs/CI.md) additionally requires all four test modules,
+at least 55 cases (28 browser) and zero skipped/failed tests. It runs lint/build
+and retains a JUnit report. A missing hosted browser is a failure. The ordinary
+local command is unchanged.
+
 The browser runner starts an isolated localhost Vite test server and headless
 browser profiles with temporary caches. The fixture intercepts every application
 fetch with an in-memory fake API. A server middleware also blocks API fallthrough,

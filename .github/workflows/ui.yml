@@ -1,0 +1,108 @@
+name: UI (fake API)
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'ui/**'
+      - '!ui/**/*.md'
+      - '.github/workflows/ui.yml'
+  pull_request:
+    paths:
+      - 'ui/**'
+      - '!ui/**/*.md'
+      - '.github/workflows/ui.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  ui:
+    name: UI lint, build and browser tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+        working-directory: ui
+    env:
+      CI: 'true'
+      LABFORGE_TEST_BROWSER: /usr/bin/google-chrome
+
+    steps:
+      - name: Check out UI and workflow only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            ui
+            .github
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '24.18.0'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Require installed browser and show tool versions
+        run: |
+          node --version
+          npm --version
+          test -x "$LABFORGE_TEST_BROWSER"
+          "$LABFORGE_TEST_BROWSER" --version
+
+      - name: Install locked UI dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Check UI lint
+        run: npm run lint
+
+      - name: Build UI
+        run: npm run build
+
+      - name: Run complete UI suite with fake API
+        id: tests
+        run: |
+          node --test --test-isolation=none \
+            --test-reporter=spec --test-reporter-destination=stdout \
+            --test-reporter=junit --test-reporter-destination="$RUNNER_TEMP/ui-tests.xml" \
+            tests/*.test.mjs
+
+      - name: Require complete UI tests without skips
+        if: always() && !cancelled() && steps.tests.outcome != 'skipped'
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          report = Path(os.environ['RUNNER_TEMP']) / 'ui-tests.xml'
+          cases = ET.parse(report).getroot().findall('.//testcase')
+          required = {'connected-execution.test.mjs', 'execution-flow.test.mjs',
+                      'guided-demo-api.test.mjs', 'recipe-api.test.mjs'}
+          present = {Path(case.get('file', '')).name for case in cases}
+          browser = sum(Path(case.get('file', '')).name == 'connected-execution.test.mjs' for case in cases)
+          skipped = sum(case.find('skipped') is not None for case in cases)
+          failed = sum(case.find('failure') is not None or case.find('error') is not None for case in cases)
+          summary = f'UI: {len(cases)} cases; browser: {browser}; failed: {failed}; skipped: {skipped}.\n'
+          print(summary, end='')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
+              stream.write(summary)
+          if required - present or len(cases) < 55 or browser < 28 or skipped or failed:
+              raise SystemExit('Incomplete or failed UI verification; require all modules, 55 cases, 28 browser cases and zero failures/skips.')
+          PY
+
+      - name: Retain UI test report
+        if: always() && !cancelled() && steps.tests.outcome != 'skipped'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ui-test-report
+          path: ${{ runner.temp }}/ui-tests.xml
+          retention-days: 7
+          if-no-files-found: ignore
