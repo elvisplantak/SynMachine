@@ -106,3 +106,12 @@ over prior main `d882030`, with the candidate tree preserved. The initial bounde
 fake-only XDL interchange is now on main alongside SiLA; commissioning remains
 separate. This software approval does not authorize full XDL, live/production
 activation, physical/wet testing, existing-state repair or firmware/EEPROM work.
+
+## UI verification automation — 2026-11-12
+
+The UI workflow automates the existing lint/build and fake API/browser suite,
+using a pinned Node.js version, locked dependencies and hosted Chrome. A report
+gate requires all current test modules, at least 55 cases including 28 browser
+cases, and no skipped/failed cases. See `ui/docs/CI.md` for execution, triggers,
+retention and limitations. Application behavior and prior execution-review scopes
+are unchanged; this feature adds no deployment, device access or physical authority.
