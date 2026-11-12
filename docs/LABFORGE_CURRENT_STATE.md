@@ -1,6 +1,6 @@
 # SynMachine current development state
 
-- Checkpoint date: 2026-11-10
+- Checkpoint date: 2026-11-12
 - Repository: `elvisplantak/SynMachine` (public consolidated repository)
 - Local checkout: `/home/elvis/Documents/SynMachine`
 - Published main includes XDL PR #2 merge `e0fd9590f711b924e42b94ba812c17f158138038`,
@@ -13,6 +13,30 @@
   The owner-approved October 28 UI screenshot, demo MP4 and README links are
   published there. The commissioning code is on its separate pushed branch;
   these branches must not be treated as identical or merged implicitly.
+
+## Active UI verification automation
+
+UI automation is isolated on `feature/ui-ci` in `/tmp/synmachine-ui-ci`, based on
+published main `23fcf8ec9622771c7ab95ee53b9841a80677888b`; implementation
+`fb4387ad4890380b943803fc514db5520c1a82c4`.
+[PR #3](https://github.com/elvisplantak/SynMachine/pull/3) prepares the change for
+separate main-merge approval. The previous XDL temporary worktrees expired;
+their branches and this commissioning-derived checkout remain preserved.
+
+The UI-only hosted workflow runs existing lint/build and all 55 test cases,
+including 28 fake browser cases. Its report gate requires all four modules and
+zero failures/skips; missing Chrome or missing/malformed reports fail. Local
+55-test verification (15.06 seconds), lint/build, Actionlint 1.7.12 and report-gate
+fault injection passed. Application/test code, dependencies/lockfile, backend CI
+and device behavior are unchanged. Hosted results and candidate status are
+tracked on PR #3; read its branch's `ui/docs/CI.md` and canonical state before
+continuing. Hosted
+[run 43212406428](https://github.com/elvisplantak/SynMachine/actions/runs/43212406428)
+passed on exact implementation `fb4387a`: 55 tests in 59.48 seconds, 28 browser
+cases, zero failures/skips, lint/build/report/upload/cache steps successful.
+The later feature documentation record does not change the workflow; the final
+candidate check is on PR #3. Main remains `23fcf8e`. No new main merge or
+physical/live/state/firmware work is authorized.
 
 ## Initial XDL software integration completed on main
 
