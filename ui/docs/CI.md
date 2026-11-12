@@ -60,3 +60,18 @@ This workflow automates the existing UI checks. Application code, test scenarios
 dependencies/lockfile, backend CI and hardware behavior are unchanged. The four
 previously recorded UI development-dependency audit alerts remain separate
 maintenance; this workflow does not claim an audit result or dependency update.
+
+## Verification record
+
+On November 12, 2026, local Node 24.18.0/Chrome 148 passed 55 tests (28 browser)
+in 15.06 seconds, zero failures/skips, plus lint/build and Actionlint 1.7.12.
+The exact report gate rejected skipped/failed/errored cases, missing browser-module
+coverage, and empty/missing/malformed reports.
+
+Hosted [run 43212406428](https://github.com/elvisplantak/SynMachine/actions/runs/43212406428)
+passed on implementation `fb4387ad4890380b943803fc514db5520c1a82c4` for
+[PR #3](https://github.com/elvisplantak/SynMachine/pull/3): 55 tests in 59.48 seconds,
+28 browser cases, zero failures/skips, Node 24.18.0/Chrome 156.0.8078.79.
+Lint/build, report verification/upload and cache cleanup passed. The latest
+candidate's check is tracked on that PR; later documentation-only records do not
+change the verified workflow or application/test code. Main merge remains pending.

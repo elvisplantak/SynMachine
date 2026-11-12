@@ -46,6 +46,15 @@ Hosted evidence is tracked on the feature branch's Actions runs and pull request
 main merge requires separate approval. Prior SiLA/XDL acceptances retain their
 exact scopes, and deferred physical/wet-state work remains deferred.
 
+Hosted [PR #3](https://github.com/elvisplantak/SynMachine/pull/3) verification also
+passed on exact implementation `fb4387ad4890380b943803fc514db5520c1a82c4`:
+[run 43212406428](https://github.com/elvisplantak/SynMachine/actions/runs/43212406428).
+All 55 tests passed in 59.48 seconds; the report gate confirmed 28 browser cases
+and zero failures/skips. Hosted Node 24.18.0 and Chrome 156.0.8078.79 completed
+lint/build, report upload and cache cleanup successfully. The full job took
+under two minutes. Later documentation-only records retain that workflow/code;
+the final candidate's check is tracked on PR #3. Main is unchanged at `23fcf8e`.
+
 ## Initial XDL 2 recipe interchange — fake profiles only
 
 The owner approved XDL integration and requested the newer generation. Direct
