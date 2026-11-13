@@ -18,5 +18,4 @@
   after executable changes and diff/whitespace/status checks for docs-only work.
 - Git identity for this project is Elvis with the owner's GitHub noreply address;
   never use example.com as a commit email. Do not alter global Git settings.
-- Use commit messages describing the change without Codex/AI generated-by
-  attribution or co-author trailers. Preserve existing historical review records.
+- Preserve existing historical review records.
